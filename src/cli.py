@@ -72,3 +72,5 @@ def print_summary(result: Dict[str, Any]):
 
     print(f"\nDocumentDOM JSON exported to: {result['dom_json_path']}")
     print(f"Quality Violations JSON exported to: {result['violations_json_path']}")
+    if result.get("html_viewer_path"):
+        print(f"Interactive HTML Web Viewer: {result['html_viewer_path']}")

@@ -13,7 +13,7 @@ from src.dom import DocumentDOM
 from src.parsers import DoclingParser
 from src.quality import detect_quality_violations, apply_text_skew_alignment
 from src.pipeline.decision_tree import DecisionTreeEngine, DEFAULT_TARGET_CONFIDENCE_THRESHOLD
-from src.visualization import PageVisualizer
+from src.visualization import PageVisualizer, generate_interactive_html
 
 
 def parse_document(pdf_path: str, language: str) -> DocumentDOM:
@@ -47,6 +47,14 @@ def render_visual_overlays(
         return []
     visualizer = PageVisualizer()
     return visualizer.render_overlay(pdf_path, dom, violations=violations, output_dir=output_dir)
+
+
+def export_interactive_html_viewer(
+    pdf_path: str, dom: DocumentDOM, decision: Dict[str, Any], violations: List[Dict[str, Any]], output_dir: str
+) -> str:
+    """Generates self-contained interactive HTML web viewer file."""
+    html_path = os.path.join(output_dir, "interactive_viewer.html")
+    return generate_interactive_html(pdf_path, dom, decision, violations, output_path=html_path)
 
 
 def export_pipeline_artifacts(
@@ -87,6 +95,7 @@ def run_pipeline(
     decision, violations = evaluate_quality_and_decision_tree(dom, target_threshold, language)
     rendered_images = render_visual_overlays(pdf_path, dom, violations, visualize, output_dir)
     dom_json_path, violations_json_path = export_pipeline_artifacts(dom, decision, violations, language, output_dir)
+    html_viewer_path = export_interactive_html_viewer(pdf_path, dom, decision, violations, output_dir)
 
     return {
         "dom": dom.to_dict(),
@@ -94,5 +103,6 @@ def run_pipeline(
         "violations": violations,
         "dom_json_path": dom_json_path,
         "violations_json_path": violations_json_path,
+        "html_viewer_path": html_viewer_path,
         "rendered_images": rendered_images
     }
