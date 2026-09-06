@@ -36,6 +36,7 @@ def main():
         pdf_path=args.input,
         target_threshold=args.target_threshold,
         language=args.language,
+        align_skew=not args.no_align_skew,
         visualize=not args.no_visuals,
         output_dir=args.output_dir
     )

@@ -6,7 +6,7 @@ Maps Docling structural items and bounding box coordinate origins into DocumentD
 """
 
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
 
@@ -28,6 +28,82 @@ LANG_CODE_MAP = {
 }
 
 
+def _extract_page_no_and_bbox(doc: Any, item: Any, prov_item: Any) -> Tuple[int, float, float, float, float]:
+    """Extracts page number and top-left origin normalized bounding box coordinates."""
+    page_no = getattr(prov_item, "page_no", 1)
+    x0, y0, x1, y1 = 0.0, 0.0, 0.0, 0.0
+
+    if not hasattr(prov_item, "bbox") or not prov_item.bbox:
+        return page_no, x0, y0, x1, y1
+
+    bbox = prov_item.bbox
+    page_height = 792.0
+    if hasattr(doc, "pages") and doc.pages:
+        if isinstance(doc.pages, dict) and page_no in doc.pages:
+            page_obj = doc.pages[page_no]
+            page_height = getattr(page_obj.size, "height", 792.0)
+        elif isinstance(doc.pages, list) and 0 <= page_no - 1 < len(doc.pages):
+            page_obj = doc.pages[page_no - 1]
+            page_height = getattr(page_obj.size, "height", 792.0)
+
+    if hasattr(bbox, "to_top_left_origin"):
+        try:
+            tl_bbox = bbox.to_top_left_origin(page_height)
+            x0, y0, x1, y1 = tl_bbox.l, tl_bbox.t, tl_bbox.r, tl_bbox.b
+        except Exception:
+            x0, y0, x1, y1 = _fallback_top_left_bbox(bbox, page_height)
+    else:
+        x0, y0, x1, y1 = _fallback_top_left_bbox(bbox, page_height)
+
+    if y0 > y1:
+        y0, y1 = y1, y0
+    if x0 > x1:
+        x0, x1 = x1, x0
+
+    return page_no, x0, y0, x1, y1
+
+
+def _fallback_top_left_bbox(bbox: Any, page_height: float) -> Tuple[float, float, float, float]:
+    """Calculates top-left origin coordinates from bottom-left origin fallback."""
+    if getattr(bbox, "coord_origin", None) and "BOTTOMLEFT" in str(bbox.coord_origin):
+        return (
+            getattr(bbox, "l", 0.0),
+            page_height - getattr(bbox, "t", 0.0),
+            getattr(bbox, "r", 0.0),
+            page_height - getattr(bbox, "b", 0.0)
+        )
+    return getattr(bbox, "l", 0.0), getattr(bbox, "t", 0.0), getattr(bbox, "r", 0.0), getattr(bbox, "b", 0.0)
+
+
+def _resolve_node_type(item: Any) -> str:
+    """Resolves cernodata DOM primitive type from docling item label."""
+    label = getattr(item, "label", "").lower() if hasattr(item, "label") else ""
+    if "header" in label or "footer" in label:
+        return "header_footer"
+    if "title" in label or "heading" in label or "section" in label:
+        return "heading"
+    if "table" in label:
+        return "table_grid"
+    if "picture" in label or "figure" in label:
+        return "figure"
+    return "paragraph"
+
+
+def _build_node_content(item: Any, node_type: str) -> Dict[str, Any]:
+    """Builds node content payload dictionary."""
+    raw_text = getattr(item, "text", str(item)).strip()
+    content_dict: Dict[str, Any] = {"raw_text": raw_text}
+
+    if node_type == "table_grid" and hasattr(item, "export_to_markdown"):
+        try:
+            content_dict["markdown_table"] = item.export_to_markdown()
+        except Exception:
+            pass
+        content_dict["cell_alignment_score"] = 0.96
+
+    return content_dict
+
+
 class DoclingParser:
     """
     Parses PDF documents using Docling layout parser and maps structural primitives into DocumentDOM.
@@ -44,9 +120,8 @@ class DoclingParser:
 
         if HAS_DOCLING and os.path.exists(pdf_path):
             return self._parse_with_docling(pdf_path, doc_id, source_filename)
-        else:
-            synthetic = SyntheticParser()
-            return synthetic.parse(doc_id, source_filename)
+        synthetic = SyntheticParser()
+        return synthetic.parse(doc_id, source_filename)
 
     def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:
         ocr_langs = LANG_CODE_MAP.get(self.language, [self.language])
@@ -76,77 +151,15 @@ class DoclingParser:
         for item, level in doc.iterate_items():
             page_no = 1
             x0, y0, x1, y1 = 0.0, 0.0, 0.0, 0.0
+            angle = 0.0
 
             if hasattr(item, "prov") and item.prov:
                 prov_item = item.prov[0]
-                page_no = getattr(prov_item, "page_no", 1)
+                page_no, x0, y0, x1, y1 = _extract_page_no_and_bbox(doc, item, prov_item)
+                angle = getattr(item, "angle", 0.0) or getattr(prov_item, "angle", 0.0)
 
-                if hasattr(prov_item, "bbox") and prov_item.bbox:
-                    bbox = prov_item.bbox
-                    page_height = 792.0
-                    if hasattr(doc, "pages") and doc.pages:
-                        if isinstance(doc.pages, dict) and page_no in doc.pages:
-                            page_obj = doc.pages[page_no]
-                            page_height = getattr(page_obj.size, "height", 792.0)
-                        elif isinstance(doc.pages, list) and 0 <= page_no - 1 < len(doc.pages):
-                            page_obj = doc.pages[page_no - 1]
-                            page_height = getattr(page_obj.size, "height", 792.0)
-
-                    if hasattr(bbox, "to_top_left_origin"):
-                        try:
-                            tl_bbox = bbox.to_top_left_origin(page_height)
-                            x0, y0, x1, y1 = tl_bbox.l, tl_bbox.t, tl_bbox.r, tl_bbox.b
-                        except Exception:
-                            if getattr(bbox, "coord_origin", None) and "BOTTOMLEFT" in str(bbox.coord_origin):
-                                x0 = getattr(bbox, "l", 0.0)
-                                y0 = page_height - getattr(bbox, "t", 0.0)
-                                x1 = getattr(bbox, "r", 0.0)
-                                y1 = page_height - getattr(bbox, "b", 0.0)
-                            else:
-                                x0 = getattr(bbox, "l", 0.0)
-                                y0 = getattr(bbox, "t", 0.0)
-                                x1 = getattr(bbox, "r", 0.0)
-                                y1 = getattr(bbox, "b", 0.0)
-                    else:
-                        if getattr(bbox, "coord_origin", None) and "BOTTOMLEFT" in str(bbox.coord_origin):
-                            x0 = getattr(bbox, "l", 0.0)
-                            y0 = page_height - getattr(bbox, "t", 0.0)
-                            x1 = getattr(bbox, "r", 0.0)
-                            y1 = page_height - getattr(bbox, "b", 0.0)
-                        else:
-                            x0 = getattr(bbox, "l", 0.0)
-                            y0 = getattr(bbox, "t", 0.0)
-                            x1 = getattr(bbox, "r", 0.0)
-                            y1 = getattr(bbox, "b", 0.0)
-
-                    if y0 > y1:
-                        y0, y1 = y1, y0
-                    if x0 > x1:
-                        x0, x1 = x1, x0
-
-            node_type = "paragraph"
-            label = getattr(item, "label", "").lower() if hasattr(item, "label") else ""
-
-            if "header" in label or "footer" in label:
-                node_type = "header_footer"
-            elif "title" in label or "heading" in label or "section" in label:
-                node_type = "heading"
-            elif "table" in label:
-                node_type = "table_grid"
-            elif "picture" in label or "figure" in label:
-                node_type = "figure"
-
-            raw_text = getattr(item, "text", str(item)).strip()
-            content_dict: Dict[str, Any] = {"raw_text": raw_text}
-
-            angle = getattr(item, "angle", 0.0) or getattr(prov_item, "angle", 0.0) if hasattr(item, "prov") and item.prov else 0.0
-
-            if node_type == "table_grid" and hasattr(item, "export_to_markdown"):
-                try:
-                    content_dict["markdown_table"] = item.export_to_markdown()
-                except Exception:
-                    pass
-                content_dict["cell_alignment_score"] = 0.96
+            node_type = _resolve_node_type(item)
+            content_dict = _build_node_content(item, node_type)
 
             dom_node = DOMNode(
                 node_id=f"node_p{page_no}_n{node_counter}",

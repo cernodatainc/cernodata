@@ -1,5 +1,5 @@
 {
-  "document_id": "doc_117946",
+  "document_id": "doc_577448",
   "source_filename": "Document 5.pdf",
   "total_pages": 1,
   "nodes": [
@@ -177,7 +177,8 @@
         "x0": 204.33,
         "y0": 786.67,
         "x1": 512.0,
-        "y1": 816.0
+        "y1": 816.0,
+        "angle": -1.15
       },
       "content": {
         "raw_text": "* Oplata zgodna z taryf\u0105 operatora. Infolinia czynna od poniedzialku do piqtku oc   )  ch h)"

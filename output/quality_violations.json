@@ -1,5 +1,5 @@
 {
-  "document_id": "doc_117946",
+  "document_id": "doc_577448",
   "source_filename": "Document 5.pdf",
   "language": "pl",
   "total_violations": 2,
@@ -17,7 +17,8 @@
         "x0": 204.33,
         "y0": 786.67,
         "x1": 512.0,
-        "y1": 816.0
+        "y1": 816.0,
+        "angle": -1.15
       }
     },
     {

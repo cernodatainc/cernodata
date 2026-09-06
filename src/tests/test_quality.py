@@ -1,16 +1,18 @@
 """
 src/tests/test_quality.py
 
-Unit tests for quality continuum, garbage metrics, language checks, and violation detection.
+Unit tests for quality continuum, garbage metrics, language checks, diacritic anomalies, and text skew detection.
 """
 
 import unittest
+import numpy as np
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.quality import (
     compute_garbage_ratio,
     compute_language_score,
     evaluate_page_confidence,
-    detect_quality_violations
+    detect_quality_violations,
+    detect_node_text_skew
 )
 
 
@@ -44,6 +46,12 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(v["detected_snippet"], "piqtku")
         self.assertEqual(v["suggested_correction"], "piątku")
         self.assertEqual(v["rule_type"], "ocr_character_substitution")
+
+    def test_detect_node_text_skew(self):
+        # Test on blank/empty array returns 0.0
+        blank_crop = np.ones((50, 200, 3), dtype=np.uint8) * 255
+        angle = detect_node_text_skew(blank_crop)
+        self.assertEqual(angle, 0.0)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="cernodata: Layout-Aware Ingestion, Quality Violations Reporter & Visual Overlay Renderer."
+        description="cernodata: Layout-Aware Ingestion, Text Skew Alignment & Visual Overlay Renderer."
     )
     parser.add_argument(
         "--input", "-i", type=str, default=os.path.join("src", "Document 5.pdf"),
@@ -26,6 +26,10 @@ def parse_args():
     parser.add_argument(
         "--language", "-l", type=str, default="en",
         help="Language hint code for OCR and quality verification (e.g. 'pl' for Polish, 'de' for German, 'en' for English)"
+    )
+    parser.add_argument(
+        "--no-align-skew", action="store_true",
+        help="Disable automatic local text alignment skew detection."
     )
     parser.add_argument(
         "--output-dir", "-o", type=str, default="output",
