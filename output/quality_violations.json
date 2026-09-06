@@ -1,0 +1,40 @@
+{
+  "document_id": "doc_618437",
+  "source_filename": "Document 5.pdf",
+  "language": "pl",
+  "total_violations": 2,
+  "violations": [
+    {
+      "violation_id": "viol_p1_v1",
+      "global_page_index": 1,
+      "node_id": "node_p1_n12",
+      "rule_type": "ocr_character_substitution",
+      "severity": "WARNING",
+      "detected_snippet": "piqtku",
+      "suggested_correction": "pi\u0105tku",
+      "description": "OCR 'q' character substitution anomaly detected ('piqtku' -> 'pi\u0105tku')",
+      "bounding_box": {
+        "x0": 204.33,
+        "y0": 786.67,
+        "x1": 512.0,
+        "y1": 816.0
+      }
+    },
+    {
+      "violation_id": "viol_p1_v2",
+      "global_page_index": 1,
+      "node_id": "node_p1_n13",
+      "rule_type": "ocr_character_substitution",
+      "severity": "WARNING",
+      "detected_snippet": "granicq",
+      "suggested_correction": "granic\u0105",
+      "description": "OCR 'q' character substitution anomaly detected ('granicq' -> 'granic\u0105')",
+      "bounding_box": {
+        "x0": 204.0,
+        "y0": 804.0,
+        "x1": 466.0,
+        "y1": 828.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "document_id": "doc_618437",
+  "source_filename": "Document 5.pdf",
+  "total_pages": 1,
+  "nodes": [
+    {
+      "node_id": "node_p1_n1",
+      "type": "figure",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 8.06,
+        "y0": 0.0,
+        "x1": 547.38,
+        "y1": 505.03
+      },
+      "content": {
+        "raw_text": "self_ref='#/pictures/0' parent=RefItem(cref='#/body') children=[RefItem(cref='#/texts/0'), RefItem(cref='#/texts/1'), RefItem(cref='#/texts/2'), RefItem(cref='#/texts/3')] content_layer=<ContentLayer.BODY: 'body'> meta=None label=<DocItemLabel.PICTURE: 'picture'> prov=[ProvenanceItem(page_no=1, bbox=BoundingBox(l=8.062236829732088, t=841.89001, r=547.3803952505637, b=336.8635827186523, coord_origin=<CoordOrigin.BOTTOMLEFT: 'BOTTOMLEFT'>), charspan=(0, 0))] source=[] comments=[] captions=[] references=[] footnotes=[] image=None annotations=[]"
+      }
+    },
+    {
+      "node_id": "node_p1_n2",
+      "type": "figure",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 36.02,
+        "y0": 535.94,
+        "x1": 106.61,
+        "y1": 612.44
+      },
+      "content": {
+        "raw_text": "self_ref='#/pictures/1' parent=RefItem(cref='#/body') children=[RefItem(cref='#/texts/4')] content_layer=<ContentLayer.BODY: 'body'> meta=None label=<DocItemLabel.PICTURE: 'picture'> prov=[ProvenanceItem(page_no=1, bbox=BoundingBox(l=36.01858204172122, t=305.95123947278387, r=106.60976995014984, b=229.44597583017526, coord_origin=<CoordOrigin.BOTTOMLEFT: 'BOTTOMLEFT'>), charspan=(0, 0))] source=[] comments=[] captions=[] references=[] footnotes=[] image=None annotations=[]"
+      }
+    },
+    {
+      "node_id": "node_p1_n3",
+      "type": "figure",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 14.85,
+        "y0": 665.2,
+        "x1": 164.97,
+        "y1": 818.24
+      },
+      "content": {
+        "raw_text": "self_ref='#/pictures/2' parent=RefItem(cref='#/body') children=[RefItem(cref='#/texts/5'), RefItem(cref='#/texts/6')] content_layer=<ContentLayer.BODY: 'body'> meta=None label=<DocItemLabel.PICTURE: 'picture'> prov=[ProvenanceItem(page_no=1, bbox=BoundingBox(l=14.852924087562815, t=176.68931849917305, r=164.9676332708781, b=23.64821659514223, coord_origin=<CoordOrigin.BOTTOMLEFT: 'BOTTOMLEFT'>), charspan=(0, 0))] source=[] comments=[] captions=[] references=[] footnotes=[] image=None annotations=[]"
+      }
+    },
+    {
+      "node_id": "node_p1_n4",
+      "type": "header_footer",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 200.33,
+        "y0": 525.67,
+        "x1": 487.67,
+        "y1": 619.33
+      },
+      "content": {
+        "raw_text": "Zamie\u0144 obligacje skarbowe i patrz, jak oszcz\u0119dno\u015bci rosn\u0105"
+      }
+    },
+    {
+      "node_id": "node_p1_n5",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 203.33,
+        "y0": 632.0,
+        "x1": 464.0,
+        "y1": 665.67
+      },
+      "content": {
+        "raw_text": "Sprawd\u017a termin wykupu swoich obligacji i zamie\u0144 je na nowe:"
+      }
+    },
+    {
+      "node_id": "node_p1_n6",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.67,
+        "y0": 673.33,
+        "x1": 492.0,
+        "y1": 697.67
+      },
+      "content": {
+        "raw_text": "im d\u0142u\u017cej oszcz\u0119dzasz, tym wi\u0119cejzyskujesz,"
+      }
+    },
+    {
+      "node_id": "node_p1_n7",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.67,
+        "y0": 711.33,
+        "x1": 487.67,
+        "y1": 732.67
+      },
+      "content": {
+        "raw_text": "masz sta\u0142y dost\u0119p do swoich oszcz\u0119dno\u015bci."
+      }
+    },
+    {
+      "node_id": "node_p1_n8",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 205.0,
+        "y0": 692.33,
+        "x1": 487.0,
+        "y1": 715.0
+      },
+      "content": {
+        "raw_text": "cieszysz si\u0119 pewno\u015bci\u0105 i bezpiecze\u0144stwem,"
+      }
+    },
+    {
+      "node_id": "node_p1_n9",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.67,
+        "y0": 742.33,
+        "x1": 526.33,
+        "y1": 763.33
+      },
+      "content": {
+        "raw_text": "Dost\u0119pne w PKo Banku Polskim lub na obligacjeskarbowe.pl."
+      }
+    },
+    {
+      "node_id": "node_p1_n10",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.33,
+        "y0": 769.0,
+        "x1": 531.33,
+        "y1": 796.0
+      },
+      "content": {
+        "raw_text": "obligacji Skarbowych w PkO Banku Polskim, pod numerami infolinii*: 801 310 210 lub +48 81 535 66 55**, lub na oblig acjeskarbowe.pl."
+      }
+    },
+    {
+      "node_id": "node_p1_n11",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.67,
+        "y0": 760.33,
+        "x1": 533.67,
+        "y1": 779.67
+      },
+      "content": {
+        "raw_text": "Sprawd\u017a termin wykupu swoich obligacji i dowiedz si\u0119 wi\u0119cej w Punktach Sprzedazy"
+      }
+    },
+    {
+      "node_id": "node_p1_n12",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.33,
+        "y0": 786.67,
+        "x1": 512.0,
+        "y1": 816.0
+      },
+      "content": {
+        "raw_text": "* Oplata zgodna z taryf\u0105 operatora. Infolinia czynna od poniedzialku do piqtku oc   )  ch h)"
+      }
+    },
+    {
+      "node_id": "node_p1_n13",
+      "type": "paragraph",
+      "global_page_index": 1,
+      "temp_slice_index": 1,
+      "bounding_box": {
+        "x0": 204.0,
+        "y0": 804.0,
+        "x1": 466.0,
+        "y1": 828.0
+      },
+      "content": {
+        "raw_text": "* Numer dost\u0119pny w kraju, za granicq I z telefon\u00f3w kom\u00f3rkowych"
+      }
+    }
+  ]
+}
