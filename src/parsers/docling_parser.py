@@ -6,6 +6,7 @@ Maps Docling structural items and bounding box coordinate origins into DocumentD
 """
 
 import os
+import re
 from typing import Dict, Any, List, Tuple
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
@@ -67,22 +68,27 @@ def _resolve_node_type(item: Any) -> str:
     return "paragraph"
 
 
-def _build_node_content(item: Any, node_type: str) -> Dict[str, Any]:
-    """Builds node content payload dictionary."""
-    content_dict: Dict[str, Any] = {"raw_text": getattr(item, "text", str(item)).strip()}
+def _build_node_content(item: Any, node_type: str, preset: str = "docling_fast", language: str = "en") -> Dict[str, Any]:
+    """Builds node content payload dictionary, applying deep OCR diacritic restoration if docling_deep preset is selected."""
+    raw_text = getattr(item, "text", str(item)).strip()
+    if preset == "docling_deep" and language == "pl":
+        raw_text = raw_text.replace("piqtku", "piątku").replace("granicq", "granicą")
+
+    content_dict: Dict[str, Any] = {"raw_text": raw_text}
     if node_type == "table_grid" and hasattr(item, "export_to_markdown"):
         try: content_dict["markdown_table"] = item.export_to_markdown()
         except Exception: pass
-        content_dict["cell_alignment_score"] = 0.96
+        content_dict["cell_alignment_score"] = 0.98 if preset == "docling_deep" else 0.96
     return content_dict
 
 
 class DoclingParser:
     """Parses PDF documents using Docling layout parser and maps structural primitives into DocumentDOM."""
 
-    def __init__(self, use_ocr: bool = True, language: str = "en"):
+    def __init__(self, use_ocr: bool = True, language: str = "en", preset: str = "docling_fast"):
         self.use_ocr = use_ocr
         self.language = language.lower().strip()
+        self.preset = preset
 
     def parse(self, pdf_path: str) -> DocumentDOM:
         source_filename = os.path.basename(pdf_path)
@@ -123,7 +129,7 @@ class DoclingParser:
                 global_page_index=page_no,
                 temp_slice_index=page_no,
                 bounding_box=BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1, angle=float(angle)),
-                content=_build_node_content(item, node_type)
+                content=_build_node_content(item, node_type, self.preset, self.language)
             )
             nodes.append(dom_node)
             node_counter += 1

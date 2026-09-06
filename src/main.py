@@ -2,13 +2,12 @@
 src/main.py
 
 Main Application Entry Point.
-Invokes CLI argument parsing and triggers the orchestrator pipeline.
+Invokes CLI argument parsing and triggers orchestrator pipeline or live server.
 """
 
 import os
 import sys
 
-# Ensure workspace root is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.cli import parse_args, print_summary
@@ -42,6 +41,10 @@ def main():
     )
 
     print_summary(result)
+
+    if getattr(args, "serve", False):
+        from src.pipeline.server import start_pipeline_server
+        start_pipeline_server(pdf_path=args.input, language=args.language)
 
 
 if __name__ == "__main__":

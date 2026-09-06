@@ -38,6 +38,10 @@ def parse_args():
     parser.add_argument(
         "--no-visuals", action="store_true", help="Disable visual bounding box overlay rendering."
     )
+    parser.add_argument(
+        "--serve", "-s", action="store_true",
+        help="Start live HTTP server listening at http://localhost:8000 for backend pipeline rerun requests."
+    )
     return parser.parse_args()
 
 
