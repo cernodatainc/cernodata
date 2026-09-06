@@ -1,15 +1,16 @@
 """
-src/visualizer.py
+src/visualization/overlay.py
 
 Page-Level Bounding Box Layout Visualizer & Provenance Overlay Engine.
-Renders input PDF pages to high-resolution images and overlays color-coded bounding boxes,
-type labels, quality violation callouts (e.g. '[!] VIOLATION: piqtku'), and bottom-left confidence badges.
+Supports text-alignment rotated bounding boxes, violation callouts, and bottom-left score badges.
 """
 
 import os
 from typing import List, Dict, Any, Optional
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont
 from src.dom import DocumentDOM, DOMNode
+from src.visualization.badges import draw_score_badge_bottom_left
+from src.visualization.callouts import draw_violation_callout
 
 HAS_PYPDFIUM = False
 try:
@@ -17,7 +18,6 @@ try:
     HAS_PYPDFIUM = True
 except ImportError:
     HAS_PYPDFIUM = False
-
 
 COLOR_PALETTE = {
     "heading": {"stroke": "#1976D2", "fill": "#1976D222", "label_bg": "#1976D2"},
@@ -30,7 +30,8 @@ COLOR_PALETTE = {
 
 class PageVisualizer:
     """
-    Renders PDF page overlays with parsed DOM bounding box annotations and quality violation markers.
+    Renders PDF page overlays with parsed DOM bounding box annotations, rotated text alignment polygons,
+    and quality violation markers.
     """
 
     def __init__(self, dpi: int = 150):
@@ -48,7 +49,6 @@ class PageVisualizer:
         output_paths = []
         violations = violations or []
 
-        # Group nodes and violations by page
         page_nodes: Dict[int, List[DOMNode]] = {p: [] for p in range(1, dom.total_pages + 1)}
         for node in dom.nodes:
             page_nodes.setdefault(node.global_page_index, []).append(node)
@@ -112,7 +112,6 @@ class PageVisualizer:
         draw_overlay = ImageDraw.Draw(overlay)
         draw_base = ImageDraw.Draw(base_img)
 
-        # Index violations by node_id
         node_violations: Dict[str, List[Dict[str, Any]]] = {}
         for v in violations:
             nid = v.get("node_id")
@@ -141,17 +140,20 @@ class PageVisualizer:
             palette = COLOR_PALETTE.get(node.type, COLOR_PALETTE["paragraph"])
             stroke_col = palette["stroke"]
 
-            # Check if node has quality violations
             active_viols = node_violations.get(node.node_id, [])
             has_violation = len(active_viols) > 0
 
+            width_val = 4 if has_violation else 3
             if has_violation:
-                stroke_col = "#FF1744"  # Bright red for violation box
-                draw_overlay.rectangle([x0, y0, x1, y1], outline="#FF1744", width=4)
-            else:
-                draw_overlay.rectangle([x0, y0, x1, y1], outline=stroke_col, width=3)
+                stroke_col = "#FF1744"
 
-            # Node label badge
+            # Support rotated text alignment polygon rendering
+            if bbox.angle != 0.0:
+                polygon = bbox.to_polygon(sx=sx, sy=sy)
+                draw_overlay.polygon(polygon, outline=stroke_col, width=width_val)
+            else:
+                draw_overlay.rectangle([x0, y0, x1, y1], outline=stroke_col, width=width_val)
+
             label_text = f"[{node.type}] {node.node_id}"
             left, top, right, bottom = font.getbbox(label_text)
             text_w = right - left
@@ -165,32 +167,12 @@ class PageVisualizer:
             draw_base.rectangle([badge_x0, badge_y0, badge_x1, badge_y1], fill=stroke_col)
             draw_base.text((badge_x0 + 4, badge_y0 + 2), label_text, fill="white", font=font)
 
-            # Draw violation callout marker badge if violations exist on node
             if has_violation:
-                v = active_viols[0]
-                snippet = v.get("detected_snippet", "")
-                suggested = v.get("suggested_correction", "")
-                viol_label = f"[!] VIOLATION: '{snippet}'"
-                if suggested:
-                    viol_label += f" -> '{suggested}'"
+                draw_violation_callout(draw_base, x0, badge_y1, active_viols[0], font)
 
-                v_left, v_top, v_right, v_bottom = font.getbbox(viol_label)
-                v_w = v_right - v_left
-                v_h = v_bottom - v_top
-
-                v_x0 = x0
-                v_y0 = badge_y1 + 2
-                v_x1 = v_x0 + v_w + 10
-                v_y1 = v_y0 + v_h + 6
-
-                draw_base.rectangle([v_x0, v_y0, v_x1, v_y1], fill="#D50000", outline="yellow", width=1)
-                draw_base.text((v_x0 + 5, v_y0 + 3), viol_label, fill="white", font=font)
-
-        # Merge translucent overlay
         result_img = Image.alpha_composite(base_img, overlay).convert("RGB")
         draw_result = ImageDraw.Draw(result_img)
 
-        # Top banner summary
         banner_h = 32
         draw_result.rectangle([0, 0, img_w, banner_h], fill="#1E1E2F")
         draw_result.text(
@@ -200,51 +182,8 @@ class PageVisualizer:
             font=header_font
         )
 
-        # Bottom-left confidence score & violation summary badge
-        self._draw_score_badge_bottom_left(
+        draw_score_badge_bottom_left(
             draw_result, img_w, img_h, page_no, nodes, violations, font, header_font
         )
 
         return result_img
-
-    def _draw_score_badge_bottom_left(
-        self,
-        draw: ImageDraw.ImageDraw,
-        img_w: int,
-        img_h: int,
-        page_no: int,
-        nodes: List[DOMNode],
-        violations: List[Dict[str, Any]],
-        font: ImageFont.ImageFont,
-        header_font: ImageFont.ImageFont
-    ):
-        """Renders overall confidence score & violation summary badge in bottom-left corner."""
-        try:
-            from src.heuristics import evaluate_page_confidence
-        except ImportError:
-            from heuristics import evaluate_page_confidence
-
-        page_score = round(evaluate_page_confidence(nodes), 3)
-        status_text = "ACCEPT" if page_score >= 0.82 else "FALLBACK"
-        status_color = "#00E676" if page_score >= 0.82 else "#FF5252"
-
-        line1 = f"Page {page_no} Confidence Score: {page_score:.3f}"
-        line2 = f"Decision Status: {status_text} | Violations Flagged: {len(violations)}"
-
-        l1_bbox = header_font.getbbox(line1)
-        l2_bbox = font.getbbox(line2)
-
-        w1 = l1_bbox[2] - l1_bbox[0]
-        w2 = l2_bbox[2] - l2_bbox[0]
-        badge_w = max(w1, w2) + 24
-        badge_h = 54
-
-        margin = 16
-        bx0 = margin
-        by1 = img_h - margin
-        by0 = by1 - badge_h
-        bx1 = bx0 + badge_w
-
-        draw.rectangle([bx0, by0, bx1, by1], fill="#111827", outline=status_color, width=2)
-        draw.text((bx0 + 12, by0 + 8), line1, fill="white", font=header_font)
-        draw.text((bx0 + 12, by0 + 28), line2, fill=status_color, font=font)

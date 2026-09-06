@@ -1,20 +1,13 @@
 """
-src/decision_tree.py
+src/pipeline/decision_tree.py
 
 cernodata Decision Tree Iteration Engine.
-Evaluates parsing output against target confidence thresholds and determines fallback actions:
-- ACCEPT output
-- Path B: Parameter Wiggling (Delta Δ >= 0.20)
-- Path A: Preset Switching (Delta Δ < 0.20)
+Evaluates parsing confidence scores against target threshold and routes dual-path fallback loops.
 """
 
 from typing import Dict, Any, List
-try:
-    from src.dom import DocumentDOM
-    from src.heuristics import evaluate_document_confidence
-except ImportError:
-    from dom import DocumentDOM
-    from heuristics import evaluate_document_confidence
+from src.dom import DocumentDOM
+from src.quality import evaluate_document_confidence
 
 DEFAULT_TARGET_CONFIDENCE_THRESHOLD = 0.82
 PRESET_ID = "docling_fast"
@@ -24,8 +17,7 @@ NEXT_PRESET_SCORE = 0.72
 
 class DecisionTreeEngine:
     """
-    Evaluates parsing confidence against target threshold and drives dual-path fallback loops,
-    incorporating language hints and diacritic verification.
+    Evaluates parsing confidence against target threshold and drives dual-path fallback loops.
     """
 
     def __init__(

@@ -1,28 +1,24 @@
 """
-src/converter.py
+src/parsers/docling_parser.py
 
 Docling layout parser and DocumentDOM normalizer.
-Converts input PDF files into cernodata's standardized DocumentDOM intermediate representation.
-Supports productively passing language hints (e.g., 'pl', 'de', 'fr', 'es', 'en') to OCR drivers.
+Maps Docling structural items and bounding box coordinate origins into DocumentDOM IR.
 """
 
 import os
-from typing import Dict, Any, List, Optional
-try:
-    from src.dom import BoundingBox, DOMNode, DocumentDOM
-except ImportError:
-    from dom import BoundingBox, DOMNode, DocumentDOM
+from typing import Dict, Any, List
+from src.dom import BoundingBox, DOMNode, DocumentDOM
+from src.parsers.synthetic_parser import SyntheticParser
 
 HAS_DOCLING = False
 try:
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.datamodel.base_models import InputFormat
     HAS_DOCLING = True
 except ImportError:
     HAS_DOCLING = False
 
-
-# Map 2-letter ISO language codes to 3-letter OCR codes (e.g., Tesseract / RapidOCR standards)
 LANG_CODE_MAP = {
     "pl": ["pol", "pl"],
     "de": ["deu", "de"],
@@ -49,12 +45,12 @@ class DoclingParser:
         if HAS_DOCLING and os.path.exists(pdf_path):
             return self._parse_with_docling(pdf_path, doc_id, source_filename)
         else:
-            return self._parse_synthetic(doc_id, source_filename)
+            synthetic = SyntheticParser()
+            return synthetic.parse(doc_id, source_filename)
 
     def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:
         ocr_langs = LANG_CODE_MAP.get(self.language, [self.language])
 
-        # Configure pipeline options with language hint if available
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = self.use_ocr
         if hasattr(pipeline_options, "ocr_options") and pipeline_options.ocr_options:
@@ -143,6 +139,8 @@ class DoclingParser:
             raw_text = getattr(item, "text", str(item)).strip()
             content_dict: Dict[str, Any] = {"raw_text": raw_text}
 
+            angle = getattr(item, "angle", 0.0) or getattr(prov_item, "angle", 0.0) if hasattr(item, "prov") and item.prov else 0.0
+
             if node_type == "table_grid" and hasattr(item, "export_to_markdown"):
                 try:
                     content_dict["markdown_table"] = item.export_to_markdown()
@@ -155,7 +153,7 @@ class DoclingParser:
                 type=node_type,
                 global_page_index=page_no,
                 temp_slice_index=page_no,
-                bounding_box=BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1),
+                bounding_box=BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1, angle=float(angle)),
                 content=content_dict
             )
             nodes.append(dom_node)
@@ -166,32 +164,5 @@ class DoclingParser:
             document_id=doc_id,
             source_filename=source_filename,
             total_pages=total_pages,
-            nodes=nodes
-        )
-
-    def _parse_synthetic(self, doc_id: str, source_filename: str) -> DocumentDOM:
-        """Fallback synthetic DOM generator when docling engine is not available or for synthetic testing."""
-        nodes = [
-            DOMNode(
-                node_id="node_p1_n1",
-                type="heading",
-                global_page_index=1,
-                temp_slice_index=1,
-                bounding_box=BoundingBox(x0=54.0, y0=40.0, x1=550.0, y1=80.0),
-                content={"raw_text": "Cernodata Layout Analysis Statement"}
-            ),
-            DOMNode(
-                node_id="node_p1_n2",
-                type="paragraph",
-                global_page_index=1,
-                temp_slice_index=1,
-                bounding_box=BoundingBox(x0=54.0, y0=90.0, x1=550.0, y1=150.0),
-                content={"raw_text": "Automated PDF extraction pipeline with confidence-guided decision tree."}
-            )
-        ]
-        return DocumentDOM(
-            document_id=doc_id,
-            source_filename=source_filename,
-            total_pages=1,
             nodes=nodes
         )
