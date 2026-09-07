@@ -42,7 +42,8 @@ def generate_interactive_html(
     dom: DocumentDOM,
     decision: Dict[str, Any],
     violations: List[Dict[str, Any]],
-    output_path: str = os.path.join("output", "interactive_viewer.html")
+    output_path: str = os.path.join("output", "interactive_viewer.html"),
+    plan: Dict[str, Any] = None
 ) -> str:
     """Generates a standalone, interactive HTML visual flow explorer file."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -51,7 +52,31 @@ def generate_interactive_html(
     dom_json = json.dumps(dom.to_dict())
     violations_json = json.dumps(violations)
     decision_json = json.dumps(decision)
+    plan_json = json.dumps(plan) if plan else "null"
     is_acc = decision.get('is_accepted', True)
+
+    plan_header_sub = ""
+    if plan:
+        tax = plan.get("taxonomy", "standard")
+        hw = plan.get("hardware", "cpu")
+        is_over = plan.get("overridden", False)
+        ov_text = " [OVERRIDDEN]" if is_over else ""
+        plan_header_sub = f" | Plan: {tax} ({hw}){ov_text}"
+
+    chosen_preset = decision.get('chosen_preset', (plan.get('primary_preset') if plan else 'docling_fast'))
+    preset2_name = "docling_deep"
+    if plan and plan.get("fallback_queue"):
+        preset2_name = plan["fallback_queue"][0].get("preset", "docling_deep") if isinstance(plan["fallback_queue"][0], dict) else plan["fallback_queue"][0]
+
+    timeline_buttons_html = f'''
+            <button class="step-btn active" id="btnPreset1" onclick="switchPreset(0)">
+                <span>Step 1: {chosen_preset}</span>
+                <span class="badge-status {'pass' if is_acc else 'fail'}" id="statusPreset1">{'ACCEPT' if is_acc else 'REJECT'}</span>
+            </button>
+            <button class="step-btn fallback" id="btnPreset2" onclick="switchPreset(1)">
+                <span>Step 2: {preset2_name}</span>
+                <span class="badge-status" id="statusPreset2" style="background:#4B5563; color:#FFF;">Candidate</span>
+            </button>'''
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -129,26 +154,19 @@ def generate_interactive_html(
 </head>
 <body>
 
-    <div class="status-banner" id="statusBanner">⏳ Running live backend Python pipeline for preset 'docling_deep'...</div>
+    <div class="status-banner" id="statusBanner">[RUNNING] Running live backend Python pipeline for preset 'docling_deep'...</div>
 
     <header>
         <div class="brand">
             <div class="brand-logo">C</div>
             <div>
                 <div class="brand-title">cernodata Visual Flow & Preset Simulator</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Document: {dom.source_filename} | ID: {dom.document_id}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Document: {dom.source_filename} | ID: {dom.document_id}{plan_header_sub}</div>
             </div>
         </div>
 
-        <div class="timeline">
-            <button class="step-btn active" id="btnPreset1" onclick="switchPreset(0)">
-                <span>Step 1: {decision.get('chosen_preset', 'docling_fast')}</span>
-                <span class="badge-status {'pass' if is_acc else 'fail'}" id="statusPreset1">{'ACCEPT' if is_acc else 'REJECT'}</span>
-            </button>
-            <button class="step-btn fallback" id="btnPreset2" onclick="switchPreset(1)">
-                <span>Step 2: docling_deep</span>
-                <span class="badge-status" id="statusPreset2" style="background:#4B5563; color:#FFF;">Candidate</span>
-            </button>
+        <div class="timeline" id="timelineContainer">
+            {timeline_buttons_html}
         </div>
     </header>
 
@@ -160,7 +178,7 @@ def generate_interactive_html(
         <div class="toggle-group" style="border-left: 1px solid var(--border-color); padding-left: 12px;">
             <label style="color: #69F0AE;"><input type="checkbox" id="toggleCorrections" onchange="toggleAllCorrections()"> Apply Quality Corrections</label>
         </div>
-        <button class="action-btn" id="btnRerun" onclick="rerunBackendPipeline('docling_deep')">🚀 Rerun Python Pipeline (Step 2: docling_deep)</button>
+        <button class="action-btn" id="btnRerun" onclick="rerunBackendPipeline('docling_deep')">[RERUN] Run Next Fallback (docling_deep)</button>
 
         <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
             <span style="color: var(--text-muted);">Filter Type:</span>
@@ -194,11 +212,13 @@ def generate_interactive_html(
                 <button class="tab-btn active" onclick="showTab(event, 'domTab')">DOM Tree (<span id="domCount">{len(dom.nodes)}</span>)</button>
                 <button class="tab-btn" onclick="showTab(event, 'violTab')">Violations (<span id="violCount">{len(violations)}</span>)</button>
                 <button class="tab-btn" onclick="showTab(event, 'logTab')">Decision Log</button>
+                <button class="tab-btn" onclick="showTab(event, 'planTab')">Plan</button>
             </div>
 
             <div class="tab-content active" id="domTab"><div id="domListContainer"></div></div>
             <div class="tab-content" id="violTab"><div id="violListContainer"></div></div>
             <div class="tab-content" id="logTab"><div class="log-box"><pre id="logContent"></pre></div></div>
+            <div class="tab-content" id="planTab"><div class="log-box" style="color: #A7F3D0;"><pre id="planContent"></pre></div></div>
         </div>
     </div>
 
@@ -206,6 +226,7 @@ def generate_interactive_html(
         const initialDomData = {dom_json};
         const initialViolationsData = {violations_json};
         const initialDecisionData = {decision_json};
+        const planData = {plan_json};
         const pdfSourceFile = "{dom.source_filename}";
 
         let activePresetIndex = 0;
@@ -271,7 +292,7 @@ def generate_interactive_html(
             document.getElementById('violCount').textContent = violationsData.length;
 
             if (violationsData.length === 0) {{
-                container.innerHTML = '<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600;">✨ Zero quality violations detected! All OCR diacritics and grid alignments passed.</div>';
+                container.innerHTML = '<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600;">[OK] Zero quality violations detected. All OCR diacritics and grid alignments passed.</div>';
                 return;
             }}
             container.innerHTML = '';
@@ -286,7 +307,7 @@ def generate_interactive_html(
                     </div>
                     <div style="font-size: 12px; font-family: monospace;">Snippet: '${{v.detected_snippet}}' -> '${{v.suggested_correction || ''}}'</div>
                     <div class="viol-desc">${{v.description}}</div>
-                    <button class="apply-fix-btn" onclick="applySingleFix(event, '${{v.node_id}}', '${{v.detected_snippet}}', '${{v.suggested_correction}}')">✓ Apply Suggested Fix ('${{v.suggested_correction}}')</button>
+                    <button class="apply-fix-btn" onclick="applySingleFix(event, '${{v.node_id}}', '${{v.detected_snippet}}', '${{v.suggested_correction}}')">[Fix] Apply Suggested Fix ('${{v.suggested_correction}}')</button>
                 `;
                 container.appendChild(card);
             }});
@@ -342,7 +363,7 @@ def generate_interactive_html(
                     const g = createSvgElem('g', {{}});
                     const isFixed = appliedCorrections || activePresetIndex === 1;
                     const labelText = isFixed
-                        ? `[✓ FIXED] '${{activeViol.detected_snippet}}' -> '${{activeViol.suggested_correction}}'`
+                        ? `[FIXED] '${{activeViol.detected_snippet}}' -> '${{activeViol.suggested_correction}}'`
                         : `[!] VIOLATION: '${{activeViol.detected_snippet}}' -> '${{activeViol.suggested_correction || ''}}'`;
 
                     const badgeBg = createSvgElem('rect', {{
@@ -388,10 +409,17 @@ def generate_interactive_html(
             document.getElementById(tabId).classList.add('active');
         }}
 
+        function renderPlanTab() {{
+            const el = document.getElementById('planContent');
+            if (el) {{
+                el.textContent = planData ? JSON.stringify(planData, null, 2) : "No planner config associated with this run.";
+            }}
+        }}
+
         async function rerunBackendPipeline(presetName) {{
             const banner = document.getElementById('statusBanner');
             banner.style.display = 'block';
-            banner.textContent = `⏳ Running real Python backend pipeline for preset '${{presetName}}'...`;
+            banner.textContent = `[RUNNING] Running real Python backend pipeline for preset '${{presetName}}'...`;
 
             try {{
                 const res = await fetch('/api/rerun', {{
@@ -402,7 +430,7 @@ def generate_interactive_html(
 
                 if (res.ok) {{
                     const data = await res.json();
-                    banner.textContent = `✅ Live Python pipeline execution finished successfully! Applied preset '${{presetName}}'.`;
+                    banner.textContent = `[OK] Live Python pipeline execution finished successfully. Applied preset '${{presetName}}'.`;
                     setTimeout(() => {{ banner.style.display = 'none'; }}, 4000);
 
                     domData = data.dom;
@@ -418,7 +446,7 @@ def generate_interactive_html(
             }}
 
             // Fallback UI update if static file mode
-            banner.textContent = `⚡ Applied preset '${{presetName}}' (To run live Python backend, launch 'python src/main.py --serve').`;
+            banner.textContent = `[INFO] Applied preset '${{presetName}}' (To run live Python backend, launch 'python src/main.py --serve').`;
             setTimeout(() => {{ banner.style.display = 'none'; }}, 5000);
             activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;
             updatePresetUIState();
@@ -458,6 +486,7 @@ def generate_interactive_html(
             renderDOMTree();
             renderViolationsList();
             renderDecisionLog();
+            renderPlanTab();
             renderSVGOverlays();
         }}
 
@@ -468,6 +497,7 @@ def generate_interactive_html(
         renderDOMTree();
         renderViolationsList();
         renderDecisionLog();
+        renderPlanTab();
         renderSVGOverlays();
     </script>
 </body>
