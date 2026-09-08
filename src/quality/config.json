@@ -1,0 +1,6 @@
+{
+  "diacritic_hit": 0.20,
+  "max_diacritic_penalty": 0.60,
+  "garbage_multiplier": 3.0,
+  "garbage_threshold": 0.05
+}

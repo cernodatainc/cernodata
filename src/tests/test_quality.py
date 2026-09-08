@@ -117,6 +117,64 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(clean_score, 1.0)
         self.assertLess(conflicted_score, 1.0)
 
+    def test_garbage_ratio_clean_vs_damaged_multilingual(self):
+        damaged_samples = [
+            "* Oplata zgodna z taryfą operatora. Infolinia czynna od poniedzialku do piątku oc   )  ch h)",
+            "\ufffd\ufffd\ufffd ab\ufffdc",
+            "l1 |] ;; ,, ..",
+            "aaaaaaaaaaaaaaaaaaaa"
+        ]
+        for s in damaged_samples:
+            ratio = compute_garbage_ratio(s)
+            self.assertGreater(
+                ratio, 0.05,
+                f"Damaged sample expected to have garbage_ratio > 0.05, got {ratio} for: {s}"
+            )
+
+        clean_samples = [
+            ("pl", "Sprawdź termin wykupu swoich obligacji i zamień je na nowe w piątku."),
+            ("en", "The quick brown fox jumps over the lazy dog."),
+            ("de", "Bitte überprüfen Sie die Fälligkeit Ihrer Bundesanleihen vor Freitag.")
+        ]
+        for lang, s in clean_samples:
+            ratio = compute_garbage_ratio(s)
+            self.assertLess(
+                ratio, 0.05,
+                f"Clean {lang} sample expected to have garbage_ratio < 0.05, got {ratio} for: {s}"
+            )
+
+    def test_node_p1_n12_damaged_sample_raises_high_violation(self):
+        node = DOMNode(
+            node_id="node_p1_n12",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(204.33, 786.67, 512.0, 816.0),
+            content={"raw_text": "* Oplata zgodna z taryfą operatora. Infolinia czynna od poniedzialku do piątku oc   )  ch h)"}
+        )
+        dom = DocumentDOM(document_id="doc_sample", source_filename="sample.pdf", total_pages=1, nodes=[node])
+
+        violations = detect_quality_violations(dom, language="pl")
+        garbage_viols = [v for v in violations if v["rule_type"] == "garbage_character_ratio"]
+        self.assertGreater(len(garbage_viols), 0)
+        self.assertEqual(garbage_viols[0]["severity"], "HIGH")
+        self.assertEqual(garbage_viols[0]["node_id"], "node_p1_n12")
+
+        page_conf = evaluate_page_confidence([node], language="pl")
+        self.assertLess(page_conf, 1.0)
+
+    def test_quality_config_json_loading(self):
+        from src.quality.evaluator import load_quality_config
+        cfg = load_quality_config()
+        self.assertIn("diacritic_hit", cfg)
+        self.assertEqual(cfg["diacritic_hit"], 0.20)
+        self.assertIn("max_diacritic_penalty", cfg)
+        self.assertEqual(cfg["max_diacritic_penalty"], 0.60)
+        self.assertIn("garbage_multiplier", cfg)
+        self.assertEqual(cfg["garbage_multiplier"], 3.0)
+        self.assertIn("garbage_threshold", cfg)
+        self.assertEqual(cfg["garbage_threshold"], 0.05)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -34,12 +34,11 @@ def evaluate_quality_and_decision_tree(
     dom: DocumentDOM,
     target_threshold: float,
     language: str,
-    preset: str = "docling_fast",
-    diacritic_hit: Optional[float] = None
+    preset: str = "docling_fast"
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Extracts quality violation records and evaluates confidence scores against target threshold."""
     violations = detect_quality_violations(dom, language=language)
-    engine = DecisionTreeEngine(target_threshold=target_threshold, language=language, diacritic_hit=diacritic_hit)
+    engine = DecisionTreeEngine(target_threshold=target_threshold, language=language)
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset
     return decision, violations
@@ -118,8 +117,7 @@ def run_pipeline(
     align_skew: bool = True,
     visualize: bool = True,
     output_dir: str = "output",
-    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
-    diacritic_hit: Optional[float] = None
+    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None
 ) -> Dict[str, Any]:
     """Executes end-to-end extraction pipeline with optional plan-driven execution and fallback orchestration."""
     plan_obj: Optional[DocumentPlan] = None
@@ -137,8 +135,6 @@ def run_pipeline(
         language = plan_obj.language
         target_threshold = plan_obj.target_threshold
         preset = plan_obj.primary_preset
-        if diacritic_hit is None and hasattr(plan_obj, "diacritic_hit"):
-            diacritic_hit = plan_obj.diacritic_hit
 
     if not pdf_path:
         raise ValueError("Input document path is required.")
@@ -149,7 +145,7 @@ def run_pipeline(
     dom = parse_document(pdf_path, language, preset=preset)
     dom = align_document_skew(dom, pdf_path, align_skew)
     decision, violations = evaluate_quality_and_decision_tree(
-        dom, target_threshold, language, preset=preset, diacritic_hit=diacritic_hit
+        dom, target_threshold, language, preset=preset
     )
 
     initial_attempt = {
@@ -187,7 +183,7 @@ def run_pipeline(
             fallback_dom = parse_document(pdf_path, language, preset="docling_deep")
             fallback_dom = align_document_skew(fallback_dom, pdf_path, align_skew)
             fb_decision, fb_violations = evaluate_quality_and_decision_tree(
-                fallback_dom, target_threshold, language, preset="docling_deep", diacritic_hit=diacritic_hit
+                fallback_dom, target_threshold, language, preset="docling_deep"
             )
             fb_decision["chosen_preset"] = "docling_deep"
 

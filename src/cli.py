@@ -45,10 +45,6 @@ def parse_args():
         help="Language hint code for OCR and quality verification (e.g. 'pl' for Polish, 'de' for German, 'en' for English)"
     )
     parser.add_argument(
-        "--diacritic-hit", type=float, default=None,
-        help="Configurable score penalty hit for diacritic anomalies and conflicts (default from language config: 0.20)"
-    )
-    parser.add_argument(
         "--no-align-skew", action="store_true",
         help="Disable automatic local text alignment skew detection."
     )

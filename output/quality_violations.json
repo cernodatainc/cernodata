@@ -1,7 +1,24 @@
 {
-  "document_id": "doc_452689",
-  "source_filename": "Document 5.pdf",
+  "document_id": "doc_861650",
+  "source_filename": "Dokument 5.pdf",
   "language": "pl",
-  "total_violations": 0,
-  "violations": []
+  "total_violations": 1,
+  "violations": [
+    {
+      "violation_id": "viol_p1_v1",
+      "global_page_index": 1,
+      "node_id": "node_p1_n12",
+      "rule_type": "garbage_character_ratio",
+      "severity": "HIGH",
+      "detected_snippet": "* Oplata zgodna z taryf\u0105 operatora. Infolinia czynna od poni",
+      "description": "High ratio of OCR noise or corrupt characters (0.137) (punctuation soup / fragmented OCR tokens)",
+      "bounding_box": {
+        "x0": 204.33,
+        "y0": 786.67,
+        "x1": 512.0,
+        "y1": 816.0,
+        "angle": -1.15
+      }
+    }
+  ]
 }

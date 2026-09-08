@@ -25,17 +25,15 @@ class DecisionTreeEngine:
         target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
         current_preset_score: float = 0.90,
         next_preset_score: float = NEXT_PRESET_SCORE,
-        language: str = "en",
-        diacritic_hit: Optional[float] = None
+        language: str = "en"
     ):
         self.target_threshold = target_threshold
         self.current_preset_score = current_preset_score
         self.next_preset_score = next_preset_score
         self.language = language
-        self.diacritic_hit = diacritic_hit
 
     def evaluate(self, dom: DocumentDOM) -> Dict[str, Any]:
-        metrics = evaluate_document_confidence(dom, language=self.language, diacritic_hit=self.diacritic_hit)
+        metrics = evaluate_document_confidence(dom, language=self.language)
         overall_conf = metrics["overall_confidence"]
         per_page_conf = metrics["per_page_confidence"]
 

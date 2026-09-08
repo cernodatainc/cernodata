@@ -102,8 +102,21 @@ class LanguageConfig:
             return 1.0
 
         score = 1.0
-        anom_hit = diacritic_hit if diacritic_hit is not None else self.anomalous_char_penalty_per_occurrence
-        conf_hit = diacritic_hit if diacritic_hit is not None else self.conflict_penalty_per_occurrence
+        default_hit = self.diacritic_hit
+        if diacritic_hit is None:
+            try:
+                import json, os
+                cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+                if os.path.exists(cfg_path):
+                    with open(cfg_path, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                        if "diacritic_hit" in cfg:
+                            default_hit = float(cfg["diacritic_hit"])
+            except Exception:
+                pass
+        hit = diacritic_hit if diacritic_hit is not None else default_hit
+        anom_hit = hit if hit is not None else self.anomalous_char_penalty_per_occurrence
+        conf_hit = hit if hit is not None else self.conflict_penalty_per_occurrence
 
         anom_matches = self.find_anomalous_substitutions(text)
         if anom_matches:

@@ -7,15 +7,31 @@ Generates structured violation records exported to quality_violations.json.
 
 from typing import List, Dict, Any, Optional
 from src.dom import DOMNode, DocumentDOM
-from src.quality.garbage import compute_garbage_ratio
+from src.quality.garbage import compute_garbage_ratio, compute_garbage_details
 from src.quality.language_config import LanguageConfig, get_language_config
 
 
 def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> List[Dict[str, Any]]:
-    """Checks node raw text for non-printable control character spikes."""
-    gb_ratio = compute_garbage_ratio(raw_text)
-    if gb_ratio <= 0.05:
+    """Checks node raw text for OCR damage, punctuation soup, or corrupt characters."""
+    from src.quality.evaluator import load_quality_config
+    threshold = load_quality_config().get("garbage_threshold", 0.05)
+
+    details = compute_garbage_details(raw_text)
+    gb_ratio = details["ratio"]
+    if gb_ratio <= threshold:
         return []
+
+    reasons = []
+    if details.get("unicode_ratio", 0) > 0:
+        reasons.append("unicode corruption")
+    if details.get("rep_ratio", 0) > 0:
+        reasons.append("character repetition")
+    if details.get("soup_ratio", 0) > 0:
+        reasons.append("punctuation soup / fragmented OCR tokens")
+    if details.get("low_alnum_penalty", 0) > 0:
+        reasons.append("low alphanumeric ratio")
+
+    desc_detail = f" ({', '.join(reasons)})" if reasons else ""
     return [{
         "violation_id": f"viol_p{node.global_page_index}_v{counter}",
         "global_page_index": node.global_page_index,
@@ -23,7 +39,7 @@ def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> Lis
         "rule_type": "garbage_character_ratio",
         "severity": "HIGH",
         "detected_snippet": raw_text[:60],
-        "description": f"High ratio of non-printable or corrupt control characters ({round(gb_ratio, 3)})",
+        "description": f"High ratio of OCR noise or corrupt characters ({round(gb_ratio, 3)}){desc_detail}",
         "bounding_box": node.bounding_box.to_dict()
     }]
 

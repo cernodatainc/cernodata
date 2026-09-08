@@ -4,11 +4,32 @@ src/quality/evaluator.py
 Page-level (S_i) and document-level (S) confidence score evaluators.
 """
 
+import json
+import os
 from typing import List, Dict, Any, Optional
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio
 from src.quality.language import compute_language_score
 from src.quality.language_config import get_language_config
+
+
+def load_quality_config() -> Dict[str, Any]:
+    """Loads quality configuration from config.json located in the quality module directory."""
+    config_dir = os.path.dirname(os.path.abspath(__file__))
+    for fname in ("config.json", "quality_config.json", "diacritic_config.json"):
+        fpath = os.path.join(config_dir, fname)
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return {
+        "diacritic_hit": 0.20,
+        "max_diacritic_penalty": 0.60,
+        "garbage_multiplier": 3.0,
+        "garbage_threshold": 0.05
+    }
 
 
 def evaluate_page_confidence(
@@ -21,15 +42,20 @@ def evaluate_page_confidence(
     if not nodes:
         return 0.0
 
+    q_cfg = load_quality_config()
     config = get_language_config(language)
-    hit = diacritic_hit if diacritic_hit is not None else (config.diacritic_hit if config else 0.0)
+    hit = diacritic_hit if diacritic_hit is not None else q_cfg.get(
+        "diacritic_hit", config.diacritic_hit if config else 0.20
+    )
+    max_diacritic_penalty = q_cfg.get("max_diacritic_penalty", 0.60)
+    garbage_multiplier = q_cfg.get("garbage_multiplier", 3.0)
 
     node_scores = []
     diacritic_anomalies_count = 0
     for node in nodes:
         raw_text = node.content.get("raw_text", "")
 
-        char_score = max(0.0, 1.0 - (compute_garbage_ratio(raw_text) * 3.0))
+        char_score = max(0.0, 1.0 - (compute_garbage_ratio(raw_text) * garbage_multiplier))
         lang_score = compute_language_score(raw_text, language=language, diacritic_hit=hit)
 
         combined_text_score = char_score * lang_score
@@ -49,7 +75,7 @@ def evaluate_page_confidence(
     base_score = float(sum(node_scores) / len(node_scores))
 
     if hit > 0 and diacritic_anomalies_count > 0:
-        page_penalty = min(0.60, diacritic_anomalies_count * hit)
+        page_penalty = min(max_diacritic_penalty, diacritic_anomalies_count * hit)
         return max(0.0, float(base_score - page_penalty))
 
     return base_score

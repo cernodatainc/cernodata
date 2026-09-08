@@ -66,9 +66,6 @@ def main():
         print(f"[ERROR] Specified input file '{doc_input}' does not exist.")
         sys.exit(1)
 
-    if args.diacritic_hit is not None and active_plan:
-        active_plan.diacritic_hit = args.diacritic_hit
-
     result = run_pipeline(
         pdf_path=doc_input,
         target_threshold=args.target_threshold,
@@ -77,8 +74,7 @@ def main():
         align_skew=not args.no_align_skew,
         visualize=not args.no_visuals,
         output_dir=args.output_dir,
-        plan=active_plan,
-        diacritic_hit=args.diacritic_hit
+        plan=active_plan
     )
 
     print_summary(result)

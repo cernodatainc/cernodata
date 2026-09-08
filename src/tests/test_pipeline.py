@@ -43,7 +43,7 @@ class TestPipelineEngine(unittest.TestCase):
         )
         dom = DocumentDOM(document_id="doc_test", source_filename="sample.pdf", total_pages=1, nodes=[node])
 
-        engine = DecisionTreeEngine(target_threshold=0.82, language="pl", diacritic_hit=0.25)
+        engine = DecisionTreeEngine(target_threshold=0.82, language="pl")
         res = engine.evaluate(dom)
         self.assertEqual(res["status"], "TRIGGER_FALLBACK")
         self.assertFalse(res["is_accepted"])
@@ -70,7 +70,7 @@ class TestPipelineEngine(unittest.TestCase):
              patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
              patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
 
-            res = run_pipeline(pdf_path="test.pdf", language="pl", preset="docling_fast", diacritic_hit=0.25)
+            res = run_pipeline(pdf_path="test.pdf", language="pl", preset="docling_fast")
             decision = res["decision"]
             self.assertIn("attempts", decision)
             attempts = decision["attempts"]
