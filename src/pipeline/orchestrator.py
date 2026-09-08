@@ -31,11 +31,15 @@ def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> Do
 
 
 def evaluate_quality_and_decision_tree(
-    dom: DocumentDOM, target_threshold: float, language: str, preset: str = "docling_fast"
+    dom: DocumentDOM,
+    target_threshold: float,
+    language: str,
+    preset: str = "docling_fast",
+    diacritic_hit: Optional[float] = None
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Extracts quality violation records and evaluates confidence scores against target threshold."""
     violations = detect_quality_violations(dom, language=language)
-    engine = DecisionTreeEngine(target_threshold=target_threshold, language=language)
+    engine = DecisionTreeEngine(target_threshold=target_threshold, language=language, diacritic_hit=diacritic_hit)
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset
     return decision, violations
@@ -114,7 +118,8 @@ def run_pipeline(
     align_skew: bool = True,
     visualize: bool = True,
     output_dir: str = "output",
-    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None
+    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
+    diacritic_hit: Optional[float] = None
 ) -> Dict[str, Any]:
     """Executes end-to-end extraction pipeline with optional plan-driven execution and fallback orchestration."""
     plan_obj: Optional[DocumentPlan] = None
@@ -132,11 +137,15 @@ def run_pipeline(
         language = plan_obj.language
         target_threshold = plan_obj.target_threshold
         preset = plan_obj.primary_preset
+        if diacritic_hit is None and hasattr(plan_obj, "diacritic_hit"):
+            diacritic_hit = plan_obj.diacritic_hit
 
     # Step 1: Initial Parse with Primary Preset
     dom = parse_document(pdf_path, language, preset=preset)
     dom = align_document_skew(dom, pdf_path, align_skew)
-    decision, violations = evaluate_quality_and_decision_tree(dom, target_threshold, language, preset=preset)
+    decision, violations = evaluate_quality_and_decision_tree(
+        dom, target_threshold, language, preset=preset, diacritic_hit=diacritic_hit
+    )
 
     if preset == "docling_deep":
         decision["chosen_preset"] = "docling_deep"
@@ -148,14 +157,19 @@ def run_pipeline(
             "preset_executed": "docling_deep",
             "reason": "Executed using 'docling_deep' preset. All OCR diacritics restored."
         }
-    elif not decision.get("is_accepted") and plan_obj and plan_obj.fallback_queue:
-        # Step 2: Plan-guided Fallback Execution
-        next_candidate = plan_obj.fallback_queue[0].get("preset") if isinstance(plan_obj.fallback_queue[0], dict) else plan_obj.fallback_queue[0]
+    elif not decision.get("is_accepted"):
+        # Step 2: Fallback Execution
+        next_candidate = None
+        if plan_obj and plan_obj.fallback_queue:
+            next_candidate = plan_obj.fallback_queue[0].get("preset") if isinstance(plan_obj.fallback_queue[0], dict) else plan_obj.fallback_queue[0]
+        elif preset == "docling_fast":
+            next_candidate = decision.get("decision_tree", {}).get("next_preset_candidate", "docling_deep")
+
         if next_candidate == "docling_deep":
             fallback_dom = parse_document(pdf_path, language, preset="docling_deep")
             fallback_dom = align_document_skew(fallback_dom, pdf_path, align_skew)
             fb_decision, fb_violations = evaluate_quality_and_decision_tree(
-                fallback_dom, target_threshold, language, preset="docling_deep"
+                fallback_dom, target_threshold, language, preset="docling_deep", diacritic_hit=diacritic_hit
             )
             fb_decision["chosen_preset"] = "docling_deep"
             fb_decision["overall_confidence"] = 0.985

@@ -36,5 +36,19 @@ class TestPipelineEngine(unittest.TestCase):
         self.assertIn("ocr_language_hint", res["decision_tree"]["recommended_parameter_adjustments"])
 
 
+    def test_diacritic_hit_triggers_fallback(self):
+        node = DOMNode(
+            node_id="n1", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Infolinia w piqtku."}
+        )
+        dom = DocumentDOM(document_id="doc_test", source_filename="sample.pdf", total_pages=1, nodes=[node])
+
+        engine = DecisionTreeEngine(target_threshold=0.82, language="pl", diacritic_hit=0.25)
+        res = engine.evaluate(dom)
+        self.assertEqual(res["status"], "TRIGGER_FALLBACK")
+        self.assertFalse(res["is_accepted"])
+        self.assertLess(res["overall_confidence"], 0.82)
+
+
 if __name__ == "__main__":
     unittest.main()

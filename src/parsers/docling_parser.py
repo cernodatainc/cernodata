@@ -119,8 +119,6 @@ def _build_node_content(item: Any, node_type: str, preset: str = "docling_fast",
         if config and config.common_word_corrections:
             for err, fix in config.common_word_corrections.items():
                 raw_text = raw_text.replace(err, fix)
-        elif language == "pl":
-            raw_text = raw_text.replace("piqtku", "piątku").replace("granicq", "granicą")
 
     content_dict: Dict[str, Any] = {"raw_text": raw_text}
     if node_type == "table_grid" and hasattr(item, "export_to_markdown"):

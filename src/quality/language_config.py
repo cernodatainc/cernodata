@@ -38,6 +38,7 @@ class LanguageConfig:
     common_word_corrections: Dict[str, str] = field(default_factory=dict)
     min_words_for_diacritic_check: int = 12
     no_diacritics_penalty: float = 0.15
+    diacritic_hit: float = 0.20
     conflict_penalty_per_occurrence: float = 0.20
     max_conflict_penalty: float = 0.60
     anomalous_char_penalty_per_occurrence: float = 0.15
@@ -91,7 +92,7 @@ class LanguageConfig:
                     results.append((base_char, clean_match, suggested))
         return results
 
-    def compute_score(self, text: str) -> float:
+    def compute_score(self, text: str, diacritic_hit: Optional[float] = None) -> float:
         """
         Computes language fidelity score between 0.0 and 1.0.
         Penalizes anomalous character substitutions, foreign diacritic conflicts,
@@ -101,12 +102,14 @@ class LanguageConfig:
             return 1.0
 
         score = 1.0
+        anom_hit = diacritic_hit if diacritic_hit is not None else self.anomalous_char_penalty_per_occurrence
+        conf_hit = diacritic_hit if diacritic_hit is not None else self.conflict_penalty_per_occurrence
 
         anom_matches = self.find_anomalous_substitutions(text)
         if anom_matches:
             penalty = min(
                 self.max_anomalous_char_penalty,
-                len(anom_matches) * self.anomalous_char_penalty_per_occurrence
+                len(anom_matches) * anom_hit
             )
             score -= penalty
 
@@ -114,7 +117,7 @@ class LanguageConfig:
         if conflicts:
             penalty = min(
                 self.max_conflict_penalty,
-                len(conflicts) * self.conflict_penalty_per_occurrence
+                len(conflicts) * conf_hit
             )
             score -= penalty
 

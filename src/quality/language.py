@@ -18,7 +18,12 @@ LANGUAGE_DIACRITICS = {
 }
 
 
-def compute_language_score(text: str, language: str = "en") -> float:
+from typing import Optional
+
+
+def compute_language_score(
+    text: str, language: str = "en", diacritic_hit: Optional[float] = None
+) -> float:
     """
     Tier 2 Language & Dictionary Verification:
     Evaluates text fidelity against specified language norms, detecting common OCR
@@ -30,6 +35,6 @@ def compute_language_score(text: str, language: str = "en") -> float:
 
     config = get_language_config(lang)
     if config:
-        return config.compute_score(text)
+        return config.compute_score(text, diacritic_hit=diacritic_hit)
 
     return 1.0

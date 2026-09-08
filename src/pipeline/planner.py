@@ -102,6 +102,7 @@ class DocumentPlan:
     overridden: bool
     scores: Dict[str, float]
     created_at: str
+    diacritic_hit: float = 0.20
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -128,7 +129,8 @@ class DocumentPlan:
             suggested_order=data.get("suggested_order", ["docling_fast"]),
             overridden=bool(data.get("overridden", False)),
             scores=data.get("scores", {}),
-            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat())
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
+            diacritic_hit=float(data.get("diacritic_hit", 0.20))
         )
 
     @classmethod
@@ -168,7 +170,8 @@ class PresetPlanner:
         language: str = "en",
         target_threshold: float = 0.82,
         override_order: Optional[List[str]] = None,
-        override_primary: Optional[str] = None
+        override_primary: Optional[str] = None,
+        diacritic_hit: float = 0.20
     ) -> DocumentPlan:
         scores = self.calculate_scores(taxonomy, hardware, target, security)
         suggested = self.suggest_preset_order(scores)
@@ -200,7 +203,8 @@ class PresetPlanner:
             suggested_order=suggested,
             overridden=overridden,
             scores=scores,
-            created_at=datetime.now(timezone.utc).isoformat()
+            created_at=datetime.now(timezone.utc).isoformat(),
+            diacritic_hit=diacritic_hit
         )
 
     def interactive_session(
