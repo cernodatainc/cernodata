@@ -26,14 +26,17 @@ def main():
     active_plan = None
     if args.create_plan:
         planner = PresetPlanner()
-        active_plan = planner.interactive_session()
+        active_plan = planner.interactive_session(default_doc=args.input)
         if args.override_preset:
             active_plan.primary_preset = args.override_preset
             active_plan.overridden = True
             active_plan.preset_order = [args.override_preset] + [p for p in active_plan.preset_order if p != args.override_preset]
         plan_path = os.path.join(args.output_dir, "plan.json")
         active_plan.save(plan_path)
-        print(f"\n[OK] Plan saved to '{plan_path}'. Proceeding to pipeline execution...\n")
+        print(f"\n[OK] Plan saved to '{plan_path}'.")
+        if getattr(args, "plan_only", False):
+            return
+        print("Proceeding to pipeline execution...\n")
     elif args.plan:
         if not os.path.exists(args.plan):
             print(f"[ERROR] Specified plan file '{args.plan}' does not exist.")
@@ -44,7 +47,10 @@ def main():
             active_plan.overridden = True
             active_plan.preset_order = [args.override_preset] + [p for p in active_plan.preset_order if p != args.override_preset]
 
-    doc_input = active_plan.document_path if active_plan else args.input
+    doc_input = args.input or (active_plan.document_path if active_plan else None)
+    if not doc_input:
+        print("[ERROR] Input document path is required (--input / -i or via plan).")
+        sys.exit(1)
 
     print("=" * 68)
     print("cernodata: Layout-Aware Ingestion & Quality Violations Pipeline")

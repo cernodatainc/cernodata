@@ -111,7 +111,7 @@ def export_pipeline_artifacts(
 
 
 def run_pipeline(
-    pdf_path: str = os.path.join("src", "Document 5.pdf"),
+    pdf_path: Optional[str] = None,
     target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
     language: str = "en",
     preset: str = "docling_fast",
@@ -132,13 +132,16 @@ def run_pipeline(
             plan_obj = plan
 
     if plan_obj:
-        if pdf_path == os.path.join("src", "Document 5.pdf") and plan_obj.document_path:
+        if not pdf_path and plan_obj.document_path:
             pdf_path = plan_obj.document_path
         language = plan_obj.language
         target_threshold = plan_obj.target_threshold
         preset = plan_obj.primary_preset
         if diacritic_hit is None and hasattr(plan_obj, "diacritic_hit"):
             diacritic_hit = plan_obj.diacritic_hit
+
+    if not pdf_path:
+        raise ValueError("Input document path is required.")
 
     # Step 1: Initial Parse with Primary Preset
     dom = parse_document(pdf_path, language, preset=preset)

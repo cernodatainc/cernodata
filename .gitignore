@@ -30,6 +30,7 @@ wheels/
 # cernodata pipeline exports & test outputs
 output/
 test_output/
+src/e2e/output/
 
 # IDE / OS files
 .vscode/

@@ -116,7 +116,7 @@ class DocumentPlan:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DocumentPlan":
         return cls(
-            document_path=data.get("document_path", os.path.join("src", "Document 5.pdf")),
+            document_path=data.get("document_path", ""),
             taxonomy=data.get("taxonomy", "general_text"),
             hardware=data.get("hardware", "low_spec_cpu"),
             target=data.get("target", "high_precision_structure"),
@@ -162,7 +162,7 @@ class PresetPlanner:
 
     def create_plan(
         self,
-        document_path: str = os.path.join("src", "Document 5.pdf"),
+        document_path: str = "",
         taxonomy: str = "general_text",
         hardware: str = "low_spec_cpu",
         target: str = "high_precision_structure",
@@ -210,7 +210,8 @@ class PresetPlanner:
     def interactive_session(
         self,
         input_func: Callable[[str], str] = input,
-        print_func: Callable[..., None] = print
+        print_func: Callable[..., None] = print,
+        default_doc: Optional[str] = None
     ) -> DocumentPlan:
         """Guides user through interactive questionnaire, presents preset recommendations, and prompts for override."""
         print_func("=" * 68)
@@ -218,9 +219,12 @@ class PresetPlanner:
         print_func("=" * 68)
 
         # 1. Document Path
-        doc_default = os.path.join("src", "Document 5.pdf")
-        doc_in = input_func(f"[1/6] Input document path [{doc_default}]: ").strip()
-        document_path = doc_in if doc_in else doc_default
+        if default_doc:
+            doc_in = input_func(f"[1/6] Input document path [{default_doc}]: ").strip()
+            document_path = doc_in if doc_in else default_doc
+        else:
+            doc_in = input_func("[1/6] Input document path: ").strip()
+            document_path = doc_in
 
         # 2. Document Taxonomy
         print_func("\n[2/6] Select Document Taxonomy:")

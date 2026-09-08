@@ -14,7 +14,7 @@ from src.pipeline.orchestrator import run_pipeline
 
 
 class PipelineViewerHandler(SimpleHTTPRequestHandler):
-    pdf_path: str = "src/Document 5.pdf"
+    pdf_path: str = ""
     language: str = "pl"
 
     def do_GET(self):
@@ -59,7 +59,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
         self.send_error(4404, "Endpoint not found")
 
 
-def start_pipeline_server(pdf_path: str = "src/Document 5.pdf", language: str = "pl", port: int = 8000, open_browser: bool = True):
+def start_pipeline_server(pdf_path: str = "", language: str = "pl", port: int = 8000, open_browser: bool = True):
     """Starts local HTTP server and opens interactive viewer in default web browser."""
     PipelineViewerHandler.pdf_path = pdf_path
     PipelineViewerHandler.language = language

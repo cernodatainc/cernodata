@@ -17,8 +17,8 @@ def parse_args():
         description="cernodata: Layout-Aware Ingestion, Plan Wizard, Text Skew Alignment & Visual Overlay Renderer."
     )
     parser.add_argument(
-        "--input", "-i", type=str, default=os.path.join("src", "Document 5.pdf"),
-        help="Path to input PDF file (default: src/Document 5.pdf)"
+        "--input", "-i", type=str, default=None,
+        help="Path to input PDF file"
     )
     parser.add_argument(
         "--plan", "-p", type=str, default=None,
@@ -27,6 +27,10 @@ def parse_args():
     parser.add_argument(
         "--create-plan", action="store_true",
         help="Launch interactive planner questionnaire to configure preset ranking and execution plan."
+    )
+    parser.add_argument(
+        "--plan-only", action="store_true",
+        help="Generate and save execution plan without immediately running the pipeline."
     )
     parser.add_argument(
         "--override-preset", type=str, default=None,

@@ -43,7 +43,7 @@ class TestPlanner(unittest.TestCase):
 
     def test_create_plan_default(self):
         plan = self.planner.create_plan(
-            document_path="src/Document 5.pdf",
+            document_path="src/e2e/Dokument 5.pdf",
             taxonomy="financial_report",
             hardware="workstation_cuda",
             target="high_precision_structure",
@@ -57,7 +57,7 @@ class TestPlanner(unittest.TestCase):
 
     def test_create_plan_with_override(self):
         plan = self.planner.create_plan(
-            document_path="src/Document 5.pdf",
+            document_path="src/e2e/Dokument 5.pdf",
             taxonomy="financial_report",
             hardware="workstation_cuda",
             target="high_precision_structure",
@@ -93,14 +93,14 @@ class TestPlanner(unittest.TestCase):
 
     def test_interactive_session_mocked(self):
         # Mock user inputs:
-        # [1] default doc
+        # [1] custom doc path: 'src/e2e/Dokument 5.pdf'
         # [2] choice 1 (financial_report)
         # [3] choice 2 (workstation_cuda)
         # [4] choice 2 (high_precision_structure)
         # [5] choice 1 (air_gapped_local)
         # [6] lang: 'pl', threshold: '0.85'
         # Override prompt: 'y'
-        inputs = ["", "1", "2", "2", "1", "pl", "0.85", "y"]
+        inputs = ["src/e2e/Dokument 5.pdf", "1", "2", "2", "1", "pl", "0.85", "y"]
         input_gen = iter(inputs)
 
         def mock_input(prompt=""):
@@ -111,6 +111,7 @@ class TestPlanner(unittest.TestCase):
             messages.append(" ".join(str(a) for a in args))
 
         plan = self.planner.interactive_session(input_func=mock_input, print_func=mock_print)
+        self.assertEqual(plan.document_path, "src/e2e/Dokument 5.pdf")
         self.assertEqual(plan.taxonomy, "financial_report")
         self.assertEqual(plan.hardware, "workstation_cuda")
         self.assertEqual(plan.language, "pl")
