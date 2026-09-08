@@ -58,11 +58,28 @@ def _fallback_top_left_bbox(bbox: Any, page_height: float) -> Tuple[float, float
     return getattr(bbox, "l", 0.0), getattr(bbox, "t", 0.0), getattr(bbox, "r", 0.0), getattr(bbox, "b", 0.0)
 
 
+# Docling emits DocItemLabel values such as "section_header" and "page_header". Exact labels
+# are resolved first: a substring check would route "section_header" to header_footer (it
+# contains "header") before the heading check could run.
+_EXACT_LABEL_TYPES: Dict[str, str] = {
+    "title": "heading",
+    "section_header": "heading",
+    "page_header": "header_footer",
+    "page_footer": "header_footer",
+    "table": "table_grid",
+    "picture": "figure",
+}
+
+
 def _resolve_node_type(item: Any) -> str:
     """Resolves cernodata DOM primitive type from docling item label."""
-    label = getattr(item, "label", "").lower() if hasattr(item, "label") else ""
-    if "header" in label or "footer" in label: return "header_footer"
+    label = getattr(item, "label", "") or ""
+    label = str(getattr(label, "value", label)).lower()
+    exact = _EXACT_LABEL_TYPES.get(label)
+    if exact:
+        return exact
     if "title" in label or "heading" in label or "section" in label: return "heading"
+    if "header" in label or "footer" in label: return "header_footer"
     if "table" in label: return "table_grid"
     if "picture" in label or "figure" in label: return "figure"
     return "paragraph"
