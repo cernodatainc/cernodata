@@ -207,6 +207,19 @@ class PresetPlanner:
             diacritic_hit=diacritic_hit
         )
 
+    @staticmethod
+    def _resolve_choice(choice: str, options: List[tuple[str, str]], default: str) -> str:
+        choice = choice.strip()
+        if choice.isdigit():
+            idx = int(choice)
+            if 1 <= idx <= len(options):
+                return options[idx - 1][0]
+        choice_lower = choice.lower()
+        for key, _ in options:
+            if key.lower() == choice_lower:
+                return key
+        return default
+
     def interactive_session(
         self,
         input_func: Callable[[str], str] = input,
@@ -231,44 +244,28 @@ class PresetPlanner:
         for idx, (k, desc) in enumerate(TAXONOMY_OPTIONS, 1):
             print_func(f"  {idx}) {k:<22} - {desc}")
         tax_choice = input_func("Choose taxonomy [1-6, default 6 (general_text)]: ").strip()
-        taxonomy = "general_text"
-        if tax_choice.isdigit() and 1 <= int(tax_choice) <= len(TAXONOMY_OPTIONS):
-            taxonomy = TAXONOMY_OPTIONS[int(tax_choice) - 1][0]
-        elif tax_choice in [k for k, _ in TAXONOMY_OPTIONS]:
-            taxonomy = tax_choice
+        taxonomy = self._resolve_choice(tax_choice, TAXONOMY_OPTIONS, default="general_text")
 
         # 3. Hardware Profile
         print_func("\n[3/6] Select Hardware Profile:")
         for idx, (k, desc) in enumerate(HARDWARE_OPTIONS, 1):
             print_func(f"  {idx}) {k:<22} - {desc}")
         hw_choice = input_func("Choose hardware profile [1-3, default 1 (low_spec_cpu)]: ").strip()
-        hardware = "low_spec_cpu"
-        if hw_choice.isdigit() and 1 <= int(hw_choice) <= len(HARDWARE_OPTIONS):
-            hardware = HARDWARE_OPTIONS[int(hw_choice) - 1][0]
-        elif hw_choice in [k for k, _ in HARDWARE_OPTIONS]:
-            hardware = hw_choice
+        hardware = self._resolve_choice(hw_choice, HARDWARE_OPTIONS, default="low_spec_cpu")
 
         # 4. Target Quality vs Speed
         print_func("\n[4/6] Select Quality vs. Speed Target:")
         for idx, (k, desc) in enumerate(TARGET_OPTIONS, 1):
             print_func(f"  {idx}) {k:<24} - {desc}")
         tgt_choice = input_func("Choose target [1-2, default 2 (high_precision_structure)]: ").strip()
-        target = "high_precision_structure"
-        if tgt_choice.isdigit() and 1 <= int(tgt_choice) <= len(TARGET_OPTIONS):
-            target = TARGET_OPTIONS[int(tgt_choice) - 1][0]
-        elif tgt_choice in [k for k, _ in TARGET_OPTIONS]:
-            target = tgt_choice
+        target = self._resolve_choice(tgt_choice, TARGET_OPTIONS, default="high_precision_structure")
 
         # 5. Security Constraints
         print_func("\n[5/6] Select Security / Network Constraint:")
         for idx, (k, desc) in enumerate(SECURITY_OPTIONS, 1):
             print_func(f"  {idx}) {k:<22} - {desc}")
         sec_choice = input_func("Choose security mode [1-2, default 1 (air_gapped_local)]: ").strip()
-        security = "air_gapped_local"
-        if sec_choice.isdigit() and 1 <= int(sec_choice) <= len(SECURITY_OPTIONS):
-            security = SECURITY_OPTIONS[int(sec_choice) - 1][0]
-        elif sec_choice in [k for k, _ in SECURITY_OPTIONS]:
-            security = sec_choice
+        security = self._resolve_choice(sec_choice, SECURITY_OPTIONS, default="air_gapped_local")
 
         # 6. Language & Threshold
         lang_in = input_func("\n[6/6] Language hint code (e.g. 'en', 'pl', 'de') [default: 'en']: ").strip()

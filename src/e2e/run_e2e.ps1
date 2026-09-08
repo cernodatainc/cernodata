@@ -13,7 +13,8 @@
 [CmdletBinding()]
 param (
     [string]$PdfPath = "",
-    [string]$OutputDir = ""
+    [string]$OutputDir = "",
+    [switch]$SkipPlanner
 )
 
 $CurrentDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
@@ -26,6 +27,6 @@ if (-not $OutputDir) {
 }
 
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $CurrentDir "../.."))
-$RunScript = Join-Path $RepoRoot "run_e2e.ps1"
+$RunScript = Join-Path $RepoRoot "src\run_e2e.ps1"
 
-& "$RunScript" -PdfPath "$PdfPath" -OutputDir "$OutputDir"
+& "$RunScript" -PdfPath "$PdfPath" -OutputDir "$OutputDir" -SkipPlanner:$SkipPlanner

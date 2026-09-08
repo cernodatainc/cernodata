@@ -119,6 +119,35 @@ class TestPlanner(unittest.TestCase):
         self.assertEqual(plan.primary_preset, "docling_deep")
         self.assertFalse(plan.overridden)
 
+    def test_interactive_session_verbatim_args(self):
+        # Mock user inputs with verbatim keys instead of numeric indices:
+        # [1] custom doc path: 'src/e2e/Dokument 5.pdf'
+        # [2] verbatim taxonomy: 'multicolumn_article'
+        # [3] verbatim hardware: 'workstation_cuda'
+        # [4] verbatim target: 'rapid_approximate'
+        # [5] verbatim security: 'hosted_vision_api'
+        # [6] lang: 'pl', threshold: '0.80'
+        # Override prompt: 'y'
+        inputs = ["src/e2e/Dokument 5.pdf", "multicolumn_article", "workstation_cuda", "rapid_approximate", "hosted_vision_api", "pl", "0.80", "y"]
+        input_gen = iter(inputs)
+
+        def mock_input(prompt=""):
+            return next(input_gen)
+
+        messages = []
+        def mock_print(*args):
+            messages.append(" ".join(str(a) for a in args))
+
+        plan = self.planner.interactive_session(input_func=mock_input, print_func=mock_print)
+        self.assertEqual(plan.document_path, "src/e2e/Dokument 5.pdf")
+        self.assertEqual(plan.taxonomy, "multicolumn_article")
+        self.assertEqual(plan.hardware, "workstation_cuda")
+        self.assertEqual(plan.target, "rapid_approximate")
+        self.assertEqual(plan.security, "hosted_vision_api")
+        self.assertEqual(plan.language, "pl")
+        self.assertEqual(plan.target_threshold, 0.80)
+        self.assertFalse(plan.overridden)
+
     def test_run_pipeline_with_plan(self):
         plan = self.planner.create_plan(
             document_path="non_existent.pdf",

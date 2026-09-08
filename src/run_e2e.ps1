@@ -25,10 +25,16 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-# Determine repository root from script location
+# Determine repository root from script location (parent of src)
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $ScriptDir) { $ScriptDir = (Get-Location).Path }
-$RepoRoot = [System.IO.Path]::GetFullPath($ScriptDir)
+$RepoRoot = if (Test-Path (Join-Path $ScriptDir "..\src")) {
+    [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".."))
+} elseif (Test-Path (Join-Path $ScriptDir "src")) {
+    [System.IO.Path]::GetFullPath($ScriptDir)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".."))
+}
 
 if (-not $PdfPath) {
     $PdfPath = Join-Path $RepoRoot "src\e2e\Dokument 5.pdf"
