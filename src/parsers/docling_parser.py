@@ -21,7 +21,14 @@ try:
 except ImportError:
     HAS_DOCLING = False
 
-LANG_CODE_MAP = {"pl": ["pol", "pl"], "de": ["deu", "de"], "fr": ["fra", "fr"], "es": ["spa", "es"], "en": ["eng", "en"]}
+LANG_CODE_MAP = {
+    "pl": ["pol", "pl"],
+    "de": ["deu", "de"],
+    "fr": ["fra", "fr"],
+    "es": ["spa", "es"],
+    "en": ["eng", "en"],
+    "auto": ["pol", "deu", "fra", "spa", "eng"]
+}
 
 
 def _extract_page_no_and_bbox(doc: Any, item: Any, prov_item: Any) -> Tuple[int, float, float, float, float]:
@@ -115,10 +122,19 @@ def _build_node_content(item: Any, node_type: str, preset: str = "docling_fast",
     """Builds node content payload dictionary, applying deep OCR diacritic restoration if docling_deep preset is selected."""
     raw_text = _resolve_raw_text(item, node_type, doc)
     if preset == "docling_deep":
-        config = get_language_config(language)
-        if config and config.common_word_corrections:
-            for err, fix in config.common_word_corrections.items():
-                raw_text = raw_text.replace(err, fix)
+        eff_lang = language
+        if eff_lang == "auto" and raw_text:
+            from src.quality.language import detect_text_language
+            eff_lang, _, _ = detect_text_language(raw_text)
+        config = get_language_config(eff_lang)
+        if config:
+            if config.common_word_corrections:
+                for err, fix in config.common_word_corrections.items():
+                    raw_text = raw_text.replace(err, fix)
+            for _, word, suggested in config.find_anomalous_substitutions(raw_text):
+                raw_text = raw_text.replace(word, suggested)
+        # Deep OCR clean-up for trailing OCR noise/fragmented punctuation soup
+        raw_text = re.sub(r"[\s\(\)\[\]]{2,}[a-z\(\)\s]{1,10}$", "", raw_text).strip()
 
     content_dict: Dict[str, Any] = {"raw_text": raw_text}
     if node_type == "table_grid" and hasattr(item, "export_to_markdown"):

@@ -9,7 +9,7 @@ import os
 from typing import List, Dict, Any, Optional
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio
-from src.quality.language import compute_language_score
+from src.quality.language import compute_language_score, detect_page_language
 from src.quality.language_config import get_language_config
 
 
@@ -92,15 +92,31 @@ def evaluate_document_confidence(
         pages_nodes.setdefault(node.global_page_index, []).append(node)
 
     page_scores: Dict[int, float] = {}
+    page_languages: Dict[int, str] = {}
+    page_confidences: Dict[int, float] = {}
+
     for page_no, p_nodes in pages_nodes.items():
-        score_i = evaluate_page_confidence(p_nodes, language=language, diacritic_hit=diacritic_hit)
+        det_lang, det_conf, _ = detect_page_language(p_nodes)
+        page_languages[page_no] = det_lang
+        page_confidences[page_no] = det_conf
+
+        effective_lang = det_lang if language == "auto" else language
+        score_i = evaluate_page_confidence(p_nodes, language=effective_lang, diacritic_hit=diacritic_hit)
         page_scores[page_no] = round(score_i, 4)
 
     overall_confidence = round(
         sum(page_scores.values()) / max(1, len(page_scores)), 4
     )
 
+    from collections import Counter
+    primary_detected = "en"
+    if page_languages:
+        primary_detected = Counter(page_languages.values()).most_common(1)[0][0]
+
     return {
         "overall_confidence": overall_confidence,
-        "per_page_confidence": page_scores
+        "per_page_confidence": page_scores,
+        "detected_languages": page_languages,
+        "detected_language_confidences": page_confidences,
+        "primary_detected_language": primary_detected
     }

@@ -7,7 +7,12 @@ from src.quality.language_config import (
     get_language_config,
     register_language_config
 )
-from src.quality.language import compute_language_score
+from src.quality.language import (
+    compute_language_score,
+    detect_text_language,
+    detect_page_language,
+    detect_document_languages
+)
 from src.quality.evaluator import (
     evaluate_page_confidence,
     evaluate_document_confidence,
@@ -23,6 +28,9 @@ __all__ = [
     "compute_garbage_ratio",
     "compute_garbage_details",
     "compute_language_score",
+    "detect_text_language",
+    "detect_page_language",
+    "detect_document_languages",
     "evaluate_page_confidence",
     "evaluate_document_confidence",
     "load_quality_config",

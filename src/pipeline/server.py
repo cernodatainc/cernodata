@@ -38,6 +38,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             preset = payload.get("preset", "docling_deep")
             pdf_path = payload.get("pdf_path", self.pdf_path)
             language = payload.get("language", self.language)
+            self.language = language
 
             print(f"\n[SERVER API] Triggering live pipeline rerun for preset: '{preset}' (PDF: {pdf_path}, Lang: {language})...")
             result = run_pipeline(pdf_path=pdf_path, preset=preset, language=language)
@@ -45,18 +46,46 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             response_data = {
                 "success": True,
                 "preset": preset,
+                "language": language,
                 "dom": result["dom"],
                 "violations": result["violations"],
                 "decision": result["decision"]
             }
 
             self.send_response(200)
-            self.send_header("Content-Type", "json/application; charset=utf-8")
+            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
             self.wfile.write(json.dumps(response_data).encode("utf-8"))
             return
 
-        self.send_error(4404, "Endpoint not found")
+        elif self.path == "/api/save_dom":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body_data = self.rfile.read(content_length).decode("utf-8")
+            payload = json.loads(body_data) if body_data else {}
+
+            dom_data = payload.get("dom")
+            output_dir = payload.get("output_dir", "output")
+
+            if not dom_data:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Missing dom payload"}).encode("utf-8"))
+                return
+
+            os.makedirs(output_dir, exist_ok=True)
+            dom_file = os.path.join(output_dir, "document_dom.json")
+            with open(dom_file, "w", encoding="utf-8") as f:
+                json.dump(dom_data, f, indent=2)
+
+            print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({len(dom_data.get('nodes', []))} nodes).")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "path": dom_file}).encode("utf-8"))
+            return
+
+        self.send_error(404, "Endpoint not found")
 
 
 def start_pipeline_server(pdf_path: str = "", language: str = "pl", port: int = 8000, open_browser: bool = True):

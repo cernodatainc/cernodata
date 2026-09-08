@@ -87,6 +87,8 @@ def export_pipeline_artifacts(
         "document_id": dom.document_id,
         "source_filename": dom.source_filename,
         "language": language,
+        "detected_languages": decision.get("detected_languages", {}),
+        "primary_detected_language": decision.get("primary_detected_language", "en"),
         "total_violations": len(violations),
         "violations": violations
     }

@@ -44,6 +44,9 @@ class DecisionTreeEngine:
         result: Dict[str, Any] = {
             "preset_id": PRESET_ID,
             "language": self.language,
+            "detected_languages": metrics.get("detected_languages", {}),
+            "detected_language_confidences": metrics.get("detected_language_confidences", {}),
+            "primary_detected_language": metrics.get("primary_detected_language", "en"),
             "target_confidence_threshold": self.target_threshold,
             "overall_confidence": overall_conf,
             "per_page_confidence": per_page_conf,

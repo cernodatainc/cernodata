@@ -39,6 +39,14 @@ class TestHTMLViewer(unittest.TestCase):
             content = f.read()
             self.assertIn("Test Heading", content)
             self.assertIn("cernodata visual flow", content.lower())
+            self.assertIn("selectLanguage", content)
+            self.assertIn("Detected Lang:", content)
+            self.assertIn("renderResizeHandles", content)
+            self.assertIn("resize-handle", content)
+            self.assertIn("toggleIncorrectText", content)
+            self.assertIn("is_incorrect_text", content)
+            self.assertIn("inpX0", content)
+            self.assertIn("btnSaveAnnotations", content)
 
         if os.path.exists(out_path):
             os.remove(out_path)

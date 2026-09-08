@@ -99,7 +99,16 @@ def detect_quality_violations(dom: DocumentDOM, language: str = "en") -> List[Di
     """
     violations = []
     lang = language.lower().strip()
-    config = get_language_config(lang)
+    is_auto = (lang == "auto")
+
+    page_configs: Dict[int, Optional[LanguageConfig]] = {}
+    if is_auto:
+        from src.quality.language import detect_document_languages
+        page_langs = detect_document_languages(dom)
+        page_configs = {p: get_language_config(l) for p, l in page_langs.items()}
+    else:
+        fixed_config = get_language_config(lang)
+
     counter = 1
 
     for node in dom.nodes:
@@ -108,7 +117,8 @@ def detect_quality_violations(dom: DocumentDOM, language: str = "en") -> List[Di
         counter += len(gb_viols)
         violations.extend(gb_viols)
 
-        lang_viols = _check_diacritic_violations(node, raw_text, config, counter)
+        cfg = page_configs.get(node.global_page_index) if is_auto else fixed_config
+        lang_viols = _check_diacritic_violations(node, raw_text, cfg, counter)
         counter += len(lang_viols)
         violations.extend(lang_viols)
 
