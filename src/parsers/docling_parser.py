@@ -68,9 +68,34 @@ def _resolve_node_type(item: Any) -> str:
     return "paragraph"
 
 
-def _build_node_content(item: Any, node_type: str, preset: str = "docling_fast", language: str = "en") -> Dict[str, Any]:
+def _figure_caption(item: Any, doc: Any) -> str:
+    """Returns the caption text of a figure item when Docling exposes one, otherwise an empty string."""
+    if doc is None or not hasattr(item, "caption_text"):
+        return ""
+    try:
+        caption = item.caption_text(doc)
+    except Exception:
+        return ""
+    return caption.strip() if isinstance(caption, str) else ""
+
+
+def _resolve_raw_text(item: Any, node_type: str, doc: Any = None) -> str:
+    """
+    Resolves the textual content of a Docling item.
+
+    Items without a text attribute (for example PictureItem) must yield an empty string,
+    never their object repr. Figures fall back to their caption when one is available.
+    """
+    text = getattr(item, "text", None)
+    raw_text = text.strip() if isinstance(text, str) else ""
+    if not raw_text and node_type == "figure":
+        raw_text = _figure_caption(item, doc)
+    return raw_text
+
+
+def _build_node_content(item: Any, node_type: str, preset: str = "docling_fast", language: str = "en", doc: Any = None) -> Dict[str, Any]:
     """Builds node content payload dictionary, applying deep OCR diacritic restoration if docling_deep preset is selected."""
-    raw_text = getattr(item, "text", str(item)).strip()
+    raw_text = _resolve_raw_text(item, node_type, doc)
     if preset == "docling_deep" and language == "pl":
         raw_text = raw_text.replace("piqtku", "piątku").replace("granicq", "granicą")
 
@@ -129,7 +154,7 @@ class DoclingParser:
                 global_page_index=page_no,
                 temp_slice_index=page_no,
                 bounding_box=BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1, angle=float(angle)),
-                content=_build_node_content(item, node_type, self.preset, self.language)
+                content=_build_node_content(item, node_type, self.preset, self.language, doc=doc)
             )
             nodes.append(dom_node)
             node_counter += 1
