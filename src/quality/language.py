@@ -4,49 +4,32 @@ src/quality/language.py
 Tier 2 Language & Dictionary Verification rules and diacritic anomaly metrics.
 """
 
-import re
+from src.quality.language_config import (
+    LanguageConfig,
+    LANGUAGE_CONFIGS,
+    get_language_config,
+    register_language_config
+)
 
 LANGUAGE_DIACRITICS = {
-    "pl": set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ"),
-    "de": set("äöüßÄÖÜ"),
-    "fr": set("éèêëàâçîïôûùÉÈÊËÀÂÇÎÏÔÛÙ"),
-    "es": set("ñáéíóúü¿¡ÑÁÉÍÓÚÜ")
+    code: cfg.valid_diacritics
+    for code, cfg in LANGUAGE_CONFIGS.items()
+    if cfg.valid_diacritics
 }
 
 
 def compute_language_score(text: str, language: str = "en") -> float:
     """
     Tier 2 Language & Dictionary Verification:
-    Evaluates text fidelity against specified language norms and detects common OCR
-    diacritic substitution errors (such as 'q' replacing 'ą' in Polish text contexts).
+    Evaluates text fidelity against specified language norms, detecting common OCR
+    diacritic substitution errors and foreign diacritic conflicts.
     """
     lang = language.lower().strip()
     if not text or lang == "en":
         return 1.0
 
-    score = 1.0
+    config = get_language_config(lang)
+    if config:
+        return config.compute_score(text)
 
-    if lang == "pl":
-        anomalous_q_matches = re.findall(r"\b\w*q\w*\b", text, re.IGNORECASE)
-        anomalous_q = [
-            w for w in anomalous_q_matches
-            if w.lower() not in {"sql", "query", "q1", "q2", "q3", "q4", "quality", "qr", "quick"}
-        ]
-        if anomalous_q:
-            penalty = min(0.50, len(anomalous_q) * 0.15)
-            score -= penalty
-
-        diacritics = LANGUAGE_DIACRITICS.get("pl", set())
-        has_diacritics = any(c in diacritics for c in text)
-        words = text.split()
-        if len(words) > 12 and not has_diacritics:
-            score -= 0.15
-
-    elif lang in LANGUAGE_DIACRITICS:
-        diacritics = LANGUAGE_DIACRITICS[lang]
-        has_diacritics = any(c in diacritics for c in text)
-        words = text.split()
-        if len(words) > 15 and not has_diacritics:
-            score -= 0.15
-
-    return max(0.0, score)
+    return 1.0

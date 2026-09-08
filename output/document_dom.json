@@ -1,5 +1,5 @@
 {
-  "document_id": "doc_753240",
+  "document_id": "doc_962126",
   "source_filename": "Document 5.pdf",
   "total_pages": 1,
   "nodes": [
@@ -15,7 +15,7 @@
         "y1": 505.03
       },
       "content": {
-        "raw_text": "self_ref='#/pictures/0' parent=RefItem(cref='#/body') children=[RefItem(cref='#/texts/0'), RefItem(cref='#/texts/1'), RefItem(cref='#/texts/2'), RefItem(cref='#/texts/3')] content_layer=<ContentLayer.BODY: 'body'> meta=None label=<DocItemLabel.PICTURE: 'picture'> prov=[ProvenanceItem(page_no=1, bbox=BoundingBox(l=8.062236829732088, t=841.89001, r=547.3803952505637, b=336.8635827186523, coord_origin=<CoordOrigin.BOTTOMLEFT: 'BOTTOMLEFT'>), charspan=(0, 0))] source=[] comments=[] captions=[] references=[] footnotes=[] image=None annotations=[]"
+        "raw_text": ""
       }
     },
     {
@@ -30,7 +30,7 @@
         "y1": 612.44
       },
       "content": {
-        "raw_text": "self_ref='#/pictures/1' parent=RefItem(cref='#/body') children=[RefItem(cref='#/texts/4')] content_layer=<ContentLayer.BODY: 'body'> meta=None label=<DocItemLabel.PICTURE: 'picture'> prov=[ProvenanceItem(page_no=1, bbox=BoundingBox(l=36.01858204172122, t=305.95123947278387, r=106.60976995014984, b=229.44597583017526, coord_origin=<CoordOrigin.BOTTOMLEFT: 'BOTTOMLEFT'>), charspan=(0, 0))] source=[] comments=[] captions=[] references=[] footnotes=[] image=None annotations=[]"
+        "raw_text": ""
       }
     },
     {
@@ -45,12 +45,12 @@
         "y1": 818.24
       },
       "content": {
-        "raw_text": "self_ref='#/pictures/2' parent=RefItem(cref='#/body') children=[RefItem(cref='#/texts/5'), RefItem(cref='#/texts/6')] content_layer=<ContentLayer.BODY: 'body'> meta=None label=<DocItemLabel.PICTURE: 'picture'> prov=[ProvenanceItem(page_no=1, bbox=BoundingBox(l=14.852924087562815, t=176.68931849917305, r=164.9676332708781, b=23.64821659514223, coord_origin=<CoordOrigin.BOTTOMLEFT: 'BOTTOMLEFT'>), charspan=(0, 0))] source=[] comments=[] captions=[] references=[] footnotes=[] image=None annotations=[]"
+        "raw_text": ""
       }
     },
     {
       "node_id": "node_p1_n4",
-      "type": "header_footer",
+      "type": "heading",
       "global_page_index": 1,
       "temp_slice_index": 1,
       "bounding_box": {

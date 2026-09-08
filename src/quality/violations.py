@@ -5,10 +5,10 @@ Quality Violation Detector & Anomaly Extractor.
 Generates structured violation records exported to quality_violations.json.
 """
 
-import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio
+from src.quality.language_config import LanguageConfig, get_language_config
 
 
 def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> List[Dict[str, Any]]:
@@ -28,38 +28,62 @@ def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> Lis
     }]
 
 
-def _check_polish_diacritic_violations(node: DOMNode, raw_text: str, lang: str, counter: int) -> List[Dict[str, Any]]:
-    """Checks Polish text nodes for raw OCR 'q' character substitutions (e.g. 'piqtku' vs 'piątku')."""
-    if lang != "pl":
+def _check_diacritic_violations(
+    node: DOMNode, raw_text: str, config: Optional[LanguageConfig], counter: int
+) -> List[Dict[str, Any]]:
+    """Checks text nodes for OCR substitution anomalies and conflicting diacritics."""
+    if not config or not raw_text or config.code == "en":
         return []
 
-    violations = []
-    q_matches = re.findall(r"\b\w*q\w*\b", raw_text, re.IGNORECASE)
-    for match in q_matches:
-        clean_match = match.strip(".,;:!?()[]\"'*")
-        if clean_match.lower() not in {"sql", "query", "q1", "q2", "q3", "q4", "quality", "qr", "quick"}:
-            suggested = clean_match.replace("q", "ą").replace("Q", "Ą")
-            violations.append({
-                "violation_id": f"viol_p{node.global_page_index}_v{counter + len(violations)}",
-                "global_page_index": node.global_page_index,
-                "node_id": node.node_id,
-                "rule_type": "ocr_character_substitution",
-                "severity": "WARNING",
-                "detected_snippet": clean_match,
-                "suggested_correction": suggested,
-                "description": f"OCR 'q' character substitution anomaly detected ('{clean_match}' -> '{suggested}')",
-                "bounding_box": node.bounding_box.to_dict()
-            })
+    violations: List[Dict[str, Any]] = []
+
+    # 1. OCR character substitution anomalies (e.g. 'q' -> 'ą' in Polish)
+    for anom_char, match_snippet, suggested in config.find_anomalous_substitutions(raw_text):
+        violations.append({
+            "violation_id": f"viol_p{node.global_page_index}_v{counter + len(violations)}",
+            "global_page_index": node.global_page_index,
+            "node_id": node.node_id,
+            "rule_type": "ocr_character_substitution",
+            "severity": "WARNING",
+            "detected_snippet": match_snippet,
+            "suggested_correction": suggested,
+            "description": f"OCR '{anom_char}' character substitution anomaly detected ('{match_snippet}' -> '{suggested}')",
+            "bounding_box": node.bounding_box.to_dict()
+        })
+
+    # 2. Conflicting foreign diacritics (e.g. 'ö' umlaut in Polish hinted context)
+    for conf_char, match_snippet, suggested in config.find_diacritic_conflicts(raw_text):
+        violations.append({
+            "violation_id": f"viol_p{node.global_page_index}_v{counter + len(violations)}",
+            "global_page_index": node.global_page_index,
+            "node_id": node.node_id,
+            "rule_type": "diacritic_conflict",
+            "severity": "WARNING",
+            "detected_snippet": match_snippet,
+            "suggested_correction": suggested,
+            "description": f"Diacritic conflict detected: '{conf_char}' is not valid in {config.name} ('{match_snippet}' -> '{suggested}')",
+            "bounding_box": node.bounding_box.to_dict()
+        })
+
     return violations
+
+
+def _check_polish_diacritic_violations(node: DOMNode, raw_text: str, lang: str, counter: int) -> List[Dict[str, Any]]:
+    """Backward compatibility wrapper for Polish diacritic violations."""
+    if lang != "pl":
+        return []
+    config = get_language_config("pl")
+    return _check_diacritic_violations(node, raw_text, config, counter)
 
 
 def detect_quality_violations(dom: DocumentDOM, language: str = "en") -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations and anomalies.
-    Composes single-rule check functions.
+    Composes single-rule check functions with language configuration rules.
     """
     violations = []
     lang = language.lower().strip()
+    config = get_language_config(lang)
     counter = 1
 
     for node in dom.nodes:
@@ -68,7 +92,7 @@ def detect_quality_violations(dom: DocumentDOM, language: str = "en") -> List[Di
         counter += len(gb_viols)
         violations.extend(gb_viols)
 
-        lang_viols = _check_polish_diacritic_violations(node, raw_text, lang, counter)
+        lang_viols = _check_diacritic_violations(node, raw_text, config, counter)
         counter += len(lang_viols)
         violations.extend(lang_viols)
 

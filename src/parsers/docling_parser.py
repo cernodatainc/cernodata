@@ -10,6 +10,7 @@ import re
 from typing import Dict, Any, List, Tuple
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
+from src.quality.language_config import get_language_config
 
 HAS_DOCLING = False
 try:
@@ -113,8 +114,13 @@ def _resolve_raw_text(item: Any, node_type: str, doc: Any = None) -> str:
 def _build_node_content(item: Any, node_type: str, preset: str = "docling_fast", language: str = "en", doc: Any = None) -> Dict[str, Any]:
     """Builds node content payload dictionary, applying deep OCR diacritic restoration if docling_deep preset is selected."""
     raw_text = _resolve_raw_text(item, node_type, doc)
-    if preset == "docling_deep" and language == "pl":
-        raw_text = raw_text.replace("piqtku", "piątku").replace("granicq", "granicą")
+    if preset == "docling_deep":
+        config = get_language_config(language)
+        if config and config.common_word_corrections:
+            for err, fix in config.common_word_corrections.items():
+                raw_text = raw_text.replace(err, fix)
+        elif language == "pl":
+            raw_text = raw_text.replace("piqtku", "piątku").replace("granicq", "granicą")
 
     content_dict: Dict[str, Any] = {"raw_text": raw_text}
     if node_type == "table_grid" and hasattr(item, "export_to_markdown"):

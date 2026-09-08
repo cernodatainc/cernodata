@@ -12,7 +12,10 @@ from src.quality import (
     compute_language_score,
     evaluate_page_confidence,
     detect_quality_violations,
-    detect_node_text_skew
+    detect_node_text_skew,
+    LanguageConfig,
+    get_language_config,
+    register_language_config
 )
 
 
@@ -52,6 +55,67 @@ class TestQualityMetrics(unittest.TestCase):
         blank_crop = np.ones((50, 200, 3), dtype=np.uint8) * 255
         angle = detect_node_text_skew(blank_crop)
         self.assertEqual(angle, 0.0)
+
+    def test_language_config_registry_and_substitutions(self):
+        config = get_language_config("pl")
+        self.assertIsNotNone(config)
+        self.assertIn("ą", config.valid_diacritics)
+        self.assertIn("q", config.common_substitutions.get("ą", []))
+        self.assertIn("a", config.common_substitutions.get("ą", []))
+        self.assertIn("e", config.common_substitutions.get("ę", []))
+        self.assertIn("n", config.common_substitutions.get("ń", []))
+        self.assertIn("ö", config.conflicting_diacritics)
+
+    def test_diacritic_conflict_reduces_page_confidence(self):
+        clean_node = DOMNode(
+            node_id="n_clean", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Sprawdź termin wykupu obligacji w piątku."}
+        )
+        conflicted_node = DOMNode(
+            node_id="n_conflict", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Sprawdź termin wykupu Möbel w piątku."}
+        )
+        clean_confidence = evaluate_page_confidence([clean_node], language="pl")
+        conflicted_confidence = evaluate_page_confidence([conflicted_node], language="pl")
+
+        self.assertEqual(clean_confidence, 1.0)
+        self.assertLess(conflicted_confidence, clean_confidence)
+
+    def test_detect_diacritic_conflict_violation(self):
+        node = DOMNode(
+            node_id="n_umlaut", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Firma dostarczy nowe Möbel do biura."}
+        )
+        dom = DocumentDOM(document_id="doc_umlaut", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        violations = detect_quality_violations(dom, language="pl")
+
+        conflict_viols = [v for v in violations if v["rule_type"] == "diacritic_conflict"]
+        self.assertEqual(len(conflict_viols), 1)
+        v = conflict_viols[0]
+        self.assertEqual(v["detected_snippet"], "Möbel")
+        self.assertEqual(v["suggested_correction"], "Móbel")
+        self.assertIn("not valid in Polish", v["description"])
+
+    def test_custom_language_config_registration(self):
+        custom_config = LanguageConfig(
+            code="custom_lang",
+            name="Custom Language",
+            valid_diacritics=set("čšž"),
+            conflicting_diacritics=set("öäü"),
+            common_substitutions={"č": ["c"], "š": ["s"], "ž": ["z"]}
+        )
+        register_language_config(custom_config)
+        retrieved = get_language_config("custom_lang")
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.name, "Custom Language")
+
+        clean_score = compute_language_score("Poročilo o delu in stroških", language="custom_lang")
+        conflicted_score = compute_language_score("Poročilo o delu Möbel", language="custom_lang")
+        self.assertEqual(clean_score, 1.0)
+        self.assertLess(conflicted_score, 1.0)
 
 
 if __name__ == "__main__":
