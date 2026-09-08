@@ -143,6 +143,8 @@ def run_pipeline(
     if not pdf_path:
         raise ValueError("Input document path is required.")
 
+    attempts: List[Dict[str, Any]] = []
+
     # Step 1: Initial Parse with Primary Preset
     dom = parse_document(pdf_path, language, preset=preset)
     dom = align_document_skew(dom, pdf_path, align_skew)
@@ -150,11 +152,21 @@ def run_pipeline(
         dom, target_threshold, language, preset=preset, diacritic_hit=diacritic_hit
     )
 
+    initial_attempt = {
+        "step": 1,
+        "preset": preset,
+        "overall_confidence": decision.get("overall_confidence"),
+        "per_page_confidence": decision.get("per_page_confidence"),
+        "status": decision.get("status"),
+        "is_accepted": decision.get("is_accepted", False),
+        "violations_count": len(violations),
+        "action": decision.get("decision_tree", {}).get("action"),
+        "reason": decision.get("decision_tree", {}).get("reason")
+    }
+    attempts.append(initial_attempt)
+
     if preset == "docling_deep":
         decision["chosen_preset"] = "docling_deep"
-        decision["overall_confidence"] = 0.985
-        decision["is_accepted"] = True
-        decision["status"] = "ACCEPT"
         decision["decision_tree"] = {
             "action": "ACCEPT_OUTPUT",
             "preset_executed": "docling_deep",
@@ -163,8 +175,11 @@ def run_pipeline(
     elif not decision.get("is_accepted"):
         # Step 2: Fallback Execution
         next_candidate = None
+        part_of_plan = False
         if plan_obj and plan_obj.fallback_queue:
-            next_candidate = plan_obj.fallback_queue[0].get("preset") if isinstance(plan_obj.fallback_queue[0], dict) else plan_obj.fallback_queue[0]
+            first_fb = plan_obj.fallback_queue[0]
+            next_candidate = first_fb.get("preset") if isinstance(first_fb, dict) else first_fb
+            part_of_plan = True
         elif preset == "docling_fast":
             next_candidate = decision.get("decision_tree", {}).get("next_preset_candidate", "docling_deep")
 
@@ -175,18 +190,43 @@ def run_pipeline(
                 fallback_dom, target_threshold, language, preset="docling_deep", diacritic_hit=diacritic_hit
             )
             fb_decision["chosen_preset"] = "docling_deep"
-            fb_decision["overall_confidence"] = 0.985
-            fb_decision["is_accepted"] = True
-            fb_decision["status"] = "ACCEPT"
+
+            if part_of_plan:
+                plan_note = f"Executed plan fallback '{next_candidate}'."
+            else:
+                plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
+
             fb_decision["decision_tree"] = {
                 "action": "PATH_A_SWITCH_PRESET",
                 "preset_executed": "docling_deep",
                 "fallback_triggered": True,
-                "reason": f"Initial preset '{preset}' fell below threshold ({decision.get('overall_confidence')} < {target_threshold}). Executed plan fallback '{next_candidate}'."
+                "reason": (
+                    f"Initial preset '{preset}' fell below threshold "
+                    f"({decision.get('overall_confidence')} < {target_threshold}). {plan_note}"
+                ),
+                "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
+                "detail": plan_note
             }
+
+            second_attempt = {
+                "step": 2,
+                "preset": "docling_deep",
+                "overall_confidence": fb_decision.get("overall_confidence"),
+                "per_page_confidence": fb_decision.get("per_page_confidence"),
+                "status": fb_decision.get("status"),
+                "is_accepted": fb_decision.get("is_accepted", False),
+                "violations_count": len(fb_violations),
+                "action": fb_decision.get("decision_tree", {}).get("action"),
+                "reason": fb_decision.get("decision_tree", {}).get("reason"),
+                "detail": plan_note
+            }
+            attempts.append(second_attempt)
+
             dom = fallback_dom
             decision = fb_decision
             violations = fb_violations
+
+    decision["attempts"] = attempts
 
     plan_dict = plan_obj.to_dict() if plan_obj else None
     rendered_images = render_visual_overlays(pdf_path, dom, violations, visualize, output_dir)

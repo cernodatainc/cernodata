@@ -19,7 +19,8 @@
 [CmdletBinding()]
 param (
     [string]$PdfPath = "",
-    [string]$OutputDir = ""
+    [string]$OutputDir = "",
+    [switch]$SkipPlanner
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,18 +71,22 @@ $env:PYTHONPATH = if ($env:PYTHONPATH) { "$RepoRoot;$env:PYTHONPATH" } else { $R
 
 Push-Location $RepoRoot
 try {
-    # Step 1: Launch interactive planner questionnaire
-    Write-Host "[Step 1/3] Launching interactive planner wizard..."
-    Write-Host "Please answer the questionnaire prompts to generate the plan."
-    Write-Host ""
-
     $PlanPath = Join-Path $OutputDir "plan.json"
 
-    & python -m src.main --create-plan --plan-only --input "$PdfPath" --output-dir "$OutputDir"
+    if ($SkipPlanner -and (Test-Path $PlanPath)) {
+        Write-Host "[Step 1/3] Using existing execution plan: $PlanPath (-SkipPlanner)"
+    } else {
+        # Step 1: Launch interactive planner wizard
+        Write-Host "[Step 1/3] Launching interactive planner wizard..."
+        Write-Host "Please answer the questionnaire prompts to generate the plan."
+        Write-Host ""
 
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $PlanPath)) {
-        Write-Error "Planner questionnaire failed or plan was not generated: $PlanPath"
-        exit 1
+        & python -m src.main --create-plan --plan-only --input "$PdfPath" --output-dir "$OutputDir"
+
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $PlanPath)) {
+            Write-Error "Planner questionnaire failed or plan was not generated: $PlanPath"
+            exit 1
+        }
     }
 
     # Step 2: Run pipeline parsing using generated plan

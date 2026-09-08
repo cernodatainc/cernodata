@@ -96,6 +96,16 @@ def print_summary(result: Dict[str, Any]):
     print(f"Action: {decision['decision_tree']['action']}")
     print(f"Reason: {decision['decision_tree']['reason']}")
 
+    attempts = decision.get("attempts", [])
+    if len(attempts) > 1:
+        print("\n--- Pipeline Execution Attempts ---")
+        for att in attempts:
+            detail_str = f" | {att['detail']}" if att.get("detail") else ""
+            print(
+                f" [Step {att['step']}] Preset: {att['preset']} | Confidence: {att['overall_confidence']} "
+                f"| Status: {att['status']}{detail_str}"
+            )
+
     if violations:
         print("\n--- Specific Quality Violations Detected ---")
         for v in violations:

@@ -63,12 +63,28 @@ def generate_interactive_html(
         ov_text = " [OVERRIDDEN]" if is_over else ""
         plan_header_sub = f" | Plan: {tax} ({hw}){ov_text}"
 
-    chosen_preset = decision.get('chosen_preset', (plan.get('primary_preset') if plan else 'docling_fast'))
-    preset2_name = "docling_deep"
-    if plan and plan.get("fallback_queue"):
-        preset2_name = plan["fallback_queue"][0].get("preset", "docling_deep") if isinstance(plan["fallback_queue"][0], dict) else plan["fallback_queue"][0]
+    attempts = decision.get("attempts", [])
+    if attempts and len(attempts) > 1:
+        att1 = attempts[0]
+        att2 = attempts[1]
+        is_att1_pass = att1.get("is_accepted", False)
+        is_att2_pass = att2.get("is_accepted", False)
+        timeline_buttons_html = f'''
+            <button class="step-btn active" id="btnPreset1" onclick="switchPreset(0)">
+                <span>Step 1: {att1.get('preset', 'docling_fast')}</span>
+                <span class="badge-status {'pass' if is_att1_pass else 'fail'}" id="statusPreset1">{'ACCEPT' if is_att1_pass else 'FALLBACK'}</span>
+            </button>
+            <button class="step-btn" id="btnPreset2" onclick="switchPreset(1)">
+                <span>Step 2: {att2.get('preset', 'docling_deep')}</span>
+                <span class="badge-status {'pass' if is_att2_pass else 'fail'}" id="statusPreset2">{'ACCEPT' if is_att2_pass else 'FAIL'}</span>
+            </button>'''
+    else:
+        chosen_preset = decision.get('chosen_preset', (plan.get('primary_preset') if plan else 'docling_fast'))
+        preset2_name = "docling_deep"
+        if plan and plan.get("fallback_queue"):
+            preset2_name = plan["fallback_queue"][0].get("preset", "docling_deep") if isinstance(plan["fallback_queue"][0], dict) else plan["fallback_queue"][0]
 
-    timeline_buttons_html = f'''
+        timeline_buttons_html = f'''
             <button class="step-btn active" id="btnPreset1" onclick="switchPreset(0)">
                 <span>Step 1: {chosen_preset}</span>
                 <span class="badge-status {'pass' if is_acc else 'fail'}" id="statusPreset1">{'ACCEPT' if is_acc else 'REJECT'}</span>
@@ -462,6 +478,16 @@ def generate_interactive_html(
             document.getElementById('btnPreset2').classList.toggle('active', activePresetIndex === 1);
             const st2 = document.getElementById('statusPreset2');
 
+            const attempts = decisionData.attempts || [];
+            let displayedScore = decisionData.overall_confidence;
+            let displayedStatus = decisionData.status || 'ACCEPT';
+
+            if (attempts.length > 1) {{
+                const currentAttempt = attempts[activePresetIndex] || attempts[attempts.length - 1];
+                displayedScore = currentAttempt.overall_confidence;
+                displayedStatus = currentAttempt.status;
+            }}
+
             if (activePresetIndex === 1) {{
                 st2.textContent = 'ACTIVE (PASSED)';
                 st2.style.background = 'var(--accent-green)';
@@ -469,8 +495,8 @@ def generate_interactive_html(
                 appliedCorrections = true;
                 document.getElementById('toggleCorrections').checked = true;
 
-                document.getElementById('scoreTitle').textContent = `Page 1 Confidence Score: ${{decisionData.overall_confidence ? decisionData.overall_confidence.toFixed(3) : '0.985'}}`;
-                document.getElementById('scoreSub').textContent = `Status: ${{decisionData.status || 'ACCEPT'}} | Violations Flagged: ${{violationsData.length}}`;
+                document.getElementById('scoreTitle').textContent = `Page 1 Confidence Score: ${{displayedScore !== undefined ? Number(displayedScore).toFixed(4) : '0.9885'}}`;
+                document.getElementById('scoreSub').textContent = `Status: ${{displayedStatus}} | Violations Flagged: ${{violationsData.length}}`;
                 document.getElementById('scoreSub').style.color = 'var(--accent-green)';
                 document.getElementById('scoreBadge').classList.remove('fail');
             }} else {{
@@ -478,9 +504,9 @@ def generate_interactive_html(
                 st2.style.background = '#4B5563';
                 st2.style.color = '#FFF';
 
-                document.getElementById('scoreTitle').textContent = `Page 1 Confidence Score: ${{decisionData.overall_confidence ? decisionData.overall_confidence.toFixed(3) : '0.931'}}`;
-                document.getElementById('scoreSub').textContent = `Status: ${{decisionData.status || 'ACCEPT'}} | Violations Flagged: ${{violationsData.length}}`;
-                document.getElementById('scoreSub').style.color = decisionData.is_accepted ? 'var(--accent-green)' : 'var(--accent-red)';
+                document.getElementById('scoreTitle').textContent = `Page 1 Confidence Score: ${{displayedScore !== undefined ? Number(displayedScore).toFixed(4) : '0.5577'}}`;
+                document.getElementById('scoreSub').textContent = `Status: ${{displayedStatus}} | Violations Flagged: ${{violationsData.length}}`;
+                document.getElementById('scoreSub').style.color = (displayedStatus === 'ACCEPT' || decisionData.is_accepted) ? 'var(--accent-green)' : 'var(--accent-red)';
             }}
 
             renderDOMTree();
