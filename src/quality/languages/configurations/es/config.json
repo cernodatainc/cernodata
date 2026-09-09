@@ -1,0 +1,19 @@
+{
+  "code": "es",
+  "name": "Spanish",
+  "valid_diacritics": "ñáéíóúü¿¡ÑÁÉÍÓÚÜ",
+  "common_substitutions": {
+    "ñ": ["n"], "á": ["a"], "é": ["e"], "í": ["i"], "ó": ["o"], "ú": ["u"], "ü": ["u"]
+  },
+  "anomalous_chars": {},
+  "allowed_anomalous_tokens": [],
+  "conflicting_diacritic_replacements": {},
+  "common_word_corrections": {},
+  "min_words_for_diacritic_check": 15,
+  "stopwords": [
+    "el", "la", "los", "las", "un", "una", "unos", "unas", "de", "en", "y", "a",
+    "que", "por", "con", "para", "como", "es", "su", "sus", "al", "lo", "del", "más",
+    "no", "se", "pero", "este", "esta", "estos", "estas", "entre", "cuando", "todo",
+    "todos", "son", "sobre", "ya", "si", "bien", "sin", "muy", "hay", "me", "te"
+  ]
+}

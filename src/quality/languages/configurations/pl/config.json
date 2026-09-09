@@ -1,0 +1,54 @@
+{
+  "code": "pl",
+  "name": "Polish",
+  "valid_diacritics": "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ",
+  "common_substitutions": {
+    "ą": ["q", "a"],
+    "ę": ["e"],
+    "ń": ["n"],
+    "ć": ["c"],
+    "ł": ["l", "1", "t"],
+    "ó": ["o", "ö"],
+    "ś": ["s"],
+    "ź": ["z"],
+    "ż": ["z"],
+    "Ą": ["Q", "A"],
+    "Ę": ["E"],
+    "Ń": ["N"],
+    "Ć": ["C"],
+    "Ł": ["L", "T"],
+    "Ó": ["O", "Ö"],
+    "Ś": ["S"],
+    "Ź": ["Z"],
+    "Ż": ["Z"]
+  },
+  "anomalous_chars": {
+    "q": "ą",
+    "Q": "Ą"
+  },
+  "allowed_anomalous_tokens": [
+    "sql", "query", "q1", "q2", "q3", "q4", "quality", "qr", "quick", "status", "faq"
+  ],
+  "conflicting_diacritic_replacements": {
+    "ö": "ó", "Ö": "Ó",
+    "ä": "ą", "Ä": "Ą",
+    "ü": "u", "Ü": "U",
+    "ë": "ę", "Ë": "Ę"
+  },
+  "common_word_corrections": {
+    "piqtku": "piątku",
+    "granicq": "granicą"
+  },
+  "min_words_for_diacritic_check": 12,
+  "stopwords": [
+    "w", "z", "i", "na", "do", "nie", "się", "jest", "jak", "to", "od", "dla", "po",
+    "oraz", "że", "o", "przez", "ale", "ze", "czy", "co", "za", "ich", "tym", "pan",
+    "pani", "rok", "roku", "jego", "jej", "ma", "może", "tak", "tylko", "więcej", "już",
+    "też", "lub", "albo", "nad", "pod", "przed", "między", "bez", "gdy", "jeśli", "tam",
+    "tu", "tutaj", "gdzie", "który", "która", "które", "którzy", "ten", "ta", "te",
+    "bardzo", "jeszcze", "można", "być", "są", "był", "była", "było", "byli", "będzie",
+    "mają", "miał", "miała", "miało", "mieli", "więc", "aż", "ci", "mu", "go", "nas",
+    "was", "nich", "nam", "wam", "im", "sobą", "sobie", "czym", "kim", "jaki", "jaka",
+    "jakie", "my", "wy", "oni", "one", "nasz", "wasz", "swój", "swoja", "swoje", "swoich"
+  ]
+}

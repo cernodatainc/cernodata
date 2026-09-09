@@ -1,0 +1,21 @@
+{
+  "all_known_diacritics": {
+    "polish": "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ",
+    "german": "äöüßÄÖÜ",
+    "french": "éèêëàâçîïôûùÉÈÊËÀÂÇÎÏÔÛÙ",
+    "spanish": "ñáéíóúü¿¡ÑÁÉÍÓÚÜ",
+    "czech_slovak": "čďěňřšťůžČĎĚŇŘŠŤŮŽ",
+    "scandinavian": "åæøÅÆØ",
+    "hungarian": "őűŐŰ",
+    "portuguese": "ãõÃÕ"
+  },
+  "defaults": {
+    "min_words_for_diacritic_check": 12,
+    "no_diacritics_penalty": 0.15,
+    "diacritic_hit": 0.20,
+    "conflict_penalty_per_occurrence": 0.20,
+    "max_conflict_penalty": 0.60,
+    "anomalous_char_penalty_per_occurrence": 0.15,
+    "max_anomalous_char_penalty": 0.50
+  }
+}

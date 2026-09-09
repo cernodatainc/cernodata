@@ -5,19 +5,41 @@ Language configuration model dataclass and character conflict resolution logic.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Set, Optional, Tuple, Any, Union
+import json
+import os
 import re
 
-ALL_KNOWN_DIACRITICS: Set[str] = set(
-    "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ"          # Polish
-    "äöüßÄÖÜ"                     # German
-    "éèêëàâçîïôûùÉÈÊËÀÂÇÎÏÔÛÙ"    # French
-    "ñáéíóúü¿¡ÑÁÉÍÓÚÜ"            # Spanish
-    "čďěňřšťůžČĎĚŇŘŠŤŮŽ"          # Czech / Slovak
-    "åæøÅÆØ"                      # Scandinavian
-    "őűŐŰ"                        # Hungarian
-    "ãõÃÕ"                        # Portuguese
-)
+_CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configurations")
+_CROSS_CUTTING_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.json")
+
+
+def load_all_known_diacritics(config_path: Optional[str] = None) -> Set[str]:
+    """Loads all known diacritics from the cross-cutting json configuration."""
+    path = config_path or _CROSS_CUTTING_CONFIG_PATH
+    if not os.path.exists(path):
+        return set()
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    raw = data.get("all_known_diacritics", {})
+    if isinstance(raw, str):
+        return set(raw)
+    if isinstance(raw, list):
+        return set("".join(raw))
+    if isinstance(raw, dict):
+        chars: List[str] = []
+        for val in raw.values():
+            if isinstance(val, str):
+                chars.append(val)
+            elif isinstance(val, list):
+                chars.extend(val)
+        return set("".join(chars))
+    return set()
+
+
+ALL_KNOWN_DIACRITICS: Set[str] = load_all_known_diacritics()
 
 
 @dataclass
@@ -35,6 +57,7 @@ class LanguageConfig:
     allowed_anomalous_tokens: Set[str] = field(default_factory=set)
     conflicting_diacritic_replacements: Dict[str, str] = field(default_factory=dict)
     common_word_corrections: Dict[str, str] = field(default_factory=dict)
+    stopwords: Set[str] = field(default_factory=set)
     min_words_for_diacritic_check: int = 12
     no_diacritics_penalty: float = 0.15
     diacritic_hit: float = 0.20

@@ -10,7 +10,8 @@ import json
 from typing import Dict, Optional, Any
 from src.quality.languages.models import LanguageConfig
 
-_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "languages.json")
+_CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configurations")
+_LEGACY_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "languages.json")
 
 
 def _build_language_config(data: Dict[str, Any]) -> LanguageConfig:
@@ -23,15 +24,34 @@ def _build_language_config(data: Dict[str, Any]) -> LanguageConfig:
         allowed_anomalous_tokens=set(data.get("allowed_anomalous_tokens", [])),
         conflicting_diacritic_replacements=data.get("conflicting_diacritic_replacements", {}),
         common_word_corrections=data.get("common_word_corrections", {}),
+        stopwords=set(data.get("stopwords", [])),
         min_words_for_diacritic_check=data.get("min_words_for_diacritic_check", 12)
     )
 
 
-def load_all_language_configs() -> Dict[str, LanguageConfig]:
-    """Loads and instantiates all LanguageConfig instances from languages.json."""
-    with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-    return {code: _build_language_config(cfg_dict) for code, cfg_dict in raw.items()}
+def load_all_language_configs(config_dir: Optional[str] = None) -> Dict[str, LanguageConfig]:
+    """Loads and instantiates all LanguageConfig instances from per-language directories in configurations/."""
+    base_dir = config_dir or _CONFIG_DIR
+    configs: Dict[str, LanguageConfig] = {}
+
+    if os.path.isdir(base_dir):
+        for entry in os.listdir(base_dir):
+            entry_path = os.path.join(base_dir, entry)
+            if os.path.isdir(entry_path):
+                cfg_file = os.path.join(entry_path, "config.json")
+                if os.path.isfile(cfg_file):
+                    with open(cfg_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    cfg = _build_language_config(data)
+                    configs[cfg.code.lower().strip()] = cfg
+
+    # Fallback to legacy languages.json if configurations directory was empty or missing
+    if not configs and os.path.isfile(_LEGACY_CONFIG_PATH):
+        with open(_LEGACY_CONFIG_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        configs = {code: _build_language_config(cfg_dict) for code, cfg_dict in raw.items()}
+
+    return configs
 
 
 LANGUAGE_CONFIGS: Dict[str, LanguageConfig] = load_all_language_configs()

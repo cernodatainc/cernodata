@@ -1,0 +1,22 @@
+{
+  "code": "fr",
+  "name": "French",
+  "valid_diacritics": "éèêëàâçîïôûùÉÈÊËÀÂÇÎÏÔÛÙ",
+  "common_substitutions": {
+    "é": ["e"], "è": ["e"], "ê": ["e"], "ë": ["e"],
+    "à": ["a"], "â": ["a"], "ç": ["c"],
+    "î": ["i"], "ï": ["i"], "ô": ["o"], "û": ["u"], "ù": ["u"]
+  },
+  "anomalous_chars": {},
+  "allowed_anomalous_tokens": [],
+  "conflicting_diacritic_replacements": {},
+  "common_word_corrections": {},
+  "min_words_for_diacritic_check": 15,
+  "stopwords": [
+    "le", "la", "les", "des", "du", "de", "un", "une", "et", "dans", "pour", "avec",
+    "sur", "au", "aux", "qui", "que", "est", "son", "sa", "ses", "en", "pas", "ce",
+    "cette", "ces", "mais", "ou", "où", "par", "nous", "vous", "ils", "elles", "tout",
+    "plus", "leur", "leurs", "comme", "ne", "ont", "sont", "être", "avoir", "fait",
+    "très", "bien", "sans", "sous", "même", "aussi"
+  ]
+}

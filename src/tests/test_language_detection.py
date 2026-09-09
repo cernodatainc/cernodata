@@ -121,6 +121,45 @@ class TestLanguageDetection(unittest.TestCase):
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0]["rule_type"], "ocr_character_substitution")
 
+    def test_language_configurations_directory_and_cross_cutting_diacritics(self):
+        from src.quality.languages.models import ALL_KNOWN_DIACRITICS
+        from src.quality.languages.definitions import (
+            POLISH_CONFIG,
+            GERMAN_CONFIG,
+            FRENCH_CONFIG,
+            SPANISH_CONFIG,
+            ENGLISH_CONFIG,
+            get_language_config
+        )
+        from src.quality.languages.detector import LANGUAGE_STOPWORDS
+
+        # Verify cross-cutting diacritics loaded from configurations/config.json
+        expected_chars = ["ć", "ä", "é", "ñ", "č", "å", "ő", "ã"]
+        for char in expected_chars:
+            self.assertIn(char, ALL_KNOWN_DIACRITICS)
+
+        # Verify individual language configurations loaded from configurations/<lang>/config.json
+        self.assertEqual(POLISH_CONFIG.code, "pl")
+        self.assertIn("się", POLISH_CONFIG.stopwords)
+        self.assertIn("się", LANGUAGE_STOPWORDS["pl"])
+
+        self.assertEqual(GERMAN_CONFIG.code, "de")
+        self.assertIn("und", GERMAN_CONFIG.stopwords)
+
+        self.assertEqual(FRENCH_CONFIG.code, "fr")
+        self.assertIn("les", FRENCH_CONFIG.stopwords)
+
+        self.assertEqual(SPANISH_CONFIG.code, "es")
+        self.assertIn("los", SPANISH_CONFIG.stopwords)
+
+        self.assertEqual(ENGLISH_CONFIG.code, "en")
+        self.assertIn("the", ENGLISH_CONFIG.stopwords)
+
+        # Test lookup helper
+        cfg = get_language_config("pl")
+        self.assertIsNotNone(cfg)
+        self.assertEqual(cfg.name, "Polish")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,9 +17,21 @@ _STOPWORDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stop
 
 
 def _load_stopwords() -> Dict[str, Set[str]]:
-    with open(_STOPWORDS_PATH, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-    return {code: set(words) for code, words in raw.items()}
+    # Extract stopwords from unified language configurations
+    stopwords = {
+        code: cfg.stopwords
+        for code, cfg in LANGUAGE_CONFIGS.items()
+        if cfg.stopwords
+    }
+    if stopwords:
+        return stopwords
+
+    if os.path.isfile(_STOPWORDS_PATH):
+        with open(_STOPWORDS_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return {code: set(words) for code, words in raw.items()}
+
+    return {}
 
 
 LANGUAGE_STOPWORDS: Dict[str, Set[str]] = _load_stopwords()

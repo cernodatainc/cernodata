@@ -1,0 +1,25 @@
+{
+  "code": "de",
+  "name": "German",
+  "valid_diacritics": "äöüßÄÖÜ",
+  "common_substitutions": {
+    "ä": ["a", "ae"],
+    "ö": ["o", "oe"],
+    "ü": ["u", "ue"],
+    "ß": ["ss", "B"]
+  },
+  "anomalous_chars": {},
+  "allowed_anomalous_tokens": [],
+  "conflicting_diacritic_replacements": {
+    "ą": "a", "ę": "e", "ł": "l", "ń": "n", "ś": "s", "ź": "z", "ż": "z", "ć": "c",
+    "é": "e", "è": "e", "à": "a", "ç": "c", "ñ": "n"
+  },
+  "common_word_corrections": {},
+  "min_words_for_diacritic_check": 15,
+  "stopwords": [
+    "der", "die", "das", "und", "in", "den", "von", "zu", "dem", "mit", "sich", "des",
+    "auf", "für", "ist", "im", "nicht", "ein", "eine", "einer", "einem", "einen", "als",
+    "auch", "es", "an", "werden", "aus", "er", "hat", "dass", "sie", "nach", "wird",
+    "bei", "noch", "wie", "oder", "über", "so", "nur", "aber", "vor", "durch", "man"
+  ]
+}
