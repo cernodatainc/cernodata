@@ -1,8 +1,7 @@
 """
-src/quality/language_config.py
+src/quality/languages/__init__.py
 
-Language configuration definitions, OCR diacritic substitution mappings,
-and diacritic conflict resolution rules.
+Language definitions, models, and detection tools for quality evaluation.
 """
 
 from src.quality.languages.models import ALL_KNOWN_DIACRITICS, LanguageConfig
@@ -16,6 +15,13 @@ from src.quality.languages.definitions import (
     get_language_config,
     register_language_config,
 )
+from src.quality.languages.detector import (
+    LANGUAGE_DIACRITICS,
+    LANGUAGE_STOPWORDS,
+    detect_text_language,
+    detect_page_language,
+    detect_document_languages,
+)
 
 __all__ = [
     "ALL_KNOWN_DIACRITICS",
@@ -28,4 +34,9 @@ __all__ = [
     "LANGUAGE_CONFIGS",
     "get_language_config",
     "register_language_config",
+    "LANGUAGE_DIACRITICS",
+    "LANGUAGE_STOPWORDS",
+    "detect_text_language",
+    "detect_page_language",
+    "detect_document_languages",
 ]

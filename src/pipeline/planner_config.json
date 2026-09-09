@@ -1,0 +1,70 @@
+{
+  "preset_weights": {
+    "docling_fast": {
+      "low_spec_cpu": 0.90,
+      "rapid_approximate": 0.80,
+      "financial_report": 0.60,
+      "scanned_form": 0.30,
+      "air_gapped_local": 0.90,
+      "hosted_vision_api": 0.50,
+      "multicolumn_article": 0.70,
+      "tabular_ledger": 0.60,
+      "mixed_text_image": 0.50,
+      "general_text": 0.85,
+      "workstation_cuda": 0.60,
+      "cloud_cluster": 0.50,
+      "high_precision_structure": 0.50
+    },
+    "docling_deep": {
+      "workstation_cuda": 0.90,
+      "cloud_cluster": 0.95,
+      "high_precision_structure": 0.85,
+      "financial_report": 0.85,
+      "tabular_ledger": 0.90,
+      "multicolumn_article": 0.85,
+      "scanned_form": 0.75,
+      "mixed_text_image": 0.70,
+      "general_text": 0.80,
+      "air_gapped_local": 0.85,
+      "hosted_vision_api": 0.70,
+      "low_spec_cpu": 0.40,
+      "rapid_approximate": 0.40
+    },
+    "vision_llm_direct": {
+      "scanned_form": 0.95,
+      "mixed_text_image": 0.90,
+      "high_precision_structure": 0.90,
+      "cloud_cluster": 0.90,
+      "workstation_cuda": 0.75,
+      "financial_report": 0.70,
+      "tabular_ledger": 0.65,
+      "multicolumn_article": 0.75,
+      "general_text": 0.60,
+      "low_spec_cpu": 0.10,
+      "rapid_approximate": 0.30,
+      "air_gapped_local": 0.30,
+      "hosted_vision_api": 0.95
+    }
+  },
+  "taxonomy_options": [
+    ["financial_report", "Dense numbers, tables, multi-page financial statements"],
+    ["multicolumn_article", "Academic or corporate papers with 2+ text columns"],
+    ["scanned_form", "Low-DPI scanned documents, hand-signed forms, low contrast"],
+    ["tabular_ledger", "Spreadsheet-like grid structures"],
+    ["mixed_text_image", "Marketing materials, slide decks, embedded graphics"],
+    ["general_text", "Standard single or multi-page prose documents"]
+  ],
+  "hardware_options": [
+    ["low_spec_cpu", "Shared CPU/RAM, no discrete GPU (<= 4GB RAM)"],
+    ["workstation_cuda", "Local CUDA-enabled GPU (NVIDIA RTX/Tesla)"],
+    ["cloud_cluster", "Distributed cloud node / multi-GPU execution"]
+  ],
+  "target_options": [
+    ["rapid_approximate", "Fast throughput, acceptable minor structural drift"],
+    ["high_precision_structure", "Maximum layout fidelity, exact bounding box extraction"]
+  ],
+  "security_options": [
+    ["air_gapped_local", "Zero external network calls (strictly local models)"],
+    ["hosted_vision_api", "Cloud multimodal APIs allowed (hosted vision models)"]
+  ]
+}

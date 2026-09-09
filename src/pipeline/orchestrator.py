@@ -5,8 +5,6 @@ End-to-end pipeline runner orchestrating parsing, text skew alignment, quality e
 Supports executing custom and planner-generated execution plans.
 """
 
-import os
-import json
 from typing import Dict, Any, List, Tuple, Optional, Union
 
 from src.dom import DocumentDOM
@@ -14,7 +12,21 @@ from src.parsers import DoclingParser
 from src.quality import detect_quality_violations, apply_text_skew_alignment
 from src.pipeline.decision_tree import DecisionTreeEngine, DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner import DocumentPlan
-from src.visualization import PageVisualizer, generate_interactive_html
+from src.pipeline.artifact_exporter import (
+    render_visual_overlays,
+    export_interactive_html_viewer,
+    export_pipeline_artifacts,
+)
+
+__all__ = [
+    "parse_document",
+    "align_document_skew",
+    "evaluate_quality_and_decision_tree",
+    "render_visual_overlays",
+    "export_interactive_html_viewer",
+    "export_pipeline_artifacts",
+    "run_pipeline",
+]
 
 
 def parse_document(pdf_path: str, language: str, preset: str = "docling_fast") -> DocumentDOM:
@@ -42,73 +54,6 @@ def evaluate_quality_and_decision_tree(
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset
     return decision, violations
-
-
-def render_visual_overlays(
-    pdf_path: str, dom: DocumentDOM, violations: List[Dict[str, Any]], visualize: bool, output_dir: str
-) -> List[str]:
-    """Renders page visual overlay images with bounding boxes and violation markers if visualize is True."""
-    if not visualize:
-        return []
-    visualizer = PageVisualizer()
-    return visualizer.render_overlay(pdf_path, dom, violations=violations, output_dir=output_dir)
-
-
-def export_interactive_html_viewer(
-    pdf_path: str,
-    dom: DocumentDOM,
-    decision: Dict[str, Any],
-    violations: List[Dict[str, Any]],
-    output_dir: str,
-    plan: Optional[Dict[str, Any]] = None
-) -> str:
-    """Generates self-contained interactive HTML web viewer file."""
-    html_path = os.path.join(output_dir, "interactive_viewer.html")
-    return generate_interactive_html(pdf_path, dom, decision, violations, output_path=html_path, plan=plan)
-
-
-def export_pipeline_artifacts(
-    dom: DocumentDOM,
-    decision: Dict[str, Any],
-    violations: List[Dict[str, Any]],
-    language: str,
-    output_dir: str,
-    plan: Optional[Dict[str, Any]] = None
-) -> Tuple[str, str, Optional[str]]:
-    """Exports DocumentDOM JSON, standalone quality_violations.json, and plan_execution_result.json reports."""
-    os.makedirs(output_dir, exist_ok=True)
-
-    dom_output_path = os.path.join(output_dir, "document_dom.json")
-    with open(dom_output_path, "w", encoding="utf-8") as f:
-        json.dump(dom.to_dict(), f, indent=2)
-
-    violations_output_path = os.path.join(output_dir, "quality_violations.json")
-    violations_report = {
-        "document_id": dom.document_id,
-        "source_filename": dom.source_filename,
-        "language": language,
-        "detected_languages": decision.get("detected_languages", {}),
-        "primary_detected_language": decision.get("primary_detected_language", "en"),
-        "total_violations": len(violations),
-        "violations": violations
-    }
-    with open(violations_output_path, "w", encoding="utf-8") as f:
-        json.dump(violations_report, f, indent=2)
-
-    plan_result_path = None
-    if plan:
-        plan_result_path = os.path.join(output_dir, "plan_execution_result.json")
-        execution_report = {
-            "plan": plan,
-            "decision": decision,
-            "total_violations": len(violations),
-            "chosen_preset": decision.get("chosen_preset"),
-            "status": decision.get("status")
-        }
-        with open(plan_result_path, "w", encoding="utf-8") as f:
-            json.dump(execution_report, f, indent=2)
-
-    return dom_output_path, violations_output_path, plan_result_path
 
 
 def run_pipeline(
@@ -227,7 +172,7 @@ def run_pipeline(
     decision["attempts"] = attempts
 
     plan_dict = plan_obj.to_dict() if plan_obj else None
-    rendered_images = render_visual_overlays(pdf_path, dom, violations, visualize, output_dir)
+    rendered_images = render_visual_overlays(pdf_path, dom, violations, visualize, output_dir, decision=decision)
     dom_json_path, violations_json_path, plan_result_path = export_pipeline_artifacts(
         dom, decision, violations, language, output_dir, plan=plan_dict
     )

@@ -1,0 +1,103 @@
+{
+  "pl": {
+    "code": "pl",
+    "name": "Polish",
+    "valid_diacritics": "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ",
+    "common_substitutions": {
+      "ą": ["q", "a"],
+      "ę": ["e"],
+      "ń": ["n"],
+      "ć": ["c"],
+      "ł": ["l", "1", "t"],
+      "ó": ["o", "ö"],
+      "ś": ["s"],
+      "ź": ["z"],
+      "ż": ["z"],
+      "Ą": ["Q", "A"],
+      "Ę": ["E"],
+      "Ń": ["N"],
+      "Ć": ["C"],
+      "Ł": ["L", "T"],
+      "Ó": ["O", "Ö"],
+      "Ś": ["S"],
+      "Ź": ["Z"],
+      "Ż": ["Z"]
+    },
+    "anomalous_chars": {
+      "q": "ą",
+      "Q": "Ą"
+    },
+    "allowed_anomalous_tokens": [
+      "sql", "query", "q1", "q2", "q3", "q4", "quality", "qr", "quick", "status", "faq"
+    ],
+    "conflicting_diacritic_replacements": {
+      "ö": "ó", "Ö": "Ó",
+      "ä": "ą", "Ä": "Ą",
+      "ü": "u", "Ü": "U",
+      "ë": "ę", "Ë": "Ę"
+    },
+    "common_word_corrections": {
+      "piqtku": "piątku",
+      "granicq": "granicą"
+    },
+    "min_words_for_diacritic_check": 12
+  },
+  "de": {
+    "code": "de",
+    "name": "German",
+    "valid_diacritics": "äöüßÄÖÜ",
+    "common_substitutions": {
+      "ä": ["a", "ae"],
+      "ö": ["o", "oe"],
+      "ü": ["u", "ue"],
+      "ß": ["ss", "B"]
+    },
+    "anomalous_chars": {},
+    "allowed_anomalous_tokens": [],
+    "conflicting_diacritic_replacements": {
+      "ą": "a", "ę": "e", "ł": "l", "ń": "n", "ś": "s", "ź": "z", "ż": "z", "ć": "c",
+      "é": "e", "è": "e", "à": "a", "ç": "c", "ñ": "n"
+    },
+    "common_word_corrections": {},
+    "min_words_for_diacritic_check": 15
+  },
+  "fr": {
+    "code": "fr",
+    "name": "French",
+    "valid_diacritics": "éèêëàâçîïôûùÉÈÊËÀÂÇÎÏÔÛÙ",
+    "common_substitutions": {
+      "é": ["e"], "è": ["e"], "ê": ["e"], "ë": ["e"],
+      "à": ["a"], "â": ["a"], "ç": ["c"],
+      "î": ["i"], "ï": ["i"], "ô": ["o"], "û": ["u"], "ù": ["u"]
+    },
+    "anomalous_chars": {},
+    "allowed_anomalous_tokens": [],
+    "conflicting_diacritic_replacements": {},
+    "common_word_corrections": {},
+    "min_words_for_diacritic_check": 15
+  },
+  "es": {
+    "code": "es",
+    "name": "Spanish",
+    "valid_diacritics": "ñáéíóúü¿¡ÑÁÉÍÓÚÜ",
+    "common_substitutions": {
+      "ñ": ["n"], "á": ["a"], "é": ["e"], "í": ["i"], "ó": ["o"], "ú": ["u"], "ü": ["u"]
+    },
+    "anomalous_chars": {},
+    "allowed_anomalous_tokens": [],
+    "conflicting_diacritic_replacements": {},
+    "common_word_corrections": {},
+    "min_words_for_diacritic_check": 15
+  },
+  "en": {
+    "code": "en",
+    "name": "English",
+    "valid_diacritics": "",
+    "common_substitutions": {},
+    "anomalous_chars": {},
+    "allowed_anomalous_tokens": [],
+    "conflicting_diacritic_replacements": {},
+    "common_word_corrections": {},
+    "min_words_for_diacritic_check": 999999
+  }
+}

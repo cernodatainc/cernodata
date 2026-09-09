@@ -120,13 +120,15 @@ class PageVisualizer:
         pdf_path: str,
         dom: DocumentDOM,
         violations: Optional[List[Dict[str, Any]]] = None,
-        output_dir: str = "output"
+        output_dir: str = "output",
+        decision: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         os.makedirs(output_dir, exist_ok=True)
         output_paths = []
         violations = violations or []
 
         page_nodes, page_violations = _group_by_page(dom, violations)
+        per_page = decision.get("per_page_confidence", {}) if decision else {}
 
         if HAS_PYPDFIUM and os.path.exists(pdf_path):
             try:
@@ -139,9 +141,12 @@ class PageVisualizer:
                     pil_img = pdf_page.render(scale=self.scale).to_pil().convert("RGBA")
                     nodes_for_page = page_nodes.get(page_no, [])
                     viols_for_page = page_violations.get(page_no, [])
+                    p_conf = per_page.get(str(page_no), per_page.get(page_no))
+                    if p_conf is None and decision:
+                        p_conf = decision.get("overall_confidence")
 
                     overlay_img = self._draw_nodes_on_image(
-                        pil_img, page_no, page_w, page_h, nodes_for_page, viols_for_page
+                        pil_img, page_no, page_w, page_h, nodes_for_page, viols_for_page, confidence_score=p_conf
                     )
                     
                     out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
@@ -155,8 +160,11 @@ class PageVisualizer:
             canvas_w, canvas_h = int(612 * self.scale), int(792 * self.scale)
             pil_img = Image.new("RGBA", (canvas_w, canvas_h), (245, 247, 250, 255))
             viols_for_page = page_violations.get(page_no, [])
+            p_conf = per_page.get(str(page_no), per_page.get(page_no))
+            if p_conf is None and decision:
+                p_conf = decision.get("overall_confidence")
             overlay_img = self._draw_nodes_on_image(
-                pil_img, page_no, 612.0, 792.0, nodes_for_page, viols_for_page
+                pil_img, page_no, 612.0, 792.0, nodes_for_page, viols_for_page, confidence_score=p_conf
             )
             out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
             overlay_img.save(out_path)
@@ -171,7 +179,8 @@ class PageVisualizer:
         page_w: float,
         page_h: float,
         nodes: List[DOMNode],
-        violations: List[Dict[str, Any]]
+        violations: List[Dict[str, Any]],
+        confidence_score: Optional[float] = None
     ) -> Image.Image:
         img_w, img_h = base_img.size
         sx = img_w / page_w if page_w > 0 else self.scale
@@ -202,6 +211,8 @@ class PageVisualizer:
         draw_result = ImageDraw.Draw(result_img)
 
         _draw_top_banner_summary(draw_result, img_w, page_no, len(nodes), len(violations), header_font)
-        draw_score_badge_bottom_left(draw_result, img_w, img_h, page_no, nodes, violations, font, header_font)
+        draw_score_badge_bottom_left(
+            draw_result, img_w, img_h, page_no, nodes, violations, font, header_font, confidence_score=confidence_score
+        )
 
         return result_img

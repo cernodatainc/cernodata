@@ -4,7 +4,7 @@ src/visualization/badges.py
 Bottom-left confidence score & violation summary badge renderer.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from PIL import ImageDraw, ImageFont
 from src.dom import DOMNode
 from src.quality import evaluate_page_confidence
@@ -18,14 +18,18 @@ def draw_score_badge_bottom_left(
     nodes: List[DOMNode],
     violations: List[Dict[str, Any]],
     font: ImageFont.ImageFont,
-    header_font: ImageFont.ImageFont
+    header_font: ImageFont.ImageFont,
+    confidence_score: Optional[float] = None
 ):
     """Renders overall confidence score & violation summary badge in bottom-left corner."""
-    page_score = round(evaluate_page_confidence(nodes), 3)
+    if confidence_score is not None:
+        page_score = float(confidence_score)
+    else:
+        page_score = float(evaluate_page_confidence(nodes))
     status_text = "ACCEPT" if page_score >= 0.82 else "FALLBACK"
     status_color = "#00E676" if page_score >= 0.82 else "#FF5252"
 
-    line1 = f"Page {page_no} Confidence Score: {page_score:.3f}"
+    line1 = f"Page {page_no} Confidence Score: {page_score:.4f}"
     line2 = f"Decision Status: {status_text} | Violations Flagged: {len(violations)}"
 
     l1_bbox = header_font.getbbox(line1)

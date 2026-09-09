@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cernodata | Interactive Visual Flow & Preset Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        <!-- __VIEWER_CSS__ -->
+    </style>
+</head>
+<body>
+
+    <div class="status-banner" id="statusBanner">[RUNNING] Running live backend Python pipeline...</div>
+
+    <header>
+        <div class="brand">
+            <div class="brand-logo">C</div>
+            <div>
+                <div class="brand-title">cernodata Visual Flow & Preset Simulator</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Document: {{ dom_source_filename }} | ID: {{ dom_document_id }}{{ plan_header_sub }}</div>
+            </div>
+        </div>
+
+        <div class="timeline" id="timelineContainer">
+            <!-- __TIMELINE_BUTTONS__ -->
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom Out">-</button>
+            <span class="zoom-label" id="zoomDisplay">100%</span>
+            <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom In">+</button>
+            <button class="zoom-btn" style="font-size:10px; width:auto; padding:0 4px;" onclick="resetZoom()" title="Reset Zoom">100%</button>
+            <button class="zoom-btn" style="font-size:10px; width:auto; padding:0 4px;" onclick="fitWidthZoom()" title="Fit Width">Fit</button>
+        </div>
+
+        <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding Boxes</label></div>
+        <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality Violations</label></div>
+        <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
+        <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score Badge</label></div>
+        <div class="toggle-group" style="border-left: 1px solid var(--border-color); padding-left: 10px;">
+            <label style="color: #69F0AE;"><input type="checkbox" id="toggleCorrections" onchange="toggleAllCorrections()"> Apply Diacritic Fixes</label>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border-color); padding-left: 12px;">
+            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;">Detected Lang:</span>
+            <span class="badge-status lang" id="detectedLangBadge">P1: {{ primary_detected }}</span>
+            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;">Override:</span>
+            <select class="type-filter" id="selectLanguage" onchange="onLanguageChanged()">
+                <option value="auto">Auto-Detect</option>
+                <option value="pl" {{ pl_selected }}>Polish (pl)</option>
+                <option value="en" {{ en_selected }}>English (en)</option>
+                <option value="de" {{ de_selected }}>German (de)</option>
+                <option value="fr" {{ fr_selected }}>French (fr)</option>
+                <option value="es" {{ es_selected }}>Spanish (es)</option>
+            </select>
+            <button class="action-btn" id="btnRedoLang" onclick="redoWithSelectedLanguage()">[REDO] Redo Run</button>
+        </div>
+
+        <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
+
+        <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+            <span style="color: var(--text-muted);">Filter:</span>
+            <select class="type-filter" id="typeFilter" onchange="updateLayers()">
+                <option value="ALL">All Types</option>
+                <option value="heading">Headings</option>
+                <option value="paragraph">Paragraphs</option>
+                <option value="table_grid">Tables</option>
+                <option value="figure">Figures</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div class="visual-pane" id="visualPane">
+            <div class="canvas-container" id="canvasContainer">
+                <img src="{{ img_data_uri }}" id="pageImg" alt="Page Canvas" />
+                <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
+            </div>
+
+            <div class="score-badge-box {{ score_badge_classes }}" id="scoreBadge">
+                <div class="score-title" id="scoreTitle">Page 1 Confidence Score: {{ page1_confidence }}</div>
+                <div class="score-sub" id="scoreSub" style="color: {{ score_sub_color }}">
+                    Status: {{ decision_status }} | Overall Confidence: {{ overall_confidence }} | Violations Flagged: {{ violations_count }}
+                </div>
+            </div>
+        </div>
+
+        <div class="inspector-pane">
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="showTab(event, 'domTab')">DOM Tree (<span id="domCount">{{ dom_node_count }}</span>)</button>
+                <button class="tab-btn" onclick="showTab(event, 'violTab')">Violations (<span id="violCount">{{ violations_count }}</span>)</button>
+                <button class="tab-btn" onclick="showTab(event, 'logTab')">Decision Log</button>
+                <button class="tab-btn" onclick="showTab(event, 'planTab')">Plan</button>
+            </div>
+
+            <div class="tab-content active" id="domTab">
+                <div id="selectedEditorContainer"></div>
+                <div id="domListContainer"></div>
+            </div>
+            <div class="tab-content" id="violTab"><div id="violListContainer"></div></div>
+            <div class="tab-content" id="logTab"><div class="log-box"><pre id="logContent"></pre></div></div>
+            <div class="tab-content" id="planTab"><div class="log-box" style="color: #A7F3D0;"><pre id="planContent"></pre></div></div>
+        </div>
+    </div>
+
+    <script>
+        window.VIEWER_DATA = {
+            dom: <!-- __DOM_JSON__ -->,
+            violations: <!-- __VIOLATIONS_JSON__ -->,
+            decision: <!-- __DECISION_JSON__ -->,
+            detectedLanguages: <!-- __DETECTED_LANGS_JSON__ -->,
+            plan: <!-- __PLAN_JSON__ -->,
+            pdfSourceFile: <!-- __PDF_SOURCE_FILE__ -->,
+            activeLanguage: <!-- __ACTIVE_LANG__ -->
+        };
+    </script>
+    <script>
+        <!-- __VIEWER_JS__ -->
+    </script>
+</body>
+</html>
