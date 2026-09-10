@@ -51,6 +51,14 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("decollideCurrentPage", content)
             self.assertIn("decollideSelectedPair", content)
             self.assertIn("renderTwoNodeDecollideEditor", content)
+            self.assertIn("renderCutoutPreview", content)
+            self.assertIn("cutout-preview-card", content)
+            self.assertIn("triggerCutoutSecondPass", content)
+            self.assertIn("toggleCutoutUnskew", content)
+            self.assertIn("getEffectiveNodeAngle", content)
+            self.assertIn("inpAngle", content)
+            self.assertIn("renderTriangleWarp", content)
+            self.assertIn("getNodeSkewCorners", content)
 
         if os.path.exists(out_path):
             os.remove(out_path)

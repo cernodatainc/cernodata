@@ -471,7 +471,7 @@ select.type-filter {
 
 .coord-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
     margin-bottom: 8px;
 }
@@ -775,4 +775,41 @@ select.type-filter {
     filter: brightness(1.15);
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
+
+.cutout-preview-card {
+    background: #0F172A;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+    margin: 8px 0;
+}
+
+.cutout-display-box {
+    background: #1F2937;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    padding: 6px;
+    text-align: center;
+    max-height: 120px;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cutout-img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    image-rendering: -webkit-optimize-contrast;
+    border-radius: 2px;
+}
+
+.cutout-action-row {
+    margin-top: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 

@@ -17,6 +17,7 @@ let appliedCorrections = false;
 let activeLanguage = window.VIEWER_DATA.activeLanguage;
 let selectedNodeId = null;
 let selectedNodeIds = [];
+let isCutoutUnskewed = false;
 let activeDrag = null;
 let currentZoom = 1.0;
 
@@ -214,12 +215,18 @@ function renderTwoNodeDecollideEditor(container) {
                     <span>Upper: ${upper.node_id} (${upper.type})</span>
                     <span class="pair-node-coords">Y: [${bUpper.y0}, ${bUpper.y1}]</span>
                 </div>
+                <div class="cutout-display-box" style="margin-bottom:4px;">
+                    <img id="cutoutPreviewImg_${upper.node_id}" class="cutout-img" alt="Upper Cutout" />
+                </div>
                 <div class="pair-node-text">${escapeHtml(upper.content.raw_text || '(no text)')}</div>
             </div>
             <div class="pair-node-item" style="border-left: 3px solid #A78BFA;">
                 <div class="pair-node-header">
                     <span>Lower: ${lower.node_id} (${lower.type})</span>
                     <span class="pair-node-coords">Y: [${bLower.y0}, ${bLower.y1}]</span>
+                </div>
+                <div class="cutout-display-box" style="margin-bottom:4px;">
+                    <img id="cutoutPreviewImg_${lower.node_id}" class="cutout-img" alt="Lower Cutout" />
                 </div>
                 <div class="pair-node-text">${escapeHtml(lower.content.raw_text || '(no text)')}</div>
             </div>
@@ -228,6 +235,8 @@ function renderTwoNodeDecollideEditor(container) {
             </div>
         </div>
     `;
+    renderCutoutPreview(upper.node_id, upper.bounding_box, 'cutoutPreviewImg_' + upper.node_id);
+    renderCutoutPreview(lower.node_id, lower.bounding_box, 'cutoutPreviewImg_' + lower.node_id);
 }
 
 function decollideSelectedPair() {
@@ -321,6 +330,231 @@ function decollideCurrentPage(pageIndex = 1) {
     return decollidedCount;
 }
 
+function getEffectiveNodeAngle(nodeId, bbox) {
+    if (bbox && bbox.angle !== undefined && bbox.angle !== null && bbox.angle !== 0) {
+        return bbox.angle;
+    }
+    if (bbox && bbox.quad && bbox.quad.length === 4) {
+        const dx = bbox.quad[1][0] - bbox.quad[0][0];
+        const dy = bbox.quad[1][1] - bbox.quad[0][1];
+        if (dx !== 0) {
+            return roundCoord((Math.atan2(dy, dx) * 180.0) / Math.PI);
+        }
+    }
+    const v = violationsData.find(viol => viol.node_id === nodeId && viol.bounding_box && viol.bounding_box.angle);
+    if (v) {
+        return v.bounding_box.angle;
+    }
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    const pageNo = node ? (node.global_page_index || 1) : 1;
+    const pageSkewNode = domData.nodes.find(n => (n.global_page_index === pageNo) && n.bounding_box && n.bounding_box.angle);
+    if (pageSkewNode) {
+        return pageSkewNode.bounding_box.angle;
+    }
+    return 0.0;
+}
+
+function toggleCutoutUnskew(nodeId) {
+    isCutoutUnskewed = !isCutoutUnskewed;
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return;
+    renderCutoutPreview(node.node_id, node.bounding_box, 'cutoutPreviewImg_' + node.node_id, isCutoutUnskewed);
+    const btn = document.getElementById('btnToggleUnskew_' + node.node_id);
+    if (btn) {
+        btn.textContent = isCutoutUnskewed ? '[SKEW] Show Skewed' : '[UNSKEW] Unskew Transformation';
+        btn.title = isCutoutUnskewed ? 'Switch to oriented skewed polygon cutout' : 'Transform skewed quadrilateral into a horizontal, unskewed text strip';
+    }
+    const modeLabel = document.getElementById('cutoutModeLabel_' + node.node_id);
+    if (modeLabel) {
+        modeLabel.textContent = isCutoutUnskewed ? 'Mode: Unskewed (Transformed Rectification)' : 'Mode: Skewed (Oriented Selection)';
+    }
+}
+
+/**
+ * Piece-wise affine transformation helper: warps triangle (s0, s1, s2) from img into (d0, d1, d2) in ctx.
+ */
+function renderTriangleWarp(ctx, img, s0, s1, s2, d0, d1, d2) {
+    const X1 = s1.x - s0.x, Y1 = s1.y - s0.y;
+    const X2 = s2.x - s0.x, Y2 = s2.y - s0.y;
+    const det = X1 * Y2 - X2 * Y1;
+    if (Math.abs(det) < 0.0001) return;
+
+    const U1 = d1.x - d0.x, U2 = d2.x - d0.x;
+    const a = (U1 * Y2 - U2 * Y1) / det;
+    const c = (U2 * X1 - U1 * X2) / det;
+    const e = d0.x - a * s0.x - c * s0.y;
+
+    const V1 = d1.y - d0.y, V2 = d2.y - d0.y;
+    const b = (V1 * Y2 - V2 * Y1) / det;
+    const d = (V2 * X1 - V1 * X2) / det;
+    const f = d0.y - b * s0.x - d * s0.y;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(d0.x, d0.y);
+    ctx.lineTo(d1.x, d1.y);
+    ctx.lineTo(d2.x, d2.y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.transform(a, b, c, d, e, f);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+}
+
+/**
+ * Derives the 4 corner vertices of the skewed text selection from explicit quad or angle.
+ * Strips outer bounding box inflation so adjacent text lines are excluded.
+ */
+function getNodeSkewCorners(nodeId, bbox) {
+    if (bbox.quad && bbox.quad.length === 4) {
+        return bbox.quad.map(pt => ({ x: pt[0], y: pt[1] }));
+    }
+    const angle = getEffectiveNodeAngle(nodeId, bbox);
+    const x0 = bbox.x0, y0 = bbox.y0, x1 = bbox.x1, y1 = bbox.y1;
+    const wSpan = Math.max(1, x1 - x0);
+    const hSpan = Math.max(1, y1 - y0);
+
+    if (angle === 0) {
+        return [
+            { x: x0, y: y0 },
+            { x: x1, y: y0 },
+            { x: x1, y: y1 },
+            { x: x0, y: y1 }
+        ];
+    }
+
+    const rad = angle * Math.PI / 180.0;
+    const deltaY = wSpan * Math.tan(rad);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (angle < 0) {
+        return [
+            { x: x0, y: y0 },
+            { x: x1, y: y0 + absDeltaY },
+            { x: x1, y: y1 },
+            { x: x0, y: y1 - absDeltaY }
+        ];
+    } else {
+        return [
+            { x: x0, y: y0 + absDeltaY },
+            { x: x1, y: y0 },
+            { x: x1, y: y1 - absDeltaY },
+            { x: x0, y: y1 }
+        ];
+    }
+}
+
+/**
+ * Renders an image crop / cutout from pageImg for the given bounding box.
+ * When skewed, extracts the oriented skewed content clipped to the polygon so adjacent lines are excluded.
+ * When unskew=true, applies a geometric transformation (affine warp) to the skewed selection to rectify it
+ * into a horizontal text strip without reverting to the outer bounding box.
+ *
+ * TODO: We might want to allow sending that cutout of the page to an OCR or LLM for a further pass.
+ */
+function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewed) {
+    const pageImg = document.getElementById('pageImg');
+    const targetImg = document.getElementById(targetImgId);
+    if (!pageImg || !targetImg) return;
+
+    function doDraw() {
+        if (!pageImg.naturalWidth || !pageImg.naturalHeight) return;
+        const svg = document.getElementById('svgOverlay');
+        const vbW = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width) ? svg.viewBox.baseVal.width : 595.28;
+        const vbH = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.height) ? svg.viewBox.baseVal.height : 841.89;
+
+        const scaleX = pageImg.naturalWidth / vbW;
+        const scaleY = pageImg.naturalHeight / vbH;
+
+        const corners = getNodeSkewCorners(nodeId, bbox);
+        const s0 = { x: corners[0].x * scaleX, y: corners[0].y * scaleY };
+        const s1 = { x: corners[1].x * scaleX, y: corners[1].y * scaleY };
+        const s2 = { x: corners[2].x * scaleX, y: corners[2].y * scaleY };
+        const s3 = { x: corners[3].x * scaleX, y: corners[3].y * scaleY };
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        if (unskew) {
+            // Unskewed mode: Affine transformation of the skewed selection into a rectified horizontal rectangle
+            const wTop = Math.hypot(s1.x - s0.x, s1.y - s0.y);
+            const wBot = Math.hypot(s2.x - s3.x, s2.y - s3.y);
+            const hLeft = Math.hypot(s3.x - s0.x, s3.y - s0.y);
+            const hRight = Math.hypot(s2.x - s1.x, s2.y - s1.y);
+
+            const dstW = Math.max(10, Math.round((wTop + wBot) / 2));
+            const dstH = Math.max(8, Math.round((hLeft + hRight) / 2));
+
+            canvas.width = dstW;
+            canvas.height = dstH;
+
+            const d0 = { x: 0, y: 0 };
+            const d1 = { x: dstW, y: 0 };
+            const d2 = { x: dstW, y: dstH };
+            const d3 = { x: 0, y: dstH };
+
+            renderTriangleWarp(ctx, pageImg, s0, s1, s2, d0, d1, d2);
+            renderTriangleWarp(ctx, pageImg, s0, s2, s3, d0, d2, d3);
+
+            targetImg.src = canvas.toDataURL('image/png');
+        } else {
+            // Skewed mode: Display the tilted selection, clipped strictly to the skewed polygon so adjacent text is omitted
+            const minX = Math.floor(Math.min(s0.x, s1.x, s2.x, s3.x));
+            const maxX = Math.ceil(Math.max(s0.x, s1.x, s2.x, s3.x));
+            const minY = Math.floor(Math.min(s0.y, s1.y, s2.y, s3.y));
+            const maxY = Math.ceil(Math.max(s0.y, s1.y, s2.y, s3.y));
+
+            const cropW = Math.max(1, maxX - minX);
+            const cropH = Math.max(1, maxY - minY);
+
+            canvas.width = cropW;
+            canvas.height = cropH;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(s0.x - minX, s0.y - minY);
+            ctx.lineTo(s1.x - minX, s1.y - minY);
+            ctx.lineTo(s2.x - minX, s2.y - minY);
+            ctx.lineTo(s3.x - minX, s3.y - minY);
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.drawImage(pageImg, -minX, -minY);
+            ctx.restore();
+
+            targetImg.src = canvas.toDataURL('image/png');
+        }
+    }
+
+    if (pageImg.complete && pageImg.naturalWidth > 0) {
+        doDraw();
+    } else {
+        pageImg.addEventListener('load', doDraw, { once: true });
+    }
+}
+
+/**
+ * TODO: Allow sending that cutout of the page to an OCR or LLM for a further pass.
+ *
+ * Future refinement pass:
+ * 1. Extract the cropped canvas as a base64 PNG.
+ * 2. Dispatch to an OCR engine or Vision LLM endpoint for targeted re-transcription.
+ * 3. Update the node's text content and re-evaluate local quality violations.
+ */
+function triggerCutoutSecondPass(nodeId) {
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return;
+
+    // TODO: Send cutout of the page to an OCR or LLM for a further pass
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = `[TODO] Cutout for '${nodeId}' prepared for second-pass OCR/LLM evaluation.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+}
+
 function renderSelectedEditor() {
     const container = document.getElementById('selectedEditorContainer');
     if (!container) return;
@@ -351,6 +585,8 @@ function renderSelectedEditor() {
     const bbox = node.bounding_box;
     const isIncorrect = !!node.is_incorrect_text;
     const hasQuad = !!bbox.quad;
+    const effectiveAngle = getEffectiveNodeAngle(node.node_id, bbox);
+    const hasAngle = (effectiveAngle !== 0);
 
     if (node.user_correction_note === undefined || node.user_correction_note === null || node.user_correction_note === '') {
         node.user_correction_note = (node.content && node.content.raw_text) ? node.content.raw_text : '';
@@ -368,7 +604,34 @@ function renderSelectedEditor() {
                 <div class="coord-field"><label>Y0</label><input type="number" step="0.5" id="inpY0" value="${bbox.y0}" onchange="onManualCoordChange()"></div>
                 <div class="coord-field"><label>X1</label><input type="number" step="0.5" id="inpX1" value="${bbox.x1}" onchange="onManualCoordChange()"></div>
                 <div class="coord-field"><label>Y1</label><input type="number" step="0.5" id="inpY1" value="${bbox.y1}" onchange="onManualCoordChange()"></div>
+                <div class="coord-field"><label>Angle</label><input type="number" step="0.1" id="inpAngle" value="${bbox.angle !== undefined && bbox.angle !== 0 ? bbox.angle : effectiveAngle}" onchange="onManualCoordChange()"></div>
             </div>
+
+            <!-- Cutout View Aid for Currently Selected Bounding Box (supports skewed polygon & unskewed view) -->
+            <div class="cutout-preview-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:10px; font-weight:700; color:#93C5FD; text-transform:uppercase;">Page Cutout View</span>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        ${hasAngle ? `<span class="badge-status lang" style="font-size:9px; padding:1px 5px;">Skew: ${effectiveAngle}°</span>` : ''}
+                        <span style="font-size:10px; color:var(--text-muted);">${Math.round(bbox.x1 - bbox.x0)} x ${Math.round(bbox.y1 - bbox.y0)} pt</span>
+                    </div>
+                </div>
+                <div class="cutout-display-box">
+                    <img id="cutoutPreviewImg_${node.node_id}" class="cutout-img" alt="Selected Bounding Box Cutout" />
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                    <span style="font-size:9px; color:var(--text-muted);" id="cutoutModeLabel_${node.node_id}">Mode: ${isCutoutUnskewed ? 'Unskewed (Transformed Rectification)' : 'Skewed (Oriented Selection)'}</span>
+                    <button class="action-btn" id="btnToggleUnskew_${node.node_id}" style="font-size:10px; padding:2px 8px; background:linear-gradient(135deg, #10B981 0%, #0284C7 100%); color:#FFF;" onclick="toggleCutoutUnskew('${node.node_id}')" title="Transform skewed quadrilateral into a horizontal, unskewed text strip">
+                        ${isCutoutUnskewed ? '[SKEW] Show Skewed' : '[UNSKEW] Unskew Transformation'}
+                    </button>
+                </div>
+                <div class="cutout-action-row" style="margin-top:6px; border-top:1px solid #334155; padding-top:6px;">
+                    <!-- TODO: Allow sending that cutout of the page to an OCR or LLM for a further pass -->
+                    <span style="font-size:9px; color:var(--text-muted);">Refined Extraction Pass:</span>
+                    <button class="action-btn secondary" style="font-size:10px; padding:3px 8px; opacity:0.85;" onclick="triggerCutoutSecondPass('${node.node_id}')" title="TODO: Allow sending that cutout of the page to an OCR or LLM for a further pass">[TODO] Send Cutout to OCR/LLM</button>
+                </div>
+            </div>
+
             ${hasQuad ? `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <span style="font-size:10px; color:#FBBF24; font-weight:600;">Custom Quad Polygon Active</span>
@@ -387,6 +650,7 @@ function renderSelectedEditor() {
             </div>
         </div>
     `;
+    renderCutoutPreview(node.node_id, node.bounding_box, 'cutoutPreviewImg_' + node.node_id, isCutoutUnskewed);
 }
 
 function resetQuadToRect(nodeId) {
@@ -406,13 +670,18 @@ function onManualCoordChange() {
     const y0 = parseFloat(document.getElementById('inpY0').value) || 0;
     const x1 = parseFloat(document.getElementById('inpX1').value) || (x0 + 10);
     const y1 = parseFloat(document.getElementById('inpY1').value) || (y0 + 10);
+    const inpAngle = document.getElementById('inpAngle');
 
     node.bounding_box.x0 = roundCoord(Math.min(x0, x1 - 5));
     node.bounding_box.y0 = roundCoord(Math.min(y0, y1 - 5));
     node.bounding_box.x1 = roundCoord(Math.max(x1, x0 + 5));
     node.bounding_box.y1 = roundCoord(Math.max(y1, y0 + 5));
+    if (inpAngle) {
+        node.bounding_box.angle = roundCoord(parseFloat(inpAngle.value) || 0);
+    }
     node.bounding_box.quad = null;
 
+    renderCutoutPreview(node.node_id, node.bounding_box, 'cutoutPreviewImg_' + node.node_id, isCutoutUnskewed);
     renderSVGOverlays();
 }
 
