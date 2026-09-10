@@ -16,6 +16,7 @@ let activePresetIndex = 0;
 let appliedCorrections = false;
 let activeLanguage = window.VIEWER_DATA.activeLanguage;
 let selectedNodeId = null;
+let selectedNodeIds = [];
 let activeDrag = null;
 let currentZoom = 1.0;
 
@@ -115,25 +116,234 @@ function applyCorrectionsToNodeText(rawText) {
     return text;
 }
 
-function selectNode(nodeId) {
-    selectedNodeId = nodeId;
+function handleNodeClick(evt, nodeId) {
+    if (!nodeId) {
+        clearSelection();
+        return;
+    }
+
+    if (evt && evt.shiftKey) {
+        if (selectedNodeIds.includes(nodeId)) {
+            selectedNodeIds = selectedNodeIds.filter(id => id !== nodeId);
+        } else {
+            if (selectedNodeIds.length >= 2) {
+                selectedNodeIds = [selectedNodeIds[1], nodeId];
+            } else {
+                selectedNodeIds.push(nodeId);
+            }
+        }
+    } else {
+        selectedNodeIds = [nodeId];
+    }
+
+    selectedNodeId = selectedNodeIds.length > 0 ? selectedNodeIds[selectedNodeIds.length - 1] : null;
+
     document.querySelectorAll('.node-card').forEach(c => c.classList.remove('selected'));
-    const card = document.getElementById(`card-${nodeId}`);
-    if (card) {
-        card.classList.add('selected');
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    selectedNodeIds.forEach(id => {
+        const c = document.getElementById(`card-${id}`);
+        if (c) c.classList.add('selected');
+    });
+
+    if (selectedNodeId) {
+        const card = document.getElementById(`card-${selectedNodeId}`);
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     }
     renderSelectedEditor();
     renderSVGOverlays();
 }
 
-function renderSelectedEditor() {
-    const container = document.getElementById('selectedEditorContainer');
-    if (!selectedNodeId) {
+function selectNode(nodeId) {
+    const evt = window.event || null;
+    handleNodeClick(evt, nodeId);
+}
+
+function clearSelection() {
+    selectedNodeIds = [];
+    selectedNodeId = null;
+    document.querySelectorAll('.node-card').forEach(c => c.classList.remove('selected'));
+    renderSelectedEditor();
+    renderSVGOverlays();
+}
+
+function renderTwoNodeDecollideEditor(container) {
+    const node1 = domData.nodes.find(n => n.node_id === selectedNodeIds[0]);
+    const node2 = domData.nodes.find(n => n.node_id === selectedNodeIds[1]);
+    if (!node1 || !node2) {
         container.innerHTML = '';
         return;
     }
-    const node = domData.nodes.find(n => n.node_id === selectedNodeId);
+
+    let upper = node1;
+    let lower = node2;
+    if (upper.bounding_box.y0 > lower.bounding_box.y0) {
+        upper = node2;
+        lower = node1;
+    }
+
+    const bUpper = upper.bounding_box;
+    const bLower = lower.bounding_box;
+
+    const hOverlap = Math.max(0, Math.min(bUpper.x1, bLower.x1) - Math.max(bUpper.x0, bLower.x0));
+    const vOverlap = Math.max(0, bUpper.y1 - bLower.y0);
+    const hasCollision = (vOverlap > 0 && hOverlap > 0);
+
+    const statusBadge = hasCollision
+        ? `<div class="collision-status-badge overlap">
+                <span>[!] Skew Overlap: ${vOverlap.toFixed(2)} pt</span>
+                <span>Horiz: ${hOverlap.toFixed(2)} pt</span>
+           </div>`
+        : `<div class="collision-status-badge clean">
+                <span>[OK] No Overlap Detected</span>
+                <span>Gap: ${(bLower.y0 - bUpper.y1).toFixed(2)} pt</span>
+           </div>`;
+
+    container.innerHTML = `
+        <div class="multi-editor-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h4>Shift-Selection: 2 Boxes</h4>
+                <button style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="clearSelection()">Clear</button>
+            </div>
+            ${statusBadge}
+            <button class="btn-decollide" onclick="decollideSelectedPair()" ${!hasCollision ? 'style="background:#2563EB;"' : ''}>
+                ${hasCollision ? '[AUTO-DECOLLIDE] De-collide Selected Boxes' : 'Evenly Space / Align Boundary'}
+            </button>
+            <div class="pair-node-item" style="border-left: 3px solid #60A5FA;">
+                <div class="pair-node-header">
+                    <span>Upper: ${upper.node_id} (${upper.type})</span>
+                    <span class="pair-node-coords">Y: [${bUpper.y0}, ${bUpper.y1}]</span>
+                </div>
+                <div class="pair-node-text">${escapeHtml(upper.content.raw_text || '(no text)')}</div>
+            </div>
+            <div class="pair-node-item" style="border-left: 3px solid #A78BFA;">
+                <div class="pair-node-header">
+                    <span>Lower: ${lower.node_id} (${lower.type})</span>
+                    <span class="pair-node-coords">Y: [${bLower.y0}, ${bLower.y1}]</span>
+                </div>
+                <div class="pair-node-text">${escapeHtml(lower.content.raw_text || '(no text)')}</div>
+            </div>
+            <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">
+                Boundary split calculates the median inter-line position and adjusts top/bottom edges cleanly without manual adjustment.
+            </div>
+        </div>
+    `;
+}
+
+function decollideSelectedPair() {
+    if (selectedNodeIds.length !== 2) return;
+    const node1 = domData.nodes.find(n => n.node_id === selectedNodeIds[0]);
+    const node2 = domData.nodes.find(n => n.node_id === selectedNodeIds[1]);
+    if (!node1 || !node2) return;
+
+    let upper = node1;
+    let lower = node2;
+    if (upper.bounding_box.y0 > lower.bounding_box.y0) {
+        upper = node2;
+        lower = node1;
+    }
+
+    const bUpper = upper.bounding_box;
+    const bLower = lower.bounding_box;
+
+    const midY = roundCoord((bUpper.y1 + bLower.y0) / 2);
+    const gap = 0.5;
+
+    bUpper.y1 = roundCoord(Math.max(bUpper.y0 + 2, midY - gap / 2));
+    bLower.y0 = roundCoord(Math.min(bLower.y1 - 2, midY + gap / 2));
+    bUpper.quad = null;
+    bLower.quad = null;
+
+    renderSVGOverlays();
+    renderDOMTree();
+    renderSelectedEditor();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = `[OK] De-collided '${upper.node_id}' and '${lower.node_id}' at Y = ${midY}. Click '[SAVE] Save Annotations' to persist.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+}
+
+function decollideCurrentPage(pageIndex = 1) {
+    const pageNodes = domData.nodes.filter(n => (n.global_page_index === pageIndex || n.temp_slice_index === pageIndex));
+    const sorted = [...pageNodes].sort((a, b) => a.bounding_box.y0 - b.bounding_box.y0);
+    let decollidedCount = 0;
+
+    for (let i = 0; i < sorted.length; i++) {
+        for (let j = i + 1; j < sorted.length; j++) {
+            const upper = sorted[i];
+            const lower = sorted[j];
+
+            if (lower.bounding_box.y0 >= upper.bounding_box.y1 + 30) {
+                break;
+            }
+
+            const bUpper = upper.bounding_box;
+            const bLower = lower.bounding_box;
+
+            const xOverlap = Math.min(bUpper.x1, bLower.x1) - Math.max(bUpper.x0, bLower.x0);
+            const minW = Math.min(bUpper.x1 - bUpper.x0, bLower.x1 - bLower.x0);
+
+            if (xOverlap > 0 && (xOverlap / Math.max(1, minW)) >= 0.25) {
+                const vOverlap = bUpper.y1 - bLower.y0;
+                const upperH = bUpper.y1 - bUpper.y0;
+                const lowerH = bLower.y1 - bLower.y0;
+
+                if (vOverlap > 0 && vOverlap <= Math.max(upperH, lowerH) * 0.5) {
+                    const midY = roundCoord((bUpper.y1 + bLower.y0) / 2);
+                    const gap = 0.5;
+                    bUpper.y1 = roundCoord(Math.max(bUpper.y0 + 2, midY - gap / 2));
+                    bLower.y0 = roundCoord(Math.min(bLower.y1 - 2, midY + gap / 2));
+                    bUpper.quad = null;
+                    bLower.quad = null;
+                    decollidedCount++;
+                }
+            }
+        }
+    }
+
+    renderSVGOverlays();
+    renderDOMTree();
+    renderSelectedEditor();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.style.display = 'block';
+        if (decollidedCount > 0) {
+            banner.textContent = `[OK] Auto-decollided ${decollidedCount} overlapping box pair(s) on Page ${pageIndex}. Click '[SAVE] Save Annotations' to persist.`;
+        } else {
+            banner.textContent = `[INFO] No skew-overlapping box pairs detected on Page ${pageIndex}.`;
+        }
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+    return decollidedCount;
+}
+
+function renderSelectedEditor() {
+    const container = document.getElementById('selectedEditorContainer');
+    if (!container) return;
+
+    if (selectedNodeIds.length === 0) {
+        container.innerHTML = `
+            <div class="editor-box" style="border-style:dashed;">
+                <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">No Box Selected</div>
+                <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">
+                    Click a bounding box to inspect/edit coordinates. <strong>Shift+Click</strong> two boxes to compare and auto-decollide them.
+                </div>
+                <button class="btn-decollide" onclick="decollideCurrentPage()" style="margin-top:8px;">[AUTO-DECOLLIDE] Decollide All Page Boxes</button>
+            </div>
+        `;
+        return;
+    }
+
+    if (selectedNodeIds.length === 2) {
+        renderTwoNodeDecollideEditor(container);
+        return;
+    }
+
+    const node = domData.nodes.find(n => n.node_id === selectedNodeIds[0]);
     if (!node) {
         container.innerHTML = '';
         return;
@@ -151,7 +361,7 @@ function renderSelectedEditor() {
         <div class="editor-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <h4>Selected: ${node.node_id} (${node.type})</h4>
-                <button style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="selectNode(null)">Close</button>
+                <button style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="clearSelection()">Close</button>
             </div>
             <div class="coord-grid">
                 <div class="coord-field"><label>X0</label><input type="number" step="0.5" id="inpX0" value="${bbox.x0}" onchange="onManualCoordChange()"></div>
@@ -171,6 +381,9 @@ function renderSelectedEditor() {
             <div style="margin-top:6px;">
                 <label style="font-size:10px; color:var(--text-muted); font-weight:600;">Parsed Text / Correction Note (Defaulted to Content):</label>
                 <textarea class="note-area" placeholder="Parsed text / manual correction note..." oninput="updateCorrectionNote('${node.node_id}', this.value)">${escapeHtml(noteVal)}</textarea>
+            </div>
+            <div style="margin-top:8px; font-size:10px; color:var(--text-muted); border-top:1px solid #334155; padding-top:6px;">
+                Tip: Hold Shift and click another box to multi-select and auto-decollide them.
             </div>
         </div>
     `;
@@ -240,10 +453,11 @@ function renderDOMTree() {
             }
         }
 
+        const isSelected = selectedNodeIds.includes(node.node_id);
         const card = document.createElement('div');
-        card.className = `node-card ${hasViol && !isFixed ? 'has-violation' : ''} ${isIncorrect ? 'is-incorrect' : ''} ${node.node_id === selectedNodeId ? 'selected' : ''}`;
+        card.className = `node-card ${hasViol && !isFixed ? 'has-violation' : ''} ${isIncorrect ? 'is-incorrect' : ''} ${isSelected ? 'selected' : ''}`;
         card.id = `card-${node.node_id}`;
-        card.onclick = () => selectNode(node.node_id);
+        card.onclick = (e) => handleNodeClick(e, node.node_id);
         card.innerHTML = `
             <div class="node-header">
                 <span class="node-id">${node.node_id}</span>
@@ -306,6 +520,11 @@ function renderDecisionLog() {
 function renderSVGOverlays() {
     const svg = document.getElementById('svgOverlay');
     svg.innerHTML = '';
+    svg.onclick = (e) => {
+        if (e.target === svg) {
+            clearSelection();
+        }
+    };
     const showBbox = document.getElementById('toggleBbox').checked;
     const showViol = document.getElementById('toggleViolations').checked;
     const filterType = document.getElementById('typeFilter').value;
@@ -316,7 +535,7 @@ function renderSVGOverlays() {
         const corners = getBoxCorners(bbox);
         const activeViol = violationsData.find(v => v.node_id === node.node_id);
         const hasViol = !!activeViol && !appliedCorrections && activePresetIndex === 0;
-        const isSelected = (node.node_id === selectedNodeId);
+        const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
 
         if (showBbox) {
@@ -332,7 +551,7 @@ function renderSVGOverlays() {
                 id: `svg-${node.node_id}`
             });
             poly.onmousedown = (e) => onPolygonMouseDown(e, node.node_id);
-            poly.onclick = (e) => { e.stopPropagation(); selectNode(node.node_id); };
+            poly.onclick = (e) => { e.stopPropagation(); handleNodeClick(e, node.node_id); };
             svg.appendChild(poly);
 
             if (isSelected) {
@@ -464,7 +683,7 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
 }
 
 function onPolygonMouseDown(evt, nodeId) {
-    if (nodeId !== selectedNodeId) return;
+    if (!selectedNodeIds.includes(nodeId)) return;
     evt.stopPropagation();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;

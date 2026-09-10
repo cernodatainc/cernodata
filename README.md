@@ -1,5 +1,8 @@
 # Cernodata
 
+> [!NOTE]
+> The available code in this repository is a Proof of Concept (PoC) and might be subject to major rewrites as it does not yet fit the architecture as described in [`Architecture_Specification.md`](Architecture_Specification.md).
+
 Cernodata is an open-source ETL framework for layout-aware PDF extraction, automated quality iteration, structural layout debugging, and dataset generation for RAG and LLM fine-tuning.
 
 ## Parsing PDFs for RAG is a guessing game

@@ -47,6 +47,10 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("is_incorrect_text", content)
             self.assertIn("inpX0", content)
             self.assertIn("btnSaveAnnotations", content)
+            self.assertIn("btnDecollidePage", content)
+            self.assertIn("decollideCurrentPage", content)
+            self.assertIn("decollideSelectedPair", content)
+            self.assertIn("renderTwoNodeDecollideEditor", content)
 
         if os.path.exists(out_path):
             os.remove(out_path)

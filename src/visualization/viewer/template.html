@@ -60,9 +60,8 @@
             </select>
             <button class="action-btn" id="btnRedoLang" onclick="redoWithSelectedLanguage()">[REDO] Redo Run</button>
         </div>
-
         <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
-
+        <button class="action-btn" id="btnDecollidePage" onclick="decollideCurrentPage()" style="background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); color: #FFF;" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
         <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
             <span style="color: var(--text-muted);">Filter:</span>
             <select class="type-filter" id="typeFilter" onchange="updateLayers()">
@@ -99,6 +98,10 @@
             </div>
 
             <div class="tab-content active" id="domTab">
+                <div class="page-action-bar">
+                    <span class="page-action-title">Page 1 Controls:</span>
+                    <button class="action-btn" style="font-size:10px; padding:3px 8px; background:linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); color:#FFF;" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
+                </div>
                 <div id="selectedEditorContainer"></div>
                 <div id="domListContainer"></div>
             </div>

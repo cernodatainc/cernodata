@@ -666,3 +666,113 @@ select.type-filter {
     color: #38BDF8;
     overflow: auto;
 }
+
+.page-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    background: #1E293B;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.page-action-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.multi-editor-box {
+    background: #1E293B;
+    border: 1px solid #3B82F6;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.multi-editor-box h4 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #93C5FD;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pair-node-item {
+    background: #0F172A;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 6px;
+}
+
+.pair-node-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    color: #60A5FA;
+    margin-bottom: 4px;
+}
+
+.pair-node-coords {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.pair-node-text {
+    font-size: 11px;
+    color: #D1D5DB;
+    margin-top: 4px;
+    max-height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collision-status-badge {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.collision-status-badge.overlap {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid #EF4444;
+    color: #FCA5A5;
+}
+
+.collision-status-badge.clean {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid #10B981;
+    color: #6EE7B7;
+}
+
+.btn-decollide {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+    color: #FFF;
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-decollide:hover {
+    filter: brightness(1.15);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
