@@ -65,4 +65,5 @@ It details the 9 core architecture subsystems:
 # Community
 
 Join our Discord server to share your thoughts and know our next move first!
+
 https://discord.gg/hXURr32wzG
