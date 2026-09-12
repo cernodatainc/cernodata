@@ -61,3 +61,8 @@ It details the 9 core architecture subsystems:
 7. Downstream Packing & Target Use-Case Decision Tree
 8. Resource Protection & Work Dispatching Subsystem
 9. Interactive Visual Web App & Audit-Friendly Standalone Script Exporter
+
+# Community
+
+Join our Discord server to share your thoughts and know our next move first!
+https://discord.gg/hXURr32wzG
