@@ -11,6 +11,7 @@ import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from typing import Dict, Any
 from src.pipeline.orchestrator import run_pipeline
+from src.parsers.section_ocr import parse_image_ocr, parse_section_from_pdf
 
 
 class PipelineViewerHandler(SimpleHTTPRequestHandler):
@@ -96,6 +97,50 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
             self.wfile.write(json.dumps({"success": True, "path": dom_file}).encode("utf-8"))
+            return
+
+        elif self.path in ("/api/parse_section_ocr", "/api/ocr_section"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body_data = self.rfile.read(content_length).decode("utf-8")
+            payload = json.loads(body_data) if body_data else {}
+
+            node_id = payload.get("node_id", "")
+            image_base64 = payload.get("image_base64")
+            bbox = payload.get("bbox")
+            page = int(payload.get("page", 1))
+            pdf_path = payload.get("pdf_path", self.pdf_path)
+            language = payload.get("language", self.language)
+
+            print(f"\n[SERVER API] Parsing selected section '{node_id}' using OCR (Lang: {language})...")
+
+            result: Dict[str, Any]
+            if image_base64:
+                result = parse_image_ocr(image_base64, language=language)
+            elif pdf_path and bbox:
+                result = parse_section_from_pdf(pdf_path, page, bbox, language=language)
+            else:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "Either image_base64 or (pdf_path and bbox) must be provided."
+                }).encode("utf-8"))
+                return
+
+            response_data = {
+                "success": result.get("success", False),
+                "node_id": node_id,
+                "text": result.get("text", ""),
+                "confidence": result.get("confidence", 0.0),
+                "lines": result.get("lines", []),
+                "error": result.get("error")
+            }
+
+            self.send_response(200 if response_data["success"] else 422)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(response_data).encode("utf-8"))
             return
 
         self.send_error(404, "Endpoint not found")

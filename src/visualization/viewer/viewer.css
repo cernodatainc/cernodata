@@ -180,6 +180,11 @@ header {
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
+.action-btn.active {
+    box-shadow: 0 0 0 2px #FFF, 0 4px 12px rgba(16, 185, 129, 0.6);
+    filter: brightness(1.2);
+}
+
 select.type-filter {
     background: #1F2937;
     color: var(--text-main);

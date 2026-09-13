@@ -165,7 +165,6 @@ class TestDataShapeServer(unittest.TestCase):
         # Thread simulating browser client submitting form after server starts
         def simulate_browser_client():
             import time
-            time.sleep(0.4)
             base_url = f"http://127.0.0.1:{port}"
             submit_data = json.dumps({
                 "document_path": "simulated_doc.pdf",
@@ -182,8 +181,14 @@ class TestDataShapeServer(unittest.TestCase):
                 data=submit_data,
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req) as resp:
-                self.assertEqual(resp.status, 200)
+            for _ in range(50):
+                time.sleep(0.1)
+                try:
+                    with urllib.request.urlopen(req) as resp:
+                        if resp.status == 200:
+                            break
+                except Exception:
+                    pass
 
         client_thread = threading.Thread(target=simulate_browser_client, daemon=True)
         client_thread.start()

@@ -534,24 +534,160 @@ function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewe
     }
 }
 
+function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return null;
+    const pageImg = document.getElementById('pageImg');
+    if (!pageImg || !pageImg.naturalWidth || !pageImg.naturalHeight) return null;
+
+    const svg = document.getElementById('svgOverlay');
+    const vbW = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width) ? svg.viewBox.baseVal.width : 595.28;
+    const vbH = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.height) ? svg.viewBox.baseVal.height : 841.89;
+
+    const scaleX = pageImg.naturalWidth / vbW;
+    const scaleY = pageImg.naturalHeight / vbH;
+
+    const corners = getNodeSkewCorners(nodeId, node.bounding_box);
+    const s0 = { x: corners[0].x * scaleX, y: corners[0].y * scaleY };
+    const s1 = { x: corners[1].x * scaleX, y: corners[1].y * scaleY };
+    const s2 = { x: corners[2].x * scaleX, y: corners[2].y * scaleY };
+    const s3 = { x: corners[3].x * scaleX, y: corners[3].y * scaleY };
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    if (unskew) {
+        const wTop = Math.hypot(s1.x - s0.x, s1.y - s0.y);
+        const wBot = Math.hypot(s2.x - s3.x, s2.y - s3.y);
+        const hLeft = Math.hypot(s3.x - s0.x, s3.y - s0.y);
+        const hRight = Math.hypot(s2.x - s1.x, s2.y - s1.y);
+
+        const dstW = Math.max(10, Math.round((wTop + wBot) / 2));
+        const dstH = Math.max(8, Math.round((hLeft + hRight) / 2));
+
+        canvas.width = dstW;
+        canvas.height = dstH;
+
+        const d0 = { x: 0, y: 0 };
+        const d1 = { x: dstW, y: 0 };
+        const d2 = { x: dstW, y: dstH };
+        const d3 = { x: 0, y: dstH };
+
+        renderTriangleWarp(ctx, pageImg, s0, s1, s2, d0, d1, d2);
+        renderTriangleWarp(ctx, pageImg, s0, s2, s3, d0, d2, d3);
+        return canvas.toDataURL('image/png');
+    } else {
+        const minX = Math.floor(Math.min(s0.x, s1.x, s2.x, s3.x));
+        const maxX = Math.ceil(Math.max(s0.x, s1.x, s2.x, s3.x));
+        const minY = Math.floor(Math.min(s0.y, s1.y, s2.y, s3.y));
+        const maxY = Math.ceil(Math.max(s0.y, s1.y, s2.y, s3.y));
+
+        const cropW = Math.max(1, maxX - minX);
+        const cropH = Math.max(1, maxY - minY);
+
+        canvas.width = cropW;
+        canvas.height = cropH;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(s0.x - minX, s0.y - minY);
+        ctx.lineTo(s1.x - minX, s1.y - minY);
+        ctx.lineTo(s2.x - minX, s2.y - minY);
+        ctx.lineTo(s3.x - minX, s3.y - minY);
+        ctx.closePath();
+        ctx.clip();
+
+        ctx.drawImage(pageImg, -minX, -minY);
+        ctx.restore();
+
+        return canvas.toDataURL('image/png');
+    }
+}
+
 /**
- * TODO: Allow sending that cutout of the page to an OCR or LLM for a further pass.
- *
- * Future refinement pass:
- * 1. Extract the cropped canvas as a base64 PNG.
- * 2. Dispatch to an OCR engine or Vision LLM endpoint for targeted re-transcription.
- * 3. Update the node's text content and re-evaluate local quality violations.
+ * Sends the selected section cutout to the backend OCR parser for targeted transcription.
  */
-function triggerCutoutSecondPass(nodeId) {
+async function triggerCutoutSecondPass(nodeId) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
 
-    // TODO: Send cutout of the page to an OCR or LLM for a further pass
     const banner = document.getElementById('statusBanner');
+    const ocrBtn = document.getElementById(`btnCutoutOcr_${nodeId}`);
+    if (ocrBtn) {
+        ocrBtn.disabled = true;
+        ocrBtn.textContent = '[OCR] Parsing...';
+    }
+
     if (banner) {
         banner.style.display = 'block';
-        banner.textContent = `[TODO] Cutout for '${nodeId}' prepared for second-pass OCR/LLM evaluation.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+        banner.className = 'status-banner';
+        banner.textContent = `[RUNNING] Parsing selected section '${nodeId}' with OCR...`;
+    }
+
+    let b64 = getCutoutBase64(nodeId, isCutoutUnskewed);
+    if (!b64) {
+        const previewImg = document.getElementById(`cutoutPreviewImg_${nodeId}`);
+        if (previewImg && previewImg.src && previewImg.src.startsWith('data:image')) {
+            b64 = previewImg.src;
+        }
+    }
+
+    const payload = {
+        node_id: nodeId,
+        image_base64: b64,
+        bbox: node.bounding_box,
+        page: node.global_page_index || 1,
+        pdf_path: pdfSourceFile || '',
+        language: activeLanguage || 'en'
+    };
+
+    try {
+        const resp = await fetch('/api/parse_section_ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || `Server returned ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        const extractedText = data.text || '';
+        const confPercent = Math.round((data.confidence || 0) * 100);
+
+        if (!node.content) node.content = {};
+        node.content.raw_text = extractedText;
+        node.user_correction_note = extractedText;
+        node.ocr_confidence = data.confidence;
+        node.is_incorrect_text = false;
+
+        renderDOMTree();
+        renderSelectedEditor();
+        renderSVGOverlays();
+
+        if (banner) {
+            banner.className = 'status-banner';
+            banner.style.display = 'block';
+            const previewSnippet = extractedText.length > 50 ? extractedText.slice(0, 50) + '...' : extractedText;
+            banner.textContent = `[OCR SUCCESS] Section '${nodeId}' parsed (${confPercent}% conf): "${previewSnippet || '(no text detected)'}"`;
+            setTimeout(() => { banner.style.display = 'none'; }, 6000);
+        }
+    } catch (err) {
+        console.error('Section OCR parse error:', err);
+        if (banner) {
+            banner.className = 'status-banner';
+            banner.style.display = 'block';
+            banner.textContent = `[ERROR] Failed to parse section with OCR: ${err.message}`;
+            setTimeout(() => { banner.style.display = 'none'; }, 6000);
+        }
+    } finally {
+        if (ocrBtn) {
+            ocrBtn.disabled = false;
+            ocrBtn.textContent = '[OCR] Parse Section with OCR';
+        }
     }
 }
 
@@ -625,10 +761,9 @@ function renderSelectedEditor() {
                         ${isCutoutUnskewed ? '[SKEW] Show Skewed' : '[UNSKEW] Unskew Transformation'}
                     </button>
                 </div>
-                <div class="cutout-action-row" style="margin-top:6px; border-top:1px solid #334155; padding-top:6px;">
-                    <!-- TODO: Allow sending that cutout of the page to an OCR or LLM for a further pass -->
+                <div class="cutout-action-row" style="margin-top:6px; border-top:1px solid #334155; padding-top:6px; display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:9px; color:var(--text-muted);">Refined Extraction Pass:</span>
-                    <button class="action-btn secondary" style="font-size:10px; padding:3px 8px; opacity:0.85;" onclick="triggerCutoutSecondPass('${node.node_id}')" title="TODO: Allow sending that cutout of the page to an OCR or LLM for a further pass">[TODO] Send Cutout to OCR/LLM</button>
+                    <button class="action-btn" id="btnCutoutOcr_${node.node_id}" style="font-size:10px; padding:3px 10px; background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFF;" onclick="triggerCutoutSecondPass('${node.node_id}')" title="Send selected section cutout to backend OCR for targeted transcription">[OCR] Parse Section with OCR</button>
                 </div>
             </div>
 
@@ -782,6 +917,35 @@ function toggleAllCorrections() {
     renderSVGOverlays();
 }
 
+let isDrawSectionMode = false;
+let drawStartPt = null;
+let drawRectEl = null;
+
+function toggleDrawSectionMode() {
+    isDrawSectionMode = !isDrawSectionMode;
+    const btn = document.getElementById('btnDrawSection');
+    const visualPane = document.getElementById('visualPane');
+    const banner = document.getElementById('statusBanner');
+    if (isDrawSectionMode) {
+        if (btn) btn.classList.add('active');
+        if (visualPane) visualPane.style.cursor = 'crosshair';
+        if (banner) {
+            banner.className = 'status-banner';
+            banner.style.display = 'block';
+            banner.textContent = '[MODE] Click and drag on page to draw and select a new section.';
+        }
+    } else {
+        if (btn) btn.classList.remove('active');
+        if (visualPane) visualPane.style.cursor = 'default';
+        if (banner) banner.style.display = 'none';
+        if (drawRectEl && drawRectEl.parentNode) {
+            drawRectEl.parentNode.removeChild(drawRectEl);
+            drawRectEl = null;
+        }
+        drawStartPt = null;
+    }
+}
+
 function renderDecisionLog() {
     document.getElementById('logContent').textContent = JSON.stringify(decisionData, null, 2);
 }
@@ -790,8 +954,27 @@ function renderSVGOverlays() {
     const svg = document.getElementById('svgOverlay');
     svg.innerHTML = '';
     svg.onclick = (e) => {
-        if (e.target === svg) {
+        if (!isDrawSectionMode && e.target === svg) {
             clearSelection();
+        }
+    };
+    svg.onmousedown = (e) => {
+        if (isDrawSectionMode && (e.target === svg || e.target.id === 'pageImg')) {
+            e.preventDefault();
+            e.stopPropagation();
+            drawStartPt = getSvgCoordinates(e);
+            drawRectEl = createSvgElem('rect', {
+                x: drawStartPt.x,
+                y: drawStartPt.y,
+                width: 0,
+                height: 0,
+                fill: 'rgba(16, 185, 129, 0.2)',
+                stroke: '#10B981',
+                'stroke-width': '2',
+                'stroke-dasharray': '4 2',
+                id: 'drawSectionPreview'
+            });
+            svg.appendChild(drawRectEl);
         }
     };
     const showBbox = document.getElementById('toggleBbox').checked;
@@ -969,6 +1152,19 @@ function onPolygonMouseDown(evt, nodeId) {
 }
 
 window.addEventListener('mousemove', (evt) => {
+    if (isDrawSectionMode && drawStartPt && drawRectEl) {
+        const curr = getSvgCoordinates(evt);
+        const x = Math.min(drawStartPt.x, curr.x);
+        const y = Math.min(drawStartPt.y, curr.y);
+        const w = Math.abs(curr.x - drawStartPt.x);
+        const h = Math.abs(curr.y - drawStartPt.y);
+        drawRectEl.setAttribute('x', x);
+        drawRectEl.setAttribute('y', y);
+        drawRectEl.setAttribute('width', w);
+        drawRectEl.setAttribute('height', h);
+        return;
+    }
+
     if (!activeDrag) return;
     const node = domData.nodes.find(n => n.node_id === activeDrag.nodeId);
     if (!node) return;
@@ -1015,7 +1211,51 @@ window.addEventListener('mousemove', (evt) => {
     renderSVGOverlays();
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', (evt) => {
+    if (isDrawSectionMode && drawStartPt && drawRectEl) {
+        const curr = getSvgCoordinates(evt);
+        const minX = roundCoord(Math.min(drawStartPt.x, curr.x));
+        const minY = roundCoord(Math.min(drawStartPt.y, curr.y));
+        const maxX = roundCoord(Math.max(drawStartPt.x, curr.x));
+        const maxY = roundCoord(Math.max(drawStartPt.y, curr.y));
+        const w = maxX - minX;
+        const h = maxY - minY;
+
+        if (drawRectEl.parentNode) {
+            drawRectEl.parentNode.removeChild(drawRectEl);
+        }
+        drawRectEl = null;
+        drawStartPt = null;
+
+        if (w >= 15 && h >= 10) {
+            const newIndex = domData.nodes.length + 1;
+            const newNodeId = `node_p1_custom_${newIndex}`;
+            const newNode = {
+                node_id: newNodeId,
+                type: 'paragraph',
+                global_page_index: 1,
+                temp_slice_index: 1,
+                bounding_box: {
+                    x0: minX,
+                    y0: minY,
+                    x1: maxX,
+                    y1: maxY,
+                    angle: 0.0
+                },
+                content: {
+                    raw_text: ''
+                },
+                user_correction_note: ''
+            };
+            domData.nodes.push(newNode);
+            toggleDrawSectionMode();
+            handleNodeClick(null, newNodeId);
+            // Proactively trigger OCR for newly drawn section
+            triggerCutoutSecondPass(newNodeId);
+            return;
+        }
+    }
+
     if (activeDrag) {
         activeDrag = null;
         renderDOMTree();
