@@ -33,6 +33,18 @@ def parse_args():
         help="Generate and save execution plan without immediately running the pipeline."
     )
     parser.add_argument(
+        "--cli", "--terminal", action="store_true", dest="cli",
+        help="Force terminal-based CLI questionnaire instead of browser-based data shape configuration."
+    )
+    parser.add_argument(
+        "--no-browser", action="store_true",
+        help="Do not automatically launch web browser when serving interactive questionnaire."
+    )
+    parser.add_argument(
+        "--browser-port", type=int, default=8000,
+        help="Port to serve interactive browser data shape configuration wizard (default: 8000)."
+    )
+    parser.add_argument(
         "--override-preset", type=str, default=None,
         help="Explicitly override primary preset (e.g. 'docling_deep', 'docling_fast', 'vision_llm_direct')"
     )

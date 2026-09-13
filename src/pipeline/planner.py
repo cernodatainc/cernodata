@@ -18,6 +18,7 @@ from src.pipeline.planner_options import (
     SECURITY_OPTIONS,
 )
 from src.pipeline.planner_wizard import resolve_choice, run_interactive_wizard
+from src.pipeline.planner_server import serve_data_shape_wizard
 
 __all__ = [
     "DocumentPlan",
@@ -29,6 +30,7 @@ __all__ = [
     "SECURITY_OPTIONS",
     "resolve_choice",
     "run_interactive_wizard",
+    "serve_data_shape_wizard",
 ]
 
 
@@ -117,4 +119,24 @@ class PresetPlanner:
             input_func=input_func,
             print_func=print_func,
             default_doc=default_doc
+        )
+
+    def browser_session(
+        self,
+        default_doc: Optional[str] = None,
+        default_lang: str = "en",
+        default_threshold: float = 0.82,
+        output_dir: str = "output",
+        port: int = 8000,
+        open_browser: bool = True
+    ) -> DocumentPlan:
+        """Interactive in-browser data shape configuration wizard delegating to serve_data_shape_wizard."""
+        return serve_data_shape_wizard(
+            planner=self,
+            default_doc=default_doc,
+            default_lang=default_lang,
+            default_threshold=default_threshold,
+            output_dir=output_dir,
+            port=port,
+            open_browser=open_browser
         )

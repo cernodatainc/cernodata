@@ -27,6 +27,19 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
                 with open(target_file, "rb") as f:
                     self.wfile.write(f.read())
                 return
+        elif self.path in ("/data_shape_config.html", "/data_shape", "/planner"):
+            candidate_paths = [
+                os.path.join("output", "data_shape_config.html"),
+                os.path.join("src", "visualization", "data_shape_config.html")
+            ]
+            for target_file in candidate_paths:
+                if os.path.exists(target_file):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    with open(target_file, "rb") as f:
+                        self.wfile.write(f.read())
+                    return
         return super().do_GET()
 
     def do_POST(self):
