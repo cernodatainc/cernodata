@@ -19,14 +19,24 @@ from src.pipeline.planner import PresetPlanner, DocumentPlan
 
 def main():
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 
     args = parse_args()
 
     active_plan = None
     if args.create_plan:
         planner = PresetPlanner()
-        active_plan = planner.interactive_session(default_doc=args.input)
+        if getattr(args, "cli", False):
+            active_plan = planner.interactive_session(default_doc=args.input)
+        else:
+            active_plan = planner.browser_session(
+                default_doc=args.input,
+                default_lang=args.language,
+                default_threshold=args.target_threshold,
+                output_dir=args.output_dir,
+                port=getattr(args, "browser_port", 8000),
+                open_browser=not getattr(args, "no_browser", False)
+            )
         if args.override_preset:
             active_plan.primary_preset = args.override_preset
             active_plan.overridden = True

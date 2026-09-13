@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cernodata | Data Shape & Pipeline Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0e1117;
+            --bg-secondary: #161b22;
+            --bg-card: #1c2128;
+            --bg-card-selected: #1f293d;
+            --border-color: #30363d;
+            --border-active: #58a6ff;
+            --text-main: #e6edf3;
+            --text-muted: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #238636;
+            --accent-green-hover: #2ea043;
+            --accent-gold: #d29922;
+            --accent-purple: #bc8cff;
+            --danger-color: #f85149;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-logo {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #1f6feb, #238636);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            font-family: 'Outfit', sans-serif;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(31, 111, 235, 0.4);
+        }
+
+        .brand-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .header-badge {
+            font-size: 11px;
+            background: rgba(88, 166, 255, 0.12);
+            color: var(--accent-blue);
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            font-weight: 600;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 24px;
+            max-width: 1440px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 28px 32px;
+            flex: 1;
+        }
+
+        .form-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-num {
+            background: var(--accent-blue);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 12px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+        }
+
+        .section-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        .input-text {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-size: 14px;
+            font-family: monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-text:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .option-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .option-card:hover {
+            border-color: #58a6ff88;
+            background: #21262d;
+        }
+
+        .option-card.selected {
+            border-color: var(--accent-blue);
+            background: var(--bg-card-selected);
+            box-shadow: 0 0 0 1px var(--accent-blue);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #ffffff;
+        }
+
+        .card-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .radio-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .option-card.selected .radio-indicator {
+            border-color: var(--accent-blue);
+        }
+
+        .option-card.selected .radio-indicator::after {
+            content: "";
+            width: 8px;
+            height: 8px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+        }
+
+        .inline-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slider-wrapper input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent-blue);
+        }
+
+        .slider-value {
+            font-family: monospace;
+            font-size: 14px;
+            font-weight: 600;
+            background: var(--bg-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            min-width: 48px;
+            text-align: center;
+        }
+
+        /* Sidebar / Presets Ranking Pane */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .ranking-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            position: sticky;
+            top: 24px;
+        }
+
+        .ranking-header {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .ranking-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .preset-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.2s;
+        }
+
+        .preset-item.primary {
+            border-color: var(--accent-green);
+            background: rgba(35, 134, 54, 0.08);
+        }
+
+        .preset-item.fallback {
+            border-color: var(--border-color);
+        }
+
+        .preset-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .preset-name {
+            font-weight: 600;
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        .preset-tag {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .preset-tag.primary-tag {
+            background: rgba(35, 134, 54, 0.2);
+            color: #69f0ae;
+            border: 1px solid rgba(105, 240, 174, 0.4);
+        }
+
+        .preset-tag.fallback-tag {
+            background: rgba(139, 148, 158, 0.15);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .score-bar-bg {
+            background: var(--bg-primary);
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: var(--accent-blue);
+            transition: width 0.3s ease;
+        }
+
+        .preset-item.primary .score-bar-fill {
+            background: var(--accent-green);
+        }
+
+        .score-num {
+            font-size: 12px;
+            font-family: monospace;
+            color: var(--text-muted);
+            text-align: right;
+        }
+
+        .override-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 14px;
+        }
+
+        .override-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .override-select {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: var(--text-main);
+            font-size: 13px;
+            font-family: monospace;
+            outline: none;
+        }
+
+        .override-select:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--accent-green);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .submit-btn:hover {
+            background: var(--accent-green-hover);
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .submit-btn:disabled {
+            background: #30363d;
+            color: #8b949e;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Banner */
+        .status-banner {
+            display: none;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .status-banner.success {
+            display: block;
+            background: rgba(35, 134, 54, 0.2);
+            border: 1px solid var(--accent-green);
+            color: #69f0ae;
+        }
+
+        .status-banner.error {
+            display: block;
+            background: rgba(248, 81, 73, 0.2);
+            border: 1px solid var(--danger-color);
+            color: #ff7b72;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 960px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            .ranking-card {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-logo">C</div>
+            <div>
+                <div class="brand-title">cernodata Data Shape & Preset Planner</div>
+                <div class="brand-subtitle">Interactive browser setup to configure ingestion constraints and preset suitability ranking</div>
+            </div>
+        </div>
+        <div class="header-badge">[SETUP WIZARD]</div>
+    </header>
+
+    <div class="main-container">
+        <!-- Form Section -->
+        <div>
+            <div class="status-banner" id="statusBanner"></div>
+
+            <!-- 1. Document & Ingestion Parameters -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-num">1</div>
+                    <div class="section-title">Document & Quality Targets</div>
+                    <div class="section-desc">File source, language hint, and confidence goal</div>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label" for="docPath">Document File Path</label>
+                    <input type="text" id="docPath" class="input-text" placeholder="e.g. src/e2e/Dokument 5.pdf" />
+                </div>
+
+                <div class="inline-inputs">
+                    <div class="input-group">
+                        <label class="input-label" for="langCode">Language Hint Code</label>
+                        <select id="langCode" class="override-select" onchange="recalculate()">
+                            <option value="en">en - English</option>
+                            <option value="pl">pl - Polish</option>
+                            <option value="de">de - German</option>
+                            <option value="fr">fr - French</option>
+                            <option value="es">es - Spanish</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label" for="thresholdSlider">Target Confidence Threshold</label>
+                        <div class="slider-wrapper">
+                            <input type="range" id="thresholdSlider" min="0.50" max="0.99" step="0.01" value="0.82" oninput="updateThreshold(this.value)" />
+                            <span class="slider-value" id="thresholdDisplay">0.82</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Document Taxonomy -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-num">2</div>
+                    <div class="section-title">Document Taxonomy</div>
+                    <div class="section-desc">Select the primary structural layout shape</div>
+                </div>
+                <div class="options-grid" id="taxonomyGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- 3. Hardware Profile -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-num">3</div>
+                    <div class="section-title">Hardware Profile</div>
+                    <div class="section-desc">Compute capability of current host environment</div>
+                </div>
+                <div class="options-grid" id="hardwareGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- 4. Quality vs Speed Target -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-num">4</div>
+                    <div class="section-title">Quality vs. Speed Target</div>
+                    <div class="section-desc">Throughput priority versus bounding box layout fidelity</div>
+                </div>
+                <div class="options-grid" id="targetGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- 5. Security Constraints -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-num">5</div>
+                    <div class="section-title">Security & Network Constraints</div>
+                    <div class="section-desc">External cloud API allowance vs. air-gapped local model</div>
+                </div>
+                <div class="options-grid" id="securityGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar / Ranking Preview -->
+        <div class="sidebar">
+            <div class="ranking-card">
+                <div class="ranking-header">Suitability Ranking</div>
+                <div class="ranking-sub">Dynamic confidence scores based on answers</div>
+
+                <div id="presetsList">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="override-box">
+                    <div class="override-title">Primary Preset Override</div>
+                    <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
+                        <option value="auto">[AUTO] Use Recommended Ranking</option>
+                        <option value="docling_fast">docling_fast</option>
+                        <option value="docling_deep">docling_deep</option>
+                        <option value="vision_llm_direct">vision_llm_direct</option>
+                    </select>
+                </div>
+
+                <button class="submit-btn" id="submitBtn" onclick="submitPlan()">
+                    [SUBMIT PLAN] Start Pipeline Execution
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Preset weight matrices loaded from cernodata planner configuration
+        const PRESET_WEIGHTS = {
+            "docling_fast": {
+                "low_spec_cpu": 0.90,
+                "rapid_approximate": 0.80,
+                "financial_report": 0.60,
+                "scanned_form": 0.30,
+                "air_gapped_local": 0.90,
+                "hosted_vision_api": 0.50,
+                "multicolumn_article": 0.70,
+                "tabular_ledger": 0.60,
+                "mixed_text_image": 0.50,
+                "general_text": 0.85,
+                "workstation_cuda": 0.60,
+                "cloud_cluster": 0.50,
+                "high_precision_structure": 0.50
+            },
+            "docling_deep": {
+                "workstation_cuda": 0.90,
+                "cloud_cluster": 0.95,
+                "high_precision_structure": 0.85,
+                "financial_report": 0.85,
+                "tabular_ledger": 0.90,
+                "multicolumn_article": 0.85,
+                "scanned_form": 0.75,
+                "mixed_text_image": 0.70,
+                "general_text": 0.80,
+                "air_gapped_local": 0.85,
+                "hosted_vision_api": 0.70,
+                "low_spec_cpu": 0.40,
+                "rapid_approximate": 0.40
+            },
+            "vision_llm_direct": {
+                "scanned_form": 0.95,
+                "mixed_text_image": 0.90,
+                "high_precision_structure": 0.90,
+                "cloud_cluster": 0.90,
+                "workstation_cuda": 0.75,
+                "financial_report": 0.70,
+                "tabular_ledger": 0.65,
+                "multicolumn_article": 0.75,
+                "general_text": 0.60,
+                "low_spec_cpu": 0.10,
+                "rapid_approximate": 0.30,
+                "air_gapped_local": 0.30,
+                "hosted_vision_api": 0.95
+            }
+        };
+
+        const TAXONOMY_OPTIONS = [
+            ["financial_report", "Dense numbers, tables, multi-page financial statements"],
+            ["multicolumn_article", "Academic or corporate papers with 2+ text columns"],
+            ["scanned_form", "Low-DPI scanned documents, hand-signed forms, low contrast"],
+            ["tabular_ledger", "Spreadsheet-like grid structures"],
+            ["mixed_text_image", "Marketing materials, slide decks, embedded graphics"],
+            ["general_text", "Standard single or multi-page prose documents"]
+        ];
+
+        const HARDWARE_OPTIONS = [
+            ["low_spec_cpu", "Shared CPU/RAM, no discrete GPU (<= 4GB RAM)"],
+            ["workstation_cuda", "Local CUDA-enabled GPU (NVIDIA RTX/Tesla)"],
+            ["cloud_cluster", "Distributed cloud node / multi-GPU execution"]
+        ];
+
+        const TARGET_OPTIONS = [
+            ["rapid_approximate", "Fast throughput, acceptable minor structural drift"],
+            ["high_precision_structure", "Maximum layout fidelity, exact bounding box extraction"]
+        ];
+
+        const SECURITY_OPTIONS = [
+            ["air_gapped_local", "Zero external network calls (strictly local models)"],
+            ["hosted_vision_api", "Cloud multimodal APIs allowed (hosted vision models)"]
+        ];
+
+        // State
+        let selectedTaxonomy = "general_text";
+        let selectedHardware = "low_spec_cpu";
+        let selectedTarget = "high_precision_structure";
+        let selectedSecurity = "air_gapped_local";
+        let currentScores = {};
+        let suggestedOrder = [];
+        let overridePrimary = null;
+
+        function renderOptionGrid(containerId, options, selectedValue, onSelectCallback) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            options.forEach(([key, desc]) => {
+                const card = document.createElement("div");
+                card.className = "option-card" + (key === selectedValue ? " selected" : "");
+                card.onclick = () => {
+                    onSelectCallback(key);
+                    renderOptionGrid(containerId, options, key, onSelectCallback);
+                    recalculate();
+                };
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-title">${key}</div>
+                        <div class="radio-indicator"></div>
+                    </div>
+                    <div class="card-desc">${desc}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateThreshold(val) {
+            document.getElementById("thresholdDisplay").textContent = parseFloat(val).toFixed(2);
+        }
+
+        function calculateSuitabilityScores(taxonomy, hardware, target, security) {
+            const answers = [taxonomy, hardware, target, security];
+            const scores = {};
+
+            for (const [presetId, weightMap] of Object.entries(PRESET_WEIGHTS)) {
+                let sum = 0;
+                for (const ans of answers) {
+                    sum += (weightMap[ans] !== undefined) ? weightMap[ans] : 0.50;
+                }
+                scores[presetId] = Math.round((sum / answers.length) * 1000) / 1000;
+            }
+            return scores;
+        }
+
+        function recalculate() {
+            currentScores = calculateSuitabilityScores(selectedTaxonomy, selectedHardware, selectedTarget, selectedSecurity);
+            suggestedOrder = Object.keys(currentScores).sort((a, b) => currentScores[b] - currentScores[a]);
+            renderPresetsList();
+        }
+
+        function onOverrideChanged() {
+            const val = document.getElementById("overrideSelect").value;
+            overridePrimary = (val === "auto") ? null : val;
+            renderPresetsList();
+        }
+
+        function renderPresetsList() {
+            const container = document.getElementById("presetsList");
+            container.innerHTML = "";
+
+            let displayOrder = [...suggestedOrder];
+            if (overridePrimary && overridePrimary !== suggestedOrder[0]) {
+                displayOrder = [overridePrimary, ...suggestedOrder.filter(p => p !== overridePrimary)];
+            }
+
+            displayOrder.forEach((preset, idx) => {
+                const isPrimary = (idx === 0);
+                const score = currentScores[preset] || 0.5;
+                const pct = Math.round(score * 100);
+
+                const item = document.createElement("div");
+                item.className = "preset-item " + (isPrimary ? "primary" : "fallback");
+
+                const tagText = isPrimary ? "[Primary Candidate]" : `[Fallback ${idx}]`;
+                const tagClass = isPrimary ? "primary-tag" : "fallback-tag";
+
+                item.innerHTML = `
+                    <div class="preset-row">
+                        <div class="preset-name">${preset}</div>
+                        <div class="preset-tag ${tagClass}">${tagText}</div>
+                    </div>
+                    <div class="score-bar-bg">
+                        <div class="score-bar-fill" style="width: ${pct}%;"></div>
+                    </div>
+                    <div class="score-num">Suitability: ${score.toFixed(3)} (${pct}%)</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        async function submitPlan() {
+            const docPath = document.getElementById("docPath").value.trim();
+            const language = document.getElementById("langCode").value;
+            const threshold = parseFloat(document.getElementById("thresholdSlider").value);
+
+            if (!docPath) {
+                showBanner("Please specify a document file path before proceeding.", "error");
+                document.getElementById("docPath").focus();
+                return;
+            }
+
+            let effectiveOrder = [...suggestedOrder];
+            if (overridePrimary && overridePrimary !== suggestedOrder[0]) {
+                effectiveOrder = [overridePrimary, ...suggestedOrder.filter(p => p !== overridePrimary)];
+            }
+
+            const payload = {
+                document_path: docPath,
+                taxonomy: selectedTaxonomy,
+                hardware: selectedHardware,
+                target: selectedTarget,
+                security: selectedSecurity,
+                language: language,
+                target_threshold: threshold,
+                override_primary: overridePrimary,
+                override_order: effectiveOrder,
+                scores: currentScores
+            };
+
+            const submitBtn = document.getElementById("submitBtn");
+            submitBtn.disabled = true;
+            submitBtn.textContent = "[SUBMITTING] Sending configuration...";
+
+            try {
+                const response = await fetch("/api/submit_plan", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    showBanner("[SUCCESS] Data shape plan configured successfully. Starting pipeline execution...", "success");
+                    submitBtn.textContent = "[COMPLETED] Plan Active";
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    showBanner("[ERROR] " + (err.error || "Failed to submit plan to server."), "error");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "[SUBMIT PLAN] Start Pipeline Execution";
+                }
+            } catch (e) {
+                // If offline or standalone file opened directly in browser without local server
+                showBanner("[STANDALONE] Server connection offline. Generated plan JSON copied to console.", "success");
+                console.log("DocumentPlan JSON:", JSON.stringify(payload, null, 2));
+                submitBtn.disabled = false;
+                submitBtn.textContent = "[SUBMIT PLAN] Start Pipeline Execution";
+            }
+        }
+
+        function showBanner(text, type) {
+            const banner = document.getElementById("statusBanner");
+            banner.textContent = text;
+            banner.className = "status-banner " + type;
+        }
+
+        // Initialize with default or server-provided values
+        window.addEventListener("DOMContentLoaded", async () => {
+            // Check if backend provides prefilled defaults
+            try {
+                const res = await fetch("/api/config");
+                if (res.ok) {
+                    const cfg = await res.json();
+                    if (cfg.default_doc) {
+                        document.getElementById("docPath").value = cfg.default_doc;
+                    }
+                    if (cfg.default_lang) {
+                        document.getElementById("langCode").value = cfg.default_lang;
+                    }
+                }
+            } catch (e) {
+                // Standalone fallback
+            }
+
+            renderOptionGrid("taxonomyGrid", TAXONOMY_OPTIONS, selectedTaxonomy, val => selectedTaxonomy = val);
+            renderOptionGrid("hardwareGrid", HARDWARE_OPTIONS, selectedHardware, val => selectedHardware = val);
+            renderOptionGrid("targetGrid", TARGET_OPTIONS, selectedTarget, val => selectedTarget = val);
+            renderOptionGrid("securityGrid", SECURITY_OPTIONS, selectedSecurity, val => selectedSecurity = val);
+
+            recalculate();
+        });
+    </script>
+</body>
+</html>
