@@ -30,6 +30,21 @@
       "low_spec_cpu": 0.40,
       "rapid_approximate": 0.40
     },
+    "pypdfium_rapidocr": {
+      "low_spec_cpu": 0.85,
+      "rapid_approximate": 0.85,
+      "general_text": 0.80,
+      "financial_report": 0.70,
+      "multicolumn_article": 0.75,
+      "scanned_form": 0.65,
+      "tabular_ledger": 0.65,
+      "mixed_text_image": 0.60,
+      "air_gapped_local": 0.90,
+      "workstation_cuda": 0.70,
+      "high_precision_structure": 0.60,
+      "hosted_vision_api": 0.50,
+      "cloud_cluster": 0.50
+    },
     "vision_llm_direct": {
       "scanned_form": 0.95,
       "mixed_text_image": 0.90,
@@ -56,8 +71,7 @@
   ],
   "hardware_options": [
     ["low_spec_cpu", "Shared CPU/RAM, no discrete GPU (<= 4GB RAM)"],
-    ["workstation_cuda", "Local CUDA-enabled GPU (NVIDIA RTX/Tesla)"],
-    ["cloud_cluster", "Distributed cloud node / multi-GPU execution"]
+    ["workstation_cuda", "Local CUDA-enabled GPU (NVIDIA RTX/Tesla)"]
   ],
   "target_options": [
     ["rapid_approximate", "Fast throughput, acceptable minor structural drift"],
@@ -65,6 +79,6 @@
   ],
   "security_options": [
     ["air_gapped_local", "Zero external network calls (strictly local models)"],
-    ["hosted_vision_api", "Cloud multimodal APIs allowed (hosted vision models)"]
+    ["hosted_vision_api", "External webhook / URI integration (external APIs allowed)"]
   ]
 }

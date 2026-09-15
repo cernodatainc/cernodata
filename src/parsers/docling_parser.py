@@ -6,7 +6,7 @@ Maps Docling structural items and bounding box coordinate origins into DocumentD
 """
 
 import os
-from typing import List
+from typing import List, Optional
 
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
@@ -42,10 +42,23 @@ except ImportError:
 class DoclingParser:
     """Parses PDF documents using Docling layout parser and maps structural primitives into DocumentDOM."""
 
-    def __init__(self, use_ocr: bool = True, language: str = "en", preset: str = "docling_fast"):
+    def __init__(
+        self,
+        use_ocr: bool = True,
+        language: str = "en",
+        preset: str = "docling_fast",
+        ocr_engine: str = "auto",
+        ocr_scale: Optional[float] = None,
+        force_full_page_ocr: bool = False,
+        do_table_structure: bool = True,
+    ):
         self.use_ocr = use_ocr
         self.language = language.lower().strip()
         self.preset = preset
+        self.ocr_engine = ocr_engine.lower().strip()
+        self.ocr_scale = ocr_scale if ocr_scale is not None else (3.5 if preset == "docling_deep" else 3.0)
+        self.force_full_page_ocr = force_full_page_ocr
+        self.do_table_structure = do_table_structure
 
     def parse(self, pdf_path: str) -> DocumentDOM:
         source_filename = os.path.basename(pdf_path)
@@ -58,9 +71,54 @@ class DoclingParser:
         ocr_langs = LANG_CODE_MAP.get(self.language, [self.language])
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = self.use_ocr
+        pipeline_options.do_table_structure = self.do_table_structure
+        if hasattr(pipeline_options, "images_scale"):
+            pipeline_options.images_scale = self.ocr_scale
+
+        # Configure specialized OCR engine options if available
+        engine = self.ocr_engine
+        if engine == "auto" and self.preset == "docling_fast":
+            engine = "rapidocr"
+
+        ocr_opts = None
+        if engine == "rapidocr":
+            try:
+                from docling.datamodel.pipeline_options import RapidOcrOptions
+                ocr_opts = RapidOcrOptions(
+                    force_full_page_ocr=self.force_full_page_ocr,
+                    scale=self.ocr_scale,
+                )
+            except Exception:
+                pass
+        elif engine in ("tesseract", "tesseract_cli"):
+            try:
+                from docling.datamodel.pipeline_options import TesseractOcrOptions
+                ocr_opts = TesseractOcrOptions(
+                    force_full_page_ocr=self.force_full_page_ocr,
+                    scale=self.ocr_scale,
+                )
+            except Exception:
+                pass
+        elif engine == "easyocr":
+            try:
+                from docling.datamodel.pipeline_options import EasyOcrOptions
+                ocr_opts = EasyOcrOptions(
+                    force_full_page_ocr=self.force_full_page_ocr,
+                    scale=self.ocr_scale,
+                )
+            except Exception:
+                pass
+
+        if ocr_opts is not None:
+            pipeline_options.ocr_options = ocr_opts
+
         if hasattr(pipeline_options, "ocr_options") and pipeline_options.ocr_options:
             if hasattr(pipeline_options.ocr_options, "lang"):
                 setattr(pipeline_options.ocr_options, "lang", ocr_langs)
+            if hasattr(pipeline_options.ocr_options, "scale"):
+                setattr(pipeline_options.ocr_options, "scale", self.ocr_scale)
+            if hasattr(pipeline_options.ocr_options, "force_full_page_ocr"):
+                setattr(pipeline_options.ocr_options, "force_full_page_ocr", self.force_full_page_ocr)
 
         try:
             converter = DocumentConverter(

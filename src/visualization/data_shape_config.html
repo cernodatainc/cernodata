@@ -603,6 +603,7 @@
                     <div class="override-title">Primary Preset Override</div>
                     <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
                         <option value="auto">[AUTO] Use Recommended Ranking</option>
+                        <option value="pypdfium_rapidocr">pypdfium_rapidocr</option>
                         <option value="docling_fast">docling_fast</option>
                         <option value="docling_deep">docling_deep</option>
                         <option value="vision_llm_direct">vision_llm_direct</option>
@@ -619,6 +620,21 @@
     <script>
         // Preset weight matrices loaded from cernodata planner configuration
         const PRESET_WEIGHTS = {
+            "pypdfium_rapidocr": {
+                "low_spec_cpu": 0.85,
+                "rapid_approximate": 0.85,
+                "general_text": 0.80,
+                "financial_report": 0.70,
+                "multicolumn_article": 0.75,
+                "scanned_form": 0.65,
+                "tabular_ledger": 0.65,
+                "mixed_text_image": 0.60,
+                "air_gapped_local": 0.90,
+                "workstation_cuda": 0.70,
+                "high_precision_structure": 0.60,
+                "hosted_vision_api": 0.50,
+                "cloud_cluster": 0.50
+            },
             "docling_fast": {
                 "low_spec_cpu": 0.90,
                 "rapid_approximate": 0.80,
