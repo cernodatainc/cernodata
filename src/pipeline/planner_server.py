@@ -21,6 +21,7 @@ from src.pipeline.planner_options import (
     TARGET_OPTIONS,
     SECURITY_OPTIONS,
 )
+from src.pipeline.server import send_json_response, read_json_payload
 
 
 def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
@@ -57,7 +58,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             return
 
         elif self.path == "/api/config":
-            config_payload = {
+            send_json_response(self, 200, {
                 "default_doc": self.server.default_doc or "",
                 "default_lang": self.server.default_lang,
                 "default_threshold": self.server.default_threshold,
@@ -66,21 +67,15 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
                 "hardware_options": HARDWARE_OPTIONS,
                 "target_options": TARGET_OPTIONS,
                 "security_options": SECURITY_OPTIONS,
-            }
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps(config_payload).encode("utf-8"))
+            })
             return
 
         return super().do_GET()
 
     def do_POST(self):
-        if self.path == "/api/calculate_scores":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length).decode("utf-8")
-            payload = json.loads(body) if body else {}
+        payload = read_json_payload(self)
 
+        if self.path == "/api/calculate_scores":
             taxonomy = payload.get("taxonomy", "general_text")
             hardware = payload.get("hardware", "low_spec_cpu")
             target = payload.get("target", "high_precision_structure")
@@ -89,22 +84,14 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             scores = self.server.planner.calculate_scores(taxonomy, hardware, target, security)
             suggested = self.server.planner.suggest_preset_order(scores)
 
-            resp = {
+            send_json_response(self, 200, {
                 "success": True,
                 "scores": scores,
                 "suggested_order": suggested,
-            }
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps(resp).encode("utf-8"))
+            })
             return
 
         elif self.path == "/api/submit_plan":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length).decode("utf-8")
-            payload = json.loads(body) if body else {}
-
             document_path = payload.get("document_path", "").strip()
             if not document_path and self.server.default_doc:
                 document_path = self.server.default_doc
@@ -141,25 +128,18 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             plan_file = os.path.join(self.server.output_dir, "plan.json")
             plan.save(plan_file)
 
-            resp = {
+            send_json_response(self, 200, {
                 "success": True,
                 "message": "Plan successfully configured and saved.",
                 "plan_path": plan_file,
                 "plan": plan.to_dict(),
-            }
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps(resp).encode("utf-8"))
+            })
 
             print(f"\n[SERVER API] Received plan configuration from browser (Document: '{document_path}', Primary: '{plan.primary_preset}').")
             print(f"[SERVER API] Plan saved to '{plan_file}'.")
 
             # Schedule clean server shutdown
-            def trigger_shutdown():
-                self.server.shutdown()
-
-            threading.Thread(target=trigger_shutdown, daemon=True).start()
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
 
         self.send_error(404, "Endpoint not found")

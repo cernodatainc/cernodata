@@ -83,6 +83,66 @@ def evaluate_quality_and_decision_tree(
     return decision, violations
 
 
+def _execute_attempt(
+    pdf_path: str,
+    language: str,
+    preset: str,
+    target_threshold: float,
+    align_skew: bool,
+    curr_score: float = 0.90,
+    next_score: float = 0.72,
+    ocr_scale: Optional[float] = None,
+    force_full_page_ocr: bool = False,
+) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
+    """Executes a single extraction attempt: parse -> skew align -> quality evaluate."""
+    dom = parse_document(
+        pdf_path,
+        language,
+        preset=preset,
+        ocr_scale=ocr_scale,
+        force_full_page_ocr=force_full_page_ocr,
+    )
+    dom = align_document_skew(dom, pdf_path, align_skew)
+    decision, violations = evaluate_quality_and_decision_tree(
+        dom,
+        target_threshold,
+        language,
+        preset=preset,
+        current_preset_score=curr_score,
+        next_preset_score=next_score,
+    )
+    return dom, decision, violations
+
+
+def _make_attempt_record(
+    step: int,
+    preset: str,
+    decision: Dict[str, Any],
+    violations: List[Dict[str, Any]],
+    action: Optional[str] = None,
+    reason: Optional[str] = None,
+    detail: Optional[str] = None,
+    parameters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Builds a structured attempt record for tracking iteration history."""
+    record: Dict[str, Any] = {
+        "step": step,
+        "preset": preset,
+        "overall_confidence": decision.get("overall_confidence"),
+        "per_page_confidence": decision.get("per_page_confidence"),
+        "status": decision.get("status"),
+        "is_accepted": decision.get("is_accepted", False),
+        "violations_count": len(violations),
+        "action": action or decision.get("decision_tree", {}).get("action"),
+        "reason": reason or decision.get("decision_tree", {}).get("reason"),
+    }
+    if detail is not None:
+        record["detail"] = detail
+    if parameters is not None:
+        record["parameters"] = parameters
+    return record
+
+
 def run_pipeline(
     pdf_path: Optional[str] = None,
     target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
@@ -129,29 +189,10 @@ def run_pipeline(
     next_score = plan_obj.scores.get(next_candidate, 0.72) if (plan_obj and next_candidate) else 0.72
 
     # Step 1: Initial Parse with Primary Preset
-    dom = parse_document(pdf_path, language, preset=preset)
-    dom = align_document_skew(dom, pdf_path, align_skew)
-    decision, violations = evaluate_quality_and_decision_tree(
-        dom,
-        target_threshold,
-        language,
-        preset=preset,
-        current_preset_score=curr_score,
-        next_preset_score=next_score,
+    dom, decision, violations = _execute_attempt(
+        pdf_path, language, preset, target_threshold, align_skew, curr_score, next_score
     )
-
-    initial_attempt = {
-        "step": 1,
-        "preset": preset,
-        "overall_confidence": decision.get("overall_confidence"),
-        "per_page_confidence": decision.get("per_page_confidence"),
-        "status": decision.get("status"),
-        "is_accepted": decision.get("is_accepted", False),
-        "violations_count": len(violations),
-        "action": decision.get("decision_tree", {}).get("action"),
-        "reason": decision.get("decision_tree", {}).get("reason")
-    }
-    attempts.append(initial_attempt)
+    attempts.append(_make_attempt_record(1, preset, decision, violations))
 
     if preset == "docling_deep":
         decision["chosen_preset"] = "docling_deep"
@@ -167,42 +208,19 @@ def run_pipeline(
         if action == "PATH_B_WIGGLE_PARAMETERS":
             wiggled_scale = 3.5 if preset == "pypdfium_rapidocr" else 4.0
             wiggled_force_ocr = True
-            w_dom = parse_document(
-                pdf_path,
-                language,
-                preset=preset,
-                ocr_scale=wiggled_scale,
-                force_full_page_ocr=wiggled_force_ocr,
+            w_dom, w_decision, w_violations = _execute_attempt(
+                pdf_path, language, preset, target_threshold, align_skew,
+                curr_score, next_score, ocr_scale=wiggled_scale, force_full_page_ocr=wiggled_force_ocr
             )
-            w_dom = align_document_skew(w_dom, pdf_path, align_skew)
-            w_decision, w_violations = evaluate_quality_and_decision_tree(
-                w_dom,
-                target_threshold,
-                language,
-                preset=preset,
-                current_preset_score=curr_score,
-                next_preset_score=next_score,
-            )
-            w_decision["chosen_preset"] = preset
-
-            w_attempt = {
-                "step": len(attempts) + 1,
-                "preset": preset,
-                "overall_confidence": w_decision.get("overall_confidence"),
-                "per_page_confidence": w_decision.get("per_page_confidence"),
-                "status": w_decision.get("status"),
-                "is_accepted": w_decision.get("is_accepted", False),
-                "violations_count": len(w_violations),
-                "action": "PATH_B_WIGGLE_PARAMETERS",
-                "reason": f"Wiggled OCR parameters: ocr_scale={wiggled_scale}, force_full_page_ocr={wiggled_force_ocr}.",
-                "parameters": {"ocr_scale": wiggled_scale, "force_full_page_ocr": wiggled_force_ocr}
-            }
-            attempts.append(w_attempt)
+            attempts.append(_make_attempt_record(
+                len(attempts) + 1, preset, w_decision, w_violations,
+                action="PATH_B_WIGGLE_PARAMETERS",
+                reason=f"Wiggled OCR parameters: ocr_scale={wiggled_scale}, force_full_page_ocr={wiggled_force_ocr}.",
+                parameters={"ocr_scale": wiggled_scale, "force_full_page_ocr": wiggled_force_ocr}
+            ))
 
             if w_decision.get("is_accepted"):
-                dom = w_dom
-                decision = w_decision
-                violations = w_violations
+                dom, decision, violations = w_dom, w_decision, w_violations
                 decision["decision_tree"] = {
                     "action": "ACCEPT_OUTPUT",
                     "preset_executed": preset,
@@ -210,13 +228,10 @@ def run_pipeline(
                 }
             elif next_candidate:
                 # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
-                fallback_dom = parse_document(pdf_path, language, preset=next_candidate)
-                fallback_dom = align_document_skew(fallback_dom, pdf_path, align_skew)
-                fb_decision, fb_violations = evaluate_quality_and_decision_tree(
-                    fallback_dom, target_threshold, language, preset=next_candidate
-                )
-                fb_decision["chosen_preset"] = next_candidate
                 plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
+                fb_dom, fb_decision, fb_violations = _execute_attempt(
+                    pdf_path, language, next_candidate, target_threshold, align_skew
+                )
                 fb_decision["decision_tree"] = {
                     "action": "PATH_A_SWITCH_PRESET",
                     "preset_executed": next_candidate,
@@ -225,36 +240,23 @@ def run_pipeline(
                     "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                     "detail": plan_note
                 }
-                fb_attempt = {
-                    "step": len(attempts) + 1,
-                    "preset": next_candidate,
-                    "overall_confidence": fb_decision.get("overall_confidence"),
-                    "per_page_confidence": fb_decision.get("per_page_confidence"),
-                    "status": fb_decision.get("status"),
-                    "is_accepted": fb_decision.get("is_accepted", False),
-                    "violations_count": len(fb_violations),
-                    "action": fb_decision.get("decision_tree", {}).get("action"),
-                    "reason": fb_decision.get("decision_tree", {}).get("reason"),
-                    "detail": plan_note
-                }
-                attempts.append(fb_attempt)
-                dom = fallback_dom
-                decision = fb_decision
-                violations = fb_violations
+                attempts.append(_make_attempt_record(
+                    len(attempts) + 1, next_candidate, fb_decision, fb_violations,
+                    action=fb_decision.get("decision_tree", {}).get("action"),
+                    reason=fb_decision.get("decision_tree", {}).get("reason"),
+                    detail=plan_note
+                ))
+                dom, decision, violations = fb_dom, fb_decision, fb_violations
         elif next_candidate:
             # Path A: Switch to next candidate preset
-            fallback_dom = parse_document(pdf_path, language, preset=next_candidate)
-            fallback_dom = align_document_skew(fallback_dom, pdf_path, align_skew)
-            fb_decision, fb_violations = evaluate_quality_and_decision_tree(
-                fallback_dom, target_threshold, language, preset=next_candidate
-            )
-            fb_decision["chosen_preset"] = next_candidate
-
             if part_of_plan:
                 plan_note = f"Executed plan fallback '{next_candidate}'."
             else:
                 plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
 
+            fb_dom, fb_decision, fb_violations = _execute_attempt(
+                pdf_path, language, next_candidate, target_threshold, align_skew
+            )
             fb_decision["decision_tree"] = {
                 "action": "PATH_A_SWITCH_PRESET",
                 "preset_executed": next_candidate,
@@ -266,24 +268,13 @@ def run_pipeline(
                 "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                 "detail": plan_note
             }
-
-            second_attempt = {
-                "step": len(attempts) + 1,
-                "preset": next_candidate,
-                "overall_confidence": fb_decision.get("overall_confidence"),
-                "per_page_confidence": fb_decision.get("per_page_confidence"),
-                "status": fb_decision.get("status"),
-                "is_accepted": fb_decision.get("is_accepted", False),
-                "violations_count": len(fb_violations),
-                "action": fb_decision.get("decision_tree", {}).get("action"),
-                "reason": fb_decision.get("decision_tree", {}).get("reason"),
-                "detail": plan_note
-            }
-            attempts.append(second_attempt)
-
-            dom = fallback_dom
-            decision = fb_decision
-            violations = fb_violations
+            attempts.append(_make_attempt_record(
+                len(attempts) + 1, next_candidate, fb_decision, fb_violations,
+                action=fb_decision.get("decision_tree", {}).get("action"),
+                reason=fb_decision.get("decision_tree", {}).get("reason"),
+                detail=plan_note
+            ))
+            dom, decision, violations = fb_dom, fb_decision, fb_violations
 
     decision["attempts"] = attempts
 

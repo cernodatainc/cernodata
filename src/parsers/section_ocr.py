@@ -30,6 +30,40 @@ except ImportError:
     HAS_PYPDFIUM = False
 
 
+def _ocr_result(
+    success: bool = True,
+    text: str = "",
+    confidence: float = 0.0,
+    lines: Optional[List[Dict[str, Any]]] = None,
+    error: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Constructs a standardized OCR result dictionary."""
+    return {
+        "success": success,
+        "text": text,
+        "confidence": confidence,
+        "lines": lines or [],
+        "error": error,
+    }
+
+
+def _normalize_to_pil(image_input: Union[Image.Image, bytes, str, np.ndarray]) -> Image.Image:
+    """Normalizes supported image inputs (PIL, numpy, bytes, base64) to an RGB PIL Image."""
+    if isinstance(image_input, Image.Image):
+        return image_input.convert("RGB")
+    if isinstance(image_input, np.ndarray):
+        arr = image_input if image_input.ndim == 2 else image_input[:, :, :3]
+        return Image.fromarray(arr).convert("RGB")
+    if isinstance(image_input, str):
+        b64_str = image_input.strip()
+        if "," in b64_str and ";base64" in b64_str:
+            b64_str = b64_str.split(",", 1)[1]
+        image_input = base64.b64decode(b64_str)
+    if isinstance(image_input, (bytes, bytearray)):
+        return Image.open(io.BytesIO(image_input)).convert("RGB")
+    raise TypeError(f"Unsupported image input type: {type(image_input)}")
+
+
 class SectionOCRParser:
     """
     Parser for executing targeted OCR extraction on document sections,
@@ -82,86 +116,31 @@ class SectionOCRParser:
             - lines (List[Dict[str, Any]]): per-line text, scores, and bounding boxes
             - error (Optional[str])
         """
-        pil_img: Optional[Image.Image] = None
-
         try:
-            if isinstance(image_input, Image.Image):
-                pil_img = image_input.convert("RGB")
-            elif isinstance(image_input, np.ndarray):
-                if image_input.ndim == 2:
-                    pil_img = Image.fromarray(image_input).convert("RGB")
-                else:
-                    pil_img = Image.fromarray(image_input[:, :, :3]).convert("RGB")
-            elif isinstance(image_input, bytes):
-                pil_img = Image.open(io.BytesIO(image_input)).convert("RGB")
-            elif isinstance(image_input, str):
-                # Check for base64 data URI
-                b64_str = image_input.strip()
-                if "," in b64_str and ";base64" in b64_str:
-                    b64_str = b64_str.split(",", 1)[1]
-                img_bytes = base64.b64decode(b64_str)
-                pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            else:
-                return {
-                    "success": False,
-                    "text": "",
-                    "confidence": 0.0,
-                    "lines": [],
-                    "error": f"Unsupported image input type: {type(image_input)}"
-                }
+            pil_img = _normalize_to_pil(image_input)
+        except TypeError as ex:
+            return _ocr_result(success=False, error=str(ex))
         except Exception as ex:
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": f"Failed to load image: {str(ex)}"
-            }
+            return _ocr_result(success=False, error=f"Failed to load image: {str(ex)}")
 
-        if pil_img is None or pil_img.width <= 0 or pil_img.height <= 0:
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": "Image is empty or has invalid dimensions."
-            }
+        if pil_img.width <= 0 or pil_img.height <= 0:
+            return _ocr_result(success=False, error="Image is empty or has invalid dimensions.")
 
         engine = self._get_engine()
         if engine is None:
-            # Fallback if OCR engine is unavailable
-            return {
-                "success": True,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": "OCR engine not available."
-            }
+            return _ocr_result(success=True, error="OCR engine not available.")
 
         try:
-            np_img = np.array(pil_img)
-            result = engine(np_img)
+            result = engine(np.array(pil_img))
         except Exception as ex:
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": f"OCR inference error: {str(ex)}"
-            }
+            return _ocr_result(success=False, error=f"OCR inference error: {str(ex)}")
 
         txts = getattr(result, "txts", None)
         scores = getattr(result, "scores", None)
         boxes = getattr(result, "boxes", None)
 
         if not txts:
-            return {
-                "success": True,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": None
-            }
+            return _ocr_result(success=True)
 
         lines: List[Dict[str, Any]] = []
         valid_scores: List[float] = []
@@ -195,13 +174,12 @@ class SectionOCRParser:
         joined_text = "\n".join([line["text"] for line in lines])
         avg_confidence = round(sum(valid_scores) / len(valid_scores), 4) if valid_scores else 0.0
 
-        return {
-            "success": True,
-            "text": joined_text,
-            "confidence": avg_confidence,
-            "lines": lines,
-            "error": None
-        }
+        return _ocr_result(
+            success=True,
+            text=joined_text,
+            confidence=avg_confidence,
+            lines=lines
+        )
 
     def parse_section_from_pdf(
         self,
@@ -222,22 +200,10 @@ class SectionOCRParser:
             scale: Resolution scale factor for PDF rendering (default 2.0 for high fidelity).
         """
         if not HAS_PYPDFIUM:
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": "pypdfium2 is not installed."
-            }
+            return _ocr_result(success=False, error="pypdfium2 is not installed.")
 
         if not os.path.exists(pdf_path):
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": f"PDF file does not exist: {pdf_path}"
-            }
+            return _ocr_result(success=False, error=f"PDF file does not exist: {pdf_path}")
 
         if isinstance(bbox, dict):
             x0 = float(bbox.get("x0", 0.0))
@@ -248,25 +214,16 @@ class SectionOCRParser:
             x0, y0, x1, y1 = bbox.x0, bbox.y0, bbox.x1, bbox.y1
 
         if x1 <= x0 or y1 <= y0:
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": f"Invalid bounding box coordinates: [{x0}, {y0}, {x1}, {y1}]"
-            }
+            return _ocr_result(success=False, error=f"Invalid bounding box coordinates: [{x0}, {y0}, {x1}, {y1}]")
 
         try:
             pdf = pypdfium2.PdfDocument(pdf_path)
             page_idx = max(0, page_number - 1)
             if page_idx >= len(pdf):
-                return {
-                    "success": False,
-                    "text": "",
-                    "confidence": 0.0,
-                    "lines": [],
-                    "error": f"Page index {page_number} out of range (total pages: {len(pdf)})."
-                }
+                return _ocr_result(
+                    success=False,
+                    error=f"Page index {page_number} out of range (total pages: {len(pdf)})."
+                )
 
             page = pdf[page_idx]
             page_w, page_h = page.get_size()
@@ -284,25 +241,13 @@ class SectionOCRParser:
             crop_y1 = min(full_pil.height, int(round(y1 * scale_y)))
 
             if crop_x1 <= crop_x0 or crop_y1 <= crop_y0:
-                return {
-                    "success": False,
-                    "text": "",
-                    "confidence": 0.0,
-                    "lines": [],
-                    "error": "Cropped bounding box is empty after scaling."
-                }
+                return _ocr_result(success=False, error="Cropped bounding box is empty after scaling.")
 
             cropped_img = full_pil.crop((crop_x0, crop_y0, crop_x1, crop_y1))
             return self.parse_image(cropped_img, language=language)
 
         except Exception as ex:
-            return {
-                "success": False,
-                "text": "",
-                "confidence": 0.0,
-                "lines": [],
-                "error": f"Failed to crop and parse PDF section: {str(ex)}"
-            }
+            return _ocr_result(success=False, error=f"Failed to crop and parse PDF section: {str(ex)}")
 
 
 _default_parser: Optional[SectionOCRParser] = None

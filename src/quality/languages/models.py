@@ -6,12 +6,28 @@ Language configuration model dataclass and character conflict resolution logic.
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Optional, Tuple, Any, Union
+import functools
 import json
 import os
 import re
 
 _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configurations")
 _CROSS_CUTTING_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.json")
+
+
+@functools.lru_cache(maxsize=1)
+def _get_default_diacritic_hit() -> Optional[float]:
+    """Reads default diacritic hit penalty from quality config.json with caching."""
+    cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            if "diacritic_hit" in cfg:
+                return float(cfg["diacritic_hit"])
+        except Exception:
+            pass
+    return None
 
 
 def load_all_known_diacritics(config_path: Optional[str] = None) -> Set[str]:
@@ -126,17 +142,9 @@ class LanguageConfig:
         score = 1.0
         default_hit = self.diacritic_hit
         if diacritic_hit is None:
-            try:
-                import json
-                import os
-                cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
-                if os.path.exists(cfg_path):
-                    with open(cfg_path, "r", encoding="utf-8") as f:
-                        cfg = json.load(f)
-                        if "diacritic_hit" in cfg:
-                            default_hit = float(cfg["diacritic_hit"])
-            except Exception:
-                pass
+            cached_hit = _get_default_diacritic_hit()
+            if cached_hit is not None:
+                default_hit = cached_hit
         hit = diacritic_hit if diacritic_hit is not None else default_hit
         anom_hit = hit if hit is not None else self.anomalous_char_penalty_per_occurrence
         conf_hit = hit if hit is not None else self.conflict_penalty_per_occurrence

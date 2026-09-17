@@ -4,6 +4,7 @@ src/quality/evaluator.py
 Page-level (S_i) and document-level (S) confidence score evaluators.
 """
 
+import functools
 import json
 import os
 from typing import List, Dict, Any, Optional
@@ -13,6 +14,7 @@ from src.quality.language import compute_language_score, detect_page_language
 from src.quality.language_config import get_language_config
 
 
+@functools.lru_cache(maxsize=1)
 def load_quality_config() -> Dict[str, Any]:
     """Loads quality configuration from config.json located in the quality module directory."""
     config_dir = os.path.dirname(os.path.abspath(__file__))
