@@ -20,7 +20,8 @@
 param (
     [string]$PdfPath = "",
     [string]$OutputDir = "",
-    [switch]$SkipPlanner
+    [switch]$SkipPlanner,
+    [switch]$NoBrowser
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,11 +37,37 @@ $RepoRoot = if (Test-Path (Join-Path $ScriptDir "..\src")) {
     [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".."))
 }
 
+$E2EDir = Join-Path $RepoRoot "src\e2e"
+$DiscoveredPdfs = @(Get-ChildItem -Path $E2EDir -Filter "*.pdf" -File -ErrorAction SilentlyContinue | Sort-Object Name)
+
 if (-not $PdfPath) {
-    $PdfPath = Join-Path $RepoRoot "src\e2e\Dokument 5.pdf"
+    if ($DiscoveredPdfs.Count -gt 0) {
+        $PdfPath = $DiscoveredPdfs[0].FullName
+    } else {
+        $PdfPath = Join-Path $E2EDir "Dokument 5.pdf"
+    }
+} elseif (-not (Test-Path $PdfPath)) {
+    # Resolve relative to E2EDir if filename or relative path given
+    $Candidate = Join-Path $E2EDir $PdfPath
+    if (Test-Path $Candidate) {
+        $PdfPath = $Candidate
+    }
 }
+
 if (-not $OutputDir) {
-    $OutputDir = Join-Path $RepoRoot "src\e2e\output"
+    $DocBaseName = [System.IO.Path]::GetFileNameWithoutExtension($PdfPath)
+    $NormalizedName = $DocBaseName.ToLower() -replace '\s+', '_'
+    $Candidates = @(
+        (Join-Path $E2EDir "output_$NormalizedName"),
+        (Join-Path $E2EDir "output_$DocBaseName"),
+        (Join-Path $E2EDir "output\$DocBaseName")
+    )
+    $FoundCandidate = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($FoundCandidate) {
+        $OutputDir = $FoundCandidate
+    } else {
+        $OutputDir = Join-Path $E2EDir "output"
+    }
 }
 
 # Resolve full paths based on current location before changing directory
@@ -109,8 +136,10 @@ try {
     $HtmlViewerPath = Join-Path $OutputDir "interactive_viewer.html"
     if (Test-Path $HtmlViewerPath) {
         Write-Host ""
-        Write-Host "[Step 3/3] Opening interactive HTML viewer: $HtmlViewerPath"
-        Start-Process "$HtmlViewerPath"
+        Write-Host "[Step 3/3] Interactive HTML viewer generated: $HtmlViewerPath"
+        if (-not $NoBrowser) {
+            Start-Process "$HtmlViewerPath"
+        }
     } else {
         Write-Warning "Interactive HTML viewer not found: $HtmlViewerPath"
     }

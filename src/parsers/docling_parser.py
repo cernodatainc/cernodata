@@ -87,6 +87,7 @@ class DoclingParser:
                 ocr_opts = RapidOcrOptions(
                     force_full_page_ocr=self.force_full_page_ocr,
                     scale=self.ocr_scale,
+                    backend="torch",
                 )
             except Exception:
                 pass

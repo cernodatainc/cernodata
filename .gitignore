@@ -31,6 +31,8 @@ wheels/
 output/
 test_output/
 src/e2e/output/
+src/e2e/output_document_8/
+src/e2e/output*/
 
 # IDE / OS files
 .vscode/

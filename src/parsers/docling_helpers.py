@@ -9,12 +9,12 @@ from typing import Dict, Any, Tuple
 from src.quality.language_config import get_language_config
 
 LANG_CODE_MAP = {
-    "pl": ["pol", "pl"],
-    "de": ["deu", "de"],
-    "fr": ["fra", "fr"],
-    "es": ["spa", "es"],
-    "en": ["eng", "en"],
-    "auto": ["pol", "deu", "fra", "spa", "eng"]
+    "pl": ["pl", "pol"],
+    "de": ["de", "deu"],
+    "fr": ["fr", "fra"],
+    "es": ["es", "spa"],
+    "en": ["en", "eng"],
+    "auto": ["pl", "de", "fr", "es", "en"]
 }
 
 # Docling emits DocItemLabel values such as "section_header" and "page_header". Exact labels

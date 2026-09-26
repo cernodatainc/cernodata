@@ -3,30 +3,22 @@
     Runs the end-to-end (E2E) testcase pipeline flow from the src/e2e directory.
 
 .PARAMETER PdfPath
-    Path to the input PDF file (default: src/e2e/Dokument 5.pdf).
+    Path or filename of the target PDF (default: autodiscovered from src/e2e).
 
 .PARAMETER OutputDir
-    Output directory to store plan, DOM JSON, violations, and HTML viewer
-    (default: src/e2e/output).
+    Output directory to store plan, DOM JSON, violations, and HTML viewer.
 #>
 
 [CmdletBinding()]
 param (
     [string]$PdfPath = "",
     [string]$OutputDir = "",
-    [switch]$SkipPlanner
+    [switch]$SkipPlanner,
+    [switch]$NoBrowser
 )
 
 $CurrentDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-
-if (-not $PdfPath) {
-    $PdfPath = Join-Path $CurrentDir "Dokument 5.pdf"
-}
-if (-not $OutputDir) {
-    $OutputDir = Join-Path $CurrentDir "output"
-}
-
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $CurrentDir "../.."))
 $RunScript = Join-Path $RepoRoot "src\run_e2e.ps1"
 
-& "$RunScript" -PdfPath "$PdfPath" -OutputDir "$OutputDir" -SkipPlanner:$SkipPlanner
+& "$RunScript" -PdfPath "$PdfPath" -OutputDir "$OutputDir" -SkipPlanner:$SkipPlanner -NoBrowser:$NoBrowser
