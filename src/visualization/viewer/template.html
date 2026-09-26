@@ -38,6 +38,14 @@
             <button class="zoom-btn" style="font-size:10px; width:auto; padding:0 4px;" onclick="fitWidthZoom()" title="Fit Width">Fit</button>
         </div>
 
+        <div class="page-controls" style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-color); padding-left: 10px;">
+            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;">Page:</span>
+            <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous Page">&lt;</button>
+            <select class="type-filter" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))" style="padding: 2px 6px; font-size: 12px;"></select>
+            <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next Page">&gt;</button>
+            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;"><span id="currentPageNum" style="color: #FFF;">1</span> / <span id="totalPagesNum">{{ total_pages }}</span></span>
+        </div>
+
         <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding Boxes</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality Violations</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
@@ -100,7 +108,7 @@
 
             <div class="tab-content active" id="domTab">
                 <div class="page-action-bar">
-                    <span class="page-action-title">Page 1 Controls:</span>
+                    <span class="page-action-title" id="pageActionTitle">Page 1 Controls:</span>
                     <button class="action-btn" style="font-size:10px; padding:3px 8px; background:linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); color:#FFF;" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
                 </div>
                 <div id="selectedEditorContainer"></div>
@@ -120,7 +128,10 @@
             detectedLanguages: <!-- __DETECTED_LANGS_JSON__ -->,
             plan: <!-- __PLAN_JSON__ -->,
             pdfSourceFile: <!-- __PDF_SOURCE_FILE__ -->,
-            activeLanguage: <!-- __ACTIVE_LANG__ -->
+            activeLanguage: <!-- __ACTIVE_LANG__ -->,
+            pageImages: <!-- __PAGE_IMAGES_JSON__ -->,
+            pageDimensions: <!-- __PAGE_DIMENSIONS_JSON__ -->,
+            totalPages: {{ total_pages }}
         };
     </script>
     <script>

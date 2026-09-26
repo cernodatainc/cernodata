@@ -59,6 +59,55 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("inpAngle", content)
             self.assertIn("renderTriangleWarp", content)
             self.assertIn("getNodeSkewCorners", content)
+            self.assertIn("btnPrevPage", content)
+            self.assertIn("btnNextPage", content)
+            self.assertIn("pageSelect", content)
+            self.assertIn("switchPage", content)
+            self.assertIn("totalPages", content)
+            self.assertIn("pageImages", content)
+
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
+    def test_generate_interactive_html_multipage(self):
+        nodes = [
+            DOMNode(
+                node_id="n1_p1", type="heading", global_page_index=1, temp_slice_index=1,
+                bounding_box=BoundingBox(10, 10, 200, 50), content={"raw_text": "Page 1 Heading"}
+            ),
+            DOMNode(
+                node_id="n2_p2", type="paragraph", global_page_index=2, temp_slice_index=2,
+                bounding_box=BoundingBox(15, 15, 300, 80), content={"raw_text": "Page 2 Text"}
+            ),
+        ]
+        dom = DocumentDOM(document_id="doc_multi", source_filename="Document 8.pdf", total_pages=2, nodes=nodes)
+        pdf_path = os.path.join("src", "e2e", "Document 8.pdf")
+        decision = {
+            "chosen_preset": "docling_fast",
+            "score": 90.0,
+            "overall_confidence": 0.90,
+            "per_page_confidence": {"1": 0.88, "2": 0.92},
+            "status": "ACCEPT",
+        }
+        violations = []
+
+        out_path = generate_interactive_html(
+            pdf_path,
+            dom=dom,
+            decision=decision,
+            violations=violations,
+            output_path="test_output/test_multipage.html"
+        )
+        self.assertTrue(os.path.exists(out_path))
+
+        with open(out_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn("Page 1 Heading", content)
+            self.assertIn("Page 2 Text", content)
+            self.assertIn("btnPrevPage", content)
+            self.assertIn("btnNextPage", content)
+            self.assertIn("data:image/png;base64,", content)
+            self.assertIn("totalPages: 2", content)
 
         if os.path.exists(out_path):
             os.remove(out_path)

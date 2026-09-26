@@ -11,6 +11,12 @@ const initialDecisionData = window.VIEWER_DATA.decision;
 const detectedLanguagesMap = window.VIEWER_DATA.detectedLanguages;
 const planData = window.VIEWER_DATA.plan;
 const pdfSourceFile = window.VIEWER_DATA.pdfSourceFile;
+const pageImages = (window.VIEWER_DATA.pageImages && window.VIEWER_DATA.pageImages.length > 0)
+    ? window.VIEWER_DATA.pageImages
+    : [(document.getElementById('pageImg') ? document.getElementById('pageImg').src : '')];
+const pageDimensions = window.VIEWER_DATA.pageDimensions || [];
+const totalPages = window.VIEWER_DATA.totalPages || pageImages.length || 1;
+let currentPage = 1;
 
 let activePresetIndex = 0;
 let appliedCorrections = false;
@@ -24,6 +30,108 @@ let currentZoom = 1.0;
 let domData = JSON.parse(JSON.stringify(initialDomData));
 let violationsData = JSON.parse(JSON.stringify(initialViolationsData));
 let decisionData = JSON.parse(JSON.stringify(initialDecisionData));
+
+function initPageControls() {
+    const pageSelect = document.getElementById('pageSelect');
+    if (pageSelect) {
+        pageSelect.innerHTML = '';
+        for (let i = 1; i <= totalPages; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = `Page ${i}`;
+            if (i === currentPage) opt.selected = true;
+            pageSelect.appendChild(opt);
+        }
+    }
+    const currNum = document.getElementById('currentPageNum');
+    if (currNum) currNum.textContent = String(currentPage);
+    const totNum = document.getElementById('totalPagesNum');
+    if (totNum) totNum.textContent = String(totalPages);
+    updateNavButtonsState();
+}
+
+function updateNavButtonsState() {
+    const btnPrev = document.getElementById('btnPrevPage');
+    if (btnPrev) btnPrev.disabled = (currentPage <= 1);
+    const btnNext = document.getElementById('btnNextPage');
+    if (btnNext) btnNext.disabled = (currentPage >= totalPages);
+}
+
+function onPageSelectChanged(pageNum) {
+    switchPage(pageNum);
+}
+
+function prevPage() {
+    if (currentPage > 1) {
+        switchPage(currentPage - 1);
+    }
+}
+
+function nextPage() {
+    if (currentPage < totalPages) {
+        switchPage(currentPage + 1);
+    }
+}
+
+function switchPage(pageNum) {
+    if (pageNum < 1 || pageNum > totalPages) return;
+    currentPage = pageNum;
+
+    const pageImg = document.getElementById('pageImg');
+    if (pageImg && pageImages[currentPage - 1]) {
+        pageImg.src = pageImages[currentPage - 1];
+    }
+
+    const svg = document.getElementById('svgOverlay');
+    if (svg && pageDimensions[currentPage - 1]) {
+        const dim = pageDimensions[currentPage - 1];
+        svg.setAttribute('viewBox', `0 0 ${dim.width} ${dim.height}`);
+    }
+
+    const pageSelect = document.getElementById('pageSelect');
+    if (pageSelect) pageSelect.value = String(currentPage);
+    const currNum = document.getElementById('currentPageNum');
+    if (currNum) currNum.textContent = String(currentPage);
+    updateNavButtonsState();
+
+    const actTitle = document.getElementById('pageActionTitle');
+    if (actTitle) actTitle.textContent = `Page ${currentPage} Controls:`;
+
+    updatePageScoreBadge();
+
+    renderSVGOverlays();
+    renderDOMTree();
+    renderSelectedEditor();
+}
+
+function updatePageScoreBadge() {
+    const attempts = decisionData.attempts || [];
+    const currentAttempt = (attempts.length > 1) ? (attempts[activePresetIndex] || attempts[attempts.length - 1]) : null;
+
+    let pageScore = null;
+    if (currentAttempt && currentAttempt.per_page_confidence) {
+        pageScore = currentAttempt.per_page_confidence[String(currentPage)] || currentAttempt.per_page_confidence[currentPage];
+    } else if (decisionData.per_page_confidence) {
+        pageScore = decisionData.per_page_confidence[String(currentPage)] || decisionData.per_page_confidence[currentPage];
+    }
+    if (pageScore === undefined || pageScore === null) {
+        pageScore = (currentAttempt && currentAttempt.overall_confidence !== undefined)
+            ? currentAttempt.overall_confidence
+            : decisionData.overall_confidence;
+    }
+
+    const titleEl = document.getElementById('scoreTitle');
+    if (titleEl) {
+        titleEl.textContent = `Page ${currentPage} Confidence Score: ${pageScore !== undefined && pageScore !== null ? Number(pageScore).toFixed(4) : '1.0000'}`;
+    }
+
+    const detBadge = document.getElementById('detectedLangBadge');
+    if (detBadge) {
+        const detMap = decisionData.detected_languages || detectedLanguagesMap || {};
+        const det = detMap[String(currentPage)] || detMap[currentPage] || decisionData.primary_detected_language || 'pl';
+        detBadge.textContent = `P${currentPage}: ${det} (Active: ${activeLanguage})`;
+    }
+}
 
 function adjustZoom(delta) {
     currentZoom = Math.min(2.5, Math.max(0.5, currentZoom + delta));
@@ -123,6 +231,11 @@ function handleNodeClick(evt, nodeId) {
         return;
     }
 
+    const targetNode = domData.nodes.find(n => n.node_id === nodeId);
+    if (targetNode && targetNode.global_page_index && targetNode.global_page_index !== currentPage) {
+        switchPage(targetNode.global_page_index);
+    }
+
     if (evt && evt.shiftKey) {
         if (selectedNodeIds.includes(nodeId)) {
             selectedNodeIds = selectedNodeIds.filter(id => id !== nodeId);
@@ -155,7 +268,10 @@ function handleNodeClick(evt, nodeId) {
     renderSVGOverlays();
 }
 
-function selectNode(nodeId) {
+function selectNode(nodeId, pageIndex = null) {
+    if (pageIndex && pageIndex !== currentPage) {
+        switchPage(pageIndex);
+    }
     const evt = window.event || null;
     handleNodeClick(evt, nodeId);
 }
@@ -275,8 +391,9 @@ function decollideSelectedPair() {
     }
 }
 
-function decollideCurrentPage(pageIndex = 1) {
-    const pageNodes = domData.nodes.filter(n => (n.global_page_index === pageIndex || n.temp_slice_index === pageIndex));
+function decollideCurrentPage(pageIndex = null) {
+    const targetPage = (typeof pageIndex === 'number' && pageIndex > 0) ? pageIndex : currentPage;
+    const pageNodes = domData.nodes.filter(n => (n.global_page_index === targetPage || n.temp_slice_index === targetPage));
     const sorted = [...pageNodes].sort((a, b) => a.bounding_box.y0 - b.bounding_box.y0);
     let decollidedCount = 0;
 
@@ -321,9 +438,9 @@ function decollideCurrentPage(pageIndex = 1) {
     if (banner) {
         banner.style.display = 'block';
         if (decollidedCount > 0) {
-            banner.textContent = `[OK] Auto-decollided ${decollidedCount} overlapping box pair(s) on Page ${pageIndex}. Click '[SAVE] Save Annotations' to persist.`;
+            banner.textContent = `[OK] Auto-decollided ${decollidedCount} overlapping box pair(s) on Page ${targetPage}. Click '[SAVE] Save Annotations' to persist.`;
         } else {
-            banner.textContent = `[INFO] No skew-overlapping box pairs detected on Page ${pageIndex}.`;
+            banner.textContent = `[INFO] No skew-overlapping box pairs detected on Page ${targetPage}.`;
         }
         setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
@@ -844,6 +961,8 @@ function renderDOMTree() {
     document.getElementById('domCount').textContent = domData.nodes.length;
 
     domData.nodes.forEach(node => {
+        const nodePage = node.global_page_index || 1;
+        const isOnCurrentPage = (nodePage === currentPage);
         const hasViol = violationsData.some(v => v.node_id === node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
         let displayText = node.content.raw_text || '';
@@ -865,7 +984,8 @@ function renderDOMTree() {
         card.innerHTML = `
             <div class="node-header">
                 <span class="node-id">${node.node_id}</span>
-                <div>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span class="badge-status" style="font-size:9px; background:${isOnCurrentPage ? '#2563EB' : '#374151'}; color:#FFF;">P${nodePage}</span>
                     <span class="node-type">${node.type}</span>
                     ${isFixed ? '<span class="node-corrected-badge">FIXED</span>' : ''}
                     ${isIncorrect ? '<span class="node-incorrect-badge">INCORRECT TEXT</span>' : ''}
@@ -889,11 +1009,15 @@ function renderViolationsList() {
     violationsData.forEach(v => {
         const card = document.createElement('div');
         card.className = 'viol-card';
-        card.onclick = () => selectNode(v.node_id);
+        const vPage = v.global_page_index || 1;
+        card.onclick = () => selectNode(v.node_id, vPage);
         card.innerHTML = `
             <div class="viol-header">
                 <span class="viol-title">[!] ${v.rule_type}</span>
-                <span style="font-size: 10px; font-weight:700; color: #F87171;">${v.severity}</span>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span class="badge-status lang" style="font-size:9px; padding:1px 5px;">P${vPage}</span>
+                    <span style="font-size: 10px; font-weight:700; color: #F87171;">${v.severity}</span>
+                </div>
             </div>
             <div style="font-size: 11px; font-family: monospace;">Snippet: '${v.detected_snippet}' -> '${v.suggested_correction || ''}'</div>
             <div class="viol-desc">${v.description}</div>
@@ -982,10 +1106,12 @@ function renderSVGOverlays() {
     const filterType = document.getElementById('typeFilter').value;
 
     domData.nodes.forEach(node => {
+        const nodePage = node.global_page_index || 1;
+        if (nodePage !== currentPage) return;
         if (filterType !== 'ALL' && node.type !== filterType) return;
         const bbox = node.bounding_box;
         const corners = getBoxCorners(bbox);
-        const activeViol = violationsData.find(v => v.node_id === node.node_id);
+        const activeViol = violationsData.find(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
         const hasViol = !!activeViol && !appliedCorrections && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
@@ -1229,12 +1355,12 @@ window.addEventListener('mouseup', (evt) => {
 
         if (w >= 15 && h >= 10) {
             const newIndex = domData.nodes.length + 1;
-            const newNodeId = `node_p1_custom_${newIndex}`;
+            const newNodeId = `node_p${currentPage}_custom_${newIndex}`;
             const newNode = {
                 node_id: newNodeId,
                 type: 'paragraph',
-                global_page_index: 1,
-                temp_slice_index: 1,
+                global_page_index: currentPage,
+                temp_slice_index: currentPage,
                 bounding_box: {
                     x0: minX,
                     y0: minY,
@@ -1404,11 +1530,7 @@ function updatePresetUIState() {
     let threshold = decisionData.target_confidence_threshold || 0.82;
     let isAccepted = (displayedStatus === 'ACCEPT' || overallScore >= threshold);
 
-    const detBadge = document.getElementById('detectedLangBadge');
-    if (detBadge) {
-        const det = (decisionData.detected_languages && decisionData.detected_languages['1']) || decisionData.primary_detected_language || 'pl';
-        detBadge.textContent = `P1: ${det} (Active: ${activeLanguage})`;
-    }
+    updatePageScoreBadge();
 
     if (activePresetIndex === 1) {
         st2.textContent = 'ACTIVE (PASSED)';
@@ -1422,7 +1544,6 @@ function updatePresetUIState() {
         st2.style.color = '#FFF';
     }
 
-    document.getElementById('scoreTitle').textContent = `Page 1 Confidence Score: ${Number(p1Score).toFixed(4)}`;
     document.getElementById('scoreSub').textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violationsData.length}`;
     document.getElementById('scoreSub').style.color = isAccepted ? 'var(--accent-green)' : 'var(--accent-red)';
     document.getElementById('scoreBadge').classList.toggle('fail', !isAccepted);
@@ -1472,9 +1593,14 @@ function escapeHtml(str) {
     return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-renderDOMTree();
-renderViolationsList();
-renderDecisionLog();
-renderPlanTab();
-renderSelectedEditor();
-renderSVGOverlays();
+window.addEventListener('keydown', (e) => {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        prevPage();
+    } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        nextPage();
+    }
+});
+
+initPageControls();
+switchPage(1);

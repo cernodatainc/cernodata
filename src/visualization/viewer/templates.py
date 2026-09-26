@@ -64,7 +64,9 @@ def build_viewer_html(
     decision_json: str,
     detected_langs_json: str,
     plan_json: str,
-    plan: Optional[Dict[str, Any]] = None
+    plan: Optional[Dict[str, Any]] = None,
+    page_images: Optional[List[str]] = None,
+    page_dimensions: Optional[List[Dict[str, float]]] = None
 ) -> str:
     """Assembles the interactive HTML application from template.html, viewer.css, and viewer.js."""
     template = load_viewer_asset("template.html")
@@ -92,6 +94,13 @@ def build_viewer_html(
     overall_conf = f"{float(decision.get('overall_confidence', 1.0)):.4f}"
     status_text = decision.get("status", "ACCEPT")
 
+    if not page_images:
+        page_images = [img_data_uri] if img_data_uri else []
+
+    total_pages = dom.total_pages or len(page_images) or 1
+    page_images_json = json.dumps(page_images)
+    page_dimensions_json = json.dumps(page_dimensions or [])
+
     replacements = {
         "<!-- __VIEWER_CSS__ -->": css_content,
         "<!-- __TIMELINE_BUTTONS__ -->": timeline_buttons,
@@ -99,6 +108,7 @@ def build_viewer_html(
         "{{ dom_document_id }}": dom.document_id,
         "{{ plan_header_sub }}": plan_header_sub,
         "{{ img_data_uri }}": img_data_uri,
+        "{{ total_pages }}": str(total_pages),
         "{{ score_badge_classes }}": "" if is_acc else "fail",
         "{{ page1_confidence }}": page1_conf,
         "{{ overall_confidence }}": overall_conf,
@@ -119,6 +129,8 @@ def build_viewer_html(
         "<!-- __PLAN_JSON__ -->": plan_json,
         "<!-- __PDF_SOURCE_FILE__ -->": json.dumps(dom.source_filename),
         "<!-- __ACTIVE_LANG__ -->": json.dumps(active_lang),
+        "<!-- __PAGE_IMAGES_JSON__ -->": page_images_json,
+        "<!-- __PAGE_DIMENSIONS_JSON__ -->": page_dimensions_json,
         "<!-- __VIEWER_JS__ -->": js_content,
     }
 

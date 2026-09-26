@@ -11,7 +11,12 @@ import json
 from typing import Dict, Any, List, Optional
 
 from src.dom import DocumentDOM
-from src.visualization.viewer import page_to_base64, build_viewer_html
+from src.visualization.viewer import (
+    page_to_base64,
+    get_pdf_page_dimensions,
+    render_all_pages_to_base64,
+    build_viewer_html,
+)
 
 # Backwards compatibility re-exports
 _page_to_base64 = page_to_base64
@@ -27,7 +32,10 @@ def generate_interactive_html(
 ) -> str:
     """Generates a standalone, interactive HTML visual flow explorer file."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    img_data_uri = page_to_base64(pdf_path, page_index=0)
+    total_pages = dom.total_pages if dom.total_pages and dom.total_pages > 0 else 1
+    page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
+    img_data_uri = page_images[0] if page_images else page_to_base64(pdf_path, page_index=0)
+    page_dimensions = get_pdf_page_dimensions(pdf_path)
 
     dom_json = json.dumps(dom.to_dict())
     violations_json = json.dumps(violations)
@@ -50,7 +58,9 @@ def generate_interactive_html(
         decision_json=decision_json,
         detected_langs_json=detected_langs_json,
         plan_json=plan_json,
-        plan=plan
+        plan=plan,
+        page_images=page_images,
+        page_dimensions=page_dimensions,
     )
 
     with open(output_path, "w", encoding="utf-8") as f:
