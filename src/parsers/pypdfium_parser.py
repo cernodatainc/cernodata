@@ -51,118 +51,118 @@ class PyPdfiumParser:
         if not HAS_PYPDFIUM or not os.path.exists(pdf_path):
             return SyntheticParser().parse(doc_id, source_filename)
 
-        try:
-            pdf = pdfium.PdfDocument(pdf_path)
-        except Exception:
-            return SyntheticParser().parse(doc_id, source_filename)
-
-        total_pages = len(pdf)
-        if total_pages == 0:
-            return SyntheticParser().parse(doc_id, source_filename)
-
+        total_pages = 0
         nodes: List[DOMNode] = []
         node_counter = 1
 
-        for page_idx in range(total_pages):
-            page_no = page_idx + 1
-            page = pdf[page_idx]
-            page_w, page_h = page.get_size()
+        try:
+            with pdfium.PdfDocument(pdf_path) as pdf:
+                total_pages = len(pdf)
+                if total_pages == 0:
+                    return SyntheticParser().parse(doc_id, source_filename)
 
-            textpage = page.get_textpage()
-            num_chars = textpage.count_chars()
+                for page_idx in range(total_pages):
+                    page_no = page_idx + 1
+                    page = pdf[page_idx]
+                    page_w, page_h = page.get_size()
 
-            if num_chars >= self.min_digital_chars:
-                # Digital page: extract native text rectangles
-                rect_count = textpage.count_rects()
-                extracted_on_page = 0
+                    textpage = page.get_textpage()
+                    num_chars = textpage.count_chars()
 
-                for r_idx in range(rect_count):
-                    rect = textpage.get_rect(r_idx)
-                    # pypdfium2 rect is (left, bottom, right, top) in PDF points
-                    l, b, r, t = rect
-                    x0 = max(0.0, float(min(l, r)))
-                    x1 = min(page_w, float(max(l, r)))
-                    # Convert to top-left origin
-                    y0 = max(0.0, float(page_h - max(t, b)))
-                    y1 = min(page_h, float(page_h - min(t, b)))
+                    if num_chars >= self.min_digital_chars:
+                        # Digital page: extract native text rectangles
+                        rect_count = textpage.count_rects()
+                        extracted_on_page = 0
 
-                    bounded_text = textpage.get_text_bounded(l, b, r, t).strip()
-                    if not bounded_text:
-                        continue
+                        for r_idx in range(rect_count):
+                            rect = textpage.get_rect(r_idx)
+                            # pypdfium2 rect is (left, bottom, right, top) in PDF points
+                            l, b, r, t = rect
+                            x0 = max(0.0, float(min(l, r)))
+                            x1 = min(page_w, float(max(l, r)))
+                            # Convert to top-left origin
+                            y0 = max(0.0, float(page_h - max(t, b)))
+                            y1 = min(page_h, float(page_h - min(t, b)))
 
-                    # Classify node type
-                    is_short = len(bounded_text.split()) < 8
-                    is_title_case = bounded_text.isupper() or bounded_text.istitle()
-                    node_type = "heading" if (extracted_on_page == 0 and is_short and is_title_case) else "paragraph"
+                            bounded_text = textpage.get_text_bounded(l, b, r, t).strip()
+                            if not bounded_text:
+                                continue
 
-                    node = DOMNode(
-                        node_id=f"node_p{page_no}_n{node_counter}",
-                        type=node_type,
-                        global_page_index=page_no,
-                        temp_slice_index=page_no,
-                        bounding_box=BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1, angle=0.0),
-                        content={"raw_text": bounded_text, "source": "native_digital"}
-                    )
-                    nodes.append(node)
-                    node_counter += 1
-                    extracted_on_page += 1
+                            # Classify node type
+                            is_short = len(bounded_text.split()) < 8
+                            is_title_case = bounded_text.isupper() or bounded_text.istitle()
+                            node_type = "heading" if (extracted_on_page == 0 and is_short and is_title_case) else "paragraph"
 
-                if extracted_on_page == 0:
-                    # Fallback to full page text if rects yielded nothing
-                    full_text = textpage.get_text_range().strip()
-                    if full_text:
-                        nodes.append(DOMNode(
-                            node_id=f"node_p{page_no}_n{node_counter}",
-                            type="paragraph",
-                            global_page_index=page_no,
-                            temp_slice_index=page_no,
-                            bounding_box=BoundingBox(x0=36.0, y0=36.0, x1=page_w - 36.0, y1=page_h - 36.0, angle=0.0),
-                            content={"raw_text": full_text, "source": "native_digital"}
-                        ))
-                        node_counter += 1
-            else:
-                # Scanned or image page: render and execute targeted OCR
-                ocr_parser = self._get_ocr_parser()
-                try:
-                    rendered_pil = page.render(scale=self.scale).to_pil().convert("RGB")
-                    ocr_res = ocr_parser.parse_image(rendered_pil, language=self.language)
-                except Exception:
-                    ocr_res = {"lines": []}
+                            node = DOMNode(
+                                node_id=f"node_p{page_no}_n{node_counter}",
+                                type=node_type,
+                                global_page_index=page_no,
+                                temp_slice_index=page_no,
+                                bounding_box=BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1, angle=0.0),
+                                content={"raw_text": bounded_text, "source": "native_digital"}
+                            )
+                            nodes.append(node)
+                            node_counter += 1
+                            extracted_on_page += 1
 
-                lines = ocr_res.get("lines", [])
-                scale_x = rendered_pil.width / page_w if page_w > 0 else 1.0
-                scale_y = rendered_pil.height / page_h if page_h > 0 else 1.0
-
-                for line_idx, line in enumerate(lines):
-                    line_text = str(line.get("text", "")).strip()
-                    if not line_text:
-                        continue
-
-                    box_coords = line.get("bbox")
-                    if box_coords and len(box_coords) >= 4:
-                        bx0 = min(pt[0] for pt in box_coords) / scale_x
-                        by0 = min(pt[1] for pt in box_coords) / scale_y
-                        bx1 = max(pt[0] for pt in box_coords) / scale_x
-                        by1 = max(pt[1] for pt in box_coords) / scale_y
+                        if extracted_on_page == 0:
+                            # Fallback to full page text if rects yielded nothing
+                            full_text = textpage.get_text_range().strip()
+                            if full_text:
+                                nodes.append(DOMNode(
+                                    node_id=f"node_p{page_no}_n{node_counter}",
+                                    type="paragraph",
+                                    global_page_index=page_no,
+                                    temp_slice_index=page_no,
+                                    bounding_box=BoundingBox(x0=36.0, y0=36.0, x1=page_w - 36.0, y1=page_h - 36.0, angle=0.0),
+                                    content={"raw_text": full_text, "source": "native_digital"}
+                                ))
+                                node_counter += 1
                     else:
-                        bx0, by0, bx1, by1 = 36.0, 36.0, page_w - 36.0, page_h - 36.0
+                        # Scanned or image page: render and execute targeted OCR
+                        ocr_parser = self._get_ocr_parser()
+                        try:
+                            rendered_pil = page.render(scale=self.scale).to_pil().convert("RGB")
+                            ocr_res = ocr_parser.parse_image(rendered_pil, language=self.language)
+                        except Exception:
+                            ocr_res = {"lines": []}
 
-                    node_type = "heading" if line_idx == 0 and len(line_text.split()) < 8 else "paragraph"
+                        lines = ocr_res.get("lines", [])
+                        scale_x = rendered_pil.width / page_w if page_w > 0 else 1.0
+                        scale_y = rendered_pil.height / page_h if page_h > 0 else 1.0
 
-                    node = DOMNode(
-                        node_id=f"node_p{page_no}_n{node_counter}",
-                        type=node_type,
-                        global_page_index=page_no,
-                        temp_slice_index=page_no,
-                        bounding_box=BoundingBox(x0=bx0, y0=by0, x1=bx1, y1=by1, angle=0.0),
-                        content={
-                            "raw_text": line_text,
-                            "confidence": line.get("confidence", 1.0),
-                            "source": "rapidocr_scanned"
-                        }
-                    )
-                    nodes.append(node)
-                    node_counter += 1
+                        for line_idx, line in enumerate(lines):
+                            line_text = str(line.get("text", "")).strip()
+                            if not line_text:
+                                continue
+
+                            box_coords = line.get("bbox")
+                            if box_coords and len(box_coords) >= 4:
+                                bx0 = min(pt[0] for pt in box_coords) / scale_x
+                                by0 = min(pt[1] for pt in box_coords) / scale_y
+                                bx1 = max(pt[0] for pt in box_coords) / scale_x
+                                by1 = max(pt[1] for pt in box_coords) / scale_y
+                            else:
+                                bx0, by0, bx1, by1 = 36.0, 36.0, page_w - 36.0, page_h - 36.0
+
+                            node_type = "heading" if line_idx == 0 and len(line_text.split()) < 8 else "paragraph"
+
+                            node = DOMNode(
+                                node_id=f"node_p{page_no}_n{node_counter}",
+                                type=node_type,
+                                global_page_index=page_no,
+                                temp_slice_index=page_no,
+                                bounding_box=BoundingBox(x0=bx0, y0=by0, x1=bx1, y1=by1, angle=0.0),
+                                content={
+                                    "raw_text": line_text,
+                                    "confidence": line.get("confidence", 1.0),
+                                    "source": "rapidocr_scanned"
+                                }
+                            )
+                            nodes.append(node)
+                            node_counter += 1
+        except Exception:
+            return SyntheticParser().parse(doc_id, source_filename)
 
         if not nodes:
             return SyntheticParser().parse(doc_id, source_filename)
