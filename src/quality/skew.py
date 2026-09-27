@@ -24,6 +24,7 @@ except ImportError:
     HAS_PYPDFIUM = False
 
 from src.dom import DocumentDOM
+from src.parsers.pdf_utils import open_pdf
 
 
 def _extract_contour_angles(crop_np: np.ndarray) -> List[float]:
@@ -55,33 +56,46 @@ def detect_node_text_skew(crop_np: np.ndarray) -> float:
     return _compute_median_skew_angle(_extract_contour_angles(crop_np))
 
 
-def apply_text_skew_alignment(dom: DocumentDOM, pdf_path: str, scale: float = 150/72.0) -> DocumentDOM:
-    """Scans PDF page images for each node in DocumentDOM and calculates local text skew angles."""
-    if not HAS_CV2 or not HAS_PYPDFIUM or not os.path.exists(pdf_path):
-        return dom
-    try:
-        pdf = pypdfium2.PdfDocument(pdf_path)
-        page_images: Dict[int, tuple] = {}
+def _render_page_images(pdf_path: str, scale: float) -> Dict[int, tuple]:
+    """Renders all PDF pages to RGB numpy arrays and scaling factors."""
+    page_images: Dict[int, tuple] = {}
+    with open_pdf(pdf_path) as pdf:
+        if pdf is None:
+            print(f"[WARN] Failed to open PDF for skew alignment ({pdf_path}).")
+            return page_images
+
         for page_idx in range(len(pdf)):
             page_no = page_idx + 1
             pdf_page = pdf[page_idx]
             page_w, page_h = pdf_page.get_size()
-            img_np = np.array(pdf_page.render(scale=scale).to_pil().convert("RGB"))
-            sx = img_np.shape[1] / page_w if page_w > 0 else scale
-            sy = img_np.shape[0] / page_h if page_h > 0 else scale
-            page_images[page_no] = (img_np, sx, sy)
+            try:
+                img_np = np.array(pdf_page.render(scale=scale).to_pil().convert("RGB"))
+                sx = img_np.shape[1] / page_w if page_w > 0 else scale
+                sy = img_np.shape[0] / page_h if page_h > 0 else scale
+                page_images[page_no] = (img_np, sx, sy)
+            except Exception as e:
+                print(f"[WARN] Page {page_no} render error in skew alignment: {e}")
+    return page_images
 
-        for node in dom.nodes:
-            page_no = node.global_page_index
-            if page_no in page_images:
-                img_np, sx, sy = page_images[page_no]
-                bbox = node.bounding_box
-                x0, y0 = int(max(0, bbox.x0 * sx)), int(max(0, bbox.y0 * sy))
-                x1, y1 = int(min(img_np.shape[1], bbox.x1 * sx)), int(min(img_np.shape[0], bbox.y1 * sy))
-                if (x1 - x0) > 15 and (y1 - y0) > 10:
-                    skew_angle = detect_node_text_skew(img_np[y0:y1, x0:x1])
-                    if skew_angle != 0.0:
-                        node.bounding_box.angle = skew_angle
-    except Exception as e:
-        print(f"[WARN] Text skew alignment error ({e}), keeping unaligned bounding boxes.")
+
+def apply_text_skew_alignment(dom: DocumentDOM, pdf_path: str, scale: float = 150/72.0) -> DocumentDOM:
+    """Scans PDF page images for each node in DocumentDOM and calculates local text skew angles."""
+    if not HAS_CV2 or not HAS_PYPDFIUM or not os.path.exists(pdf_path):
+        return dom
+
+    page_images = _render_page_images(pdf_path, scale)
+    if not page_images:
+        return dom
+
+    for node in dom.nodes:
+        page_no = node.global_page_index
+        if page_no in page_images:
+            img_np, sx, sy = page_images[page_no]
+            bbox = node.bounding_box
+            x0, y0 = int(max(0, bbox.x0 * sx)), int(max(0, bbox.y0 * sy))
+            x1, y1 = int(min(img_np.shape[1], bbox.x1 * sx)), int(min(img_np.shape[0], bbox.y1 * sy))
+            if (x1 - x0) > 15 and (y1 - y0) > 10:
+                skew_angle = detect_node_text_skew(img_np[y0:y1, x0:x1])
+                if skew_angle != 0.0:
+                    node.bounding_box.angle = skew_angle
     return dom

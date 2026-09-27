@@ -9,6 +9,7 @@ import os
 from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 from src.dom import DocumentDOM, DOMNode
+from src.parsers.pdf_utils import open_pdf
 from src.visualization.badges import draw_score_badge_bottom_left
 from src.visualization.callouts import draw_violation_callout
 
@@ -115,6 +116,29 @@ class PageVisualizer:
         self.dpi = dpi
         self.scale = dpi / 72.0  # PDF points to pixel scale factor
 
+    def _render_pdf_page_backgrounds(
+        self,
+        pdf_path: str
+    ) -> Optional[List[Tuple[int, Image.Image, float, float]]]:
+        """Renders all PDF pages to RGBA background images with dimensions."""
+        with open_pdf(pdf_path) as pdf:
+            if pdf is None:
+                return None
+
+            backgrounds: List[Tuple[int, Image.Image, float, float]] = []
+            for page_idx in range(len(pdf)):
+                page_no = page_idx + 1
+                pdf_page = pdf[page_idx]
+                page_w, page_h = pdf_page.get_size()
+                try:
+                    pil_img = pdf_page.render(scale=self.scale).to_pil().convert("RGBA")
+                    backgrounds.append((page_no, pil_img, page_w, page_h))
+                except Exception as e:
+                    print(f"[WARN] pypdfium2 rendering failed on page {page_no} ({e}).")
+                    return None
+
+            return backgrounds
+
     def render_overlay(
         self,
         pdf_path: str,
@@ -130,31 +154,23 @@ class PageVisualizer:
         page_nodes, page_violations = _group_by_page(dom, violations)
         per_page = decision.get("per_page_confidence", {}) if decision else {}
 
-        if HAS_PYPDFIUM and os.path.exists(pdf_path):
-            try:
-                pdf = pypdfium2.PdfDocument(pdf_path)
-                for page_idx in range(len(pdf)):
-                    page_no = page_idx + 1
-                    pdf_page = pdf[page_idx]
-                    page_w, page_h = pdf_page.get_size()
+        backgrounds = self._render_pdf_page_backgrounds(pdf_path)
+        if backgrounds:
+            for page_no, pil_img, page_w, page_h in backgrounds:
+                nodes_for_page = page_nodes.get(page_no, [])
+                viols_for_page = page_violations.get(page_no, [])
+                p_conf = per_page.get(str(page_no), per_page.get(page_no))
+                if p_conf is None and decision:
+                    p_conf = decision.get("overall_confidence")
 
-                    pil_img = pdf_page.render(scale=self.scale).to_pil().convert("RGBA")
-                    nodes_for_page = page_nodes.get(page_no, [])
-                    viols_for_page = page_violations.get(page_no, [])
-                    p_conf = per_page.get(str(page_no), per_page.get(page_no))
-                    if p_conf is None and decision:
-                        p_conf = decision.get("overall_confidence")
+                overlay_img = self._draw_nodes_on_image(
+                    pil_img, page_no, page_w, page_h, nodes_for_page, viols_for_page, confidence_score=p_conf
+                )
 
-                    overlay_img = self._draw_nodes_on_image(
-                        pil_img, page_no, page_w, page_h, nodes_for_page, viols_for_page, confidence_score=p_conf
-                    )
-                    
-                    out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
-                    overlay_img.save(out_path)
-                    output_paths.append(out_path)
-                return output_paths
-            except Exception as e:
-                print(f"[WARN] pypdfium2 rendering failed ({e}), using synthetic visualizer fallback.")
+                out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
+                overlay_img.save(out_path)
+                output_paths.append(out_path)
+            return output_paths
 
         for page_no, nodes_for_page in page_nodes.items():
             canvas_w, canvas_h = int(612 * self.scale), int(792 * self.scale)

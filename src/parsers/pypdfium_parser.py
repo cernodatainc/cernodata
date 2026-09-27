@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
+from src.parsers.pdf_utils import open_pdf
 
 HAS_PYPDFIUM = False
 try:
@@ -92,30 +93,23 @@ class PyPdfiumParser:
         source_filename = os.path.basename(pdf_path)
         doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
 
-        if not HAS_PYPDFIUM or not os.path.exists(pdf_path):
-            return SyntheticParser().parse(doc_id, source_filename)
-
         total_pages = 0
         nodes: List[DOMNode] = []
         node_counter = 1
 
-        try:
-            with pdfium.PdfDocument(pdf_path) as pdf:
-                total_pages = len(pdf)
-                if total_pages == 0:
-                    return SyntheticParser().parse(doc_id, source_filename)
+        with open_pdf(pdf_path) as pdf:
+            if pdf is None or len(pdf) == 0:
+                return SyntheticParser().parse(doc_id, source_filename)
 
-                for page_idx in range(total_pages):
-                    page_no = page_idx + 1
-                    page = pdf[page_idx]
-                    page_nodes, node_counter = self._extract_page_nodes(
-                        page=page,
-                        page_no=page_no,
-                        start_node_counter=node_counter
-                    )
-                    nodes.extend(page_nodes)
-        except Exception:
-            return SyntheticParser().parse(doc_id, source_filename)
+            total_pages = len(pdf)
+            for page_idx in range(total_pages):
+                page_no = page_idx + 1
+                page_nodes, node_counter = self._extract_page_nodes(
+                    page=pdf[page_idx],
+                    page_no=page_no,
+                    start_node_counter=node_counter
+                )
+                nodes.extend(page_nodes)
 
         if not nodes:
             return SyntheticParser().parse(doc_id, source_filename)
@@ -137,26 +131,29 @@ class PyPdfiumParser:
         Extracts DOM nodes from a single PDF page, selecting native digital text
         extraction or RapidOCR based on character density.
         """
-        page_w, page_h = page.get_size()
-        textpage = page.get_textpage()
-        num_chars = textpage.count_chars()
+        try:
+            page_w, page_h = page.get_size()
+            textpage = page.get_textpage()
+            num_chars = textpage.count_chars()
 
-        if num_chars >= self.min_digital_chars:
-            return self._extract_digital_page_nodes(
-                textpage=textpage,
+            if num_chars >= self.min_digital_chars:
+                return self._extract_digital_page_nodes(
+                    textpage=textpage,
+                    page_no=page_no,
+                    page_w=page_w,
+                    page_h=page_h,
+                    start_node_counter=start_node_counter
+                )
+
+            return self._extract_scanned_page_nodes(
+                page=page,
                 page_no=page_no,
                 page_w=page_w,
                 page_h=page_h,
                 start_node_counter=start_node_counter
             )
-
-        return self._extract_scanned_page_nodes(
-            page=page,
-            page_no=page_no,
-            page_w=page_w,
-            page_h=page_h,
-            start_node_counter=start_node_counter
-        )
+        except Exception:
+            return [], start_node_counter
 
     def _extract_digital_page_nodes(
         self,
@@ -241,20 +238,19 @@ class PyPdfiumParser:
     ) -> Tuple[List[DOMNode], int]:
         """Renders page bitmap and executes RapidOCR for scanned or image-dominant pages."""
         ocr_parser = self._get_ocr_parser()
+        rendered_pil = None
         try:
             rendered_pil = page.render(scale=self.scale).to_pil().convert("RGB")
             ocr_res = ocr_parser.parse_image(rendered_pil, language=self.language)
         except Exception:
             ocr_res = {"lines": []}
-            rendered_pil = None
 
         lines = ocr_res.get("lines", [])
+        scale_x = 1.0
+        scale_y = 1.0
         if rendered_pil is not None and page_w > 0 and page_h > 0:
             scale_x = rendered_pil.width / page_w
             scale_y = rendered_pil.height / page_h
-        else:
-            scale_x = 1.0
-            scale_y = 1.0
 
         nodes: List[DOMNode] = []
         node_counter = start_node_counter

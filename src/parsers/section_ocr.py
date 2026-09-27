@@ -14,6 +14,7 @@ from PIL import Image
 import numpy as np
 
 from src.dom.bounding_box import BoundingBox
+from src.parsers.pdf_utils import open_pdf
 
 HAS_RAPIDOCR = False
 try:
@@ -216,8 +217,10 @@ class SectionOCRParser:
         if x1 <= x0 or y1 <= y0:
             return _ocr_result(success=False, error=f"Invalid bounding box coordinates: [{x0}, {y0}, {x1}, {y1}]")
 
-        try:
-            pdf = pypdfium2.PdfDocument(pdf_path)
+        with open_pdf(pdf_path) as pdf:
+            if pdf is None:
+                return _ocr_result(success=False, error=f"Failed to open PDF: {pdf_path}")
+
             page_idx = max(0, page_number - 1)
             if page_idx >= len(pdf):
                 return _ocr_result(
@@ -227,27 +230,25 @@ class SectionOCRParser:
 
             page = pdf[page_idx]
             page_w, page_h = page.get_size()
+            try:
+                full_pil = page.render(scale=scale).to_pil().convert("RGB")
+            except Exception as ex:
+                return _ocr_result(success=False, error=f"Failed to render page: {ex}")
 
-            # Render full page at desired scale
-            full_pil = page.render(scale=scale).to_pil().convert("RGB")
+        # Calculate crop box in rendered pixel coordinates outside PDF context
+        scale_x = full_pil.width / page_w
+        scale_y = full_pil.height / page_h
 
-            # Calculate crop box in rendered pixel coordinates
-            scale_x = full_pil.width / page_w
-            scale_y = full_pil.height / page_h
+        crop_x0 = max(0, int(round(x0 * scale_x)))
+        crop_y0 = max(0, int(round(y0 * scale_y)))
+        crop_x1 = min(full_pil.width, int(round(x1 * scale_x)))
+        crop_y1 = min(full_pil.height, int(round(y1 * scale_y)))
 
-            crop_x0 = max(0, int(round(x0 * scale_x)))
-            crop_y0 = max(0, int(round(y0 * scale_y)))
-            crop_x1 = min(full_pil.width, int(round(x1 * scale_x)))
-            crop_y1 = min(full_pil.height, int(round(y1 * scale_y)))
+        if crop_x1 <= crop_x0 or crop_y1 <= crop_y0:
+            return _ocr_result(success=False, error="Cropped bounding box is empty after scaling.")
 
-            if crop_x1 <= crop_x0 or crop_y1 <= crop_y0:
-                return _ocr_result(success=False, error="Cropped bounding box is empty after scaling.")
-
-            cropped_img = full_pil.crop((crop_x0, crop_y0, crop_x1, crop_y1))
-            return self.parse_image(cropped_img, language=language)
-
-        except Exception as ex:
-            return _ocr_result(success=False, error=f"Failed to crop and parse PDF section: {str(ex)}")
+        cropped_img = full_pil.crop((crop_x0, crop_y0, crop_x1, crop_y1))
+        return self.parse_image(cropped_img, language=language)
 
 
 _default_parser: Optional[SectionOCRParser] = None
