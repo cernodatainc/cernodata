@@ -67,11 +67,17 @@ class PyPdfiumParser:
     operating independently of Docling for lightweight, high-throughput extraction.
     """
 
-    def __init__(self, language: str = "en", scale: float = 2.0, min_digital_chars: int = 20):
+    def __init__(
+        self,
+        language: str = "en",
+        scale: float = 2.0,
+        min_digital_chars: int = 20,
+        ocr_parser: Optional[SectionOCRParser] = None,
+    ):
         self.language = language.lower().strip()
         self.scale = scale
         self.min_digital_chars = min_digital_chars
-        self._section_ocr: Optional[SectionOCRParser] = None
+        self._section_ocr: Optional[SectionOCRParser] = ocr_parser
 
     def _get_ocr_parser(self) -> SectionOCRParser:
         if self._section_ocr is None:
