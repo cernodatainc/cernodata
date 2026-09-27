@@ -98,7 +98,7 @@ def main() -> None:
         from src.pipeline.server import start_pipeline_server
         start_pipeline_server(
             pdf_path=doc_input,
-            language=active_plan.language if active_plan else args.language
+            language=(active_plan.language or args.language or "en") if active_plan else (args.language or "en")
         )
 
 

@@ -133,7 +133,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             else:
                 plan_file = ""
 
-            if plan_file: 
+            if plan_file:
                 send_json_response(self, 200, {
                     "success": True,
                     "message": "Plan successfully configured and saved.",

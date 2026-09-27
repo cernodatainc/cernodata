@@ -4,7 +4,7 @@ src/visualization/badges.py
 Bottom-left confidence score & violation summary badge renderer.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from PIL import ImageDraw, ImageFont
 from src.dom import DOMNode
 from src.quality import evaluate_page_confidence
@@ -17,8 +17,8 @@ def draw_score_badge_bottom_left(
     page_no: int,
     nodes: List[DOMNode],
     violations: List[Dict[str, Any]],
-    font: ImageFont.ImageFont,
-    header_font: ImageFont.ImageFont,
+    font: Union[ImageFont.FreeTypeFont, ImageFont.ImageFont],
+    header_font: Union[ImageFont.FreeTypeFont, ImageFont.ImageFont],
     confidence_score: Optional[float] = None
 ) -> None:
     """Renders overall confidence score & violation summary badge in bottom-left corner."""

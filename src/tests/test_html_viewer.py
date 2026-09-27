@@ -34,7 +34,7 @@ class TestHTMLViewer(unittest.TestCase):
             output_path="test_output/test_interactive.html"
         )
         self.assertTrue(os.path.exists(out_path))
-        
+
         with open(out_path, "r", encoding="utf-8") as f:
             content = f.read()
             self.assertIn("Test Heading", content)

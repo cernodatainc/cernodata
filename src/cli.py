@@ -89,7 +89,8 @@ def print_summary(result: dict[str, Any]) -> None:
         print("[Plan Context]")
         print(f"  Taxonomy: {plan.get('taxonomy')}")
         print(f"  Primary Preset: {plan.get('primary_preset')} (Overridden: {plan.get('overridden')})")
-        fb_names = [f.get('preset') if isinstance(f, dict) else str(f) for f in plan.get('fallback_queue', [])]
+        fb_names = [str(f.get('preset', '')) if isinstance(f, dict) else str(f) for f in plan.get('fallback_queue', [])]
+        fb_names = [n for n in fb_names if n]
         print(f"  Fallback Queue: {', '.join(fb_names) if fb_names else 'None'}")
         print("-" * 25)
 

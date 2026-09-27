@@ -31,21 +31,13 @@ _resolve_raw_text = resolve_raw_text
 _build_node_content = build_node_content
 
 HAS_DOCLING = False
-HAS_OCR_MODE = False
 try:
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.datamodel.pipeline_options import PdfPipelineOptions, OcrMode
     from docling.datamodel.base_models import InputFormat
     HAS_DOCLING = True
-    HAS_OCR_MODE = True
 except ImportError:
-    try:
-        from docling.document_converter import DocumentConverter, PdfFormatOption
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
-        from docling.datamodel.base_models import InputFormat
-        HAS_DOCLING = True
-    except ImportError:
-        HAS_DOCLING = False
+    HAS_DOCLING = False
 
 
 class DoclingParser:
@@ -54,7 +46,7 @@ class DoclingParser:
     def __init__(
         self,
         use_ocr: bool = True,
-        language: str = "en",
+        language: Optional[str] = "en",
         preset: str = "docling_fast",
         ocr_engine: str = "auto",
         ocr_scale: Optional[float] = None,
@@ -81,9 +73,7 @@ class DoclingParser:
         if hasattr(pipeline_options, "images_scale"):
             pipeline_options.images_scale = self.ocr_scale
 
-        ocr_mode = None
-        if HAS_OCR_MODE:
-            ocr_mode = OcrMode.FULL_PAGE if self.force_full_page_ocr else OcrMode.DEFAULT
+        ocr_mode = OcrMode.FULL_PAGE if self.force_full_page_ocr else OcrMode.DEFAULT
 
         # Configure specialized OCR engine options if available
         engine = self.ocr_engine
@@ -91,13 +81,8 @@ class DoclingParser:
             engine = "rapidocr"
 
         def _instantiate_ocr_options(cls: Any, **extra_kwargs: Any) -> Any:
-            if ocr_mode is not None:
-                try:
-                    return cls(mode=ocr_mode, scale=self.ocr_scale, **extra_kwargs)
-                except Exception:
-                    pass
             try:
-                return cls(force_full_page_ocr=self.force_full_page_ocr, scale=self.ocr_scale, **extra_kwargs)
+                return cls(mode=ocr_mode, scale=self.ocr_scale, **extra_kwargs)
             except Exception:
                 try:
                     return cls(scale=self.ocr_scale, **extra_kwargs)
@@ -132,10 +117,8 @@ class DoclingParser:
                 setattr(pipeline_options.ocr_options, "lang", ocr_langs)
             if hasattr(pipeline_options.ocr_options, "scale"):
                 setattr(pipeline_options.ocr_options, "scale", self.ocr_scale)
-            if ocr_mode is not None and hasattr(pipeline_options.ocr_options, "mode"):
+            if hasattr(pipeline_options.ocr_options, "mode"):
                 setattr(pipeline_options.ocr_options, "mode", ocr_mode)
-            elif hasattr(pipeline_options.ocr_options, "force_full_page_ocr"):
-                setattr(pipeline_options.ocr_options, "force_full_page_ocr", self.force_full_page_ocr)
 
         return pipeline_options
 

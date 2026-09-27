@@ -6,7 +6,7 @@ Red quality violation callout badge renderer for bounding box overlays.
 
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from PIL import ImageDraw, ImageFont
 
 
@@ -15,7 +15,7 @@ def draw_violation_callout(
     x0: float,
     badge_y1: float,
     violation: Dict[str, Any],
-    font: ImageFont.ImageFont
+    font: Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]
 ) -> None:
     """Draws red callout marker badge for a quality violation."""
     snippet = violation.get("detected_snippet", "")

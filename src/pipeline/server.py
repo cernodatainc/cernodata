@@ -115,11 +115,11 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
 
             print(f"\n[SERVER API] Parsing selected section '{node_id}' using OCR (Lang: {language})...")
 
-            result: Dict[str, Any]
+            ocr_result: Any
             if image_base64:
-                result = parse_image_ocr(image_base64, language=language)
+                ocr_result = parse_image_ocr(image_base64, language=language)
             elif pdf_path and bbox:
-                result = parse_section_from_pdf(pdf_path, page, bbox, language=language)
+                ocr_result = parse_section_from_pdf(pdf_path, page, bbox, language=language)
             else:
                 send_json_response(self, 400, {
                     "success": False,
@@ -128,12 +128,12 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
                 return
 
             response_data = {
-                "success": result.get("success", False),
+                "success": ocr_result.get("success", False),
                 "node_id": node_id,
-                "text": result.get("text", ""),
-                "confidence": result.get("confidence", 0.0),
-                "lines": result.get("lines", []),
-                "error": result.get("error")
+                "text": ocr_result.get("text", ""),
+                "confidence": ocr_result.get("confidence", 0.0),
+                "lines": ocr_result.get("lines", []),
+                "error": ocr_result.get("error")
             }
             send_json_response(self, 200 if response_data["success"] else 422, response_data)
             return

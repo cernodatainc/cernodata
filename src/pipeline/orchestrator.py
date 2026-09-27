@@ -51,18 +51,16 @@ def parse_document(
 
     if preset == "pypdfium_rapidocr":
         scale = ocr_scale if ocr_scale is not None else 2.0
-        parser = PyPdfiumParser(language=language, scale=scale)
-        return parser.parse(pdf_path)
+        return PyPdfiumParser(language=language, scale=scale).parse(pdf_path)
 
-    parser = DoclingParser(
+    return DoclingParser(
         language=language,
         preset=preset,
         ocr_engine=ocr_engine,
         ocr_scale=ocr_scale,
         force_full_page_ocr=force_full_page_ocr,
         do_table_structure=do_table_structure,
-    )
-    return parser.parse(pdf_path)
+    ).parse(pdf_path)
 
 
 def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> DocumentDOM:

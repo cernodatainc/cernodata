@@ -106,7 +106,7 @@ def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") 
     if is_auto:
         from src.quality.language import detect_document_languages
         page_langs = detect_document_languages(dom)
-        page_configs = {p: get_language_config(l) for p, l in page_langs.items()}
+        page_configs = {p: get_language_config(lang_code) for p, lang_code in page_langs.items()}
     else:
         fixed_config = get_language_config(lang)
 
