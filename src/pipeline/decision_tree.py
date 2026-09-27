@@ -71,10 +71,10 @@ class DecisionTreeEngine:
             }
             if delta >= 0.20:
                 action = "PATH_B_WIGGLE_PARAMETERS"
-                reason = f"Delta Δ ({delta}) >= 0.20. Language/quality heuristics below threshold ({overall_conf} < {self.target_threshold}). Wiggling OCR language hint and DPI."
+                reason = f"Delta ({delta}) >= 0.20. Language/quality heuristics below threshold ({overall_conf} < {self.target_threshold}). Wiggling OCR language hint and DPI."
             else:
                 action = "PATH_A_SWITCH_PRESET"
-                reason = f"Delta Δ ({delta}) < 0.20. Switching to next preset candidate ('{NEXT_PRESET_ID}') with explicit '{self.language}' language hint."
+                reason = f"Delta ({delta}) < 0.20. Switching to next preset candidate ('{NEXT_PRESET_ID}') with explicit '{self.language}' language hint."
 
             result["decision_tree"] = {
                 "action": action,

@@ -49,7 +49,8 @@ def export_pipeline_artifacts(
     plan: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str, Optional[str]]:
     """Exports DocumentDOM JSON, standalone quality_violations.json, and plan_execution_result.json reports."""
-    os.makedirs(output_dir, exist_ok=True)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
     dom_output_path = os.path.join(output_dir, "document_dom.json")
     with open(dom_output_path, "w", encoding="utf-8") as f:

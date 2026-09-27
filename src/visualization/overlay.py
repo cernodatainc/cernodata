@@ -147,7 +147,8 @@ class PageVisualizer:
         output_dir: str = "output",
         decision: Optional[Dict[str, Any]] = None
     ) -> List[str]:
-        os.makedirs(output_dir, exist_ok=True)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         output_paths = []
         violations = violations or []
 

@@ -56,6 +56,19 @@ class TestQualityMetrics(unittest.TestCase):
         angle = detect_node_text_skew(blank_crop)
         self.assertEqual(angle, 0.0)
 
+    def test_detect_node_text_skew_rotated(self):
+        import cv2
+        from src.quality.skew import _extract_contour_angles
+        img = np.ones((100, 200, 3), dtype=np.uint8) * 255
+        rect = ((100, 50), (80, 20), 12.0)
+        box = np.intp(cv2.boxPoints(rect))
+        cv2.drawContours(img, [box], 0, (0, 0, 0), -1)
+        angles = _extract_contour_angles(img)
+        self.assertTrue(len(angles) >= 1)
+        self.assertAlmostEqual(angles[0], 12.0, delta=2.0)
+        skew = detect_node_text_skew(img)
+        self.assertAlmostEqual(skew, 12.0, delta=2.0)
+
     def test_language_config_registry_and_substitutions(self):
         config = get_language_config("pl")
         self.assertIsNotNone(config)

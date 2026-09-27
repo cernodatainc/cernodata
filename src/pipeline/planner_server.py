@@ -124,19 +124,30 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             self.server.submitted_plan = plan
 
             # Save plan.json to output directory
-            os.makedirs(self.server.output_dir, exist_ok=True)
-            plan_file = os.path.join(self.server.output_dir, "plan.json")
-            plan.save(plan_file)
+            if self.server.output_dir:
+                os.makedirs(self.server.output_dir, exist_ok=True)
+                plan_file = os.path.join(self.server.output_dir, "plan.json")
+                plan.save(plan_file)
+            else:
+                plan_file = ""
 
-            send_json_response(self, 200, {
-                "success": True,
-                "message": "Plan successfully configured and saved.",
-                "plan_path": plan_file,
-                "plan": plan.to_dict(),
-            })
+            if plan_file: 
+                send_json_response(self, 200, {
+                    "success": True,
+                    "message": "Plan successfully configured and saved.",
+                    "plan_path": plan_file,
+                    "plan": plan.to_dict(),
+                })
+            else:
+                send_json_response(self, 200, {
+                    "success": True,
+                    "message": "Plan successfully configured but not saved (no output directory).",
+                    "plan": plan.to_dict(),
+                })
 
             print(f"\n[SERVER API] Received plan configuration from browser (Document: '{document_path}', Primary: '{plan.primary_preset}').")
-            print(f"[SERVER API] Plan saved to '{plan_file}'.")
+            if plan_file:
+                print(f"[SERVER API] Plan saved to '{plan_file}'.")
 
             # Schedule clean server shutdown
             threading.Thread(target=self.server.shutdown, daemon=True).start()
@@ -173,7 +184,8 @@ def serve_data_shape_wizard(
         html_content = "<html><body><h1>cernodata Data Shape Planner</h1><p>Template missing.</p></body></html>"
 
     # Also export standalone copy to output directory
-    os.makedirs(output_dir, exist_ok=True)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     exported_html_path = os.path.join(output_dir, "data_shape_config.html")
     with open(exported_html_path, "w", encoding="utf-8") as f:
         f.write(html_content)

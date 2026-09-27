@@ -35,18 +35,20 @@ def _extract_contour_angles(crop_np: np.ndarray) -> List[float]:
     angles = []
     for c in contours:
         if cv2.contourArea(c) > 30:
-            angle = cv2.minAreaRect(c)[-1]
-            if angle < -45: angle += 90
-            elif angle > 45: angle -= 90
-            if -30.0 <= angle <= 30.0: angles.append(angle)
+            angle = (cv2.minAreaRect(c)[-1] + 45) % 90 - 45
+            if -30.0 <= angle <= 30.0:
+                angles.append(angle)
     return angles
 
 
 def _compute_median_skew_angle(angles: List[float]) -> float:
     """Calculates median text skew angle from contour angles list."""
-    if not angles: return 0.0
+    if not angles:
+        return 0.0
     median_angle = float(np.median(angles))
-    return 0.0 if abs(median_angle) < 0.4 else round(median_angle, 2)
+    if abs(median_angle) < 0.4:
+        return 0.0
+    return round(median_angle, 2)
 
 
 def detect_node_text_skew(crop_np: np.ndarray) -> float:

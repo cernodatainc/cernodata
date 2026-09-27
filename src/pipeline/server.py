@@ -95,7 +95,8 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
                 send_json_response(self, 400, {"error": "Missing dom payload"})
                 return
 
-            os.makedirs(output_dir, exist_ok=True)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
             dom_file = os.path.join(output_dir, "document_dom.json")
             with open(dom_file, "w", encoding="utf-8") as f:
                 json.dump(dom_data, f, indent=2)
@@ -154,7 +155,7 @@ def start_pipeline_server(pdf_path: str = "", language: str = "pl", port: int = 
 
     print("=" * 68)
     print(f"cernodata Interactive Live Pipeline Server running at {url}")
-    print(f"Preset Rerun API endpoint listening at POST http://localhost:{port}/api/rerun")
+    print(f"Preset Rerun API endpoint listening at POST http://localhost:{actual_port}/api/rerun")
     print("=" * 68)
 
     if open_browser:

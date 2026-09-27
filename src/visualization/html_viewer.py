@@ -31,7 +31,9 @@ def generate_interactive_html(
     plan: Optional[Dict[str, Any]] = None
 ) -> str:
     """Generates a standalone, interactive HTML visual flow explorer file."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    dir_name = os.path.dirname(output_path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
     total_pages = dom.total_pages if dom.total_pages and dom.total_pages > 0 else 1
     page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
     img_data_uri = page_images[0] if page_images else page_to_base64(pdf_path, page_index=0)

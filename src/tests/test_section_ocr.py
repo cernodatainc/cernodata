@@ -178,6 +178,7 @@ class TestSectionOCRParser(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as ctx:
                 urllib.request.urlopen(empty_req)
             self.assertEqual(ctx.exception.code, 400)
+            ctx.exception.close()
 
         finally:
             httpd.shutdown()

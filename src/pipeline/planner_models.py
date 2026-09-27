@@ -32,7 +32,9 @@ class DocumentPlan:
         return asdict(self)
 
     def save(self, output_path: str = os.path.join("output", "plan.json")) -> str:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        dir_name = os.path.dirname(output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2)
         return output_path
