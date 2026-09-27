@@ -7,6 +7,7 @@ and the standalone pypdfium_rapidocr preset outside of Docling.
 
 import os
 import unittest
+from src.dom import DocumentDOM, DOMNode, BoundingBox
 from src.parsers.docling_parser import DoclingParser
 from src.parsers.pypdfium_parser import PyPdfiumParser
 from src.pipeline.planner import PresetPlanner
@@ -70,23 +71,28 @@ class TestDoclingOCRPresets(unittest.TestCase):
             self.assertGreaterEqual(first_node.bounding_box.x0, 0.0)
             self.assertGreaterEqual(first_node.bounding_box.y0, 0.0)
 
-    def test_pypdfium_parser_synthetic_fallback(self):
-        """Verifies PyPdfiumParser falls back gracefully when file does not exist."""
+    def test_pypdfium_parser_missing_file_raises(self):
+        """Verifies PyPdfiumParser raises FileNotFoundError when file does not exist."""
         parser = PyPdfiumParser()
-        dom = parser.parse("non_existent_doc.pdf")
-        self.assertEqual(dom.total_pages, 1)
-        self.assertGreater(len(dom.nodes), 0)
+        with self.assertRaises(FileNotFoundError):
+            parser.parse("non_existent_doc.pdf")
 
     def test_orchestrator_parse_document_presets(self):
         """Verifies parse_document handles both docling and pypdfium_rapidocr presets."""
-        # Non-existent file tests synthetic fallback across all presets
-        dom_docling = parse_document("dummy.pdf", language="en", preset="docling_fast")
-        self.assertIsNotNone(dom_docling)
-        self.assertGreater(len(dom_docling.nodes), 0)
+        from unittest.mock import patch
+        mock_dom = DocumentDOM(document_id="d1", source_filename="test.pdf", total_pages=1, nodes=[
+            DOMNode(node_id="n1", type="text", global_page_index=1, temp_slice_index=1,
+                    bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Sample text"})
+        ])
+        with patch.object(DoclingParser, "parse", return_value=mock_dom), \
+             patch.object(PyPdfiumParser, "parse", return_value=mock_dom):
+            dom_docling = parse_document(self.sample_pdf, language="en", preset="docling_fast")
+            self.assertIsNotNone(dom_docling)
+            self.assertGreater(len(dom_docling.nodes), 0)
 
-        dom_pypdfium = parse_document("dummy.pdf", language="en", preset="pypdfium_rapidocr")
-        self.assertIsNotNone(dom_pypdfium)
-        self.assertGreater(len(dom_pypdfium.nodes), 0)
+            dom_pypdfium = parse_document(self.sample_pdf, language="en", preset="pypdfium_rapidocr")
+            self.assertIsNotNone(dom_pypdfium)
+            self.assertGreater(len(dom_pypdfium.nodes), 0)
 
     def test_planner_includes_pypdfium_rapidocr(self):
         """Verifies PresetPlanner calculates scores for pypdfium_rapidocr."""
@@ -103,6 +109,11 @@ class TestDoclingOCRPresets(unittest.TestCase):
 
     def test_pipeline_path_b_parameter_wiggling(self):
         """Verifies pipeline executes Path B parameter wiggling when delta >= 0.20 and threshold fails."""
+        from unittest.mock import patch
+        mock_dom = DocumentDOM(document_id="d1", source_filename="test_dummy.pdf", total_pages=1, nodes=[
+            DOMNode(node_id="n1", type="text", global_page_index=1, temp_slice_index=1,
+                    bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Sample text"})
+        ])
         planner = PresetPlanner()
         # Create a custom plan where primary is pypdfium_rapidocr and fallback delta >= 0.20
         plan = planner.create_plan(
@@ -119,15 +130,20 @@ class TestDoclingOCRPresets(unittest.TestCase):
         if plan.fallback_queue:
             plan.scores[plan.fallback_queue[0]["preset"]] = 0.65
 
-        res = run_pipeline(
-            pdf_path="test_dummy.pdf",
-            plan=plan,
-            output_dir="test_output",
-            visualize=False
-        )
-        self.assertIn("attempts", res["decision"])
-        attempts = res["decision"]["attempts"]
-        self.assertGreaterEqual(len(attempts), 1)
+        with patch("src.pipeline.orchestrator.parse_document", return_value=mock_dom), \
+             patch("src.pipeline.orchestrator.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.orchestrator.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
+            res = run_pipeline(
+                pdf_path="test_dummy.pdf",
+                plan=plan,
+                output_dir="test_output",
+                visualize=False
+            )
+            self.assertIn("attempts", res["decision"])
+            attempts = res["decision"]["attempts"]
+            self.assertGreaterEqual(len(attempts), 1)
 
 
 if __name__ == "__main__":

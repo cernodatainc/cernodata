@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cernodata | Document Ingestion &amp; Pipeline Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0B0F19;
+            --bg-card: #111827;
+            --bg-card-hover: #1F2937;
+            --bg-input: #1F2937;
+            --border-color: #374151;
+            --border-active: #3B82F6;
+            --text-primary: #F9FAFB;
+            --text-muted: #9CA3AF;
+            --accent-blue: #3B82F6;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --accent-purple: #8B5CF6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #0F172A;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 18px;
+            color: #FFF;
+        }
+
+        .brand-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .header-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-link-btn {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            background: #1E293B;
+            transition: all 0.15s ease;
+        }
+
+        .header-link-btn:hover {
+            color: #FFF;
+            border-color: var(--accent-blue);
+        }
+
+        .header-link-btn.active {
+            background: var(--accent-blue);
+            color: #FFF;
+            border-color: var(--accent-blue);
+        }
+
+        /* Navigation Bar */
+        .hub-nav-bar {
+            background: #111827;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .hub-tab-btn {
+            padding: 12px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hub-tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .hub-tab-btn.active {
+            color: #60A5FA;
+            border-bottom-color: var(--accent-blue);
+        }
+
+        .hub-tab-badge {
+            font-size: 10px;
+            font-weight: 700;
+            background: #1F2937;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--text-muted);
+        }
+
+        .hub-tab-btn.active .hub-tab-badge {
+            background: #1E3A8A;
+            color: #93C5FD;
+        }
+
+        /* Main Container */
+        .hub-content {
+            flex: 1;
+            padding: 24px;
+            max-width: 1320px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .tab-section {
+            display: none;
+        }
+
+        .tab-section.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #FFF;
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #D1D5DB;
+        }
+
+        .form-input, .form-select {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #FFF;
+            font-size: 13px;
+            outline: none;
+            transition: border 0.15s ease;
+        }
+
+        .form-input:focus, .form-select:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .file-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .chip-btn {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: #1F2937;
+            border: 1px solid #374151;
+            color: #93C5FD;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .chip-btn:hover {
+            background: #374151;
+        }
+
+        /* Buttons */
+        .btn {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue) 0%, #2563EB 100%);
+            color: #FFF;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-green) 0%, #059669 100%);
+            color: #FFF;
+        }
+
+        .btn-success:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+        }
+
+        .btn-secondary {
+            background: #374151;
+            color: #FFF;
+        }
+
+        .btn-secondary:hover {
+            background: #4B5563;
+        }
+
+        .action-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 16px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
+        /* Progress Bar */
+        .progress-track {
+            background: #1F2937;
+            border-radius: 999px;
+            height: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            border: 1px solid #374151;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #3B82F6 0%, #10B981 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Pipeline Steps */
+        .pipeline-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .step-card {
+            background: #0F172A;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 11px;
+            transition: border-color 0.2s;
+        }
+
+        .step-card.active {
+            border-color: var(--accent-blue);
+            background: #1E293B;
+        }
+
+        .step-card.done {
+            border-color: var(--accent-green);
+        }
+
+        .step-card-num {
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .step-card.active .step-card-num {
+            color: #60A5FA;
+        }
+
+        .step-card.done .step-card-num {
+            color: #34D399;
+        }
+
+        .step-card-title {
+            font-weight: 600;
+            color: #F3F4F6;
+        }
+
+        /* Terminal Console */
+        .terminal-box {
+            background: #050811;
+            border: 1px solid #1F2937;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            color: #10B981;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        /* Status Badge */
+        .badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-idle { background: #374151; color: #D1D5DB; }
+        .badge-running { background: #1E3A8A; color: #93C5FD; }
+        .badge-success { background: #064E3B; color: #6EE7B7; }
+        .badge-error { background: #7F1D1D; color: #FCA5A5; }
+
+        /* Comparison Table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .comparison-table th, .comparison-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .comparison-table th {
+            background: #0F172A;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .comparison-table tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .preset-badge {
+            font-family: monospace;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #1E3A8A;
+            color: #93C5FD;
+        }
+
+        /* Embedded Viewer Frame */
+        .viewer-frame-container {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 16px;
+            height: 680px;
+            background: #000;
+        }
+
+        .viewer-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-logo">C</div>
+            <div>
+                <div class="brand-title">cernodata Ingestion Hub</div>
+                <div class="brand-sub">Document Ingestion, Preset Planning, Live Execution &amp; Preset Results</div>
+            </div>
+        </div>
+        <div class="header-links">
+            <a href="/" class="header-link-btn active">Dashboard</a>
+            <a href="/planner" class="header-link-btn">Planner Wizard</a>
+            <a href="/viewer" class="header-link-btn">Visual Flow Viewer</a>
+        </div>
+    </header>
+
+    <nav class="hub-nav-bar">
+        <button class="hub-tab-btn active" id="tabBtnInput" onclick="switchNavTab('input')">
+            <span>[1] Input Selection</span>
+            <span class="hub-tab-badge">PDF &amp; OCR</span>
+        </button>
+        <button class="hub-tab-btn" id="tabBtnPlan" onclick="switchNavTab('plan')">
+            <span>[2] Planning</span>
+            <span class="hub-tab-badge">Preset Wizard</span>
+        </button>
+        <button class="hub-tab-btn" id="tabBtnProgress" onclick="switchNavTab('progress')">
+            <span>[3] Parsing Progress</span>
+            <span class="hub-tab-badge" id="navBadgeProgress">Idle</span>
+        </button>
+        <button class="hub-tab-btn" id="tabBtnResults" onclick="switchNavTab('results')">
+            <span>[4] Preset Results</span>
+            <span class="hub-tab-badge" id="navBadgeResults">Scores</span>
+        </button>
+    </nav>
+
+    <main class="hub-content">
+
+        <!-- 1. Input Selection Section -->
+        <section class="tab-section active" id="secInput">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">1. Document Input &amp; Ingestion Parameters</div>
+                        <div class="card-subtitle">Select the PDF file, OCR language hint, and confidence targets for automated iteration.</div>
+                    </div>
+                    <span class="badge badge-idle" id="inputStatusBadge">Ready</span>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label" for="inpPdfPath">Select or Enter Input PDF Document</label>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <select class="form-select" id="docSelectDropdown" style="min-width: 280px; flex: 1;" onchange="if(this.value) selectDocPath(this.value);">
+                                <option value="">-- Choose Discovered Document --</option>
+                            </select>
+                            <input type="text" class="form-input" id="inpPdfPath" value="src/e2e/Document 8.pdf" placeholder="e.g. src/e2e/Document 8.pdf" style="flex: 2; min-width: 240px;">
+                        </div>
+                        <div class="file-chips" id="docChipsContainer">
+                            <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Discovered files:</span>
+                            <button class="chip-btn" onclick="selectDocPath('src/e2e/Document 8.pdf')">src/e2e/Document 8.pdf</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="inpLanguage">Language Hint (OCR &amp; Verification)</label>
+                        <select class="form-select" id="inpLanguage">
+                            <option value="auto">Auto-Detect Document Language</option>
+                            <option value="pl" selected>Polish (pl)</option>
+                            <option value="en">English (en)</option>
+                            <option value="de">German (de)</option>
+                            <option value="fr">French (fr)</option>
+                            <option value="es">Spanish (es)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="inpPreset">Primary Ingestion Preset</label>
+                        <select class="form-select" id="inpPreset">
+                            <option value="docling_fast" selected>docling_fast (Hybrid Parser)</option>
+                            <option value="docling_deep">docling_deep (Deep Visual OCR &amp; Tables)</option>
+                            <option value="pypdfium_rapidocr">pypdfium_rapidocr (RapidOCR Standalone)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            Target Confidence Threshold: <span id="thresholdDisplay" style="color: #60A5FA; font-weight:700;">0.85</span>
+                        </label>
+                        <input type="range" id="inpThreshold" min="0.50" max="0.98" step="0.01" value="0.85" oninput="document.getElementById('thresholdDisplay').textContent = Number(this.value).toFixed(2);" style="margin-top: 6px;">
+                    </div>
+
+                    <div class="form-group" style="justify-content: center;">
+                        <label style="font-size: 12px; color: #D1D5DB; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="inpAlignSkew" checked> Auto-align Text Skew Angles
+                        </label>
+                        <label style="font-size: 12px; color: #D1D5DB; display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px;">
+                            <input type="checkbox" id="inpVisualize" checked> Generate Visual Overlays
+                        </label>
+                    </div>
+                </div>
+
+                <div class="action-row">
+                    <button class="btn btn-secondary" onclick="switchNavTab('plan')">Configure Plan in Wizard -&gt;</button>
+                    <button class="btn btn-primary" id="btnRunDirect" onclick="triggerRunPipeline(false)">[RUN] Run Pipeline Directly</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Planning Section -->
+        <section class="tab-section" id="secPlan">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">2. Execution Plan &amp; Preset Strategy Planning</div>
+                        <div class="card-subtitle">Configure heuristic weighting to optimize latency, cost, and layout precision before execution.</div>
+                    </div>
+                    <a href="/planner" target="_blank" class="btn btn-secondary" style="font-size: 11px;">[POPUP] Open Full Plan Wizard</a>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="planTaxonomy">Document Taxonomy</label>
+                        <select class="form-select" id="planTaxonomy" onchange="updateSuggestedPlan()">
+                            <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
+                            <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
+                            <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
+                            <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="planTarget">Target Use-Case</label>
+                        <select class="form-select" id="planTarget" onchange="updateSuggestedPlan()">
+                            <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
+                            <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
+                            <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="planLatency">Latency vs Quality Trade-off</label>
+                        <select class="form-select" id="planLatency" onchange="updateSuggestedPlan()">
+                            <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
+                            <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
+                            <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="planHardware">Hardware Environment</label>
+                        <select class="form-select" id="planHardware" onchange="updateSuggestedPlan()">
+                            <option value="cpu" selected>Local CPU (Standard host)</option>
+                            <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
+                            <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="background: #0F172A; border: 1px solid var(--border-color); border-radius: 6px; padding: 14px; margin-top: 8px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #93C5FD; text-transform: uppercase; margin-bottom: 8px;">Suggested Preset Hierarchy</div>
+                    <div id="planPresetOrderList" style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="font-size: 12px; color: #D1D5DB;">1. Primary Candidate: <span class="preset-badge" id="planPrimaryBadge">docling_fast</span> (Initial execution pass)</div>
+                        <div style="font-size: 12px; color: #9CA3AF;">2. Fallback Queue: <span class="preset-badge" id="planFallbackBadge">docling_deep</span> (Automated confidence fallback)</div>
+                    </div>
+                </div>
+
+                <div class="action-row">
+                    <button class="btn btn-secondary" onclick="switchNavTab('input')">&lt;- Back to Input</button>
+                    <button class="btn btn-success" onclick="triggerRunPipeline(true)">[EXECUTE] Start Parsing with Configured Plan</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Parsing Progress Section -->
+        <section class="tab-section" id="secProgress">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">3. Live Ingestion &amp; Parsing Progress</div>
+                        <div class="card-subtitle">Real-time status tracking across ingestion, text skew orientation, and quality verification gates.</div>
+                    </div>
+                    <span class="badge badge-idle" id="progressStatusBadge">IDLE</span>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
+                    <span id="progressCurrentStepText" style="font-weight:600; color:#D1D5DB;">Waiting to start...</span>
+                    <span id="progressPercentText" style="font-weight:700; color:#60A5FA;">0%</span>
+                </div>
+
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFillBar"></div>
+                </div>
+
+                <div class="pipeline-steps">
+                    <div class="step-card" id="stepCard1">
+                        <div class="step-card-num">STEP 1</div>
+                        <div class="step-card-title">Document Validation &amp; Slicing</div>
+                    </div>
+                    <div class="step-card" id="stepCard2">
+                        <div class="step-card-num">STEP 2</div>
+                        <div class="step-card-title">Preset Layout &amp; OCR Parsing</div>
+                    </div>
+                    <div class="step-card" id="stepCard3">
+                        <div class="step-card-num">STEP 3</div>
+                        <div class="step-card-title">Text Skew Alignment</div>
+                    </div>
+                    <div class="step-card" id="stepCard4">
+                        <div class="step-card-num">STEP 4</div>
+                        <div class="step-card-title">Quality Checks &amp; Violations</div>
+                    </div>
+                    <div class="step-card" id="stepCard5">
+                        <div class="step-card-num">STEP 5</div>
+                        <div class="step-card-title">Decision Tree &amp; Fallback</div>
+                    </div>
+                </div>
+
+                <div class="terminal-box" id="progressLogConsole">--- [CONSOLE READY] Ready to execute pipeline ---
+</div>
+
+                <div id="progressCompletionBanner" style="display:none; margin-top:14px; background:#064E3B; border:1px solid #10B981; border-radius:6px; padding:12px; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:12px; font-weight:700; color:#6EE7B7;">[SUCCESS] Pipeline Run Completed Successfully!</div>
+                        <div style="font-size:11px; color:#A7F3D0; margin-top:2px;" id="progressSummaryText">Result: ACCEPT | Score: 1.0000 | Preset: docling_fast</div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-primary" onclick="switchNavTab('results')">Inspect Preset Results -&gt;</button>
+                        <a href="/viewer" class="btn btn-secondary">Open Visual Flow Viewer</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Preset Results Section -->
+        <section class="tab-section" id="secResults">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">4. Multi-Preset Evaluation &amp; Comparison Results</div>
+                        <div class="card-subtitle">Review confidence scores, quality violations, and fallback decisions across candidate presets.</div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary" onclick="refreshResultsData()">[REFRESH] Refresh Data</button>
+                        <a href="/viewer" target="_blank" class="btn btn-primary">[EXPAND] Open Full Viewer (/viewer)</a>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; background: #0F172A; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; align-items: center;">
+                    <span style="font-size: 11px; font-weight: 700; color: #93C5FD; text-transform: uppercase;">Quick Preset Actions:</span>
+                    <button class="chip-btn" onclick="triggerRerunWithPreset('docling_fast')">Rerun docling_fast</button>
+                    <button class="chip-btn" onclick="triggerRerunWithPreset('docling_deep')">Rerun docling_deep (Deep Fallback)</button>
+                    <button class="chip-btn" onclick="triggerRerunWithPreset('pypdfium_rapidocr')">Rerun pypdfium_rapidocr</button>
+                    <span style="flex: 1;"></span>
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="reloadViewerIframe()">Reload Viewer</button>
+                </div>
+
+                <div id="resultsTableContainer">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Step / Attempt</th>
+                                <th>Preset</th>
+                                <th>Confidence</th>
+                                <th>Per-Page Score</th>
+                                <th>Violations</th>
+                                <th>Status</th>
+                                <th>Decision Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <tr>
+                                <td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No pipeline run executed yet. Run a document from Input Selection or Planning to see multi-preset results.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                    <div style="font-size:12px; color:#D1D5DB; font-weight:600;">Embedded Interactive Visual Flow &amp; DOM Viewer:</div>
+                    <div style="font-size:11px; color:var(--text-muted);">Hydrated dynamically from backend <span style="font-family:monospace; color:#60A5FA;">/api/viewer_data</span></div>
+                </div>
+
+                <div class="viewer-frame-container">
+                    <iframe class="viewer-frame" id="viewerFrame" src="/viewer" title="cernodata Interactive Visual Flow Viewer"></iframe>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        let currentTab = 'input';
+        let progressInterval = null;
+
+        function switchNavTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('.hub-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+
+            const btn = document.getElementById('tabBtn' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            const sec = document.getElementById('sec' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+
+            if (btn) btn.classList.add('active');
+            if (sec) sec.classList.add('active');
+
+            if (tabName === 'results') {
+                refreshResultsData();
+                reloadViewerIframe();
+            }
+        }
+
+        function selectDocPath(path) {
+            document.getElementById('inpPdfPath').value = path;
+        }
+
+        function updateSuggestedPlan() {
+            const tax = document.getElementById('planTaxonomy').value;
+            const target = document.getElementById('planTarget').value;
+            const lat = document.getElementById('planLatency').value;
+
+            let primary = 'docling_fast';
+            let fallback = 'docling_deep';
+
+            if (tax === 'scanned_archive' || tax === 'form_heavy' || lat === 'maximum_accuracy') {
+                primary = 'docling_deep';
+                fallback = 'pypdfium_rapidocr';
+            } else if (lat === 'fast_low_cost') {
+                primary = 'docling_fast';
+                fallback = 'pypdfium_rapidocr';
+            }
+
+            document.getElementById('planPrimaryBadge').textContent = primary;
+            document.getElementById('planFallbackBadge').textContent = fallback;
+        }
+
+        async function triggerRunPipeline(withPlan = false) {
+            const pdfPath = document.getElementById('inpPdfPath').value.trim();
+            const language = document.getElementById('inpLanguage').value;
+            const threshold = parseFloat(document.getElementById('inpThreshold').value);
+            const preset = document.getElementById('inpPreset').value;
+            const alignSkew = document.getElementById('inpAlignSkew').checked;
+            const visualize = document.getElementById('inpVisualize').checked;
+
+            if (!pdfPath) {
+                alert("Please provide an input document path.");
+                return;
+            }
+
+            switchNavTab('progress');
+            resetProgressUI();
+
+            appendLog(`[START] Initiating pipeline run for '${pdfPath}' (Preset: ${preset}, Lang: ${language})...`);
+
+            const payload = {
+                pdf_path: pdfPath,
+                language: language,
+                target_threshold: threshold,
+                preset: preset,
+                align_skew: alignSkew,
+                visualize: visualize,
+                with_plan: withPlan
+            };
+
+            if (withPlan) {
+                payload.plan_config = {
+                    taxonomy: document.getElementById('planTaxonomy').value,
+                    target_use_case: document.getElementById('planTarget').value,
+                    latency: document.getElementById('planLatency').value,
+                    hardware: document.getElementById('planHardware').value
+                };
+            }
+
+            startProgressPolling();
+
+            try {
+                const resp = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    appendLog(`[ERROR] Pipeline run failed: ${errData.error || resp.statusText}`);
+                    updateProgressStatus('ERROR', 'Pipeline execution error.');
+                    stopProgressPolling();
+                    return;
+                }
+
+                const result = await resp.json();
+                onPipelineCompleted(result);
+            } catch (e) {
+                appendLog(`[ERROR] Network or server communication error: ${e.message}`);
+                updateProgressStatus('ERROR', e.message);
+                stopProgressPolling();
+            }
+        }
+
+        function resetProgressUI() {
+            document.getElementById('progressFillBar').style.width = '10%';
+            document.getElementById('progressPercentText').textContent = '10%';
+            document.getElementById('progressCurrentStepText').textContent = 'Starting ingestion...';
+            document.getElementById('progressStatusBadge').textContent = 'PARSING';
+            document.getElementById('progressStatusBadge').className = 'badge badge-running';
+            document.getElementById('navBadgeProgress').textContent = 'Running';
+            document.getElementById('progressCompletionBanner').style.display = 'none';
+
+            for (let i = 1; i <= 5; i++) {
+                const card = document.getElementById('stepCard' + i);
+                if (card) {
+                    card.className = 'step-card' + (i === 1 ? ' active' : '');
+                }
+            }
+        }
+
+        function startProgressPolling() {
+            stopProgressPolling();
+            progressInterval = setInterval(async () => {
+                try {
+                    const resp = await fetch('/api/progress');
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data) {
+                            if (data.progress !== undefined) {
+                                document.getElementById('progressFillBar').style.width = data.progress + '%';
+                                document.getElementById('progressPercentText').textContent = data.progress + '%';
+                            }
+                            if (data.current_step) {
+                                document.getElementById('progressCurrentStepText').textContent = data.current_step;
+                            }
+                            if (data.logs && Array.isArray(data.logs)) {
+                                const consoleEl = document.getElementById('progressLogConsole');
+                                consoleEl.textContent = data.logs.join('\n');
+                                consoleEl.scrollTop = consoleEl.scrollHeight;
+                            }
+                            if (data.step_index) {
+                                for (let i = 1; i <= 5; i++) {
+                                    const card = document.getElementById('stepCard' + i);
+                                    if (card) {
+                                        if (i < data.step_index) card.className = 'step-card done';
+                                        else if (i === data.step_index) card.className = 'step-card active';
+                                        else card.className = 'step-card';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // ignore polling errors
+                }
+            }, 400);
+        }
+
+        function stopProgressPolling() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function onPipelineCompleted(result) {
+            stopProgressPolling();
+            document.getElementById('progressFillBar').style.width = '100%';
+            document.getElementById('progressPercentText').textContent = '100%';
+            document.getElementById('progressCurrentStepText').textContent = 'Ingestion and verification finished.';
+            document.getElementById('progressStatusBadge').textContent = 'COMPLETED';
+            document.getElementById('progressStatusBadge').className = 'badge badge-success';
+            document.getElementById('navBadgeProgress').textContent = 'Done';
+
+            for (let i = 1; i <= 5; i++) {
+                const card = document.getElementById('stepCard' + i);
+                if (card) card.className = 'step-card done';
+            }
+
+            const dec = result.decision || {};
+            const viols = result.violations || [];
+            const summaryStr = `Status: ${dec.status || 'ACCEPT'} | Confidence: ${Number(dec.overall_confidence || 1.0).toFixed(4)} | Preset: ${dec.chosen_preset || 'docling_fast'} | Violations: ${viols.length}`;
+            document.getElementById('progressSummaryText').textContent = summaryStr;
+            document.getElementById('progressCompletionBanner').style.display = 'flex';
+
+            appendLog(`[COMPLETE] ${summaryStr}`);
+
+            // Pre-load results
+            refreshResultsData();
+            reloadViewerIframe();
+
+            // Auto-switch to results so user immediately inspects and works with the parsed output
+            setTimeout(() => {
+                switchNavTab('results');
+            }, 1200);
+        }
+
+        function updateProgressStatus(status, message) {
+            document.getElementById('progressStatusBadge').textContent = status;
+            document.getElementById('progressStatusBadge').className = status === 'ERROR' ? 'badge badge-error' : 'badge badge-running';
+            document.getElementById('progressCurrentStepText').textContent = message;
+        }
+
+        function appendLog(line) {
+            const consoleEl = document.getElementById('progressLogConsole');
+            const now = new Date().toISOString().substring(11, 19);
+            consoleEl.textContent += `\n[${now}] ${line}`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        async function triggerRerunWithPreset(presetName) {
+            const pdfPath = document.getElementById('inpPdfPath').value.trim() || 'src/e2e/Document 8.pdf';
+            const language = document.getElementById('inpLanguage').value || 'pl';
+            appendLog(`[RERUN] Triggering live rerun with preset '${presetName}' for '${pdfPath}'...`);
+            switchNavTab('progress');
+            resetProgressUI();
+            startProgressPolling();
+
+            try {
+                const resp = await fetch('/api/rerun', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preset: presetName, pdf_path: pdfPath, language: language })
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    appendLog(`[ERROR] Rerun failed: ${err.error || resp.statusText}`);
+                    updateProgressStatus('ERROR', 'Rerun failure');
+                    stopProgressPolling();
+                    return;
+                }
+                const result = await resp.json();
+                onPipelineCompleted(result);
+            } catch (e) {
+                appendLog(`[ERROR] Network error during rerun: ${e.message}`);
+                updateProgressStatus('ERROR', e.message);
+                stopProgressPolling();
+            }
+        }
+
+        async function loadAvailableDocuments() {
+            try {
+                const resp = await fetch('/api/documents');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const docs = data.documents || [];
+                const select = document.getElementById('docSelectDropdown');
+                const container = document.getElementById('docChipsContainer');
+                if (select && docs.length > 0) {
+                    select.innerHTML = '<option value="">-- Choose Discovered Document --</option>' +
+                        docs.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+                }
+                if (container && docs.length > 0) {
+                    container.innerHTML = '<span style="font-size: 11px; color: var(--text-muted); align-self: center;">Discovered files:</span>' +
+                        docs.map(d => `<button class="chip-btn" onclick="selectDocPath('${escapeHtml(d)}')">${escapeHtml(d)}</button>`).join('');
+                }
+            } catch (e) {
+                console.log('[WARN] Failed to load documents list:', e);
+            }
+        }
+
+        async function refreshResultsData() {
+            try {
+                const resp = await fetch('/api/results');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                renderResultsTable(data);
+            } catch (e) {
+                console.log('[INFO] Failed to fetch results:', e);
+            }
+        }
+
+        function renderResultsTable(data) {
+            const tbody = document.getElementById('resultsTableBody');
+            if (!tbody) return;
+
+            const attempts = (data && data.attempts && data.attempts.length > 0)
+                ? data.attempts
+                : (data && data.decision ? [{
+                    step: 1,
+                    preset: data.decision.chosen_preset || 'docling_fast',
+                    overall_confidence: data.decision.overall_confidence,
+                    per_page_confidence: data.decision.per_page_confidence,
+                    violations_count: (data.violations || []).length,
+                    status: data.decision.status || 'ACCEPT',
+                    action: (data.decision.decision_tree ? data.decision.decision_tree.action : 'ACCEPT_PARSE')
+                }] : []);
+
+            if (attempts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No pipeline run executed yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = attempts.map(att => {
+                const conf = (att.overall_confidence !== undefined && att.overall_confidence !== null)
+                    ? Number(att.overall_confidence).toFixed(4)
+                    : '1.0000';
+                const perPageStr = att.per_page_confidence
+                    ? Object.entries(att.per_page_confidence).map(([p, s]) => `P${p}: ${Number(s).toFixed(2)}`).join(', ')
+                    : '-';
+                const isAccept = (att.status === 'ACCEPT' || att.is_accepted);
+                const badgeClass = isAccept ? 'badge-success' : (att.status === 'FALLBACK' ? 'badge-running' : 'badge-error');
+
+                return `
+                    <tr>
+                        <td><strong>Step ${att.step || 1}</strong></td>
+                        <td><span class="preset-badge">${escapeHtml(att.preset || 'docling_fast')}</span></td>
+                        <td style="font-weight:700; color:${isAccept ? '#34D399' : '#F87171'};">${conf}</td>
+                        <td style="font-size:11px; font-family:monospace; color:#9CA3AF;">${escapeHtml(perPageStr)}</td>
+                        <td>${att.violations_count || 0}</td>
+                        <td><span class="badge ${badgeClass}">${escapeHtml(att.status || 'ACCEPT')}</span></td>
+                        <td style="font-size:11px; color:#D1D5DB;">${escapeHtml(att.action || 'EXECUTE')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function reloadViewerIframe() {
+            const frame = document.getElementById('viewerFrame');
+            if (frame) {
+                frame.src = '/viewer?' + Date.now();
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // Initial setup
+        updateSuggestedPlan();
+        loadAvailableDocuments();
+        refreshResultsData();
+    </script>
+</body>
+</html>

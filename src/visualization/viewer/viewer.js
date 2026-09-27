@@ -5,24 +5,24 @@
  * Reads initial context from window.VIEWER_DATA.
  */
 
-const initialDomData = window.VIEWER_DATA.dom;
-const initialViolationsData = window.VIEWER_DATA.violations;
-const initialDecisionData = window.VIEWER_DATA.decision;
-const detectedLanguagesMap = window.VIEWER_DATA.detectedLanguages;
-const planData = window.VIEWER_DATA.plan;
-const pdfSourceFile = window.VIEWER_DATA.pdfSourceFile;
-const pageImages = (window.VIEWER_DATA.pageImages && window.VIEWER_DATA.pageImages.length > 0)
+let initialDomData = (window.VIEWER_DATA && window.VIEWER_DATA.dom) ? window.VIEWER_DATA.dom : { nodes: [] };
+let initialViolationsData = (window.VIEWER_DATA && window.VIEWER_DATA.violations) ? window.VIEWER_DATA.violations : [];
+let initialDecisionData = (window.VIEWER_DATA && window.VIEWER_DATA.decision) ? window.VIEWER_DATA.decision : {};
+let detectedLanguagesMap = (window.VIEWER_DATA && window.VIEWER_DATA.detectedLanguages) ? window.VIEWER_DATA.detectedLanguages : {};
+let planData = (window.VIEWER_DATA && window.VIEWER_DATA.plan) ? window.VIEWER_DATA.plan : null;
+let pdfSourceFile = (window.VIEWER_DATA && window.VIEWER_DATA.pdfSourceFile) ? window.VIEWER_DATA.pdfSourceFile : "";
+let pageImages = (window.VIEWER_DATA && window.VIEWER_DATA.pageImages && window.VIEWER_DATA.pageImages.length > 0)
     ? window.VIEWER_DATA.pageImages
     : [(document.getElementById('pageImg') ? document.getElementById('pageImg').src : '')];
-const pageDimensions = window.VIEWER_DATA.pageDimensions || [];
-const totalPages = window.VIEWER_DATA.totalPages || pageImages.length || 1;
+let pageDimensions = (window.VIEWER_DATA && window.VIEWER_DATA.pageDimensions) ? window.VIEWER_DATA.pageDimensions : [];
+let totalPages = (window.VIEWER_DATA && window.VIEWER_DATA.totalPages) ? window.VIEWER_DATA.totalPages : (pageImages.length || 1);
 let currentPage = 1;
 let showAllDomNodes = false;
 let showAllViolations = false;
 
 let activePresetIndex = 0;
 let appliedCorrections = false;
-let activeLanguage = window.VIEWER_DATA.activeLanguage;
+let activeLanguage = (window.VIEWER_DATA && window.VIEWER_DATA.activeLanguage) ? window.VIEWER_DATA.activeLanguage : "en";
 let selectedNodeId = null;
 let selectedNodeIds = [];
 let isCutoutUnskewed = false;
@@ -91,7 +91,100 @@ function ensureViolationIds() {
         }
     });
 }
-ensureViolationIds();
+function renderTimelineButtons() {
+    const container = document.getElementById('timelineContainer');
+    if (!container) return;
+
+    const attempts = decisionData.attempts || [];
+    if (attempts && attempts.length > 1) {
+        const att1 = attempts[0];
+        const att2 = attempts[1];
+        const isAtt1Pass = !!att1.is_accepted;
+        const isAtt2Pass = !!att2.is_accepted;
+        container.innerHTML = `
+            <button class="step-btn ${activePresetIndex === 0 ? 'active' : ''}" id="btnPreset1" onclick="switchPreset(0)">
+                <span>Step 1: ${escapeHtml(att1.preset || 'docling_fast')}</span>
+                <span class="badge-status ${isAtt1Pass ? 'pass' : 'fail'}" id="statusPreset1">${isAtt1Pass ? 'ACCEPT' : 'FALLBACK'}</span>
+            </button>
+            <button class="step-btn ${activePresetIndex === 1 ? 'active' : ''}" id="btnPreset2" onclick="switchPreset(1)">
+                <span>Step 2: ${escapeHtml(att2.preset || 'docling_deep')}</span>
+                <span class="badge-status ${isAtt2Pass ? 'pass' : 'fail'}" id="statusPreset2">${isAtt2Pass ? 'ACCEPT' : 'FAIL'}</span>
+            </button>
+        `;
+        return;
+    }
+
+    const isAcc = (decisionData.is_accepted !== undefined) ? decisionData.is_accepted : true;
+    const chosenPreset = decisionData.chosen_preset || (planData ? planData.primary_preset : 'docling_fast') || 'docling_fast';
+    let preset2Name = 'docling_deep';
+    if (planData && planData.fallback_queue && planData.fallback_queue.length > 0) {
+        const fb = planData.fallback_queue[0];
+        preset2Name = (typeof fb === 'object' && fb.preset) ? fb.preset : fb;
+    }
+
+    container.innerHTML = `
+        <button class="step-btn ${activePresetIndex === 0 ? 'active' : ''}" id="btnPreset1" onclick="switchPreset(0)">
+            <span>Step 1: ${escapeHtml(chosenPreset)}</span>
+            <span class="badge-status ${isAcc ? 'pass' : 'fail'}" id="statusPreset1">${isAcc ? 'ACCEPT' : 'REJECT'}</span>
+        </button>
+        <button class="step-btn fallback ${activePresetIndex === 1 ? 'active' : ''}" id="btnPreset2" onclick="switchPreset(1)">
+            <span>Step 2: ${escapeHtml(preset2Name)}</span>
+            <span class="badge-status" id="statusPreset2" style="background:#4B5563; color:#FFF;">Candidate</span>
+        </button>
+    `;
+}
+
+function hydrateViewer(data) {
+    if (!data) return;
+    window.VIEWER_DATA = data;
+    initialDomData = data.dom || { nodes: [] };
+    initialViolationsData = data.violations || [];
+    initialDecisionData = data.decision || {};
+    detectedLanguagesMap = data.detectedLanguages || {};
+    planData = data.plan || null;
+    pdfSourceFile = data.pdfSourceFile || "";
+    if (data.pageImages && data.pageImages.length > 0) {
+        pageImages = data.pageImages;
+    }
+    pageDimensions = data.pageDimensions || [];
+    totalPages = data.totalPages || pageImages.length || 1;
+    activeLanguage = data.activeLanguage || "en";
+
+    domData = JSON.parse(JSON.stringify(initialDomData));
+    violationsData = JSON.parse(JSON.stringify(initialViolationsData));
+    decisionData = JSON.parse(JSON.stringify(initialDecisionData));
+
+    ensureViolationIds();
+
+    const docEl = document.getElementById('domSourceFilename');
+    if (docEl && (domData.source_filename || pdfSourceFile)) {
+        docEl.textContent = domData.source_filename || pdfSourceFile;
+    }
+    const idEl = document.getElementById('domDocId');
+    if (idEl && domData.document_id) {
+        idEl.textContent = domData.document_id;
+    }
+    const totEl = document.getElementById('totalPagesNum');
+    if (totEl) {
+        totEl.textContent = String(totalPages);
+    }
+
+    const detBadge = document.getElementById('detectedLangBadge');
+    if (detBadge) {
+        detBadge.textContent = `P${currentPage}: ${decisionData.primary_detected_language || 'pl'} (Active: ${activeLanguage})`;
+    }
+
+    const selLang = document.getElementById('selectLanguage');
+    if (selLang && activeLanguage) {
+        selLang.value = activeLanguage;
+    }
+
+    renderTimelineButtons();
+    initPageControls();
+    switchPage(1);
+    renderDecisionLog();
+    renderPlanTab();
+}
 
 function initPageControls() {
     const pageSelect = document.getElementById('pageSelect');
@@ -2075,5 +2168,25 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-initPageControls();
-switchPage(1);
+async function startViewer() {
+    if (window.VIEWER_DATA && window.VIEWER_DATA.dom && window.VIEWER_DATA.dom.nodes && window.VIEWER_DATA.dom.nodes.length > 0) {
+        hydrateViewer(window.VIEWER_DATA);
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/viewer_data');
+        if (resp.ok) {
+            const data = await resp.json();
+            hydrateViewer(data);
+            return;
+        }
+    } catch (e) {
+        console.log('[INFO] Backend /api/viewer_data not reachable, using offline state.');
+    }
+
+    initPageControls();
+    switchPage(1);
+}
+
+startViewer();

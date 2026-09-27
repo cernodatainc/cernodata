@@ -3,7 +3,6 @@ src/parsers package re-exports
 """
 from src.parsers.docling_parser import DoclingParser
 from src.parsers.pypdfium_parser import PyPdfiumParser
-from src.parsers.synthetic_parser import SyntheticParser
 from src.parsers.section_ocr import (
     OCRLine,
     OCRResult,
@@ -21,7 +20,6 @@ from src.parsers.pdf_utils import open_pdf
 __all__ = [
     "DoclingParser",
     "PyPdfiumParser",
-    "SyntheticParser",
     "SectionOCRParser",
     "OCRLine",
     "OCRResult",

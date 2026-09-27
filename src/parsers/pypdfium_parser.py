@@ -11,8 +11,8 @@ from __future__ import annotations
 import os
 from typing import List, Any, Optional, Tuple
 
+from src.utils import resolve_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
-from src.parsers.synthetic_parser import SyntheticParser
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
 from src.parsers.pdf_utils import open_pdf
 
@@ -91,16 +91,20 @@ class PyPdfiumParser:
         For pages with embedded digital text, extracts native text rectangles.
         For scanned or image-dominant pages, renders page bitmaps and runs RapidOCR.
         """
-        source_filename = os.path.basename(pdf_path)
+        resolved_path = resolve_pdf_path(pdf_path)
+        if not os.path.exists(resolved_path):
+            raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
+
+        source_filename = os.path.basename(resolved_path)
         doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
 
         total_pages = 0
         nodes: List[DOMNode] = []
         node_counter = 1
 
-        with open_pdf(pdf_path) as pdf:
+        with open_pdf(resolved_path) as pdf:
             if pdf is None or len(pdf) == 0:
-                return SyntheticParser().parse(doc_id, source_filename)
+                raise ValueError(f"Unable to open or read PDF document: '{resolved_path}'")
 
             total_pages = len(pdf)
             for page_idx in range(total_pages):
@@ -111,9 +115,6 @@ class PyPdfiumParser:
                     start_node_counter=node_counter
                 )
                 nodes.extend(page_nodes)
-
-        if not nodes:
-            return SyntheticParser().parse(doc_id, source_filename)
 
         return DocumentDOM(
             document_id=doc_id,

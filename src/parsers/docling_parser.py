@@ -10,8 +10,8 @@ from __future__ import annotations
 import os
 from typing import List, Optional, Any
 
+from src.utils import resolve_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
-from src.parsers.synthetic_parser import SyntheticParser
 from src.parsers.docling_helpers import (
     LANG_CODE_MAP,
     fallback_top_left_bbox,
@@ -123,11 +123,15 @@ class DoclingParser:
         return pipeline_options
 
     def parse(self, pdf_path: str) -> DocumentDOM:
-        source_filename = os.path.basename(pdf_path)
+        resolved_path = resolve_pdf_path(pdf_path)
+        if not os.path.exists(resolved_path):
+            raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
+        if not HAS_DOCLING:
+            raise RuntimeError("Docling library is not installed or available in this Python environment.")
+
+        source_filename = os.path.basename(resolved_path)
         doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
-        if HAS_DOCLING and os.path.exists(pdf_path):
-            return self._parse_with_docling(pdf_path, doc_id, source_filename)
-        return SyntheticParser().parse(doc_id, source_filename)
+        return self._parse_with_docling(resolved_path, doc_id, source_filename)
 
     def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:
         pipeline_options = self.build_pipeline_options()

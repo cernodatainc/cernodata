@@ -7,6 +7,8 @@ and plan-driven pipeline execution.
 
 import os
 import unittest
+from unittest.mock import patch
+from src.dom import DocumentDOM, DOMNode, BoundingBox
 from src.pipeline.planner import PresetPlanner, DocumentPlan
 from src.pipeline.planner_models import PlannerCriteria, IngestionConfig
 from src.pipeline.orchestrator import run_pipeline
@@ -162,24 +164,44 @@ class TestPlanner(unittest.TestCase):
         self.assertFalse(plan.overridden)
 
     def test_run_pipeline_with_plan(self):
+        mock_dom = DocumentDOM(
+            document_id="d1",
+            source_filename="test.pdf",
+            total_pages=1,
+            nodes=[
+                DOMNode(
+                    node_id="n1",
+                    type="text",
+                    global_page_index=1,
+                    temp_slice_index=1,
+                    bounding_box=BoundingBox(0.0, 0.0, 100.0, 100.0),
+                    content={"raw_text": "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych."}
+                )
+            ]
+        )
         plan = self.planner.create_plan(
-            document_path="non_existent.pdf",
+            document_path="test.pdf",
             taxonomy="financial_report",
             target="high_precision_structure",
             security="air_gapped_local",
             language="pl",
             target_threshold=0.82
         )
-        res = run_pipeline(
-            pdf_path="non_existent.pdf",
-            plan=plan,
-            output_dir="test_output",
-            visualize=False
-        )
-        self.assertIn("plan", res)
-        self.assertIsNotNone(res["plan"])
-        self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
-        self.assertTrue(res["decision"]["is_accepted"])
+        with patch("src.pipeline.orchestrator.parse_document", return_value=mock_dom), \
+             patch("src.pipeline.orchestrator.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.orchestrator.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
+            res = run_pipeline(
+                pdf_path="test.pdf",
+                plan=plan,
+                output_dir="test_output",
+                visualize=False
+            )
+            self.assertIn("plan", res)
+            self.assertIsNotNone(res["plan"])
+            self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
+            self.assertTrue(res["decision"]["is_accepted"])
 
     def test_planner_criteria_model(self):
         criteria = PlannerCriteria(
@@ -244,6 +266,21 @@ class TestPlanner(unittest.TestCase):
         self.assertFalse(restored.do_table_structure)
 
     def test_run_pipeline_with_ingestion_config(self):
+        mock_dom = DocumentDOM(
+            document_id="d1",
+            source_filename="test.pdf",
+            total_pages=1,
+            nodes=[
+                DOMNode(
+                    node_id="n1",
+                    type="text",
+                    global_page_index=1,
+                    temp_slice_index=1,
+                    bounding_box=BoundingBox(0.0, 0.0, 100.0, 100.0),
+                    content={"raw_text": "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych."}
+                )
+            ]
+        )
         cfg = IngestionConfig(
             target_threshold=0.82,
             language="pl",
@@ -251,12 +288,17 @@ class TestPlanner(unittest.TestCase):
             visualize=False,
             output_dir="test_output"
         )
-        res = run_pipeline(
-            pdf_path="non_existent.pdf",
-            config=cfg,
-        )
-        self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
-        self.assertTrue(res["decision"]["is_accepted"])
+        with patch("src.pipeline.orchestrator.parse_document", return_value=mock_dom), \
+             patch("src.pipeline.orchestrator.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.orchestrator.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
+            res = run_pipeline(
+                pdf_path="test.pdf",
+                config=cfg,
+            )
+            self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
+            self.assertTrue(res["decision"]["is_accepted"])
 
 
 if __name__ == "__main__":

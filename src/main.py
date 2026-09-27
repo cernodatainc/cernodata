@@ -57,6 +57,18 @@ def main() -> None:
             active_plan.overridden = True
             active_plan.preset_order = [args.override_preset] + [p for p in active_plan.preset_order if p != args.override_preset]
 
+    # Canonical workflow: Launch the interactive landing page hub if --serve is requested
+    # or if no batch CLI arguments (--input, --plan, --create-plan) are specified.
+    if getattr(args, "serve", False) or (not args.input and not args.plan and not args.create_plan):
+        from src.pipeline.server import start_pipeline_server
+        start_pipeline_server(
+            pdf_path=args.input or "",
+            language=args.language or "en",
+            port=getattr(args, "browser_port", 8000),
+            open_browser=not getattr(args, "no_browser", False),
+        )
+        return
+
     doc_input = args.input or (active_plan.document_path if active_plan else None)
     if not doc_input:
         print("[ERROR] Input document path is required (--input / -i or via plan).")
@@ -98,7 +110,9 @@ def main() -> None:
         from src.pipeline.server import start_pipeline_server
         start_pipeline_server(
             pdf_path=doc_input,
-            language=(active_plan.language or args.language or "en") if active_plan else (args.language or "en")
+            language=(active_plan.language or args.language or "en") if active_plan else (args.language or "en"),
+            port=getattr(args, "browser_port", 8000),
+            open_browser=not getattr(args, "no_browser", False),
         )
 
 

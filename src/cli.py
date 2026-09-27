@@ -8,6 +8,7 @@ Supports direct pipeline runs, interactive plan generation, and plan-driven exec
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import Any
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 
@@ -79,6 +80,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def print_summary(result: dict[str, Any]) -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     decision = result["decision"]
     dom_dict = result["dom"]
     violations = result["violations"]

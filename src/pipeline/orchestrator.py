@@ -5,9 +5,11 @@ End-to-end pipeline runner orchestrating parsing, text skew alignment, quality e
 Supports executing custom and planner-generated execution plans.
 """
 
+import os
 from dataclasses import replace
 from typing import Dict, Any, List, Tuple, Optional, Union
 
+from src.utils import resolve_pdf_path
 from src.dom import DocumentDOM
 from src.parsers import DoclingParser, PyPdfiumParser
 from src.quality import detect_quality_violations, apply_text_skew_alignment
@@ -49,9 +51,13 @@ def parse_document(
         force_full_page_ocr = config.force_full_page_ocr
         do_table_structure = config.do_table_structure
 
+    resolved_path = resolve_pdf_path(pdf_path)
+    if not os.path.exists(resolved_path):
+        raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
+
     if preset == "pypdfium_rapidocr":
         scale = ocr_scale if ocr_scale is not None else 2.0
-        return PyPdfiumParser(language=language, scale=scale).parse(pdf_path)
+        return PyPdfiumParser(language=language, scale=scale).parse(resolved_path)
 
     return DoclingParser(
         language=language,
@@ -60,7 +66,7 @@ def parse_document(
         ocr_scale=ocr_scale,
         force_full_page_ocr=force_full_page_ocr,
         do_table_structure=do_table_structure,
-    ).parse(pdf_path)
+    ).parse(resolved_path)
 
 
 def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> DocumentDOM:
@@ -187,6 +193,8 @@ def run_pipeline(
 
     if not pdf_path:
         raise ValueError("Input document path is required.")
+
+    pdf_path = resolve_pdf_path(pdf_path)
 
     attempts: List[Dict[str, Any]] = []
 

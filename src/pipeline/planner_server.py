@@ -8,13 +8,12 @@ Serves data_shape_config.html and accepts submitted execution plans via API endp
 from __future__ import annotations
 
 import os
-import socket
 import threading
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from typing import Optional, Any
 
-from src.utils import mkdirs
+from src.utils import mkdirs, find_available_port
 from src.pipeline.planner_models import DocumentPlan, PlannerCriteria
 from src.pipeline.planner_options import (
     DEFAULT_PRESET_WEIGHTS,
@@ -24,15 +23,6 @@ from src.pipeline.planner_options import (
     WIZARD_DIMENSIONS,
 )
 from src.pipeline.server import send_json_response, read_json_payload
-
-
-def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
-    """Finds an available TCP port starting from start_port."""
-    for port in range(start_port, start_port + max_attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
-                return port
-    return start_port
 
 
 class DataShapeServer(HTTPServer):
