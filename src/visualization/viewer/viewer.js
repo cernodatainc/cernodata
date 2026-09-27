@@ -17,6 +17,8 @@ const pageImages = (window.VIEWER_DATA.pageImages && window.VIEWER_DATA.pageImag
 const pageDimensions = window.VIEWER_DATA.pageDimensions || [];
 const totalPages = window.VIEWER_DATA.totalPages || pageImages.length || 1;
 let currentPage = 1;
+let showAllDomNodes = false;
+let showAllViolations = false;
 
 let activePresetIndex = 0;
 let appliedCorrections = false;
@@ -30,6 +32,66 @@ let currentZoom = 1.0;
 let domData = JSON.parse(JSON.stringify(initialDomData));
 let violationsData = JSON.parse(JSON.stringify(initialViolationsData));
 let decisionData = JSON.parse(JSON.stringify(initialDecisionData));
+
+const TEXTUAL_TYPES = ['paragraph', 'heading', 'header_footer', 'text'];
+
+function isTextualType(type) {
+    return TEXTUAL_TYPES.includes(type);
+}
+
+function isTextualNode(node) {
+    if (!node) return false;
+    if (isTextualType(node.type)) return true;
+    const text = (node.content && node.content.raw_text) ? node.content.raw_text.trim() : '';
+    return text.length > 0;
+}
+
+function getNodePage(node) {
+    if (!node) return 1;
+    if (node.global_page_index !== undefined && node.global_page_index !== null) {
+        return Number(node.global_page_index);
+    }
+    if (node.temp_slice_index !== undefined && node.temp_slice_index !== null) {
+        return Number(node.temp_slice_index);
+    }
+    return 1;
+}
+
+function getViolationPage(v) {
+    if (!v) return 1;
+    if (v.global_page_index !== undefined && v.global_page_index !== null) {
+        return Number(v.global_page_index);
+    }
+    if (v.page !== undefined && v.page !== null) {
+        return Number(v.page);
+    }
+    const node = domData.nodes.find(n => n.node_id === v.node_id);
+    if (node && node.global_page_index) {
+        return Number(node.global_page_index);
+    }
+    return 1;
+}
+
+function toggleShowAllDom(force = null) {
+    showAllDomNodes = (force !== null) ? Boolean(force) : !showAllDomNodes;
+    renderDOMTree();
+    return showAllDomNodes;
+}
+
+function toggleShowAllViolations(force = null) {
+    showAllViolations = (force !== null) ? Boolean(force) : !showAllViolations;
+    renderViolationsList();
+    return showAllViolations;
+}
+
+function ensureViolationIds() {
+    violationsData.forEach((v, idx) => {
+        if (!v.violation_id) {
+            v.violation_id = `viol_auto_${v.node_id || idx}_${idx}`;
+        }
+    });
+}
+ensureViolationIds();
 
 function initPageControls() {
     const pageSelect = document.getElementById('pageSelect');
@@ -101,6 +163,7 @@ function switchPage(pageNum) {
 
     renderSVGOverlays();
     renderDOMTree();
+    renderViolationsList();
     renderSelectedEditor();
 }
 
@@ -294,7 +357,8 @@ function renderTwoNodeDecollideEditor(container) {
 
     let upper = node1;
     let lower = node2;
-    if (upper.bounding_box.y0 > lower.bounding_box.y0) {
+    if (upper.bounding_box.y0 > lower.bounding_box.y0 ||
+       (Math.abs(upper.bounding_box.y0 - lower.bounding_box.y0) < 5 && upper.bounding_box.x0 > lower.bounding_box.x0)) {
         upper = node2;
         lower = node1;
     }
@@ -316,6 +380,104 @@ function renderTwoNodeDecollideEditor(container) {
                 <span>Gap: ${(bLower.y0 - bUpper.y1).toFixed(2)} pt</span>
            </div>`;
 
+    const upperText = (upper.content && upper.content.raw_text) ? upper.content.raw_text.trim() : '';
+    const lowerText = (lower.content && lower.content.raw_text) ? lower.content.raw_text.trim() : '';
+    const isUpperText = isTextualNode(upper);
+    const isLowerText = isTextualNode(lower);
+    const bothTextual = isUpperText && isLowerText;
+    const sameType = (upper.type === lower.type);
+
+    const isSameLine = Math.abs(bUpper.y0 - bLower.y0) < 6;
+    const defaultMergedText = (upperText && lowerText)
+        ? (upperText + (isSameLine ? ' ' : '\n') + lowerText)
+        : (upperText || lowerText);
+
+    let mergeHtml = '';
+    if (sameType && bothTextual) {
+        mergeHtml = `
+            <div class="merge-editor-card">
+                <div class="merge-editor-title">
+                    <span>[MERGE] Merge Elements (${escapeHtml(upper.type)})</span>
+                    <span class="badge-status" style="font-size:9px; background:#065F46; color:#6EE7B7;">Textual</span>
+                </div>
+                <div class="merge-editor-subtitle">
+                    Both elements are textual (${escapeHtml(upper.type)}). Text will be merged in reading order.
+                </div>
+                <div class="merge-field-group">
+                    <label class="merge-field-label">Merged Text Preview (editable):</label>
+                    <textarea id="mergeMergedText" class="merge-textarea" rows="3">${escapeHtml(defaultMergedText)}</textarea>
+                </div>
+                <button class="btn-merge textual" id="btnMergeElements" onclick="executeMergeElements()">
+                    [MERGE] Merge Textual Elements
+                </button>
+            </div>
+        `;
+    } else if (!sameType) {
+        mergeHtml = `
+            <div class="merge-editor-card" style="border-color:#F59E0B;">
+                <div class="merge-editor-title" style="color:#FBBF24;">
+                    <span>[MERGE] Merge Elements (Different Types)</span>
+                    <span class="badge-status" style="font-size:9px; background:#78350F; color:#FDE68A;">${escapeHtml(upper.type)} vs ${escapeHtml(lower.type)}</span>
+                </div>
+                <div class="merge-editor-subtitle">
+                    Both elements are of different types. Select what happens to the merged element:
+                </div>
+                <div class="merge-field-group">
+                    <label class="merge-field-label">Resulting Element Type:</label>
+                    <select id="mergeTargetType" class="type-filter" style="width: 100%;" onchange="onMergeConfigChanged()">
+                        <option value="${escapeHtml(upper.type)}" selected>Keep '${escapeHtml(upper.type)}' (from ${escapeHtml(upper.node_id)})</option>
+                        <option value="${escapeHtml(lower.type)}">Keep '${escapeHtml(lower.type)}' (from ${escapeHtml(lower.node_id)})</option>
+                        <option value="paragraph">paragraph</option>
+                        <option value="heading">heading</option>
+                        <option value="table_grid">table_grid</option>
+                        <option value="figure">figure</option>
+                        <option value="header_footer">header_footer</option>
+                    </select>
+                </div>
+                <div class="merge-field-group">
+                    <label class="merge-field-label">Content / Text Handling:</label>
+                    <select id="mergeContentAction" class="type-filter" style="width: 100%;" onchange="onMergeConfigChanged()">
+                        <option value="concat" selected>Merge text from both elements (${escapeHtml(upper.node_id)} + ${escapeHtml(lower.node_id)})</option>
+                        <option value="keep_upper">Keep only ${escapeHtml(upper.node_id)} content ('${escapeHtml(upper.type)}')</option>
+                        <option value="keep_lower">Keep only ${escapeHtml(lower.node_id)} content ('${escapeHtml(lower.type)}')</option>
+                        <option value="custom">Custom text</option>
+                    </select>
+                </div>
+                <div class="merge-field-group">
+                    <label class="merge-field-label">Resulting Text Preview (editable):</label>
+                    <textarea id="mergeMergedText" class="merge-textarea" rows="3">${escapeHtml(defaultMergedText)}</textarea>
+                </div>
+                <button class="btn-merge different-type" id="btnMergeElements" onclick="executeMergeElements()">
+                    [MERGE] Merge Elements as Selected
+                </button>
+            </div>
+        `;
+    } else {
+        mergeHtml = `
+            <div class="merge-editor-card">
+                <div class="merge-editor-title">
+                    <span>[MERGE] Merge Elements (${escapeHtml(upper.type)})</span>
+                    <span class="badge-status" style="font-size:9px; background:#1F2937; color:#9CA3AF;">Non-textual</span>
+                </div>
+                <div class="merge-editor-subtitle">
+                    Both elements are of type '${escapeHtml(upper.type)}'. Merging will combine their bounding boxes and properties.
+                </div>
+                <div class="merge-field-group">
+                    <label class="merge-field-label">Resulting Element Type:</label>
+                    <select id="mergeTargetType" class="type-filter" style="width: 100%;">
+                        <option value="${escapeHtml(upper.type)}" selected>${escapeHtml(upper.type)}</option>
+                        <option value="figure">figure</option>
+                        <option value="table_grid">table_grid</option>
+                        <option value="paragraph">paragraph</option>
+                    </select>
+                </div>
+                <button class="btn-merge different-type" id="btnMergeElements" onclick="executeMergeElements()">
+                    [MERGE] Combine Bounding Boxes into Single Element
+                </button>
+            </div>
+        `;
+    }
+
     container.innerHTML = `
         <div class="multi-editor-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -326,9 +488,10 @@ function renderTwoNodeDecollideEditor(container) {
             <button class="btn-decollide" onclick="decollideSelectedPair()" ${!hasCollision ? 'style="background:#2563EB;"' : ''}>
                 ${hasCollision ? '[AUTO-DECOLLIDE] De-collide Selected Boxes' : 'Evenly Space / Align Boundary'}
             </button>
+            ${mergeHtml}
             <div class="pair-node-item" style="border-left: 3px solid #60A5FA;">
                 <div class="pair-node-header">
-                    <span>Upper: ${upper.node_id} (${upper.type})</span>
+                    <span>Upper: ${escapeHtml(upper.node_id)} (${escapeHtml(upper.type)})</span>
                     <span class="pair-node-coords">Y: [${bUpper.y0}, ${bUpper.y1}]</span>
                 </div>
                 <div class="cutout-display-box" style="margin-bottom:4px;">
@@ -338,7 +501,7 @@ function renderTwoNodeDecollideEditor(container) {
             </div>
             <div class="pair-node-item" style="border-left: 3px solid #A78BFA;">
                 <div class="pair-node-header">
-                    <span>Lower: ${lower.node_id} (${lower.type})</span>
+                    <span>Lower: ${escapeHtml(lower.node_id)} (${escapeHtml(lower.type)})</span>
                     <span class="pair-node-coords">Y: [${bLower.y0}, ${bLower.y1}]</span>
                 </div>
                 <div class="cutout-display-box" style="margin-bottom:4px;">
@@ -353,6 +516,126 @@ function renderTwoNodeDecollideEditor(container) {
     `;
     renderCutoutPreview(upper.node_id, upper.bounding_box, 'cutoutPreviewImg_' + upper.node_id);
     renderCutoutPreview(lower.node_id, lower.bounding_box, 'cutoutPreviewImg_' + lower.node_id);
+}
+
+function onMergeConfigChanged() {
+    const actionEl = document.getElementById('mergeContentAction');
+    const textEl = document.getElementById('mergeMergedText');
+    if (!actionEl || !textEl || selectedNodeIds.length !== 2) return;
+
+    const n1 = domData.nodes.find(n => n.node_id === selectedNodeIds[0]);
+    const n2 = domData.nodes.find(n => n.node_id === selectedNodeIds[1]);
+    if (!n1 || !n2) return;
+
+    let upper = (n1.bounding_box.y0 <= n2.bounding_box.y0) ? n1 : n2;
+    let lower = (n1.bounding_box.y0 <= n2.bounding_box.y0) ? n2 : n1;
+
+    const tUpper = (upper.content && upper.content.raw_text) ? upper.content.raw_text.trim() : '';
+    const tLower = (lower.content && lower.content.raw_text) ? lower.content.raw_text.trim() : '';
+
+    if (actionEl.value === 'keep_upper') {
+        textEl.value = tUpper;
+    } else if (actionEl.value === 'keep_lower') {
+        textEl.value = tLower;
+    } else if (actionEl.value === 'concat') {
+        const isSameLine = Math.abs(upper.bounding_box.y0 - lower.bounding_box.y0) < 6;
+        textEl.value = (tUpper && tLower) ? (tUpper + (isSameLine ? ' ' : '\n') + tLower) : (tUpper || tLower);
+    }
+}
+
+function executeMergeElements() {
+    if (selectedNodeIds.length !== 2) return;
+    const n1 = selectedNodeIds[0];
+    const n2 = selectedNodeIds[1];
+
+    const typeEl = document.getElementById('mergeTargetType');
+    const actionEl = document.getElementById('mergeContentAction');
+    const textEl = document.getElementById('mergeMergedText');
+
+    const targetType = typeEl ? typeEl.value : null;
+    const contentAction = actionEl ? actionEl.value : 'concat';
+    const mergedText = textEl ? textEl.value : null;
+
+    mergeDOMNodes(n1, n2, { targetType, contentAction, mergedText });
+}
+
+function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
+    const n1 = domData.nodes.find(n => n.node_id === nodeId1);
+    const n2 = domData.nodes.find(n => n.node_id === nodeId2);
+    if (!n1 || !n2) return null;
+
+    let upper = n1;
+    let lower = n2;
+    if (upper.bounding_box.y0 > lower.bounding_box.y0 ||
+       (Math.abs(upper.bounding_box.y0 - lower.bounding_box.y0) < 5 && upper.bounding_box.x0 > lower.bounding_box.x0)) {
+        upper = n2;
+        lower = n1;
+    }
+
+    const bUpper = upper.bounding_box;
+    const bLower = lower.bounding_box;
+
+    const targetType = options.targetType || (upper.type === lower.type ? upper.type : upper.type);
+
+    let mergedText = '';
+    const upperText = (upper.content && upper.content.raw_text) ? upper.content.raw_text.trim() : '';
+    const lowerText = (lower.content && lower.content.raw_text) ? lower.content.raw_text.trim() : '';
+
+    if (options.mergedText !== undefined && options.mergedText !== null) {
+        mergedText = options.mergedText;
+    } else if (options.contentAction === 'keep_upper') {
+        mergedText = upperText;
+    } else if (options.contentAction === 'keep_lower') {
+        mergedText = lowerText;
+    } else {
+        const isSameLine = Math.abs(bUpper.y0 - bLower.y0) < 6;
+        if (upperText && lowerText) {
+            mergedText = upperText + (isSameLine ? ' ' : '\n') + lowerText;
+        } else {
+            mergedText = upperText || lowerText;
+        }
+    }
+
+    const mergedBbox = {
+        x0: roundCoord(Math.min(bUpper.x0, bLower.x0)),
+        y0: roundCoord(Math.min(bUpper.y0, bLower.y0)),
+        x1: roundCoord(Math.max(bUpper.x1, bLower.x1)),
+        y1: roundCoord(Math.max(bUpper.y1, bLower.y1)),
+        angle: 0.0,
+        quad: null
+    };
+
+    const mergedContent = Object.assign({}, upper.content, lower.content, { raw_text: mergedText });
+
+    upper.type = targetType;
+    upper.bounding_box = mergedBbox;
+    upper.content = mergedContent;
+    upper.user_correction_note = mergedText;
+
+    domData.nodes = domData.nodes.filter(n => n.node_id !== lower.node_id);
+
+    violationsData.forEach(v => {
+        if (v.node_id === lower.node_id) {
+            v.node_id = upper.node_id;
+        }
+    });
+
+    selectedNodeIds = [upper.node_id];
+    selectedNodeId = upper.node_id;
+
+    renderDOMTree();
+    renderViolationsList();
+    renderSelectedEditor();
+    renderSVGOverlays();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = `[OK] Merged '${upper.node_id}' and '${lower.node_id}' into '${upper.node_id}' (${targetType}). Click '[SAVE] Save Annotations' to persist.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+
+    return upper;
 }
 
 function decollideSelectedPair() {
@@ -846,6 +1129,50 @@ function renderSelectedEditor() {
     }
     const noteVal = node.user_correction_note;
 
+    const nodeViols = violationsData.filter(v => v.node_id === node.node_id);
+    let violationsHtml = '';
+    if (nodeViols.length > 0) {
+        violationsHtml = `
+            <div class="selected-violations-box">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:10px; font-weight:700; color:#FCA5A5; text-transform:uppercase;">[!] Quality Violations (${nodeViols.length})</span>
+                    <span class="badge-status" style="font-size:9px; background:#7F1D1D; color:#FECACA;">Violation Inspector</span>
+                </div>
+                ${nodeViols.map((v, vIdx) => {
+                    const isFixed = !!v.is_fixed || !!node.is_fixed || appliedCorrections || activePresetIndex === 1;
+                    const canFix = !!v.suggested_correction;
+                    return `
+                        <div class="selected-viol-item" style="border-top: ${vIdx > 0 ? '1px solid #451A20' : 'none'}; padding-top: ${vIdx > 0 ? '6px' : '0'}; margin-top: ${vIdx > 0 ? '6px' : '0'};">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:11px; font-weight:600; color:#F87171;">[!] ${escapeHtml(v.rule_type)}</span>
+                                <span style="font-size:9px; font-weight:700; color:${isFixed ? '#10B981' : '#F87171'};">${isFixed ? '[FIXED]' : escapeHtml(v.severity || 'WARNING')}</span>
+                            </div>
+                            <div style="font-size:10px; color:#FECACA; margin-top:2px;">${escapeHtml(v.description || '')}</div>
+                            ${v.detected_snippet ? `
+                                <div style="font-size:11px; font-family:monospace; margin-top:4px; color:#FDE047;">
+                                    Snippet: '${escapeHtml(v.detected_snippet)}'${v.suggested_correction ? ` -> '${escapeHtml(v.suggested_correction)}'` : ''}
+                                </div>
+                            ` : ''}
+                            ${canFix ? `
+                                <div style="margin-top:6px;">
+                                    ${isFixed ? `
+                                        <span class="badge-status" style="font-size:10px; background:#10B981; color:#000; padding:2px 8px; font-weight:700;">[OK] Fix Applied</span>
+                                    ` : `
+                                        <button class="apply-fix-btn" id="btnApplyFix_${node.node_id}_${vIdx}" onclick="applySingleFix(event, '${v.violation_id || node.node_id}')">
+                                            [Fix] Apply Suggested Fix: '${escapeHtml(v.suggested_correction)}'
+                                        </button>
+                                    `}
+                                </div>
+                            ` : `
+                                <div style="font-size:9px; color:var(--text-muted); margin-top:4px;">(No automated fix - manual review required)</div>
+                            `}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
     container.innerHTML = `
         <div class="editor-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -890,6 +1217,7 @@ function renderSelectedEditor() {
                 <button style="background:#374151; border:1px solid #4B5563; color:#FFF; font-size:10px; padding:2px 6px; border-radius:3px; cursor:pointer;" onclick="resetQuadToRect('${node.node_id}')">Reset to Rect</button>
             </div>
             ` : ''}
+            ${violationsHtml}
             <button class="flag-btn ${isIncorrect ? 'flagged' : ''}" onclick="toggleIncorrectText('${node.node_id}')">
                 ${isIncorrect ? '[X] Flagged: Incorrect Parsed Text (Click to Unmark)' : '[!] Mark as Incorrect Parsed Text'}
             </button>
@@ -957,16 +1285,36 @@ function updateCorrectionNote(nodeId, text) {
 
 function renderDOMTree() {
     const container = document.getElementById('domListContainer');
+    if (!container) return;
     container.innerHTML = '';
-    document.getElementById('domCount').textContent = domData.nodes.length;
 
-    domData.nodes.forEach(node => {
-        const nodePage = node.global_page_index || 1;
+    const nodesToDisplay = showAllDomNodes
+        ? domData.nodes
+        : domData.nodes.filter(node => getNodePage(node) === currentPage);
+
+    const countEl = document.getElementById('domCount');
+    if (countEl) countEl.textContent = nodesToDisplay.length;
+
+    const labelEl = document.getElementById('domTabLabel');
+    if (labelEl) {
+        labelEl.textContent = showAllDomNodes ? 'DOM Page [ALL]' : 'DOM Page';
+    }
+
+    if (nodesToDisplay.length === 0) {
+        container.innerHTML = `<div style="color: var(--text-muted); text-align: center; margin-top: 20px; font-size: 12px; padding: 10px;">
+            No DOM elements found on Page ${currentPage}.<br>
+            <span style="font-size:10px; color: #9CA3AF;">(Shift-click "DOM Page" tab to show all ${domData.nodes.length} elements across all pages)</span>
+        </div>`;
+        return;
+    }
+
+    nodesToDisplay.forEach(node => {
+        const nodePage = getNodePage(node);
         const isOnCurrentPage = (nodePage === currentPage);
-        const hasViol = violationsData.some(v => v.node_id === node.node_id);
+        const hasViol = violationsData.some(v => v.node_id === node.node_id && !v.is_fixed);
         const isIncorrect = !!node.is_incorrect_text;
-        let displayText = node.content.raw_text || '';
-        let isFixed = false;
+        let displayText = (node.content && node.content.raw_text) ? node.content.raw_text : '';
+        let isFixed = !!node.is_fixed;
 
         if (appliedCorrections || activePresetIndex === 1) {
             const corrected = applyCorrectionsToNodeText(displayText);
@@ -983,10 +1331,10 @@ function renderDOMTree() {
         card.onclick = (e) => handleNodeClick(e, node.node_id);
         card.innerHTML = `
             <div class="node-header">
-                <span class="node-id">${node.node_id}</span>
+                <span class="node-id">${escapeHtml(node.node_id)}</span>
                 <div style="display:flex; align-items:center; gap:4px;">
                     <span class="badge-status" style="font-size:9px; background:${isOnCurrentPage ? '#2563EB' : '#374151'}; color:#FFF;">P${nodePage}</span>
-                    <span class="node-type">${node.type}</span>
+                    <span class="node-type">${escapeHtml(node.type)}</span>
                     ${isFixed ? '<span class="node-corrected-badge">FIXED</span>' : ''}
                     ${isIncorrect ? '<span class="node-incorrect-badge">INCORRECT TEXT</span>' : ''}
                 </div>
@@ -999,40 +1347,135 @@ function renderDOMTree() {
 
 function renderViolationsList() {
     const container = document.getElementById('violListContainer');
-    document.getElementById('violCount').textContent = violationsData.length;
+    if (!container) return;
 
-    if (violationsData.length === 0) {
-        container.innerHTML = '<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600;">[OK] Zero quality violations detected for current language/preset.</div>';
+    const violationsToDisplay = showAllViolations
+        ? violationsData
+        : violationsData.filter(v => getViolationPage(v) === currentPage);
+
+    const unfixedCount = violationsToDisplay.filter(v => !v.is_fixed).length;
+    const countEl = document.getElementById('violCount');
+    if (countEl) countEl.textContent = unfixedCount;
+
+    const labelEl = document.getElementById('violTabLabel');
+    if (labelEl) {
+        labelEl.textContent = showAllViolations ? 'Violations [ALL]' : 'Violations';
+    }
+
+    if (violationsToDisplay.length === 0) {
+        if (violationsData.length === 0) {
+            container.innerHTML = '<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600;">[OK] Zero quality violations detected for current language/preset.</div>';
+        } else {
+            container.innerHTML = `<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600; padding: 10px;">
+                [OK] Zero quality violations on Page ${currentPage}.<br>
+                <span style="font-size:10px; color: var(--text-muted); font-weight:400;">(Shift-click "Violations" tab to show all ${violationsData.length} violation(s) across all pages)</span>
+            </div>`;
+        }
         return;
     }
+
     container.innerHTML = '';
-    violationsData.forEach(v => {
+    violationsToDisplay.forEach(v => {
         const card = document.createElement('div');
-        card.className = 'viol-card';
-        const vPage = v.global_page_index || 1;
+        const isFixed = !!v.is_fixed;
+        card.className = `viol-card ${isFixed ? 'fixed' : ''}`;
+        const vPage = getViolationPage(v);
         card.onclick = () => selectNode(v.node_id, vPage);
+        const canFix = !!v.suggested_correction;
         card.innerHTML = `
             <div class="viol-header">
-                <span class="viol-title">[!] ${v.rule_type}</span>
+                <span class="viol-title">[!] ${escapeHtml(v.rule_type)}</span>
                 <div style="display:flex; align-items:center; gap:4px;">
                     <span class="badge-status lang" style="font-size:9px; padding:1px 5px;">P${vPage}</span>
-                    <span style="font-size: 10px; font-weight:700; color: #F87171;">${v.severity}</span>
+                    <span style="font-size: 10px; font-weight:700; color: ${isFixed ? '#10B981' : '#F87171'};">${isFixed ? '[FIXED]' : escapeHtml(v.severity || 'WARNING')}</span>
                 </div>
             </div>
-            <div style="font-size: 11px; font-family: monospace;">Snippet: '${v.detected_snippet}' -> '${v.suggested_correction || ''}'</div>
-            <div class="viol-desc">${v.description}</div>
-            <button class="apply-fix-btn" onclick="applySingleFix(event, '${v.node_id}', '${v.detected_snippet}', '${v.suggested_correction}')">[Fix] Apply Suggested Fix</button>
+            <div style="font-size: 11px; font-family: monospace;">Snippet: '${escapeHtml(v.detected_snippet)}'${v.suggested_correction ? ` -> '${escapeHtml(v.suggested_correction)}'` : ''}</div>
+            <div class="viol-desc">${escapeHtml(v.description || '')}</div>
+            ${canFix ? `
+                ${isFixed ? `
+                    <div style="margin-top:6px;"><span class="badge-status" style="font-size:10px; background:#10B981; color:#000; padding:2px 8px; font-weight:700;">[OK] Fix Applied</span></div>
+                ` : `
+                    <button class="apply-fix-btn" onclick="applySingleFix(event, '${v.violation_id || v.node_id}')">[Fix] Apply Suggested Fix</button>
+                `}
+            ` : ''}
         `;
         container.appendChild(card);
     });
 }
 
-function applySingleFix(evt, nodeId, snippet, fix) {
-    evt.stopPropagation();
-    appliedCorrections = true;
-    document.getElementById('toggleCorrections').checked = true;
+function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
+    if (evt && evt.stopPropagation) {
+        evt.stopPropagation();
+    }
+
+    let targetViol = null;
+    let targetNodeId = idOrNodeId;
+    let targetSnippet = snippet;
+    let targetFix = fix;
+
+    if (typeof idOrNodeId === 'string') {
+        const found = violationsData.find(v => v.violation_id === idOrNodeId);
+        if (found) {
+            targetViol = found;
+            targetNodeId = found.node_id;
+            targetSnippet = snippet || found.detected_snippet;
+            targetFix = (fix !== null && fix !== undefined) ? fix : found.suggested_correction;
+        }
+    }
+
+    if (!targetViol && targetNodeId) {
+        targetViol = violationsData.find(v => v.node_id === targetNodeId && (!targetSnippet || v.detected_snippet === targetSnippet));
+        if (targetViol) {
+            if (!targetSnippet) targetSnippet = targetViol.detected_snippet;
+            if (targetFix === null || targetFix === undefined) targetFix = targetViol.suggested_correction;
+        }
+    }
+
+    const node = domData.nodes.find(n => n.node_id === targetNodeId);
+    if (!node) return;
+
+    if (!node.content) {
+        node.content = {};
+    }
+
+    if (targetSnippet && targetFix !== undefined && targetFix !== null) {
+        const currentText = node.content.raw_text || '';
+        node.content.raw_text = currentText.split(targetSnippet).join(targetFix);
+
+        if (node.user_correction_note) {
+            node.user_correction_note = node.user_correction_note.split(targetSnippet).join(targetFix);
+        } else {
+            node.user_correction_note = node.content.raw_text;
+        }
+    }
+
+    node.is_fixed = true;
+
+    if (targetViol) {
+        targetViol.is_fixed = true;
+    }
+
+    if (targetSnippet) {
+        violationsData.forEach(v => {
+            if (v.node_id === targetNodeId && v.detected_snippet === targetSnippet) {
+                v.is_fixed = true;
+            }
+        });
+    }
+
     renderDOMTree();
+    renderSelectedEditor();
     renderSVGOverlays();
+    renderViolationsList();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = `[OK] Applied violation fix for '${targetNodeId}': '${targetSnippet || ''}' -> '${targetFix || ''}'. Click '[SAVE] Save Annotations' to persist.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
 }
 
 function toggleAllCorrections() {
@@ -1111,8 +1554,9 @@ function renderSVGOverlays() {
         if (filterType !== 'ALL' && node.type !== filterType) return;
         const bbox = node.bounding_box;
         const corners = getBoxCorners(bbox);
-        const activeViol = violationsData.find(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
-        const hasViol = !!activeViol && !appliedCorrections && activePresetIndex === 0;
+        const nodeViols = violationsData.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
+        const hasUnfixedViol = nodeViols.some(v => !v.is_fixed);
+        const hasViol = hasUnfixedViol && !appliedCorrections && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
 
@@ -1155,27 +1599,30 @@ function renderSVGOverlays() {
             }
         }
 
-        if (showViol && activeViol) {
-            const g = createSvgElem('g', {});
-            const isFixed = appliedCorrections || activePresetIndex === 1;
-            const labelText = isFixed
-                ? `[FIXED] '${activeViol.detected_snippet}' -> '${activeViol.suggested_correction}'`
-                : `[!] VIOLATION: '${activeViol.detected_snippet}' -> '${activeViol.suggested_correction || ''}'`;
+        if ((showViol || isSelected) && nodeViols.length > 0) {
+            nodeViols.forEach((viol, vIdx) => {
+                const g = createSvgElem('g', {});
+                const isFixed = !!viol.is_fixed || !!node.is_fixed || appliedCorrections || activePresetIndex === 1;
+                const labelText = isFixed
+                    ? `[FIXED] '${viol.detected_snippet}' -> '${viol.suggested_correction || ''}'`
+                    : `[!] VIOLATION: '${viol.detected_snippet}' -> '${viol.suggested_correction || ''}'`;
 
-            const badgeBg = createSvgElem('rect', {
-                x: bbox.x0, y: Math.max(0, bbox.y0 - 18),
-                width: Math.min(320, labelText.length * 6.8), height: 18,
-                class: 'viol-callout',
-                style: isFixed ? 'fill: #00E676; stroke: #00B0FF;' : ''
+                const yOffset = vIdx * 20;
+                const badgeBg = createSvgElem('rect', {
+                    x: bbox.x0, y: Math.max(0, bbox.y0 - 18 - yOffset),
+                    width: Math.min(360, labelText.length * 6.8), height: 18,
+                    class: 'viol-callout',
+                    style: isFixed ? 'fill: #00E676; stroke: #00B0FF;' : ''
+                });
+                const badgeTxt = createSvgElem('text', {
+                    x: bbox.x0 + 4, y: Math.max(12, bbox.y0 - 4 - yOffset), class: 'viol-text',
+                    style: isFixed ? 'fill: #000;' : ''
+                });
+                badgeTxt.textContent = labelText;
+                g.appendChild(badgeBg);
+                g.appendChild(badgeTxt);
+                svg.appendChild(g);
             });
-            const badgeTxt = createSvgElem('text', {
-                x: bbox.x0 + 4, y: Math.max(12, bbox.y0 - 4), class: 'viol-text',
-                style: isFixed ? 'fill: #000;' : ''
-            });
-            badgeTxt.textContent = labelText;
-            g.appendChild(badgeBg);
-            g.appendChild(badgeTxt);
-            svg.appendChild(g);
         }
     });
 }
@@ -1396,10 +1843,34 @@ function updateLayers() {
 }
 
 function showTab(evt, tabId) {
+    if (tabId === 'domTab') {
+        if (evt && evt.shiftKey) {
+            toggleShowAllDom();
+        } else {
+            toggleShowAllDom(false);
+        }
+    } else if (tabId === 'violTab') {
+        if (evt && evt.shiftKey) {
+            toggleShowAllViolations();
+        } else {
+            toggleShowAllViolations(false);
+        }
+    }
+
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    evt.currentTarget.classList.add('active');
-    document.getElementById(tabId).classList.add('active');
+
+    let btn = (evt && evt.currentTarget) ? evt.currentTarget : null;
+    if (!btn || !btn.classList || !btn.classList.contains('tab-btn')) {
+        if (tabId === 'domTab') btn = document.getElementById('tabBtnDom');
+        else if (tabId === 'violTab') btn = document.getElementById('tabBtnViol');
+        else if (tabId === 'logTab') btn = document.getElementById('tabBtnLog');
+        else if (tabId === 'planTab') btn = document.getElementById('tabBtnPlan');
+    }
+    if (btn) btn.classList.add('active');
+
+    const targetContent = document.getElementById(tabId);
+    if (targetContent) targetContent.classList.add('active');
 }
 
 function renderPlanTab() {
@@ -1444,6 +1915,7 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
             domData = data.dom;
             violationsData = data.violations;
             decisionData = data.decision;
+            ensureViolationIds();
             activeLanguage = targetLang;
             activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;
 
@@ -1483,6 +1955,7 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         violationsData = violationsData.filter(v => v.rule_type !== 'diacritic_conflict' && v.rule_type !== 'ocr_character_substitution');
     } else if (targetLang === 'pl') {
         violationsData = JSON.parse(JSON.stringify(initialViolationsData));
+        ensureViolationIds();
     }
 
     activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;

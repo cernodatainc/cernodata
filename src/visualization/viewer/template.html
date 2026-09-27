@@ -100,10 +100,10 @@
 
         <div class="inspector-pane">
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="showTab(event, 'domTab')">DOM Tree (<span id="domCount">{{ dom_node_count }}</span>)</button>
-                <button class="tab-btn" onclick="showTab(event, 'violTab')">Violations (<span id="violCount">{{ violations_count }}</span>)</button>
-                <button class="tab-btn" onclick="showTab(event, 'logTab')">Decision Log</button>
-                <button class="tab-btn" onclick="showTab(event, 'planTab')">Plan</button>
+                <button class="tab-btn active" id="tabBtnDom" data-name="dom page" onclick="showTab(event, 'domTab')" title="Click: Show selected page | Shift+Click: Show all pages"><span id="domTabLabel">DOM Page</span> (<span id="domCount">{{ dom_node_count }}</span>)</button>
+                <button class="tab-btn" id="tabBtnViol" data-name="violations" onclick="showTab(event, 'violTab')" title="Click: Show selected page | Shift+Click: Show all pages"><span id="violTabLabel">Violations</span> (<span id="violCount">{{ violations_count }}</span>)</button>
+                <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision Log</button>
+                <button class="tab-btn" id="tabBtnPlan" onclick="showTab(event, 'planTab')">Plan</button>
             </div>
 
             <div class="tab-content active" id="domTab">
