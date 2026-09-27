@@ -40,7 +40,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
     pdf_path: str = ""
     language: str = "pl"
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         if self.path in ("/", "/index.html", "/interactive_viewer.html"):
             target_file = os.path.join("output", "interactive_viewer.html")
             if os.path.exists(target_file):
@@ -65,7 +65,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
                     return
         return super().do_GET()
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         payload = read_json_payload(self)
 
         if self.path == "/api/rerun":
@@ -141,7 +141,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
         self.send_error(404, "Endpoint not found")
 
 
-def start_pipeline_server(pdf_path: str = "", language: str = "pl", port: int = 8000, open_browser: bool = True):
+def start_pipeline_server(pdf_path: str = "", language: str = "pl", port: int = 8000, open_browser: bool = True) -> None:
     """Starts local HTTP server and opens interactive viewer in default web browser."""
     from src.pipeline.planner_server import find_available_port
     actual_port = find_available_port(start_port=port)

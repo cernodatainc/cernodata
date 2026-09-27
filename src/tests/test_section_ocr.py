@@ -19,7 +19,6 @@ from PIL import Image, ImageDraw
 from src.dom.bounding_box import BoundingBox
 from src.parsers.section_ocr import (
     SectionOCRParser,
-    crop_pdf_region,
     get_default_section_parser,
     normalize_bbox_coords,
     normalize_to_pil,

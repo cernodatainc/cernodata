@@ -36,14 +36,14 @@ __all__ = [
 
 
 def compute_language_score(
-    text: str, language: str = "en", diacritic_hit: Optional[float] = None
+    text: str, language: Optional[str] = "en", diacritic_hit: Optional[float] = None
 ) -> float:
     """
     Tier 2 Language & Dictionary Verification:
     Evaluates text fidelity against specified language norms, detecting common OCR
     diacritic substitution errors and foreign diacritic conflicts.
     """
-    lang = language.lower().strip()
+    lang = language.lower().strip() if language else "en"
     if not text or lang == "en":
         return 1.0
 

@@ -17,7 +17,7 @@ from src.pipeline.orchestrator import run_pipeline
 from src.pipeline.planner import PresetPlanner, DocumentPlan
 
 
-def main():
+def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 

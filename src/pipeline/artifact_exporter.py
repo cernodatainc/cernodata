@@ -45,7 +45,7 @@ def export_pipeline_artifacts(
     dom: DocumentDOM,
     decision: Dict[str, Any],
     violations: List[Dict[str, Any]],
-    language: str,
+    language: Optional[str],
     output_dir: str,
     plan: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str, Optional[str]]:
@@ -60,7 +60,7 @@ def export_pipeline_artifacts(
     violations_report = {
         "document_id": dom.document_id,
         "source_filename": dom.source_filename,
-        "language": language,
+        "language": language or "en",
         "detected_languages": decision.get("detected_languages", {}),
         "primary_detected_language": decision.get("primary_detected_language", "en"),
         "total_violations": len(violations),

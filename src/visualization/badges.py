@@ -20,7 +20,7 @@ def draw_score_badge_bottom_left(
     font: ImageFont.ImageFont,
     header_font: ImageFont.ImageFont,
     confidence_score: Optional[float] = None
-):
+) -> None:
     """Renders overall confidence score & violation summary badge in bottom-left corner."""
     if confidence_score is not None:
         page_score = float(confidence_score)

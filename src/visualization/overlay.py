@@ -108,7 +108,7 @@ class PageVisualizer:
     and quality violation markers.
     """
 
-    def __init__(self, dpi: int = 150):
+    def __init__(self, dpi: int = 150) -> None:
         self.dpi = dpi
         self.scale = dpi / 72.0  # PDF points to pixel scale factor
 

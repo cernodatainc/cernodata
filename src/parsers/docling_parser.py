@@ -52,7 +52,7 @@ class DoclingParser:
         ocr_scale: Optional[float] = None,
         force_full_page_ocr: bool = False,
         do_table_structure: bool = True,
-    ):
+    ) -> None:
         self.use_ocr = use_ocr
         self.language = language.lower().strip() if language else ""
         self.preset = preset

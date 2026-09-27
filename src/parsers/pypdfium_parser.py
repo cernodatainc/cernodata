@@ -73,7 +73,7 @@ class PyPdfiumParser:
         scale: float = 2.0,
         min_digital_chars: int = 20,
         ocr_parser: Optional[SectionOCRParser] = None,
-    ):
+    ) -> None:
         self.language = language.lower().strip() if language else ""
         self.scale = scale
         self.min_digital_chars = min_digital_chars

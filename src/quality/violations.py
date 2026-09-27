@@ -93,13 +93,13 @@ def _check_polish_diacritic_violations(node: DOMNode, raw_text: str, lang: str, 
     return _check_diacritic_violations(node, raw_text, config, counter)
 
 
-def detect_quality_violations(dom: DocumentDOM, language: str = "en") -> List[Dict[str, Any]]:
+def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations and anomalies.
     Composes single-rule check functions with language configuration rules.
     """
     violations = []
-    lang = language.lower().strip()
+    lang = language.lower().strip() if language else "en"
     is_auto = (lang == "auto")
 
     page_configs: Dict[int, Optional[LanguageConfig]] = {}

@@ -9,7 +9,7 @@ import os
 import unittest
 from src.pipeline.planner import PresetPlanner, DocumentPlan
 from src.pipeline.planner_models import PlannerCriteria, IngestionConfig
-from src.pipeline.orchestrator import run_pipeline, parse_document, evaluate_quality_and_decision_tree
+from src.pipeline.orchestrator import run_pipeline
 
 
 class TestPlanner(unittest.TestCase):

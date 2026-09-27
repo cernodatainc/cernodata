@@ -4,10 +4,7 @@ src/pipeline/decision_tree.py
 cernodata Decision Tree Iteration Engine.
 Evaluates parsing confidence scores against target threshold and routes dual-path fallback loops.
 """
-from __future__ import annotations
-from typing_extensions import Optional
-
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from src.dom import DocumentDOM
 from src.quality import evaluate_document_confidence
 
@@ -28,7 +25,7 @@ class DecisionTreeEngine:
         current_preset_score: float = 0.90,
         next_preset_score: float = NEXT_PRESET_SCORE,
         language: Optional[str] = "en"
-    ):
+    ) -> None:
         self.target_threshold = target_threshold
         self.current_preset_score = current_preset_score
         self.next_preset_score = next_preset_score

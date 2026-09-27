@@ -63,7 +63,7 @@ SPANISH_CONFIG: LanguageConfig = LANGUAGE_CONFIGS["es"]
 ENGLISH_CONFIG: LanguageConfig = LANGUAGE_CONFIGS["en"]
 
 
-def get_language_config(language: str) -> Optional[LanguageConfig]:
+def get_language_config(language: Optional[str]) -> Optional[LanguageConfig]:
     """Retrieves language configuration for the given language code."""
     if not language:
         return None

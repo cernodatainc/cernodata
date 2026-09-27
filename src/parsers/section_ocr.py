@@ -213,7 +213,7 @@ class SectionOCRParser:
         language: Optional[str] = "en",
         engine: Optional[Any] = None,
         engine_factory: Optional[Callable[[], Any]] = None,
-    ):
+    ) -> None:
         self.language = language.lower().strip() if language else ""
         self._engine: Optional[Any] = engine
         self._engine_factory: Optional[Callable[[], Any]] = engine_factory

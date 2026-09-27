@@ -51,7 +51,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
 
     server: DataShapeServer
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         if self.path in ("/", "/index.html", "/data_shape_config.html"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -83,7 +83,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
 
         return super().do_GET()
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         payload = read_json_payload(self)
 
         if self.path == "/api/calculate_scores":

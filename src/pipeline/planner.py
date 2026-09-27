@@ -43,7 +43,7 @@ __all__ = [
 class PresetPlanner:
     """Calculates preset confidence scores and generates pipeline execution plans."""
 
-    def __init__(self, weights: Optional[Dict[str, Dict[str, float]]] = None):
+    def __init__(self, weights: Optional[Dict[str, Dict[str, float]]] = None) -> None:
         self.weights = weights or DEFAULT_PRESET_WEIGHTS
 
     def calculate_scores(

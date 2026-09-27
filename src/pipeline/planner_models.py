@@ -98,7 +98,7 @@ class DocumentPlan:
         target: Optional[str] = None,
         security: Optional[str] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         self.document_path = document_path
         if criteria is not None:
             self.criteria = criteria

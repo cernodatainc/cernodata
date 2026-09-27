@@ -50,6 +50,24 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(v["suggested_correction"], "piątku")
         self.assertEqual(v["rule_type"], "ocr_character_substitution")
 
+    def test_none_language_handling(self):
+        # Verify compute_language_score handles None language without AttributeError
+        score = compute_language_score("Some test text", language=None)
+        self.assertEqual(score, 1.0)
+
+        # Verify detect_quality_violations handles None language without AttributeError
+        node = DOMNode(
+            node_id="n1", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Clean English text sample."}
+        )
+        dom = DocumentDOM(document_id="doc1", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        violations = detect_quality_violations(dom, language=None)
+        self.assertEqual(violations, [])
+
+        # Verify get_language_config handles None safely
+        self.assertIsNone(get_language_config(None))
+
     def test_detect_node_text_skew(self):
         # Test on blank/empty array returns 0.0
         blank_crop = np.ones((50, 200, 3), dtype=np.uint8) * 255
