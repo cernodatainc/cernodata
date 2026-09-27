@@ -15,12 +15,13 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from typing import Optional, Any
 
 from src.utils import mkdirs
-from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.planner_models import DocumentPlan, PlannerCriteria
 from src.pipeline.planner_options import (
     DEFAULT_PRESET_WEIGHTS,
     TAXONOMY_OPTIONS,
     TARGET_OPTIONS,
     SECURITY_OPTIONS,
+    WIZARD_DIMENSIONS,
 )
 from src.pipeline.server import send_json_response, read_json_payload
 
@@ -64,6 +65,16 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
                 "default_lang": self.server.default_lang or "",
                 "default_threshold": self.server.default_threshold,
                 "preset_weights": DEFAULT_PRESET_WEIGHTS,
+                "dimensions": [
+                    {
+                        "key": d.key,
+                        "title": d.title,
+                        "description": d.description,
+                        "options": d.options,
+                        "default": d.default,
+                    }
+                    for d in WIZARD_DIMENSIONS
+                ],
                 "taxonomy_options": TAXONOMY_OPTIONS,
                 "target_options": TARGET_OPTIONS,
                 "security_options": SECURITY_OPTIONS,
@@ -76,11 +87,8 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
         payload = read_json_payload(self)
 
         if self.path == "/api/calculate_scores":
-            taxonomy = payload.get("taxonomy", "general_text")
-            target = payload.get("target", "high_precision_structure")
-            security = payload.get("security", "air_gapped_local")
-
-            scores = self.server.planner.calculate_scores(taxonomy=taxonomy, target=target, security=security)
+            criteria = PlannerCriteria.from_dict(payload)
+            scores = self.server.planner.calculate_scores(criteria=criteria)
             suggested = self.server.planner.suggest_preset_order(scores)
 
             send_json_response(self, 200, {
@@ -95,9 +103,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             if not document_path and self.server.default_doc:
                 document_path = self.server.default_doc
 
-            taxonomy = payload.get("taxonomy", "general_text")
-            target = payload.get("target", "high_precision_structure")
-            security = payload.get("security", "air_gapped_local")
+            criteria = PlannerCriteria.from_dict(payload)
             raw_lang = payload.get("language")
             language = raw_lang.strip() if (isinstance(raw_lang, str) and raw_lang.strip() and raw_lang.strip().lower() != "none") else None
             try:
@@ -110,9 +116,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
 
             plan = self.server.planner.create_plan(
                 document_path=document_path,
-                taxonomy=taxonomy,
-                target=target,
-                security=security,
+                criteria=criteria,
                 language=language,
                 target_threshold=target_threshold,
                 override_primary=override_primary,

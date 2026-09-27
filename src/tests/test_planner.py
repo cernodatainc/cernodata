@@ -8,7 +8,8 @@ and plan-driven pipeline execution.
 import os
 import unittest
 from src.pipeline.planner import PresetPlanner, DocumentPlan
-from src.pipeline.orchestrator import run_pipeline
+from src.pipeline.planner_models import PlannerCriteria, IngestionConfig
+from src.pipeline.orchestrator import run_pipeline, parse_document, evaluate_quality_and_decision_tree
 
 
 class TestPlanner(unittest.TestCase):
@@ -177,6 +178,83 @@ class TestPlanner(unittest.TestCase):
         )
         self.assertIn("plan", res)
         self.assertIsNotNone(res["plan"])
+        self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
+        self.assertTrue(res["decision"]["is_accepted"])
+
+    def test_planner_criteria_model(self):
+        criteria = PlannerCriteria(
+            taxonomy="financial_report",
+            target="high_precision_structure",
+            security="air_gapped_local"
+        )
+        self.assertEqual(criteria.values(), ["financial_report", "high_precision_structure", "air_gapped_local"])
+        d = criteria.to_dict()
+        self.assertEqual(d["taxonomy"], "financial_report")
+        restored = PlannerCriteria.from_dict(d)
+        self.assertEqual(restored.taxonomy, criteria.taxonomy)
+        self.assertEqual(restored.target, criteria.target)
+        self.assertEqual(restored.security, criteria.security)
+
+    def test_calculate_scores_with_criteria_object(self):
+        criteria = PlannerCriteria(
+            taxonomy="financial_report",
+            target="high_precision_structure",
+            security="air_gapped_local"
+        )
+        scores = self.planner.calculate_scores(criteria=criteria)
+        self.assertGreater(scores["docling_deep"], scores["docling_fast"])
+
+    def test_create_plan_with_criteria_object(self):
+        criteria = PlannerCriteria(
+            taxonomy="general_text",
+            target="rapid_approximate",
+            security="air_gapped_local"
+        )
+        plan = self.planner.create_plan(criteria=criteria, language="en")
+        self.assertEqual(plan.primary_preset, "docling_fast")
+        self.assertEqual(plan.criteria.taxonomy, "general_text")
+        self.assertEqual(plan.taxonomy, "general_text")
+        cfg = plan.to_ingestion_config()
+        self.assertIsInstance(cfg, IngestionConfig)
+        self.assertEqual(cfg.preset, "docling_fast")
+        self.assertEqual(cfg.language, "en")
+
+    def test_ingestion_config_model(self):
+        cfg = IngestionConfig(
+            target_threshold=0.85,
+            language="pl",
+            preset="docling_deep",
+            align_skew=False,
+            visualize=False,
+            ocr_scale=3.0,
+            force_full_page_ocr=True,
+            do_table_structure=False
+        )
+        d = cfg.to_dict()
+        self.assertEqual(d["preset"], "docling_deep")
+        self.assertEqual(d["ocr_scale"], 3.0)
+        restored = IngestionConfig.from_dict(d)
+        self.assertEqual(restored.target_threshold, 0.85)
+        self.assertEqual(restored.language, "pl")
+        self.assertEqual(restored.preset, "docling_deep")
+        self.assertFalse(restored.align_skew)
+        self.assertFalse(restored.visualize)
+        self.assertEqual(restored.ocr_scale, 3.0)
+        self.assertTrue(restored.force_full_page_ocr)
+        self.assertFalse(restored.do_table_structure)
+
+    def test_run_pipeline_with_ingestion_config(self):
+        cfg = IngestionConfig(
+            target_threshold=0.82,
+            language="pl",
+            preset="docling_deep",
+            visualize=False,
+            output_dir="test_output"
+        )
+        res = run_pipeline(
+            pdf_path="non_existent.pdf",
+            config=cfg,
+        )
         self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
         self.assertTrue(res["decision"]["is_accepted"])
 

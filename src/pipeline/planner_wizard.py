@@ -4,12 +4,10 @@ src/pipeline/planner_wizard.py
 Interactive CLI wizard flow for inquiring document characteristics and system constraints.
 """
 
-from typing import List, Tuple, Callable, Optional, Any
-from src.pipeline.planner_models import DocumentPlan
+from typing import List, Tuple, Callable, Optional, Any, Dict
+from src.pipeline.planner_models import DocumentPlan, PlannerCriteria
 from src.pipeline.planner_options import (
-    TAXONOMY_OPTIONS,
-    TARGET_OPTIONS,
-    SECURITY_OPTIONS,
+    WIZARD_DIMENSIONS,
 )
 
 
@@ -38,37 +36,30 @@ def run_interactive_wizard(
     print_func("cernodata Preset Planner & Pipeline Configuration Wizard")
     print_func("=" * 68)
 
+    total_steps = len(WIZARD_DIMENSIONS) + 2
+
     # 1. Document Path
     if default_doc:
-        doc_in = input_func(f"[1/5] Input document path [{default_doc}]: ").strip()
+        doc_in = input_func(f"[1/{total_steps}] Input document path [{default_doc}]: ").strip()
         document_path = doc_in if doc_in else default_doc
     else:
-        doc_in = input_func("[1/5] Input document path: ").strip()
+        doc_in = input_func(f"[1/{total_steps}] Input document path: ").strip()
         document_path = doc_in
 
-    # 2. Document Taxonomy
-    print_func("\n[2/5] Select Document Taxonomy:")
-    for idx, (k, desc) in enumerate(TAXONOMY_OPTIONS, 1):
-        print_func(f"  {idx}) {k:<22} - {desc}")
-    tax_choice = input_func("Choose taxonomy [1-6, default 6 (general_text)]: ").strip()
-    taxonomy = resolve_choice(tax_choice, TAXONOMY_OPTIONS, default="general_text")
+    # 2..N Dimensions driven by schema
+    criteria_kwargs: Dict[str, str] = {}
+    for step_num, dim in enumerate(WIZARD_DIMENSIONS, start=2):
+        print_func(f"\n[{step_num}/{total_steps}] Select {dim.title}:")
+        for idx, (k, desc) in enumerate(dim.options, 1):
+            print_func(f"  {idx}) {k:<24} - {desc}")
+        choice = input_func(f"Choose {dim.key} [1-{len(dim.options)}, default {dim.default}]: ").strip()
+        criteria_kwargs[dim.key] = resolve_choice(choice, dim.options, default=dim.default)
 
-    # 3. Target Quality vs Speed
-    print_func("\n[3/5] Select Quality vs. Speed Target:")
-    for idx, (k, desc) in enumerate(TARGET_OPTIONS, 1):
-        print_func(f"  {idx}) {k:<24} - {desc}")
-    tgt_choice = input_func("Choose target [1-2, default 2 (high_precision_structure)]: ").strip()
-    target = resolve_choice(tgt_choice, TARGET_OPTIONS, default="high_precision_structure")
+    criteria = PlannerCriteria.from_dict(criteria_kwargs)
 
-    # 4. Security Constraints
-    print_func("\n[4/5] Select Security / Network Constraint:")
-    for idx, (k, desc) in enumerate(SECURITY_OPTIONS, 1):
-        print_func(f"  {idx}) {k:<22} - {desc}")
-    sec_choice = input_func("Choose security mode [1-2, default 1 (air_gapped_local)]: ").strip()
-    security = resolve_choice(sec_choice, SECURITY_OPTIONS, default="air_gapped_local")
-
-    # 5. Language & Threshold
-    lang_in = input_func("\n[5/5] Language hint code (e.g. 'en', 'pl', 'de') [press Enter for none]: ").strip()
+    # Language Hint & Threshold
+    final_step = total_steps
+    lang_in = input_func(f"\n[{final_step}/{total_steps}] Language hint code (e.g. 'en', 'pl', 'de') [press Enter for none]: ").strip()
     language: Optional[str] = lang_in if lang_in and lang_in.lower() != "none" else None
 
     thresh_in = input_func("Target confidence threshold (0.0 - 1.0) [default: 0.82]: ").strip()
@@ -78,7 +69,7 @@ def run_interactive_wizard(
         target_threshold = 0.82
 
     # Calculate Scores
-    scores = planner.calculate_scores(taxonomy=taxonomy, target=target, security=security)
+    scores = planner.calculate_scores(criteria=criteria)
     suggested = planner.suggest_preset_order(scores)
 
     print_func("\n" + "-" * 68)
@@ -111,9 +102,7 @@ def run_interactive_wizard(
 
     plan = planner.create_plan(
         document_path=document_path,
-        taxonomy=taxonomy,
-        target=target,
-        security=security,
+        criteria=criteria,
         language=language,
         target_threshold=target_threshold,
         override_order=override_order

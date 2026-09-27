@@ -5,13 +5,14 @@ End-to-end pipeline runner orchestrating parsing, text skew alignment, quality e
 Supports executing custom and planner-generated execution plans.
 """
 
+from dataclasses import replace
 from typing import Dict, Any, List, Tuple, Optional, Union
 
 from src.dom import DocumentDOM
 from src.parsers import DoclingParser, PyPdfiumParser
 from src.quality import detect_quality_violations, apply_text_skew_alignment
 from src.pipeline.decision_tree import DecisionTreeEngine, DEFAULT_TARGET_CONFIDENCE_THRESHOLD
-from src.pipeline.planner import DocumentPlan
+from src.pipeline.planner_models import DocumentPlan, IngestionConfig
 from src.pipeline.artifact_exporter import (
     render_visual_overlays,
     export_interactive_html_viewer,
@@ -19,6 +20,7 @@ from src.pipeline.artifact_exporter import (
 )
 
 __all__ = [
+    "IngestionConfig",
     "parse_document",
     "align_document_skew",
     "evaluate_quality_and_decision_tree",
@@ -37,8 +39,16 @@ def parse_document(
     ocr_scale: Optional[float] = None,
     force_full_page_ocr: bool = False,
     do_table_structure: bool = True,
+    config: Optional[IngestionConfig] = None,
 ) -> DocumentDOM:
     """Parses PDF document using the specified preset into DocumentDOM IR."""
+    if config is not None:
+        language = config.language
+        preset = config.preset
+        ocr_scale = config.ocr_scale if config.ocr_scale is not None else ocr_scale
+        force_full_page_ocr = config.force_full_page_ocr
+        do_table_structure = config.do_table_structure
+
     if preset == "pypdfium_rapidocr":
         scale = ocr_scale if ocr_scale is not None else 2.0
         parser = PyPdfiumParser(language=language, scale=scale)
@@ -64,13 +74,19 @@ def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> Do
 
 def evaluate_quality_and_decision_tree(
     dom: DocumentDOM,
-    target_threshold: float,
+    target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
     language: Optional[str] = "en",
     preset: str = "docling_fast",
     current_preset_score: float = 0.90,
     next_preset_score: float = 0.72,
+    config: Optional[IngestionConfig] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Extracts quality violation records and evaluates confidence scores against target threshold."""
+    if config is not None:
+        target_threshold = config.target_threshold
+        language = config.language
+        preset = config.preset
+
     violations = detect_quality_violations(dom, language=language)
     engine = DecisionTreeEngine(
         target_threshold=target_threshold,
@@ -85,29 +101,16 @@ def evaluate_quality_and_decision_tree(
 
 def _execute_attempt(
     pdf_path: str,
-    language: Optional[str],
-    preset: str,
-    target_threshold: float,
-    align_skew: bool,
+    config: IngestionConfig,
     curr_score: float = 0.90,
     next_score: float = 0.72,
-    ocr_scale: Optional[float] = None,
-    force_full_page_ocr: bool = False,
 ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
     """Executes a single extraction attempt: parse -> skew align -> quality evaluate."""
-    dom = parse_document(
-        pdf_path,
-        language,
-        preset=preset,
-        ocr_scale=ocr_scale,
-        force_full_page_ocr=force_full_page_ocr,
-    )
-    dom = align_document_skew(dom, pdf_path, align_skew)
+    dom = parse_document(pdf_path, config=config)
+    dom = align_document_skew(dom, pdf_path, config.align_skew)
     decision, violations = evaluate_quality_and_decision_tree(
         dom,
-        target_threshold,
-        language,
-        preset=preset,
+        config=config,
         current_preset_score=curr_score,
         next_preset_score=next_score,
     )
@@ -151,7 +154,8 @@ def run_pipeline(
     align_skew: bool = True,
     visualize: bool = True,
     output_dir: str = "output",
-    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None
+    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
+    config: Optional[IngestionConfig] = None,
 ) -> Dict[str, Any]:
     """Executes end-to-end extraction pipeline with optional plan-driven execution and fallback orchestration."""
     plan_obj: Optional[DocumentPlan] = None
@@ -163,12 +167,25 @@ def run_pipeline(
         elif isinstance(plan, DocumentPlan):
             plan_obj = plan
 
-    if plan_obj:
-        if not pdf_path and plan_obj.document_path:
-            pdf_path = plan_obj.document_path
-        language = plan_obj.language
-        target_threshold = plan_obj.target_threshold
-        preset = plan_obj.primary_preset
+    if not config:
+        if plan_obj:
+            config = plan_obj.to_ingestion_config(
+                align_skew=align_skew,
+                visualize=visualize,
+                output_dir=output_dir,
+            )
+        else:
+            config = IngestionConfig(
+                target_threshold=target_threshold,
+                language=language,
+                preset=preset,
+                align_skew=align_skew,
+                visualize=visualize,
+                output_dir=output_dir,
+            )
+
+    if not pdf_path and plan_obj and plan_obj.document_path:
+        pdf_path = plan_obj.document_path
 
     if not pdf_path:
         raise ValueError("Input document path is required.")
@@ -182,19 +199,19 @@ def run_pipeline(
         first_fb = plan_obj.fallback_queue[0]
         next_candidate = first_fb.get("preset") if isinstance(first_fb, dict) else first_fb
         part_of_plan = True
-    elif preset in ("docling_fast", "pypdfium_rapidocr"):
+    elif config.preset in ("docling_fast", "pypdfium_rapidocr"):
         next_candidate = "docling_deep"
 
-    curr_score = plan_obj.scores.get(preset, 0.90) if plan_obj else 0.90
+    curr_score = plan_obj.scores.get(config.preset, 0.90) if plan_obj else 0.90
     next_score = plan_obj.scores.get(next_candidate, 0.72) if (plan_obj and next_candidate) else 0.72
 
     # Step 1: Initial Parse with Primary Preset
     dom, decision, violations = _execute_attempt(
-        pdf_path, language, preset, target_threshold, align_skew, curr_score, next_score
+        pdf_path, config, curr_score, next_score
     )
-    attempts.append(_make_attempt_record(1, preset, decision, violations))
+    attempts.append(_make_attempt_record(1, config.preset, decision, violations))
 
-    if preset == "docling_deep":
+    if config.preset == "docling_deep":
         decision["chosen_preset"] = "docling_deep"
         decision["decision_tree"] = {
             "action": "ACCEPT_OUTPUT",
@@ -206,14 +223,18 @@ def run_pipeline(
 
         # Path B: Parameter Wiggling on current preset if delta is large
         if action == "PATH_B_WIGGLE_PARAMETERS":
-            wiggled_scale = 3.5 if preset == "pypdfium_rapidocr" else 4.0
+            wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
             wiggled_force_ocr = True
+            wiggled_config = replace(
+                config,
+                ocr_scale=wiggled_scale,
+                force_full_page_ocr=wiggled_force_ocr,
+            )
             w_dom, w_decision, w_violations = _execute_attempt(
-                pdf_path, language, preset, target_threshold, align_skew,
-                curr_score, next_score, ocr_scale=wiggled_scale, force_full_page_ocr=wiggled_force_ocr
+                pdf_path, wiggled_config, curr_score, next_score
             )
             attempts.append(_make_attempt_record(
-                len(attempts) + 1, preset, w_decision, w_violations,
+                len(attempts) + 1, config.preset, w_decision, w_violations,
                 action="PATH_B_WIGGLE_PARAMETERS",
                 reason=f"Wiggled OCR parameters: ocr_scale={wiggled_scale}, force_full_page_ocr={wiggled_force_ocr}.",
                 parameters={"ocr_scale": wiggled_scale, "force_full_page_ocr": wiggled_force_ocr}
@@ -223,14 +244,15 @@ def run_pipeline(
                 dom, decision, violations = w_dom, w_decision, w_violations
                 decision["decision_tree"] = {
                     "action": "ACCEPT_OUTPUT",
-                    "preset_executed": preset,
-                    "reason": f"Preset '{preset}' reached target threshold after parameter wiggling."
+                    "preset_executed": config.preset,
+                    "reason": f"Preset '{config.preset}' reached target threshold after parameter wiggling."
                 }
             elif next_candidate:
                 # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
                 plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
+                fallback_config = replace(config, preset=next_candidate)
                 fb_dom, fb_decision, fb_violations = _execute_attempt(
-                    pdf_path, language, next_candidate, target_threshold, align_skew
+                    pdf_path, fallback_config
                 )
                 fb_decision["decision_tree"] = {
                     "action": "PATH_A_SWITCH_PRESET",
@@ -254,16 +276,17 @@ def run_pipeline(
             else:
                 plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
 
+            fallback_config = replace(config, preset=next_candidate)
             fb_dom, fb_decision, fb_violations = _execute_attempt(
-                pdf_path, language, next_candidate, target_threshold, align_skew
+                pdf_path, fallback_config
             )
             fb_decision["decision_tree"] = {
                 "action": "PATH_A_SWITCH_PRESET",
                 "preset_executed": next_candidate,
                 "fallback_triggered": True,
                 "reason": (
-                    f"Initial preset '{preset}' fell below threshold "
-                    f"({decision.get('overall_confidence')} < {target_threshold}). {plan_note}"
+                    f"Initial preset '{config.preset}' fell below threshold "
+                    f"({decision.get('overall_confidence')} < {config.target_threshold}). {plan_note}"
                 ),
                 "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                 "detail": plan_note
@@ -279,11 +302,11 @@ def run_pipeline(
     decision["attempts"] = attempts
 
     plan_dict = plan_obj.to_dict() if plan_obj else None
-    rendered_images = render_visual_overlays(pdf_path, dom, violations, visualize, output_dir, decision=decision)
+    rendered_images = render_visual_overlays(pdf_path, dom, violations, config.visualize, config.output_dir, decision=decision)
     dom_json_path, violations_json_path, plan_result_path = export_pipeline_artifacts(
-        dom, decision, violations, language, output_dir, plan=plan_dict
+        dom, decision, violations, config.language, config.output_dir, plan=plan_dict
     )
-    html_viewer_path = export_interactive_html_viewer(pdf_path, dom, decision, violations, output_dir, plan=plan_dict)
+    html_viewer_path = export_interactive_html_viewer(pdf_path, dom, decision, violations, config.output_dir, plan=plan_dict)
 
     return {
         "dom": dom.to_dict(),

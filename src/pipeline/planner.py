@@ -9,25 +9,31 @@ rankings, allows user override, and produces an executable execution plan.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, Union
 
-from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.planner_models import DocumentPlan, PlannerCriteria, IngestionConfig
 from src.pipeline.planner_options import (
     DEFAULT_PRESET_WEIGHTS,
     TAXONOMY_OPTIONS,
     TARGET_OPTIONS,
     SECURITY_OPTIONS,
+    WizardDimension,
+    WIZARD_DIMENSIONS,
 )
 from src.pipeline.planner_wizard import resolve_choice, run_interactive_wizard
 from src.pipeline.planner_server import serve_data_shape_wizard
 
 __all__ = [
     "DocumentPlan",
+    "PlannerCriteria",
+    "IngestionConfig",
     "PresetPlanner",
     "DEFAULT_PRESET_WEIGHTS",
     "TAXONOMY_OPTIONS",
     "TARGET_OPTIONS",
     "SECURITY_OPTIONS",
+    "WizardDimension",
+    "WIZARD_DIMENSIONS",
     "resolve_choice",
     "run_interactive_wizard",
     "serve_data_shape_wizard",
@@ -42,26 +48,37 @@ class PresetPlanner:
 
     def calculate_scores(
         self,
-        taxonomy: str,
+        criteria: Optional[Union[PlannerCriteria, str]] = None,
+        taxonomy: Optional[str] = None,
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
         *args: Any,
         **kwargs: Any
     ) -> Dict[str, float]:
-        """Calculates preset suitability scores based on document taxonomy, quality target, and security constraints."""
-        # Handle backwards-compatible positional call: (taxonomy, hardware, target, security)
-        if args:
-            actual_target = security
-            actual_security = str(args[0])
+        """Calculates preset suitability scores based on strongly-typed PlannerCriteria or backward-compatible arguments."""
+        if isinstance(criteria, PlannerCriteria):
+            resolved_criteria = criteria
+        elif isinstance(taxonomy, PlannerCriteria):
+            resolved_criteria = taxonomy
         else:
-            actual_target = target
-            actual_security = security
+            tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
+            # Handle backwards-compatible positional call: (taxonomy, hardware, target, security)
+            if args:
+                actual_target = security
+                actual_security = str(args[0])
+            else:
+                actual_target = target
+                actual_security = security
 
-        answers = [taxonomy, actual_target, actual_security]
+            resolved_criteria = PlannerCriteria(
+                taxonomy=tax,
+                target=actual_target,
+                security=actual_security
+            )
+
         scores: Dict[str, float] = {}
-
         for preset_id, weight_map in self.weights.items():
-            matched_weights = [weight_map.get(ans, 0.50) for ans in answers]
+            matched_weights = [weight_map.get(ans, 0.50) for ans in resolved_criteria.values()]
             score = sum(matched_weights) / len(matched_weights)
             scores[preset_id] = round(score, 3)
 
@@ -74,7 +91,8 @@ class PresetPlanner:
     def create_plan(
         self,
         document_path: str = "",
-        taxonomy: str = "general_text",
+        criteria: Optional[Union[PlannerCriteria, str]] = None,
+        taxonomy: Optional[str] = None,
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
         language: Optional[str] = None,
@@ -84,8 +102,20 @@ class PresetPlanner:
         *args: Any,
         **kwargs: Any
     ) -> DocumentPlan:
-        """Constructs an executable DocumentPlan instance with fallback queues."""
-        scores = self.calculate_scores(taxonomy=taxonomy, target=target, security=security)
+        """Constructs an executable DocumentPlan instance using strongly-typed PlannerCriteria."""
+        if isinstance(criteria, PlannerCriteria):
+            resolved_criteria = criteria
+        elif isinstance(taxonomy, PlannerCriteria):
+            resolved_criteria = taxonomy
+        else:
+            tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
+            resolved_criteria = PlannerCriteria(
+                taxonomy=tax,
+                target=target,
+                security=security
+            )
+
+        scores = self.calculate_scores(criteria=resolved_criteria)
         suggested = self.suggest_preset_order(scores)
 
         overridden = False
@@ -103,9 +133,7 @@ class PresetPlanner:
 
         return DocumentPlan(
             document_path=document_path,
-            taxonomy=taxonomy,
-            target=target,
-            security=security,
+            criteria=resolved_criteria,
             language=language,
             target_threshold=target_threshold,
             primary_preset=primary_preset,
