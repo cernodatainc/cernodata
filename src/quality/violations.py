@@ -9,11 +9,10 @@ from typing import List, Dict, Any, Optional
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio, compute_garbage_details
 from src.quality.language_config import LanguageConfig, get_language_config
-
+from src.quality.evaluator import load_quality_config
 
 def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> List[Dict[str, Any]]:
     """Checks node raw text for OCR damage, punctuation soup, or corrupt characters."""
-    from src.quality.evaluator import load_quality_config
     threshold = load_quality_config().get("garbage_threshold", 0.05)
 
     details = compute_garbage_details(raw_text)

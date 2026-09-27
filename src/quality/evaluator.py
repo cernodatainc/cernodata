@@ -8,6 +8,7 @@ import functools
 import json
 import os
 from typing import List, Dict, Any, Optional
+from collections import Counter
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio
 from src.quality.language import compute_language_score, detect_page_language
@@ -110,7 +111,6 @@ def evaluate_document_confidence(
         sum(page_scores.values()) / max(1, len(page_scores)), 4
     )
 
-    from collections import Counter
     primary_detected = "en"
     if page_languages:
         primary_detected = Counter(page_languages.values()).most_common(1)[0][0]
