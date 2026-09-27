@@ -56,9 +56,9 @@ class TestDataShapeServer(unittest.TestCase):
         self.assertIn("cernodata Data Shape & Preset Planner", content)
         self.assertIn("docPath", content)
         self.assertIn("langCode", content)
+        self.assertIn("enableLangHint", content)
         self.assertIn("thresholdSlider", content)
         self.assertIn("taxonomyGrid", content)
-        self.assertIn("hardwareGrid", content)
         self.assertIn("targetGrid", content)
         self.assertIn("securityGrid", content)
         self.assertIn("presetsList", content)
@@ -107,7 +107,6 @@ class TestDataShapeServer(unittest.TestCase):
             # 3. Test POST /api/calculate_scores
             score_req_data = json.dumps({
                 "taxonomy": "financial_report",
-                "hardware": "workstation_cuda",
                 "target": "high_precision_structure",
                 "security": "air_gapped_local",
             }).encode("utf-8")
@@ -124,14 +123,13 @@ class TestDataShapeServer(unittest.TestCase):
                 self.assertIn("docling_deep", calc_resp["scores"])
                 self.assertEqual(calc_resp["suggested_order"][0], "docling_deep")
 
-            # 4. Test POST /api/submit_plan
+            # 4. Test POST /api/submit_plan without language hint (language=None)
             plan_submit_data = json.dumps({
                 "document_path": "sample_test.pdf",
                 "taxonomy": "scanned_form",
-                "hardware": "cloud_cluster",
                 "target": "high_precision_structure",
                 "security": "hosted_vision_api",
-                "language": "en",
+                "language": None,
                 "target_threshold": 0.88,
                 "override_primary": "vision_llm_direct",
             }).encode("utf-8")
@@ -147,6 +145,7 @@ class TestDataShapeServer(unittest.TestCase):
                 self.assertTrue(submit_resp["success"])
                 self.assertIn("plan", submit_resp)
                 self.assertEqual(submit_resp["plan"]["primary_preset"], "vision_llm_direct")
+                self.assertIsNone(submit_resp["plan"]["language"])
 
             # Verify saved plan file
             saved_plan_file = os.path.join(self.test_output, "plan.json")
@@ -154,6 +153,7 @@ class TestDataShapeServer(unittest.TestCase):
             loaded = DocumentPlan.load(saved_plan_file)
             self.assertEqual(loaded.primary_preset, "vision_llm_direct")
             self.assertEqual(loaded.taxonomy, "scanned_form")
+            self.assertIsNone(loaded.language)
 
         finally:
             httpd.shutdown()
@@ -169,7 +169,6 @@ class TestDataShapeServer(unittest.TestCase):
             submit_data = json.dumps({
                 "document_path": "simulated_doc.pdf",
                 "taxonomy": "general_text",
-                "hardware": "low_spec_cpu",
                 "target": "rapid_approximate",
                 "security": "air_gapped_local",
                 "language": "en",
@@ -203,7 +202,6 @@ class TestDataShapeServer(unittest.TestCase):
         self.assertIsNotNone(plan)
         self.assertEqual(plan.document_path, "simulated_doc.pdf")
         self.assertEqual(plan.taxonomy, "general_text")
-        self.assertEqual(plan.hardware, "low_spec_cpu")
         self.assertEqual(plan.target, "rapid_approximate")
         self.assertEqual(plan.primary_preset, "docling_fast")
 

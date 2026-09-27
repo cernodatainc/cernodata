@@ -85,7 +85,7 @@ def evaluate_page_confidence(
 
 
 def evaluate_document_confidence(
-    dom: DocumentDOM, language: str = "en", diacritic_hit: Optional[float] = None
+    dom: DocumentDOM, language: Optional[str] = "en", diacritic_hit: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Evaluates confidence score across all pages in a DocumentDOM.
@@ -103,7 +103,7 @@ def evaluate_document_confidence(
         page_languages[page_no] = det_lang
         page_confidences[page_no] = det_conf
 
-        effective_lang = det_lang if language == "auto" else language
+        effective_lang = det_lang if (not language or language.lower() in ("auto", "none")) else language
         score_i = evaluate_page_confidence(p_nodes, language=effective_lang, diacritic_hit=diacritic_hit)
         page_scores[page_no] = round(score_i, 4)
 

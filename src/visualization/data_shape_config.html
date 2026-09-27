@@ -520,8 +520,14 @@
 
                 <div class="inline-inputs">
                     <div class="input-group">
-                        <label class="input-label" for="langCode">Language Hint Code</label>
-                        <select id="langCode" class="override-select" onchange="recalculate()">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <label class="input-label" for="langCode" style="margin-bottom: 0;">Language Hint</label>
+                            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer;">
+                                <input type="checkbox" id="enableLangHint" onchange="toggleLanguageHint()" style="accent-color: var(--accent-blue); cursor: pointer;" />
+                                Provide hint
+                            </label>
+                        </div>
+                        <select id="langCode" class="override-select" onchange="recalculate()" disabled style="opacity: 0.5;">
                             <option value="en">en - English</option>
                             <option value="pl">pl - Polish</option>
                             <option value="de">de - German</option>
@@ -552,22 +558,10 @@
                 </div>
             </div>
 
-            <!-- 3. Hardware Profile -->
+            <!-- 3. Quality vs Speed Target -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">3</div>
-                    <div class="section-title">Hardware Profile</div>
-                    <div class="section-desc">Compute capability of current host environment</div>
-                </div>
-                <div class="options-grid" id="hardwareGrid">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <!-- 4. Quality vs Speed Target -->
-            <div class="form-section">
-                <div class="section-header">
-                    <div class="section-num">4</div>
                     <div class="section-title">Quality vs. Speed Target</div>
                     <div class="section-desc">Throughput priority versus bounding box layout fidelity</div>
                 </div>
@@ -576,10 +570,10 @@
                 </div>
             </div>
 
-            <!-- 5. Security Constraints -->
+            <!-- 4. Security Constraints -->
             <div class="form-section">
                 <div class="section-header">
-                    <div class="section-num">5</div>
+                    <div class="section-num">4</div>
                     <div class="section-title">Security & Network Constraints</div>
                     <div class="section-desc">External cloud API allowance vs. air-gapped local model</div>
                 </div>
@@ -621,7 +615,6 @@
         // Preset weight matrices loaded from cernodata planner configuration
         const PRESET_WEIGHTS = {
             "pypdfium_rapidocr": {
-                "low_spec_cpu": 0.85,
                 "rapid_approximate": 0.85,
                 "general_text": 0.80,
                 "financial_report": 0.70,
@@ -630,13 +623,10 @@
                 "tabular_ledger": 0.65,
                 "mixed_text_image": 0.60,
                 "air_gapped_local": 0.90,
-                "workstation_cuda": 0.70,
                 "high_precision_structure": 0.60,
-                "hosted_vision_api": 0.50,
-                "cloud_cluster": 0.50
+                "hosted_vision_api": 0.50
             },
             "docling_fast": {
-                "low_spec_cpu": 0.90,
                 "rapid_approximate": 0.80,
                 "financial_report": 0.60,
                 "scanned_form": 0.30,
@@ -646,13 +636,9 @@
                 "tabular_ledger": 0.60,
                 "mixed_text_image": 0.50,
                 "general_text": 0.85,
-                "workstation_cuda": 0.60,
-                "cloud_cluster": 0.50,
                 "high_precision_structure": 0.50
             },
             "docling_deep": {
-                "workstation_cuda": 0.90,
-                "cloud_cluster": 0.95,
                 "high_precision_structure": 0.85,
                 "financial_report": 0.85,
                 "tabular_ledger": 0.90,
@@ -662,20 +648,16 @@
                 "general_text": 0.80,
                 "air_gapped_local": 0.85,
                 "hosted_vision_api": 0.70,
-                "low_spec_cpu": 0.40,
                 "rapid_approximate": 0.40
             },
             "vision_llm_direct": {
                 "scanned_form": 0.95,
                 "mixed_text_image": 0.90,
                 "high_precision_structure": 0.90,
-                "cloud_cluster": 0.90,
-                "workstation_cuda": 0.75,
                 "financial_report": 0.70,
                 "tabular_ledger": 0.65,
                 "multicolumn_article": 0.75,
                 "general_text": 0.60,
-                "low_spec_cpu": 0.10,
                 "rapid_approximate": 0.30,
                 "air_gapped_local": 0.30,
                 "hosted_vision_api": 0.95
@@ -691,12 +673,6 @@
             ["general_text", "Standard single or multi-page prose documents"]
         ];
 
-        const HARDWARE_OPTIONS = [
-            ["low_spec_cpu", "Shared CPU/RAM, no discrete GPU (<= 4GB RAM)"],
-            ["workstation_cuda", "Local CUDA-enabled GPU (NVIDIA RTX/Tesla)"],
-            ["cloud_cluster", "Distributed cloud node / multi-GPU execution"]
-        ];
-
         const TARGET_OPTIONS = [
             ["rapid_approximate", "Fast throughput, acceptable minor structural drift"],
             ["high_precision_structure", "Maximum layout fidelity, exact bounding box extraction"]
@@ -709,12 +685,18 @@
 
         // State
         let selectedTaxonomy = "general_text";
-        let selectedHardware = "low_spec_cpu";
         let selectedTarget = "high_precision_structure";
         let selectedSecurity = "air_gapped_local";
         let currentScores = {};
         let suggestedOrder = [];
         let overridePrimary = null;
+
+        function toggleLanguageHint() {
+            const enabled = document.getElementById("enableLangHint").checked;
+            const select = document.getElementById("langCode");
+            select.disabled = !enabled;
+            select.style.opacity = enabled ? "1" : "0.5";
+        }
 
         function renderOptionGrid(containerId, options, selectedValue, onSelectCallback) {
             const container = document.getElementById(containerId);
@@ -743,8 +725,8 @@
             document.getElementById("thresholdDisplay").textContent = parseFloat(val).toFixed(2);
         }
 
-        function calculateSuitabilityScores(taxonomy, hardware, target, security) {
-            const answers = [taxonomy, hardware, target, security];
+        function calculateSuitabilityScores(taxonomy, target, security) {
+            const answers = [taxonomy, target, security];
             const scores = {};
 
             for (const [presetId, weightMap] of Object.entries(PRESET_WEIGHTS)) {
@@ -758,7 +740,7 @@
         }
 
         function recalculate() {
-            currentScores = calculateSuitabilityScores(selectedTaxonomy, selectedHardware, selectedTarget, selectedSecurity);
+            currentScores = calculateSuitabilityScores(selectedTaxonomy, selectedTarget, selectedSecurity);
             suggestedOrder = Object.keys(currentScores).sort((a, b) => currentScores[b] - currentScores[a]);
             renderPresetsList();
         }
@@ -805,7 +787,8 @@
 
         async function submitPlan() {
             const docPath = document.getElementById("docPath").value.trim();
-            const language = document.getElementById("langCode").value;
+            const enableHint = document.getElementById("enableLangHint").checked;
+            const language = enableHint ? document.getElementById("langCode").value : null;
             const threshold = parseFloat(document.getElementById("thresholdSlider").value);
 
             if (!docPath) {
@@ -822,7 +805,6 @@
             const payload = {
                 document_path: docPath,
                 taxonomy: selectedTaxonomy,
-                hardware: selectedHardware,
                 target: selectedTarget,
                 security: selectedSecurity,
                 language: language,
@@ -878,7 +860,11 @@
                         document.getElementById("docPath").value = cfg.default_doc;
                     }
                     if (cfg.default_lang) {
-                        document.getElementById("langCode").value = cfg.default_lang;
+                        document.getElementById("enableLangHint").checked = true;
+                        const langSelect = document.getElementById("langCode");
+                        langSelect.value = cfg.default_lang;
+                        langSelect.disabled = false;
+                        langSelect.style.opacity = "1";
                     }
                 }
             } catch (e) {
@@ -886,7 +872,6 @@
             }
 
             renderOptionGrid("taxonomyGrid", TAXONOMY_OPTIONS, selectedTaxonomy, val => selectedTaxonomy = val);
-            renderOptionGrid("hardwareGrid", HARDWARE_OPTIONS, selectedHardware, val => selectedHardware = val);
             renderOptionGrid("targetGrid", TARGET_OPTIONS, selectedTarget, val => selectedTarget = val);
             renderOptionGrid("securityGrid", SECURITY_OPTIONS, selectedSecurity, val => selectedSecurity = val);
 

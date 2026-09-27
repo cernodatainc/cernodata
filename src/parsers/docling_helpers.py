@@ -14,7 +14,9 @@ LANG_CODE_MAP = {
     "fr": ["fr", "fra"],
     "es": ["es", "spa"],
     "en": ["en", "eng"],
-    "auto": ["pl", "de", "fr", "es", "en"]
+    "auto": ["pl", "de", "fr", "es", "en"],
+    "": ["pl", "de", "fr", "es", "en"],
+    "none": ["pl", "de", "fr", "es", "en"],
 }
 
 # Docling emits DocItemLabel values such as "section_header" and "page_header". Exact labels

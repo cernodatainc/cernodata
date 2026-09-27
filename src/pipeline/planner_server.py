@@ -19,7 +19,6 @@ from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.planner_options import (
     DEFAULT_PRESET_WEIGHTS,
     TAXONOMY_OPTIONS,
-    HARDWARE_OPTIONS,
     TARGET_OPTIONS,
     SECURITY_OPTIONS,
 )
@@ -39,7 +38,7 @@ class DataShapeServer(HTTPServer):
     """Custom HTTPServer tracking submitted plan and shutdown synchronization."""
     planner: Any
     default_doc: Optional[str]
-    default_lang: str
+    default_lang: Optional[str]
     default_threshold: float
     output_dir: str
     submitted_plan: Optional[DocumentPlan] = None
@@ -62,11 +61,10 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
         elif self.path == "/api/config":
             send_json_response(self, 200, {
                 "default_doc": self.server.default_doc or "",
-                "default_lang": self.server.default_lang,
+                "default_lang": self.server.default_lang or "",
                 "default_threshold": self.server.default_threshold,
                 "preset_weights": DEFAULT_PRESET_WEIGHTS,
                 "taxonomy_options": TAXONOMY_OPTIONS,
-                "hardware_options": HARDWARE_OPTIONS,
                 "target_options": TARGET_OPTIONS,
                 "security_options": SECURITY_OPTIONS,
             })
@@ -79,11 +77,10 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
 
         if self.path == "/api/calculate_scores":
             taxonomy = payload.get("taxonomy", "general_text")
-            hardware = payload.get("hardware", "low_spec_cpu")
             target = payload.get("target", "high_precision_structure")
             security = payload.get("security", "air_gapped_local")
 
-            scores = self.server.planner.calculate_scores(taxonomy, hardware, target, security)
+            scores = self.server.planner.calculate_scores(taxonomy=taxonomy, target=target, security=security)
             suggested = self.server.planner.suggest_preset_order(scores)
 
             send_json_response(self, 200, {
@@ -99,10 +96,10 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
                 document_path = self.server.default_doc
 
             taxonomy = payload.get("taxonomy", "general_text")
-            hardware = payload.get("hardware", "low_spec_cpu")
             target = payload.get("target", "high_precision_structure")
             security = payload.get("security", "air_gapped_local")
-            language = payload.get("language", "en")
+            raw_lang = payload.get("language")
+            language = raw_lang.strip() if (isinstance(raw_lang, str) and raw_lang.strip() and raw_lang.strip().lower() != "none") else None
             try:
                 target_threshold = float(payload.get("target_threshold", 0.82))
             except (ValueError, TypeError):
@@ -114,7 +111,6 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
             plan = self.server.planner.create_plan(
                 document_path=document_path,
                 taxonomy=taxonomy,
-                hardware=hardware,
                 target=target,
                 security=security,
                 language=language,
@@ -165,7 +161,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
 def serve_data_shape_wizard(
     planner: Any,
     default_doc: Optional[str] = None,
-    default_lang: str = "en",
+    default_lang: Optional[str] = None,
     default_threshold: float = 0.82,
     output_dir: str = "output",
     port: int = 8000,

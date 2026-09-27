@@ -8,7 +8,7 @@ import os
 import json
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from src.utils import mkdirs
 
@@ -17,10 +17,9 @@ from src.utils import mkdirs
 class DocumentPlan:
     document_path: str
     taxonomy: str
-    hardware: str
     target: str
     security: str
-    language: str
+    language: Optional[str]
     target_threshold: float
     primary_preset: str
     fallback_queue: List[Dict[str, Any]]
@@ -44,10 +43,9 @@ class DocumentPlan:
         return cls(
             document_path=data.get("document_path", ""),
             taxonomy=data.get("taxonomy", "general_text"),
-            hardware=data.get("hardware", "low_spec_cpu"),
             target=data.get("target", "high_precision_structure"),
             security=data.get("security", "air_gapped_local"),
-            language=data.get("language", "en"),
+            language=data.get("language"),
             target_threshold=float(data.get("target_threshold", 0.82)),
             primary_preset=data.get("primary_preset", "docling_fast"),
             fallback_queue=data.get("fallback_queue", []),

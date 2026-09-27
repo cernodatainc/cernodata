@@ -20,6 +20,5 @@ _CONFIG = _load_planner_config()
 
 DEFAULT_PRESET_WEIGHTS: Dict[str, Dict[str, float]] = _CONFIG.get("preset_weights", {})
 TAXONOMY_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("taxonomy_options", [])]
-HARDWARE_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("hardware_options", [])]
 TARGET_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("target_options", [])]
 SECURITY_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("security_options", [])]

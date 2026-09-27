@@ -77,13 +77,12 @@ class TestDoclingOCRPresets(unittest.TestCase):
         planner = PresetPlanner()
         scores = planner.calculate_scores(
             taxonomy="general_text",
-            hardware="low_spec_cpu",
             target="rapid_approximate",
             security="air_gapped_local"
         )
         self.assertIn("pypdfium_rapidocr", scores)
         self.assertIn("docling_fast", scores)
-        # On low spec CPU and rapid target, pypdfium_rapidocr should have a very high score
+        # On general text and rapid target, pypdfium_rapidocr should have a very high score
         self.assertGreaterEqual(scores["pypdfium_rapidocr"], 0.85)
 
     def test_pipeline_path_b_parameter_wiggling(self):
@@ -93,7 +92,6 @@ class TestDoclingOCRPresets(unittest.TestCase):
         plan = planner.create_plan(
             document_path="test_dummy.pdf",
             taxonomy="general_text",
-            hardware="low_spec_cpu",
             target="rapid_approximate",
             security="air_gapped_local",
             language="en",

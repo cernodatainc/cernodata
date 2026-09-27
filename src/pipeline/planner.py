@@ -9,13 +9,12 @@ rankings, allows user override, and produces an executable execution plan.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Any
 
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.planner_options import (
     DEFAULT_PRESET_WEIGHTS,
     TAXONOMY_OPTIONS,
-    HARDWARE_OPTIONS,
     TARGET_OPTIONS,
     SECURITY_OPTIONS,
 )
@@ -27,7 +26,6 @@ __all__ = [
     "PresetPlanner",
     "DEFAULT_PRESET_WEIGHTS",
     "TAXONOMY_OPTIONS",
-    "HARDWARE_OPTIONS",
     "TARGET_OPTIONS",
     "SECURITY_OPTIONS",
     "resolve_choice",
@@ -42,9 +40,24 @@ class PresetPlanner:
     def __init__(self, weights: Optional[Dict[str, Dict[str, float]]] = None):
         self.weights = weights or DEFAULT_PRESET_WEIGHTS
 
-    def calculate_scores(self, taxonomy: str, hardware: str, target: str, security: str) -> Dict[str, float]:
-        """Calculates preset suitability scores based on document and hardware parameters."""
-        answers = [taxonomy, hardware, target, security]
+    def calculate_scores(
+        self,
+        taxonomy: str,
+        target: str = "high_precision_structure",
+        security: str = "air_gapped_local",
+        *args: Any,
+        **kwargs: Any
+    ) -> Dict[str, float]:
+        """Calculates preset suitability scores based on document taxonomy, quality target, and security constraints."""
+        # Handle backwards-compatible positional call: (taxonomy, hardware, target, security)
+        if args:
+            actual_target = security
+            actual_security = str(args[0])
+        else:
+            actual_target = target
+            actual_security = security
+
+        answers = [taxonomy, actual_target, actual_security]
         scores: Dict[str, float] = {}
 
         for preset_id, weight_map in self.weights.items():
@@ -62,16 +75,17 @@ class PresetPlanner:
         self,
         document_path: str = "",
         taxonomy: str = "general_text",
-        hardware: str = "low_spec_cpu",
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
-        language: str = "en",
+        language: Optional[str] = None,
         target_threshold: float = 0.82,
         override_order: Optional[List[str]] = None,
-        override_primary: Optional[str] = None
+        override_primary: Optional[str] = None,
+        *args: Any,
+        **kwargs: Any
     ) -> DocumentPlan:
         """Constructs an executable DocumentPlan instance with fallback queues."""
-        scores = self.calculate_scores(taxonomy, hardware, target, security)
+        scores = self.calculate_scores(taxonomy=taxonomy, target=target, security=security)
         suggested = self.suggest_preset_order(scores)
 
         overridden = False
@@ -90,7 +104,6 @@ class PresetPlanner:
         return DocumentPlan(
             document_path=document_path,
             taxonomy=taxonomy,
-            hardware=hardware,
             target=target,
             security=security,
             language=language,
@@ -126,7 +139,7 @@ class PresetPlanner:
     def browser_session(
         self,
         default_doc: Optional[str] = None,
-        default_lang: str = "en",
+        default_lang: Optional[str] = None,
         default_threshold: float = 0.82,
         output_dir: str = "output",
         port: int = 8000,

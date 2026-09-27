@@ -49,7 +49,7 @@ flowchart LR
 ```
 
 1. **Plan Generation (`--create-plan`)**:
-   The planner evaluates document taxonomy, local hardware capabilities (`low_spec_cpu`, `workstation_cuda`), target quality, and security requirements. It calculates preset scores across `pypdfium_rapidocr`, `docling_fast`, and `docling_deep`, proposes an execution order, and records the plan to `output/plan.json`.
+   The planner evaluates document taxonomy, target quality, and security requirements. It calculates preset scores across `pypdfium_rapidocr`, `docling_fast`, and `docling_deep`, proposes an execution order, and records the plan to `output/plan.json`.
 
 2. **Plan Execution (`--plan output/plan.json`)**:
    The orchestrator runs the primary preset. If quality heuristics fall below `target_confidence_threshold`, it initiates the confidence-guided fallback loop:

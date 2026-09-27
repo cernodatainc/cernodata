@@ -4,8 +4,8 @@ src/pipeline/decision_tree.py
 cernodata Decision Tree Iteration Engine.
 Evaluates parsing confidence scores against target threshold and routes dual-path fallback loops.
 """
-
 from __future__ import annotations
+from typing_extensions import Optional
 
 from typing import Dict, Any
 from src.dom import DocumentDOM
@@ -27,7 +27,7 @@ class DecisionTreeEngine:
         target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
         current_preset_score: float = 0.90,
         next_preset_score: float = NEXT_PRESET_SCORE,
-        language: str = "en"
+        language: Optional[str] = "en"
     ):
         self.target_threshold = target_threshold
         self.current_preset_score = current_preset_score
@@ -57,17 +57,18 @@ class DecisionTreeEngine:
             "decision_tree": {}
         }
 
+        lang_label = f" [Language: {self.language}]" if self.language else " [Language: auto-detected]"
         if is_accepted:
             result["status"] = "ACCEPT"
             result["decision_tree"] = {
                 "action": "ACCEPT_OUTPUT",
-                "reason": f"Overall confidence ({overall_conf}) >= target threshold ({self.target_threshold}) [Language: {self.language}]"
+                "reason": f"Overall confidence ({overall_conf}) >= target threshold ({self.target_threshold}){lang_label}"
             }
         else:
             result["status"] = "TRIGGER_FALLBACK"
             recommended_wiggles = {
                 "rendering_dpi": 200,
-                "ocr_language_hint": [self.language],
+                "ocr_language_hint": [self.language] if self.language else [],
                 "table_detection_mode": "strict_grid",
                 "contrast_enhancement": 1.2
             }
@@ -76,7 +77,8 @@ class DecisionTreeEngine:
                 reason = f"Delta ({delta}) >= 0.20. Language/quality heuristics below threshold ({overall_conf} < {self.target_threshold}). Wiggling OCR language hint and DPI."
             else:
                 action = "PATH_A_SWITCH_PRESET"
-                reason = f"Delta ({delta}) < 0.20. Switching to next preset candidate ('{NEXT_PRESET_ID}') with explicit '{self.language}' language hint."
+                hint_str = f" with explicit '{self.language}' language hint." if self.language else "."
+                reason = f"Delta ({delta}) < 0.20. Switching to next preset candidate ('{NEXT_PRESET_ID}'){hint_str}"
 
             result["decision_tree"] = {
                 "action": action,

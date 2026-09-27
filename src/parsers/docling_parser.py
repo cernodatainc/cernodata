@@ -54,7 +54,7 @@ class DoclingParser:
         do_table_structure: bool = True,
     ):
         self.use_ocr = use_ocr
-        self.language = language.lower().strip()
+        self.language = language.lower().strip() if language else ""
         self.preset = preset
         self.ocr_engine = ocr_engine.lower().strip()
         self.ocr_scale = ocr_scale if ocr_scale is not None else (3.5 if preset == "docling_deep" else 3.0)
@@ -69,7 +69,7 @@ class DoclingParser:
         return SyntheticParser().parse(doc_id, source_filename)
 
     def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:
-        ocr_langs = LANG_CODE_MAP.get(self.language, [self.language])
+        ocr_langs = LANG_CODE_MAP.get(self.language, [self.language] if self.language else ["pl", "de", "fr", "es", "en"])
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = self.use_ocr
         pipeline_options.do_table_structure = self.do_table_structure

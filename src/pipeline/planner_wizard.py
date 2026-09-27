@@ -8,7 +8,6 @@ from typing import List, Tuple, Callable, Optional, Any
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.planner_options import (
     TAXONOMY_OPTIONS,
-    HARDWARE_OPTIONS,
     TARGET_OPTIONS,
     SECURITY_OPTIONS,
 )
@@ -41,43 +40,36 @@ def run_interactive_wizard(
 
     # 1. Document Path
     if default_doc:
-        doc_in = input_func(f"[1/6] Input document path [{default_doc}]: ").strip()
+        doc_in = input_func(f"[1/5] Input document path [{default_doc}]: ").strip()
         document_path = doc_in if doc_in else default_doc
     else:
-        doc_in = input_func("[1/6] Input document path: ").strip()
+        doc_in = input_func("[1/5] Input document path: ").strip()
         document_path = doc_in
 
     # 2. Document Taxonomy
-    print_func("\n[2/6] Select Document Taxonomy:")
+    print_func("\n[2/5] Select Document Taxonomy:")
     for idx, (k, desc) in enumerate(TAXONOMY_OPTIONS, 1):
         print_func(f"  {idx}) {k:<22} - {desc}")
     tax_choice = input_func("Choose taxonomy [1-6, default 6 (general_text)]: ").strip()
     taxonomy = resolve_choice(tax_choice, TAXONOMY_OPTIONS, default="general_text")
 
-    # 3. Hardware Profile
-    print_func("\n[3/6] Select Hardware Profile:")
-    for idx, (k, desc) in enumerate(HARDWARE_OPTIONS, 1):
-        print_func(f"  {idx}) {k:<22} - {desc}")
-    hw_choice = input_func("Choose hardware profile [1-3, default 1 (low_spec_cpu)]: ").strip()
-    hardware = resolve_choice(hw_choice, HARDWARE_OPTIONS, default="low_spec_cpu")
-
-    # 4. Target Quality vs Speed
-    print_func("\n[4/6] Select Quality vs. Speed Target:")
+    # 3. Target Quality vs Speed
+    print_func("\n[3/5] Select Quality vs. Speed Target:")
     for idx, (k, desc) in enumerate(TARGET_OPTIONS, 1):
         print_func(f"  {idx}) {k:<24} - {desc}")
     tgt_choice = input_func("Choose target [1-2, default 2 (high_precision_structure)]: ").strip()
     target = resolve_choice(tgt_choice, TARGET_OPTIONS, default="high_precision_structure")
 
-    # 5. Security Constraints
-    print_func("\n[5/6] Select Security / Network Constraint:")
+    # 4. Security Constraints
+    print_func("\n[4/5] Select Security / Network Constraint:")
     for idx, (k, desc) in enumerate(SECURITY_OPTIONS, 1):
         print_func(f"  {idx}) {k:<22} - {desc}")
     sec_choice = input_func("Choose security mode [1-2, default 1 (air_gapped_local)]: ").strip()
     security = resolve_choice(sec_choice, SECURITY_OPTIONS, default="air_gapped_local")
 
-    # 6. Language & Threshold
-    lang_in = input_func("\n[6/6] Language hint code (e.g. 'en', 'pl', 'de') [default: 'en']: ").strip()
-    language = lang_in if lang_in else "en"
+    # 5. Language & Threshold
+    lang_in = input_func("\n[5/5] Language hint code (e.g. 'en', 'pl', 'de') [press Enter for none]: ").strip()
+    language: Optional[str] = lang_in if lang_in and lang_in.lower() != "none" else None
 
     thresh_in = input_func("Target confidence threshold (0.0 - 1.0) [default: 0.82]: ").strip()
     try:
@@ -86,7 +78,7 @@ def run_interactive_wizard(
         target_threshold = 0.82
 
     # Calculate Scores
-    scores = planner.calculate_scores(taxonomy, hardware, target, security)
+    scores = planner.calculate_scores(taxonomy=taxonomy, target=target, security=security)
     suggested = planner.suggest_preset_order(scores)
 
     print_func("\n" + "-" * 68)
@@ -120,7 +112,6 @@ def run_interactive_wizard(
     plan = planner.create_plan(
         document_path=document_path,
         taxonomy=taxonomy,
-        hardware=hardware,
         target=target,
         security=security,
         language=language,
@@ -133,6 +124,6 @@ def run_interactive_wizard(
     print_func(f"  Fallback Queue:  {', '.join(f['preset'] for f in plan.fallback_queue)}")
     print_func(f"  User Override:   {'YES' if plan.overridden else 'NO'}")
     print_func(f"  Target Threshold: {plan.target_threshold}")
-    print_func(f"  Language Hint:   {plan.language}")
+    print_func(f"  Language Hint:   {plan.language if plan.language else 'None (auto-detect)'}")
 
     return plan

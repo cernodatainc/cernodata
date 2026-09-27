@@ -36,7 +36,6 @@ class TestE2EPipeline(unittest.TestCase):
             plan = planner.create_plan(
                 document_path=pdf_path,
                 taxonomy="general_text",
-                hardware="low_spec_cpu",
                 target="high_precision_structure",
                 security="air_gapped_local",
                 language="pl",

@@ -31,7 +31,7 @@ __all__ = [
 
 def parse_document(
     pdf_path: str,
-    language: str,
+    language: Optional[str] = "en",
     preset: str = "docling_fast",
     ocr_engine: str = "auto",
     ocr_scale: Optional[float] = None,
@@ -65,7 +65,7 @@ def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> Do
 def evaluate_quality_and_decision_tree(
     dom: DocumentDOM,
     target_threshold: float,
-    language: str,
+    language: Optional[str] = "en",
     preset: str = "docling_fast",
     current_preset_score: float = 0.90,
     next_preset_score: float = 0.72,
@@ -85,7 +85,7 @@ def evaluate_quality_and_decision_tree(
 
 def _execute_attempt(
     pdf_path: str,
-    language: str,
+    language: Optional[str],
     preset: str,
     target_threshold: float,
     align_skew: bool,
@@ -146,7 +146,7 @@ def _make_attempt_record(
 def run_pipeline(
     pdf_path: Optional[str] = None,
     target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-    language: str = "en",
+    language: Optional[str] = "en",
     preset: str = "docling_fast",
     align_skew: bool = True,
     visualize: bool = True,
