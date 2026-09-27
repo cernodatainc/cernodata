@@ -8,7 +8,7 @@ Maps Docling structural items and bounding box coordinate origins into DocumentD
 from __future__ import annotations
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
@@ -31,13 +31,21 @@ _resolve_raw_text = resolve_raw_text
 _build_node_content = build_node_content
 
 HAS_DOCLING = False
+HAS_OCR_MODE = False
 try:
     from docling.document_converter import DocumentConverter, PdfFormatOption
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.datamodel.pipeline_options import PdfPipelineOptions, OcrMode
     from docling.datamodel.base_models import InputFormat
     HAS_DOCLING = True
+    HAS_OCR_MODE = True
 except ImportError:
-    HAS_DOCLING = False
+    try:
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.datamodel.base_models import InputFormat
+        HAS_DOCLING = True
+    except ImportError:
+        HAS_DOCLING = False
 
 
 class DoclingParser:
@@ -61,14 +69,11 @@ class DoclingParser:
         self.force_full_page_ocr = force_full_page_ocr
         self.do_table_structure = do_table_structure
 
-    def parse(self, pdf_path: str) -> DocumentDOM:
-        source_filename = os.path.basename(pdf_path)
-        doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
-        if HAS_DOCLING and os.path.exists(pdf_path):
-            return self._parse_with_docling(pdf_path, doc_id, source_filename)
-        return SyntheticParser().parse(doc_id, source_filename)
+    def build_pipeline_options(self) -> Any:
+        """Constructs and configures PdfPipelineOptions and specialized OCR options."""
+        if not HAS_DOCLING:
+            return None
 
-    def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:
         ocr_langs = LANG_CODE_MAP.get(self.language, [self.language] if self.language else ["pl", "de", "fr", "es", "en"])
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = self.use_ocr
@@ -76,38 +81,46 @@ class DoclingParser:
         if hasattr(pipeline_options, "images_scale"):
             pipeline_options.images_scale = self.ocr_scale
 
+        ocr_mode = None
+        if HAS_OCR_MODE:
+            ocr_mode = OcrMode.FULL_PAGE if self.force_full_page_ocr else OcrMode.DEFAULT
+
         # Configure specialized OCR engine options if available
         engine = self.ocr_engine
         if engine == "auto" and self.preset == "docling_fast":
             engine = "rapidocr"
 
+        def _instantiate_ocr_options(cls: Any, **extra_kwargs: Any) -> Any:
+            if ocr_mode is not None:
+                try:
+                    return cls(mode=ocr_mode, scale=self.ocr_scale, **extra_kwargs)
+                except Exception:
+                    pass
+            try:
+                return cls(force_full_page_ocr=self.force_full_page_ocr, scale=self.ocr_scale, **extra_kwargs)
+            except Exception:
+                try:
+                    return cls(scale=self.ocr_scale, **extra_kwargs)
+                except Exception:
+                    return None
+
         ocr_opts = None
         if engine == "rapidocr":
             try:
                 from docling.datamodel.pipeline_options import RapidOcrOptions
-                ocr_opts = RapidOcrOptions(
-                    force_full_page_ocr=self.force_full_page_ocr,
-                    scale=self.ocr_scale,
-                    backend="torch",
-                )
+                ocr_opts = _instantiate_ocr_options(RapidOcrOptions, backend="torch")
             except Exception:
                 pass
         elif engine in ("tesseract", "tesseract_cli"):
             try:
                 from docling.datamodel.pipeline_options import TesseractOcrOptions
-                ocr_opts = TesseractOcrOptions(
-                    force_full_page_ocr=self.force_full_page_ocr,
-                    scale=self.ocr_scale,
-                )
+                ocr_opts = _instantiate_ocr_options(TesseractOcrOptions)
             except Exception:
                 pass
         elif engine == "easyocr":
             try:
                 from docling.datamodel.pipeline_options import EasyOcrOptions
-                ocr_opts = EasyOcrOptions(
-                    force_full_page_ocr=self.force_full_page_ocr,
-                    scale=self.ocr_scale,
-                )
+                ocr_opts = _instantiate_ocr_options(EasyOcrOptions)
             except Exception:
                 pass
 
@@ -119,8 +132,22 @@ class DoclingParser:
                 setattr(pipeline_options.ocr_options, "lang", ocr_langs)
             if hasattr(pipeline_options.ocr_options, "scale"):
                 setattr(pipeline_options.ocr_options, "scale", self.ocr_scale)
-            if hasattr(pipeline_options.ocr_options, "force_full_page_ocr"):
+            if ocr_mode is not None and hasattr(pipeline_options.ocr_options, "mode"):
+                setattr(pipeline_options.ocr_options, "mode", ocr_mode)
+            elif hasattr(pipeline_options.ocr_options, "force_full_page_ocr"):
                 setattr(pipeline_options.ocr_options, "force_full_page_ocr", self.force_full_page_ocr)
+
+        return pipeline_options
+
+    def parse(self, pdf_path: str) -> DocumentDOM:
+        source_filename = os.path.basename(pdf_path)
+        doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
+        if HAS_DOCLING and os.path.exists(pdf_path):
+            return self._parse_with_docling(pdf_path, doc_id, source_filename)
+        return SyntheticParser().parse(doc_id, source_filename)
+
+    def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:
+        pipeline_options = self.build_pipeline_options()
 
         try:
             converter = DocumentConverter(

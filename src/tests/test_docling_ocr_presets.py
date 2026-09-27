@@ -40,6 +40,22 @@ class TestDoclingOCRPresets(unittest.TestCase):
         self.assertTrue(parser_wiggled.force_full_page_ocr)
         self.assertFalse(parser_wiggled.do_table_structure)
 
+        # Verify pipeline options map force_full_page_ocr to OcrMode
+        pipeline_opts_default = parser_default.build_pipeline_options()
+        if pipeline_opts_default and hasattr(pipeline_opts_default, "ocr_options"):
+            ocr_opt = pipeline_opts_default.ocr_options
+            if hasattr(ocr_opt, "mode"):
+                from docling.datamodel.pipeline_options import OcrMode
+                self.assertEqual(ocr_opt.mode, OcrMode.DEFAULT)
+
+        pipeline_opts_wiggled = parser_wiggled.build_pipeline_options()
+        if pipeline_opts_wiggled and hasattr(pipeline_opts_wiggled, "ocr_options"):
+            ocr_opt = pipeline_opts_wiggled.ocr_options
+            if hasattr(ocr_opt, "mode"):
+                from docling.datamodel.pipeline_options import OcrMode
+                self.assertEqual(ocr_opt.mode, OcrMode.FULL_PAGE)
+            self.assertTrue(getattr(ocr_opt, "force_full_page_ocr", False))
+
     def test_pypdfium_parser_standalone(self):
         """Verifies PyPdfiumParser runs outside of Docling and extracts DOM nodes."""
         parser = PyPdfiumParser(language="pl", scale=2.0)
