@@ -10,6 +10,7 @@ import json
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from typing import Dict, Any
+from src.utils import mkdirs
 from src.parsers.section_ocr import parse_image_ocr, parse_section_from_pdf
 
 
@@ -95,8 +96,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
                 send_json_response(self, 400, {"error": "Missing dom payload"})
                 return
 
-            if output_dir:
-                os.makedirs(output_dir, exist_ok=True)
+            mkdirs(output_dir)
             dom_file = os.path.join(output_dir, "document_dom.json")
             with open(dom_file, "w", encoding="utf-8") as f:
                 json.dump(dom_data, f, indent=2)

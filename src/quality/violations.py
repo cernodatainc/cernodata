@@ -5,9 +5,11 @@ Quality Violation Detector & Anomaly Extractor.
 Generates structured violation records exported to quality_violations.json.
 """
 
+from __future__ import annotations
+
 from typing import List, Dict, Any, Optional
 from src.dom import DOMNode, DocumentDOM
-from src.quality.garbage import compute_garbage_ratio, compute_garbage_details
+from src.quality.garbage import compute_garbage_details
 from src.quality.language_config import LanguageConfig, get_language_config
 from src.quality.evaluator import load_quality_config
 

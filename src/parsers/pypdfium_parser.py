@@ -6,20 +6,15 @@ Uses pypdfium2 for rapid native vector text and bounding box extraction,
 with automatic fallback to SectionOCRParser (RapidOCR) for scanned or image pages.
 """
 
+from __future__ import annotations
+
 import os
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Any, Optional, Tuple
 
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
 from src.parsers.pdf_utils import open_pdf
-
-HAS_PYPDFIUM = False
-try:
-    import pypdfium2 as pdfium
-    HAS_PYPDFIUM = True
-except ImportError:
-    HAS_PYPDFIUM = False
 
 
 def _convert_pdf_rect_to_bbox(rect: Any, page_w: float, page_h: float) -> BoundingBox:

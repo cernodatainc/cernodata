@@ -1,16 +1,18 @@
-﻿"""
+"""
 src/tests/test_e2e.py
 
 End-to-end (E2E) pipeline tests with autodiscovery of test documents from src/e2e.
 """
 
+from __future__ import annotations
+
 import glob
 import json
 import os
 import unittest
-from typing import Dict, Any, List
+from typing import Any
 
-from src.pipeline.planner import PresetPlanner, DocumentPlan
+from src.pipeline.planner import PresetPlanner
 
 
 class TestE2EPipeline(unittest.TestCase):
@@ -18,7 +20,7 @@ class TestE2EPipeline(unittest.TestCase):
     def setUp(self) -> None:
         self.repo_root: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.e2e_dir: str = os.path.join(self.repo_root, "src", "e2e")
-        self.discovered_pdfs: List[str] = sorted(glob.glob(os.path.join(self.e2e_dir, "*.pdf")))
+        self.discovered_pdfs: list[str] = sorted(glob.glob(os.path.join(self.e2e_dir, "*.pdf")))
 
     def test_e2e_documents_discovered(self) -> None:
         """Verifies that E2E test documents are discovered in src/e2e."""
@@ -54,7 +56,7 @@ class TestE2EPipeline(unittest.TestCase):
                 self.assertTrue(os.path.exists(file_path), f"Artifact missing: {file_path}")
 
             with open(os.path.join(doc8_output, "document_dom.json"), "r", encoding="utf-8") as f:
-                dom_data: Dict[str, Any] = json.load(f)
+                dom_data: dict[str, Any] = json.load(f)
             self.assertIn("nodes", dom_data)
             self.assertEqual(dom_data.get("total_pages"), 6)
 

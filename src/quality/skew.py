@@ -5,6 +5,8 @@ Local Text Alignment Skew Detector.
 Uses OpenCV minimum-area oriented bounding box analysis (cv2.minAreaRect) to detect local text line skew.
 """
 
+from __future__ import annotations
+
 import os
 from typing import Dict, List
 import numpy as np
@@ -16,15 +18,8 @@ try:
 except ImportError:
     HAS_CV2 = False
 
-HAS_PYPDFIUM = False
-try:
-    import pypdfium2
-    HAS_PYPDFIUM = True
-except ImportError:
-    HAS_PYPDFIUM = False
-
 from src.dom import DocumentDOM
-from src.parsers.pdf_utils import open_pdf
+from src.parsers.pdf_utils import open_pdf, HAS_PYPDFIUM
 
 
 def _extract_contour_angles(crop_np: np.ndarray) -> List[float]:

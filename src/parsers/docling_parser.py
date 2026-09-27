@@ -5,6 +5,8 @@ Docling layout parser and DocumentDOM normalizer.
 Maps Docling structural items and bounding box coordinate origins into DocumentDOM IR.
 """
 
+from __future__ import annotations
+
 import os
 from typing import List, Optional
 
@@ -12,7 +14,6 @@ from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.parsers.synthetic_parser import SyntheticParser
 from src.parsers.docling_helpers import (
     LANG_CODE_MAP,
-    _EXACT_LABEL_TYPES,
     fallback_top_left_bbox,
     extract_page_no_and_bbox,
     resolve_node_type,

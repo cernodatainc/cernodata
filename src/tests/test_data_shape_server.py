@@ -5,22 +5,22 @@ Unit tests for interactive data shape HTML interface, planner server,
 and browser questionnaire workflow.
 """
 
+from __future__ import annotations
+
 import os
 import re
 import json
-import socket
 import threading
 import unittest
 import urllib.request
 import urllib.parse
-from http.server import HTTPServer
 
+from src.utils import mkdirs
 from src.pipeline.planner import PresetPlanner, DocumentPlan
 from src.pipeline.planner_server import (
     DataShapeServer,
     DataShapeHandler,
     find_available_port,
-    serve_data_shape_wizard,
 )
 
 
@@ -35,7 +35,7 @@ class TestDataShapeServer(unittest.TestCase):
             "data_shape_config.html"
         )
         cls.test_output = "test_output_server"
-        os.makedirs(cls.test_output, exist_ok=True)
+        mkdirs(cls.test_output)
 
     @classmethod
     def tearDownClass(cls):

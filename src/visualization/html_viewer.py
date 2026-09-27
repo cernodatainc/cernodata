@@ -10,6 +10,7 @@ import os
 import json
 from typing import Dict, Any, List, Optional
 
+from src.utils import mkdirs
 from src.dom import DocumentDOM
 from src.visualization.viewer import (
     page_to_base64,
@@ -31,9 +32,7 @@ def generate_interactive_html(
     plan: Optional[Dict[str, Any]] = None
 ) -> str:
     """Generates a standalone, interactive HTML visual flow explorer file."""
-    dir_name = os.path.dirname(output_path)
-    if dir_name:
-        os.makedirs(dir_name, exist_ok=True)
+    mkdirs(os.path.dirname(output_path))
     total_pages = dom.total_pages if dom.total_pages and dom.total_pages > 0 else 1
     page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
     img_data_uri = page_images[0] if page_images else page_to_base64(pdf_path, page_index=0)

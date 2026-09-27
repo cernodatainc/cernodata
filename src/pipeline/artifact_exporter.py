@@ -8,6 +8,7 @@ import os
 import json
 from typing import Dict, Any, List, Tuple, Optional
 
+from src.utils import mkdirs
 from src.dom import DocumentDOM
 from src.visualization import PageVisualizer, generate_interactive_html
 
@@ -49,8 +50,7 @@ def export_pipeline_artifacts(
     plan: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str, Optional[str]]:
     """Exports DocumentDOM JSON, standalone quality_violations.json, and plan_execution_result.json reports."""
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+    mkdirs(output_dir)
 
     dom_output_path = os.path.join(output_dir, "document_dom.json")
     with open(dom_output_path, "w", encoding="utf-8") as f:

@@ -4,8 +4,10 @@ src/quality/languages/models.py
 Language configuration model dataclass and character conflict resolution logic.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Optional, Tuple, Any, Union
+from typing import Dict, List, Set, Optional, Tuple
 import functools
 import json
 import os

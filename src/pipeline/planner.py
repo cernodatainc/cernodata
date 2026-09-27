@@ -6,8 +6,10 @@ Inquires about document characteristics and system constraints, computes preset 
 rankings, allows user override, and produces an executable execution plan.
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, List, Optional, Callable
 
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.planner_options import (

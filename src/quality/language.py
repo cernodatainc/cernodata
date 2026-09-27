@@ -4,8 +4,9 @@ src/quality/language.py
 Tier 2 Language & Dictionary Verification rules and diacritic anomaly metrics.
 """
 
-from typing import Optional, Dict, Tuple, List
-from src.dom import DOMNode, DocumentDOM
+from __future__ import annotations
+
+from typing import Optional
 from src.quality.languages import (
     LanguageConfig,
     LANGUAGE_CONFIGS,

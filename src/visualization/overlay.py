@@ -5,20 +5,16 @@ Page-Level Bounding Box Layout Visualizer & Provenance Overlay Engine.
 Supports text-alignment rotated bounding boxes, violation callouts, and bottom-left score badges.
 """
 
+from __future__ import annotations
+
 import os
 from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
+from src.utils import mkdirs
 from src.dom import DocumentDOM, DOMNode
 from src.parsers.pdf_utils import open_pdf
 from src.visualization.badges import draw_score_badge_bottom_left
 from src.visualization.callouts import draw_violation_callout
-
-HAS_PYPDFIUM = False
-try:
-    import pypdfium2
-    HAS_PYPDFIUM = True
-except ImportError:
-    HAS_PYPDFIUM = False
 
 COLOR_PALETTE = {
     "heading": {"stroke": "#1976D2", "fill": "#1976D222", "label_bg": "#1976D2"},
@@ -51,7 +47,7 @@ def _draw_single_node_overlay(
     font: ImageFont.ImageFont,
     sx: float,
     sy: float
-):
+) -> None:
     """Renders visual overlay bounding box polygon and violation callout badge for a single node."""
     bbox = node.bounding_box
     x0, y0 = bbox.x0 * sx, bbox.y0 * sy
@@ -94,7 +90,7 @@ def _draw_single_node_overlay(
 
 def _draw_top_banner_summary(
     draw_result: ImageDraw.ImageDraw, img_w: int, page_no: int, nodes_count: int, violations_count: int, header_font: ImageFont.ImageFont
-):
+) -> None:
     """Renders top banner summary bar across image width."""
     banner_h = 32
     draw_result.rectangle([0, 0, img_w, banner_h], fill="#1E1E2F")
@@ -147,8 +143,7 @@ class PageVisualizer:
         output_dir: str = "output",
         decision: Optional[Dict[str, Any]] = None
     ) -> List[str]:
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
+        mkdirs(output_dir)
         output_paths = []
         violations = violations or []
 

@@ -5,7 +5,9 @@ cernodata Decision Tree Iteration Engine.
 Evaluates parsing confidence scores against target threshold and routes dual-path fallback loops.
 """
 
-from typing import Dict, Any, List, Optional
+from __future__ import annotations
+
+from typing import Dict, Any
 from src.dom import DocumentDOM
 from src.quality import evaluate_document_confidence
 

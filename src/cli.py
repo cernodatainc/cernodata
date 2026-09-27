@@ -5,14 +5,14 @@ CLI Argument Parser & Console Output Summary Formatter.
 Supports direct pipeline runs, interactive plan generation, and plan-driven execution.
 """
 
-import os
-import sys
+from __future__ import annotations
+
 import argparse
-from typing import Dict, Any
+from typing import Any
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="cernodata: Layout-Aware Ingestion, Plan Wizard, Text Skew Alignment & Visual Overlay Renderer."
     )
@@ -78,7 +78,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def print_summary(result: Dict[str, Any]):
+def print_summary(result: dict[str, Any]) -> None:
     decision = result["decision"]
     dom_dict = result["dom"]
     violations = result["violations"]

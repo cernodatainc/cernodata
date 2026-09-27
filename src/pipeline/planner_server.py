@@ -5,14 +5,16 @@ Zero-dependency HTTP server for interactive in-browser data shape configuration.
 Serves data_shape_config.html and accepts submitted execution plans via API endpoints.
 """
 
+from __future__ import annotations
+
 import os
-import json
 import socket
 import threading
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 
+from src.utils import mkdirs
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.planner_options import (
     DEFAULT_PRESET_WEIGHTS,
@@ -125,7 +127,7 @@ class DataShapeHandler(SimpleHTTPRequestHandler):
 
             # Save plan.json to output directory
             if self.server.output_dir:
-                os.makedirs(self.server.output_dir, exist_ok=True)
+                mkdirs(self.server.output_dir)
                 plan_file = os.path.join(self.server.output_dir, "plan.json")
                 plan.save(plan_file)
             else:
@@ -184,8 +186,7 @@ def serve_data_shape_wizard(
         html_content = "<html><body><h1>cernodata Data Shape Planner</h1><p>Template missing.</p></body></html>"
 
     # Also export standalone copy to output directory
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+    mkdirs(output_dir)
     exported_html_path = os.path.join(output_dir, "data_shape_config.html")
     with open(exported_html_path, "w", encoding="utf-8") as f:
         f.write(html_content)

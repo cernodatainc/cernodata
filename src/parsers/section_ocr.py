@@ -5,16 +5,17 @@ Targeted OCR parser for document sections, cutouts, and bounding box regions.
 Uses RapidOCR with PyTorch CPU backend, with support for base64 cutouts and PDF crops.
 """
 
+from __future__ import annotations
+
 import os
 import io
-import re
 import base64
-from typing import Dict, Any, List, Optional, Union, Tuple
+from typing import Dict, Any, List, Optional, Union
 from PIL import Image
 import numpy as np
 
 from src.dom.bounding_box import BoundingBox
-from src.parsers.pdf_utils import open_pdf
+from src.parsers.pdf_utils import open_pdf, HAS_PYPDFIUM
 
 HAS_RAPIDOCR = False
 try:
@@ -22,13 +23,6 @@ try:
     HAS_RAPIDOCR = True
 except ImportError:
     HAS_RAPIDOCR = False
-
-HAS_PYPDFIUM = False
-try:
-    import pypdfium2
-    HAS_PYPDFIUM = True
-except ImportError:
-    HAS_PYPDFIUM = False
 
 
 def _ocr_result(

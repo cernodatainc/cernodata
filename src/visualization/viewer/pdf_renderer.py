@@ -4,11 +4,11 @@ src/visualization/viewer/pdf_renderer.py
 Helper functions for rendering PDF pages to base64 data URIs.
 """
 
-import os
+from __future__ import annotations
+
 import base64
 import io
-
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 
 from src.parsers.pdf_utils import open_pdf
 
