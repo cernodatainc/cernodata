@@ -12,6 +12,7 @@ import re
 import json
 import threading
 import unittest
+import pytest
 import urllib.request
 import urllib.parse
 
@@ -159,6 +160,7 @@ class TestDataShapeServer(unittest.TestCase):
             httpd.shutdown()
             httpd.server_close()
 
+    @pytest.mark.slow
     def test_browser_session_flow(self):
         port = find_available_port(start_port=9300, max_attempts=20)
 

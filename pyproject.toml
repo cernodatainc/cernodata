@@ -1,7 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cernodata"
+version = "0.1.0"
+description = "Multi-preset document ingestion, layout analysis, quality verification, and interactive visual flow system."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pypdfium2>=4.30.0",
+    "Pillow>=10.0.0",
+    "rapidocr-onnxruntime>=1.3.0",
+    "docling>=2.0.0",
+    "torch>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "faker>=24.0.0",
+    "anyio>=4.0.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
 python_files = ["test_*.py"]
 addopts = "-ra"
+markers = [
+    "slow: marks tests as slow / resource-intensive (deselect with '-m \"not slow\"')",
+]
 
 [tool.ruff]
 target-version = "py310"

@@ -150,14 +150,16 @@ class PageVisualizer:
         violations = violations or []
 
         page_nodes, page_violations = _group_by_page(dom, violations)
-        per_page = decision.get("per_page_confidence", {}) if decision else {}
+        per_page: Dict[Union[int, str], Any] = decision.get("per_page_confidence", {}) if decision else {}
 
         backgrounds = self._render_pdf_page_backgrounds(pdf_path)
         if backgrounds:
             for page_no, pil_img, page_w, page_h in backgrounds:
                 nodes_for_page = page_nodes.get(page_no, [])
                 viols_for_page = page_violations.get(page_no, [])
-                p_conf = per_page.get(str(page_no), per_page.get(page_no))
+                p_conf = per_page.get(page_no)
+                if p_conf is None:
+                    p_conf = per_page.get(str(page_no))
                 if p_conf is None and decision:
                     p_conf = decision.get("overall_confidence")
 
@@ -174,7 +176,9 @@ class PageVisualizer:
             canvas_w, canvas_h = int(612 * self.scale), int(792 * self.scale)
             pil_img = Image.new("RGBA", (canvas_w, canvas_h), (245, 247, 250, 255))
             viols_for_page = page_violations.get(page_no, [])
-            p_conf = per_page.get(str(page_no), per_page.get(page_no))
+            p_conf = per_page.get(page_no)
+            if p_conf is None:
+                p_conf = per_page.get(str(page_no))
             if p_conf is None and decision:
                 p_conf = decision.get("overall_confidence")
             overlay_img = self._draw_nodes_on_image(

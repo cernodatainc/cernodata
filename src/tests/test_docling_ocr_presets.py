@@ -7,6 +7,7 @@ and the standalone pypdfium_rapidocr preset outside of Docling.
 
 import os
 import unittest
+import pytest
 from src.dom import DocumentDOM, DOMNode, BoundingBox
 from src.parsers.docling_parser import DoclingParser
 from src.parsers.pypdfium_parser import PyPdfiumParser
@@ -57,6 +58,7 @@ class TestDoclingOCRPresets(unittest.TestCase):
                 self.assertEqual(ocr_opt.mode, OcrMode.FULL_PAGE)
             self.assertTrue(getattr(ocr_opt, "force_full_page_ocr", False))
 
+    @pytest.mark.slow
     def test_pypdfium_parser_standalone(self):
         """Verifies PyPdfiumParser runs outside of Docling and extracts DOM nodes."""
         parser = PyPdfiumParser(language="pl", scale=2.0)

@@ -11,6 +11,7 @@ import re
 import json
 import base64
 import unittest
+import pytest
 import threading
 import urllib.request
 from http.server import HTTPServer
@@ -64,6 +65,7 @@ class TestSectionOCRParser(unittest.TestCase):
                 f"Emoji detected in {filepath}!"
             )
 
+    @pytest.mark.slow
     def test_parse_pil_image_with_text(self):
         """Verifies OCR parsing on a PIL Image containing text."""
         test_text = "Account ID: ACC-8842"
@@ -79,6 +81,7 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertIn("ACC-8842", result["text"])
         self.assertGreaterEqual(len(result["lines"]), 1)
 
+    @pytest.mark.slow
     def test_parse_base64_data_uri(self):
         """Verifies OCR parsing when image is supplied as base64 data URI string."""
         test_text = "Invoice Number: INV-2026"
@@ -92,6 +95,7 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertIn("INV-2026", result["text"])
         self.assertGreater(result["confidence"], 0.7)
 
+    @pytest.mark.slow
     def test_parse_image_bytes(self):
         """Verifies OCR parsing when image is supplied as raw PNG bytes."""
         img = _create_test_image_with_text("Subtotal: $450.00")
@@ -120,6 +124,7 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertIn("Unsupported image input type", result["error"])
 
+    @pytest.mark.slow
     def test_parse_section_from_pdf(self):
         """Verifies cropping and parsing a section from an existing PDF document."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -138,6 +143,7 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIsInstance(result["text"], str)
 
+    @pytest.mark.slow
     def test_server_ocr_endpoint(self):
         """Verifies POST /api/parse_section_ocr HTTP server endpoint."""
         server_address = ("127.0.0.1", 0)  # OS allocates free port

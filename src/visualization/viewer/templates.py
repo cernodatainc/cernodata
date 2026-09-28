@@ -9,6 +9,7 @@ import os
 import json
 from typing import Dict, Any, List, Optional
 from src.dom import DocumentDOM
+from src.visualization.viewer.scripts import get_viewer_js
 
 _VIEWER_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -70,8 +71,16 @@ def build_viewer_html(
 ) -> str:
     """Assembles the interactive HTML application from template.html, viewer.css, and viewer.js."""
     template = load_viewer_asset("template.html")
+    html_dir = os.path.join(_VIEWER_DIR, "html")
+    if os.path.exists(html_dir):
+        for part in ["header", "toolbar", "canvas", "inspector"]:
+            part_path = os.path.join(html_dir, f"{part}.html")
+            if os.path.exists(part_path):
+                with open(part_path, "r", encoding="utf-8") as f:
+                    template = template.replace(f"<!-- __{part.upper()}_HTML__ -->", f.read())
+
     css_content = load_viewer_asset("viewer.css")
-    js_content = load_viewer_asset("viewer.js")
+    js_content = get_viewer_js()
 
     is_acc = decision.get("is_accepted", True)
     primary_detected = decision.get("primary_detected_language", "en")
