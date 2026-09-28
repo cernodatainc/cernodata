@@ -7,7 +7,7 @@ Supports executing custom and planner-generated execution plans.
 
 import os
 from dataclasses import replace
-from typing import Dict, Any, List, Tuple, Optional, Union, TypedDict
+from typing import Dict, Any, List, Tuple, Optional, Union, TypedDict, Callable
 
 from src.utils import resolve_pdf_path
 from src.dom import DocumentDOM
@@ -175,8 +175,16 @@ def run_pipeline(
     output_dir: str = "output",
     plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
     config: Optional[IngestionConfig] = None,
+    progress_callback: Optional[Callable[[int, str, str], None]] = None,
 ) -> PipelineExecutionResult:
     """Executes end-to-end extraction pipeline with optional plan-driven execution and fallback orchestration."""
+    def notify(pct: int, step_desc: str, log_msg: str) -> None:
+        if progress_callback is not None:
+            try:
+                progress_callback(pct, step_desc, log_msg)
+            except Exception:
+                pass
+
     plan_obj: Optional[DocumentPlan] = None
     if plan:
         if isinstance(plan, str):
@@ -202,6 +210,7 @@ def run_pipeline(
                 visualize=visualize,
                 output_dir=output_dir,
             )
+    assert config is not None
 
     if not pdf_path and plan_obj and plan_obj.document_path:
         pdf_path = plan_obj.document_path
@@ -210,6 +219,8 @@ def run_pipeline(
         raise ValueError("Input document path is required.")
 
     pdf_path = resolve_pdf_path(pdf_path)
+    assert pdf_path is not None
+    notify(20, "Step 1: Document Validation & Subdivision", f"Ingestion initiated for '{pdf_path}' (Preset: {config.preset}, Lang: {config.language}).")
 
     attempts: List[Dict[str, Any]] = []
 
@@ -227,10 +238,12 @@ def run_pipeline(
     next_score = plan_obj.scores.get(next_candidate, 0.72) if (plan_obj and next_candidate) else 0.72
 
     # Step 1: Initial Parse with Primary Preset
+    notify(40, f"Step 2: Executing Preset '{config.preset}'", f"Running extraction with preset '{config.preset}'...")
     dom, decision, violations = _execute_attempt(
         pdf_path, config, curr_score, next_score
     )
     attempts.append(_make_attempt_record(1, config.preset, decision, violations))
+    notify(65, "Step 3: Document Skew Alignment & Verification", "Document parsed. Analyzing layout geometry and quality rules...")
 
     if config.preset == "docling_deep":
         decision["chosen_preset"] = "docling_deep"
@@ -244,6 +257,7 @@ def run_pipeline(
 
         # Path B: Parameter Wiggling on current preset if delta is large
         if action == "PATH_B_WIGGLE_PARAMETERS":
+            notify(70, "Step 4: Parameter Wiggling", f"Target threshold not met. Wiggling OCR parameters for '{config.preset}'...")
             wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
             wiggled_force_ocr = True
             wiggled_config = replace(
@@ -271,6 +285,7 @@ def run_pipeline(
             elif next_candidate:
                 # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
                 plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
+                notify(75, "Step 4: Switching Preset", f"Wiggling exhausted. Switching to fallback preset '{next_candidate}'...")
                 fallback_config = replace(config, preset=next_candidate)
                 fb_dom, fb_decision, fb_violations = _execute_attempt(
                     pdf_path, fallback_config
@@ -297,6 +312,7 @@ def run_pipeline(
             else:
                 plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
 
+            notify(75, "Step 4: Switching Preset", f"Target threshold not met ({decision.get('overall_confidence')} < {config.target_threshold}). Switching to fallback '{next_candidate}'...")
             fallback_config = replace(config, preset=next_candidate)
             fb_dom, fb_decision, fb_violations = _execute_attempt(
                 pdf_path, fallback_config
@@ -323,11 +339,16 @@ def run_pipeline(
     decision["attempts"] = attempts
 
     plan_dict = plan_obj.to_dict() if plan_obj else None
+    notify(88, "Step 5: Exporting Artifacts & Overlays", "Saving DocumentDOM, quality violations, and rendering visual overlays...")
     rendered_images = render_visual_overlays(pdf_path, dom, violations, config.visualize, config.output_dir, decision=decision)
     dom_json_path, violations_json_path, plan_result_path = export_pipeline_artifacts(
         dom, decision, violations, config.language, config.output_dir, plan=plan_dict
     )
     html_viewer_path = export_interactive_html_viewer(pdf_path, dom, decision, violations, config.output_dir, plan=plan_dict)
+
+    status_str = str(decision.get("status", "ACCEPT"))
+    score_val = float(decision.get("overall_confidence", 1.0) or 1.0)
+    notify(100, f"Step 5: Decision Tree Complete ({status_str})", f"Run complete: Status '{status_str}', Confidence: {score_val:.4f}, Violations: {len(violations)}.")
 
     return {
         "dom": dom.to_dict(),
