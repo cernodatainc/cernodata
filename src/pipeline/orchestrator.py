@@ -44,6 +44,7 @@ __all__ = [
     "render_visual_overlays",
     "export_interactive_html_viewer",
     "export_pipeline_artifacts",
+    "execute_pipeline",
     "run_pipeline",
 ]
 
@@ -165,19 +166,13 @@ def _make_attempt_record(
     return record
 
 
-def run_pipeline(
-    pdf_path: Optional[str] = None,
-    target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-    language: Optional[str] = "en",
-    preset: str = "docling_fast",
-    align_skew: bool = True,
-    visualize: bool = True,
-    output_dir: str = "output",
-    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
-    config: Optional[IngestionConfig] = None,
+def execute_pipeline(
+    pdf_path: str,
+    config: IngestionConfig,
+    plan: Optional[DocumentPlan] = None,
     progress_callback: Optional[Callable[[int, str, str], None]] = None,
 ) -> PipelineExecutionResult:
-    """Executes end-to-end extraction pipeline with optional plan-driven execution and fallback orchestration."""
+    """Executes end-to-end extraction pipeline with concrete configuration and optional fallback orchestration."""
     def notify(pct: int, step_desc: str, log_msg: str) -> None:
         if progress_callback is not None:
             try:
@@ -185,43 +180,11 @@ def run_pipeline(
             except Exception:
                 pass
 
-    plan_obj: Optional[DocumentPlan] = None
-    if plan:
-        if isinstance(plan, str):
-            plan_obj = DocumentPlan.load(plan)
-        elif isinstance(plan, dict):
-            plan_obj = DocumentPlan.from_dict(plan)
-        elif isinstance(plan, DocumentPlan):
-            plan_obj = plan
+    plan_obj = plan
+    resolved_path = resolve_pdf_path(pdf_path)
+    notify(20, "Step 1: Document Validation & Subdivision", f"Ingestion initiated for '{resolved_path}' (Preset: {config.preset}, Lang: {config.language}).")
 
-    if not config:
-        if plan_obj:
-            config = plan_obj.to_ingestion_config(
-                align_skew=align_skew,
-                visualize=visualize,
-                output_dir=output_dir,
-            )
-        else:
-            config = IngestionConfig(
-                target_threshold=target_threshold,
-                language=language,
-                preset=preset,
-                align_skew=align_skew,
-                visualize=visualize,
-                output_dir=output_dir,
-            )
-    assert config is not None
-
-    if not pdf_path and plan_obj and plan_obj.document_path:
-        pdf_path = plan_obj.document_path
-
-    if not pdf_path:
-        raise ValueError("Input document path is required.")
-
-    pdf_path = resolve_pdf_path(pdf_path)
-    assert pdf_path is not None
-    notify(20, "Step 1: Document Validation & Subdivision", f"Ingestion initiated for '{pdf_path}' (Preset: {config.preset}, Lang: {config.language}).")
-
+    pdf_path = resolved_path
     attempts: List[Dict[str, Any]] = []
 
     # Determine candidate scores and potential fallback candidate
@@ -361,3 +324,56 @@ def run_pipeline(
         "rendered_images": rendered_images,
         "plan": plan_dict
     }
+
+
+def run_pipeline(
+    pdf_path: Optional[str] = None,
+    target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
+    language: Optional[str] = "en",
+    preset: str = "docling_fast",
+    align_skew: bool = True,
+    visualize: bool = True,
+    output_dir: str = "output",
+    plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
+    config: Optional[IngestionConfig] = None,
+    progress_callback: Optional[Callable[[int, str, str], None]] = None,
+) -> PipelineExecutionResult:
+    """Convenience facade: resolves flexible ingress arguments into strongly-typed execution inputs."""
+    plan_obj: Optional[DocumentPlan] = None
+    if plan:
+        if isinstance(plan, str):
+            plan_obj = DocumentPlan.load(plan)
+        elif isinstance(plan, dict):
+            plan_obj = DocumentPlan.from_dict(plan)
+        elif isinstance(plan, DocumentPlan):
+            plan_obj = plan
+
+    if config is not None:
+        cfg = config
+    elif plan_obj is not None:
+        cfg = plan_obj.to_ingestion_config(
+            align_skew=align_skew,
+            visualize=visualize,
+            output_dir=output_dir,
+        )
+    else:
+        cfg = IngestionConfig(
+            target_threshold=target_threshold,
+            language=language,
+            preset=preset,
+            align_skew=align_skew,
+            visualize=visualize,
+            output_dir=output_dir,
+        )
+
+    resolved_path = pdf_path or (plan_obj.document_path if plan_obj else None)
+    if not resolved_path:
+        raise ValueError("Input document path is required.")
+
+    return execute_pipeline(
+        pdf_path=resolved_path,
+        config=cfg,
+        plan=plan_obj,
+        progress_callback=progress_callback,
+    )
+
