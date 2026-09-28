@@ -7,7 +7,7 @@ Supports executing custom and planner-generated execution plans.
 
 import os
 from dataclasses import replace
-from typing import Dict, Any, List, Tuple, Optional, Union
+from typing import Dict, Any, List, Tuple, Optional, Union, TypedDict
 
 from src.utils import resolve_pdf_path
 from src.dom import DocumentDOM
@@ -21,8 +21,23 @@ from src.pipeline.artifact_exporter import (
     export_pipeline_artifacts,
 )
 
+
+class PipelineExecutionResult(TypedDict, total=False):
+    """Strongly-typed execution result container for pipeline extraction runs."""
+    dom: Dict[str, Any]
+    decision: Dict[str, Any]
+    violations: List[Dict[str, Any]]
+    dom_json_path: str
+    violations_json_path: str
+    plan_result_path: Optional[str]
+    html_viewer_path: Optional[str]
+    rendered_images: List[str]
+    plan: Optional[Dict[str, Any]]
+
+
 __all__ = [
     "IngestionConfig",
+    "PipelineExecutionResult",
     "parse_document",
     "align_document_skew",
     "evaluate_quality_and_decision_tree",
@@ -160,7 +175,7 @@ def run_pipeline(
     output_dir: str = "output",
     plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
     config: Optional[IngestionConfig] = None,
-) -> Dict[str, Any]:
+) -> PipelineExecutionResult:
     """Executes end-to-end extraction pipeline with optional plan-driven execution and fallback orchestration."""
     plan_obj: Optional[DocumentPlan] = None
     if plan:

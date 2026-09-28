@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import glob
 import json
+import logging
 import os
 import webbrowser
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Mapping
+
+logger = logging.getLogger("cernodata.server")
 
 from src.utils import mkdirs, find_available_port, resolve_pdf_path
 from src.parsers.section_ocr import parse_image_ocr, parse_section_from_pdf
@@ -47,7 +50,8 @@ def read_json_payload(handler: SimpleHTTPRequestHandler) -> Dict[str, Any]:
     try:
         body = handler.rfile.read(content_length).decode("utf-8")
         return json.loads(body) if body else {}
-    except Exception:
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.warning("Malformed JSON request payload received: %s", e)
         return {}
 
 
@@ -125,29 +129,29 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             try:
                 with open(dom_file, "r", encoding="utf-8") as f:
                     dom_data = json.load(f)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Could not load DOM cache from %s: %s", dom_file, e)
 
         if os.path.exists(viol_file):
             try:
                 with open(viol_file, "r", encoding="utf-8") as f:
                     violations_data = json.load(f)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Could not load violations cache from %s: %s", viol_file, e)
 
         if os.path.exists(dec_file):
             try:
                 with open(dec_file, "r", encoding="utf-8") as f:
                     decision_data = json.load(f)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Could not load decision cache from %s: %s", dec_file, e)
 
         if os.path.exists(plan_file):
             try:
                 with open(plan_file, "r", encoding="utf-8") as f:
                     plan_data = json.load(f)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Could not load plan cache from %s: %s", plan_file, e)
 
         raw_pdf = cls.pdf_path or dom_data.get("source_filename") or "src/e2e/Document 8.pdf"
         pdf_path = resolve_pdf_path(raw_pdf)
@@ -161,8 +165,8 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             try:
                 page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
                 page_dimensions = get_pdf_page_dimensions(pdf_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Could not render page images for %s: %s", pdf_path, e)
 
         cls.viewer_data = {
             "dom": dom_data,
@@ -179,10 +183,10 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
         return cls.viewer_data
 
     @classmethod
-    def update_result_state(cls, result: Dict[str, Any], pdf_path: str, language: str) -> None:
+    def update_result_state(cls, result: Mapping[str, Any], pdf_path: str, language: str) -> None:
         """Updates server memory state and hydration dataset from run_pipeline result."""
         resolved_path = resolve_pdf_path(pdf_path)
-        cls.current_result = result
+        cls.current_result = dict(result)
         cls.pdf_path = resolved_path
         cls.language = language
 
@@ -199,8 +203,8 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             try:
                 page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
                 page_dimensions = get_pdf_page_dimensions(pdf_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Could not render page images for %s: %s", pdf_path, e)
 
         cls.viewer_data = {
             "dom": dom_dict,

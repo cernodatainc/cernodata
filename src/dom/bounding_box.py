@@ -31,6 +31,20 @@ class BoundingBox:
             res["quad"] = [[round(p[0], 2), round(p[1], 2)] for p in self.quad]
         return res
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BoundingBox":
+        """Reconstructs BoundingBox from serialized dictionary representation."""
+        x0 = float(data.get("x0", 0.0))
+        y0 = float(data.get("y0", 0.0))
+        x1 = float(data.get("x1", 0.0))
+        y1 = float(data.get("y1", 0.0))
+        angle = float(data.get("angle", 0.0))
+        raw_quad = data.get("quad")
+        quad: Optional[List[List[float]]] = None
+        if raw_quad is not None and isinstance(raw_quad, list):
+            quad = [[float(pt[0]), float(pt[1])] for pt in raw_quad if len(pt) >= 2]
+        return cls(x0=x0, y0=y0, x1=x1, y1=y1, angle=angle, quad=quad)
+
     def to_polygon(self, sx: float = 1.0, sy: float = 1.0) -> List[Tuple[float, float]]:
         """
         Computes 4 corner vertices [(x0', y0'), (x1', y1'), (x2', y2'), (x3', y3')]

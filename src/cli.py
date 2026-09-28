@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
+from typing import Any, Mapping
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 
 
@@ -79,7 +79,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def print_summary(result: dict[str, Any]) -> None:
+def print_summary(result: Mapping[str, Any]) -> None:
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")

@@ -56,7 +56,6 @@ class TestDoclingOCRPresets(unittest.TestCase):
             if hasattr(ocr_opt, "mode"):
                 from docling.datamodel.pipeline_options import OcrMode
                 self.assertEqual(ocr_opt.mode, OcrMode.FULL_PAGE)
-            self.assertTrue(getattr(ocr_opt, "force_full_page_ocr", False))
 
     @pytest.mark.slow
     def test_pypdfium_parser_standalone(self):

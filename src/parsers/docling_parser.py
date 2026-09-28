@@ -8,10 +8,13 @@ Maps Docling structural items and bounding box coordinate origins into DocumentD
 from __future__ import annotations
 
 import os
+import logging
 from typing import List, Optional, Any
 
 from src.utils import resolve_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
+
+logger = logging.getLogger("cernodata.docling_parser")
 from src.parsers.docling_helpers import (
     LANG_CODE_MAP,
     fallback_top_left_bbox,
@@ -140,7 +143,11 @@ class DoclingParser:
             converter = DocumentConverter(
                 format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to initialize DocumentConverter with custom pipeline options: %s. Falling back to default options.",
+                e
+            )
             converter = DocumentConverter()
 
         doc = converter.convert(pdf_path).document

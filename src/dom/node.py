@@ -31,3 +31,27 @@ class DOMNode:
         if self.template_hint_applied:
             res["template_hint_applied"] = self.template_hint_applied
         return res
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DOMNode":
+        """Reconstructs DOMNode from serialized dictionary representation."""
+        raw_box = data.get("bounding_box", {})
+        if isinstance(raw_box, dict):
+            bbox = BoundingBox.from_dict(raw_box)
+        elif isinstance(raw_box, BoundingBox):
+            bbox = raw_box
+        else:
+            bbox = BoundingBox(0.0, 0.0, 0.0, 0.0)
+
+        raw_type = data.get("type", "paragraph")
+        node_type = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
+
+        return cls(
+            node_id=str(data.get("node_id", "")),
+            type=node_type,
+            global_page_index=int(data.get("global_page_index", 1)),
+            temp_slice_index=int(data.get("temp_slice_index", 1)),
+            bounding_box=bbox,
+            content=dict(data.get("content", {})),
+            template_hint_applied=data.get("template_hint_applied"),
+        )

@@ -101,8 +101,9 @@ def main() -> None:
 
     print_summary(result)
 
-    if getattr(args, "view", False) and result.get("html_viewer_path"):
-        viewer_uri = "file:///" + os.path.abspath(result["html_viewer_path"]).replace("\\", "/")
+    viewer_path = result.get("html_viewer_path")
+    if getattr(args, "view", False) and viewer_path:
+        viewer_uri = "file:///" + os.path.abspath(viewer_path).replace("\\", "/")
         print(f"\n[VIEW] Opening interactive viewer in default browser: {viewer_uri}")
         webbrowser.open(viewer_uri)
 

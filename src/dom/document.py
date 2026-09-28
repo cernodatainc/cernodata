@@ -4,6 +4,8 @@ src/dom/document.py
 DocumentDOM tree container primitive.
 """
 
+import os
+import json
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from src.dom.bounding_box import BoundingBox
@@ -24,6 +26,52 @@ class DocumentDOM:
             "total_pages": self.total_pages,
             "nodes": [node.to_dict() for node in self.nodes]
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DocumentDOM":
+        """Reconstructs DocumentDOM from serialized dictionary representation."""
+        raw_nodes = data.get("nodes", [])
+        nodes: List[DOMNode] = []
+        for n in raw_nodes:
+            if isinstance(n, dict):
+                nodes.append(DOMNode.from_dict(n))
+            elif isinstance(n, DOMNode):
+                nodes.append(n)
+
+        total_pages = data.get("total_pages")
+        if total_pages is None:
+            total_pages = max((n.global_page_index for n in nodes), default=1)
+
+        return cls(
+            document_id=str(data.get("document_id", "")),
+            source_filename=str(data.get("source_filename", "")),
+            total_pages=int(total_pages),
+            nodes=nodes,
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "DocumentDOM":
+        """Parses a JSON string directly into a DocumentDOM instance."""
+        return cls.from_dict(json.loads(json_str))
+
+    def to_json(self, indent: Optional[int] = 2) -> str:
+        """Serializes DocumentDOM to a JSON formatted string."""
+        return json.dumps(self.to_dict(), indent=indent)
+
+    @classmethod
+    def load(cls, filepath: str) -> "DocumentDOM":
+        """Loads and parses a DocumentDOM instance from a JSON file."""
+        with open(filepath, "r", encoding="utf-8") as f:
+            return cls.from_dict(json.load(f))
+
+    def save(self, filepath: str, indent: int = 2) -> None:
+        """Serializes and saves DocumentDOM to a target JSON file path."""
+        from src.utils import mkdirs
+        dir_name = os.path.dirname(filepath)
+        if dir_name:
+            mkdirs(dir_name)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, indent=indent)
 
     def merge_nodes(
         self,
