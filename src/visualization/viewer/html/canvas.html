@@ -1,0 +1,13 @@
+        <div class="visual-pane" id="visualPane">
+            <div class="canvas-container" id="canvasContainer">
+                <img src="{{ img_data_uri }}" id="pageImg" alt="Page Canvas" />
+                <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
+            </div>
+
+            <div class="score-badge-box {{ score_badge_classes }}" id="scoreBadge">
+                <div class="score-title" id="scoreTitle">Page 1 Confidence Score: {{ page1_confidence }}</div>
+                <div class="score-sub" id="scoreSub" style="color: {{ score_sub_color }}">
+                    Status: {{ decision_status }} | Overall Confidence: {{ overall_confidence }} | Violations Flagged: {{ violations_count }}
+                </div>
+            </div>
+        </div>

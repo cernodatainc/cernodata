@@ -2,17 +2,45 @@
 src/visualization/viewer/scripts.py
 
 Client-side JavaScript runtime loader for interactive HTML visual flow explorer.
-Loads script runtime from viewer.js on demand.
+Loads script runtime from modular JS files by concern or viewer.js.
 """
 
 import os
 import json
+from typing import List
 
-_JS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "viewer.js")
+_VIEWER_DIR = os.path.dirname(os.path.abspath(__file__))
+_JS_DIR = os.path.join(_VIEWER_DIR, "js")
+_JS_PATH = os.path.join(_VIEWER_DIR, "viewer.js")
+
+JS_MODULE_ORDER: List[str] = [
+    "state.js",
+    "controls.js",
+    "overlay.js",
+    "inspector.js",
+    "cutout.js",
+    "decollide.js",
+    "violations.js",
+    "api.js",
+    "app.js",
+]
+
+
+def bundle_viewer_js() -> str:
+    """Concatenates the modular client scripts by concern in dependency order."""
+    parts: List[str] = []
+    for mod_name in JS_MODULE_ORDER:
+        mod_path = os.path.join(_JS_DIR, mod_name)
+        if os.path.exists(mod_path):
+            with open(mod_path, "r", encoding="utf-8") as f:
+                parts.append(f"/* === Concern Module: {mod_name} === */\n" + f.read())
+    return "\n\n".join(parts)
 
 
 def get_viewer_js() -> str:
-    """Returns client script content from viewer.js."""
+    """Returns client script content from modular JS sources or viewer.js."""
+    if os.path.exists(_JS_DIR):
+        return bundle_viewer_js()
     with open(_JS_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
