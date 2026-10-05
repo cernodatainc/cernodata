@@ -82,6 +82,11 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("tabBtnViol", content)
             self.assertIn('data-name="dom page"', content)
             self.assertIn('data-name="violations"', content)
+            self.assertIn("viol-bundle", content)
+            self.assertIn("btn-accept-bundle", content)
+            self.assertIn("acceptCategoryOnPage", content)
+            self.assertIn("restoreCategoryOnPage", content)
+            self.assertIn("toggleSuppressSingleViolation", content)
 
         if os.path.exists(out_path):
             os.remove(out_path)

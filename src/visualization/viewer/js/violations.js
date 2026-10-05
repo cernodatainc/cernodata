@@ -1,7 +1,8 @@
 /**
  * src/visualization/viewer/js/violations.js
  *
- * Quality violation inspector, violation card rendering, and automated fix application.
+ * Quality violation inspector, category bundling, violation card rendering,
+ * category-level false-positive acceptance, and automated fix application.
  */
 
 function renderViolationsList() {
@@ -12,9 +13,9 @@ function renderViolationsList() {
         ? violationsData
         : violationsData.filter(v => getViolationPage(v) === currentPage);
 
-    const unfixedCount = violationsToDisplay.filter(v => !v.is_fixed).length;
+    const activeCount = violationsToDisplay.filter(v => !v.is_fixed && !isSuppressed(v)).length;
     const countEl = document.getElementById('violCount');
-    if (countEl) countEl.textContent = unfixedCount;
+    if (countEl) countEl.textContent = activeCount;
 
     const labelEl = document.getElementById('violTabLabel');
     if (labelEl) {
@@ -33,34 +34,268 @@ function renderViolationsList() {
         return;
     }
 
-    container.innerHTML = '';
+    // Group violations into category bundles
+    const categories = {};
     violationsToDisplay.forEach(v => {
-        const card = document.createElement('div');
-        const isFixed = !!v.is_fixed;
-        card.className = `viol-card ${isFixed ? 'fixed' : ''}`;
-        const vPage = getViolationPage(v);
-        card.onclick = () => selectNode(v.node_id, vPage);
-        const canFix = !!v.suggested_correction;
-        card.innerHTML = `
-            <div class="viol-header">
-                <span class="viol-title">[!] ${escapeHtml(v.rule_type)}</span>
-                <div style="display:flex; align-items:center; gap:4px;">
-                    <span class="badge-status lang" style="font-size:9px; padding:1px 5px;">P${vPage}</span>
-                    <span style="font-size: 10px; font-weight:700; color: ${isFixed ? '#10B981' : '#F87171'};">${isFixed ? '[FIXED]' : escapeHtml(v.severity || 'WARNING')}</span>
+        const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+        if (!categories[cat]) {
+            categories[cat] = [];
+        }
+        categories[cat].push(v);
+    });
+
+    container.innerHTML = '';
+
+    const catKeys = Object.keys(categories).sort();
+    catKeys.forEach(cat => {
+        const catViols = categories[cat];
+        const catActiveCount = catViols.filter(v => !v.is_fixed && !isSuppressed(v)).length;
+        const catSuppressedCount = catViols.filter(v => isSuppressed(v)).length;
+        const catFixedCount = catViols.filter(v => !!v.is_fixed).length;
+        const hasFixable = catViols.some(v => !v.is_fixed && (v.suggested_correction || v.suggestion));
+
+        const bundleEl = document.createElement('div');
+        bundleEl.className = 'viol-bundle';
+
+        const pageLabel = showAllViolations ? 'All Pages' : `Page ${currentPage}`;
+        bundleEl.innerHTML = `
+            <div class="viol-bundle-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="viol-bundle-title">[Category: ${escapeHtml(cat.toUpperCase())}]</span>
+                    <span class="badge-status" style="font-size:10px; background:#374151; color:#E5E7EB;">
+                        ${catViols.length} total | ${catActiveCount} active | ${catSuppressedCount} accepted
+                    </span>
+                </div>
+                <div class="viol-bundle-actions">
+                    ${catActiveCount > 0 ? `
+                        <button class="btn-accept-bundle" onclick="acceptCategoryOnPage('${escapeHtml(cat)}')">
+                            [Accept All '${escapeHtml(cat)}' on ${pageLabel}]
+                        </button>
+                    ` : `
+                        <button class="btn-restore-bundle" onclick="restoreCategoryOnPage('${escapeHtml(cat)}')">
+                            [Restore '${escapeHtml(cat)}' on ${pageLabel}]
+                        </button>
+                    `}
+                    ${hasFixable ? `
+                        <button class="apply-fix-btn" style="margin-top:0;" onclick="applyAllFixesForCategory('${escapeHtml(cat)}')">
+                            [Fix All '${escapeHtml(cat)}']
+                        </button>
+                    ` : ''}
                 </div>
             </div>
-            <div style="font-size: 11px; font-family: monospace;">Snippet: '${escapeHtml(v.detected_snippet)}'${v.suggested_correction ? ` -> '${escapeHtml(v.suggested_correction)}'` : ''}</div>
-            <div class="viol-desc">${escapeHtml(v.description || '')}</div>
-            ${canFix ? `
-                ${isFixed ? `
-                    <div style="margin-top:6px;"><span class="badge-status" style="font-size:10px; background:#10B981; color:#000; padding:2px 8px; font-weight:700;">[OK] Fix Applied</span></div>
-                ` : `
-                    <button class="apply-fix-btn" onclick="applySingleFix(event, '${v.violation_id || v.node_id}')">[Fix] Apply Suggested Fix</button>
-                `}
-            ` : ''}
+            <div class="viol-bundle-items" id="bundle-items-${escapeHtml(cat)}"></div>
         `;
-        container.appendChild(card);
+
+        const itemsContainer = bundleEl.querySelector(`#bundle-items-${cat}`);
+        catViols.forEach(v => {
+            const card = document.createElement('div');
+            const isFixed = !!v.is_fixed;
+            const isSupp = isSuppressed(v);
+            card.className = `viol-card ${isFixed ? 'fixed' : ''} ${isSupp ? 'suppressed' : ''}`;
+            const vPage = getViolationPage(v);
+            card.onclick = () => selectNode(v.node_id, vPage);
+            const canFix = !!(v.suggested_correction || v.suggestion);
+
+            let statusHtml = '';
+            if (isFixed) {
+                statusHtml = '<span style="font-size: 10px; font-weight:700; color: #10B981;">[FIXED]</span>';
+            } else if (isSupp) {
+                statusHtml = '<span style="font-size: 10px; font-weight:700; color: #34D399;">[ACCEPTED (FALSE POSITIVE)]</span>';
+            } else {
+                statusHtml = `<span style="font-size: 10px; font-weight:700; color: #F87171;">${escapeHtml(v.severity || 'WARNING')}</span>`;
+            }
+
+            card.innerHTML = `
+                <div class="viol-header">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="viol-title">[!] ${escapeHtml(v.rule_type || v.type)}</span>
+                        <span class="badge-status" style="font-size:9px; background:#4B5563; color:#E5E7EB;">${escapeHtml(cat)}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <span class="badge-status lang" style="font-size:9px; padding:1px 5px;">P${vPage}</span>
+                        ${statusHtml}
+                    </div>
+                </div>
+                <div style="font-size: 11px; font-family: monospace; color:#FDE047;">
+                    Snippet: '${escapeHtml(v.detected_snippet || '')}'${v.suggested_correction ? ` -> '${escapeHtml(v.suggested_correction)}'` : ''}
+                </div>
+                ${v.suggestion && v.suggestion !== v.suggested_correction ? `
+                    <div style="font-size: 10px; font-family: monospace; color:#A7F3D0; margin-top:2px;">
+                        Rewrite: '${escapeHtml(v.suggestion)}'
+                    </div>
+                ` : ''}
+                <div class="viol-desc">${escapeHtml(v.description || '')}</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                    ${isSupp ? `
+                        <button class="btn-restore-bundle" onclick="toggleSuppressSingleViolation(event, '${v.violation_id}', false)">
+                            [Restore] Re-flag as Active
+                        </button>
+                    ` : `
+                        ${!isFixed ? `
+                            <button class="btn-accept-bundle" onclick="toggleSuppressSingleViolation(event, '${v.violation_id}', true)">
+                                [Accept] Accept as Legitimate
+                            </button>
+                        ` : ''}
+                    `}
+                    ${canFix ? `
+                        ${isFixed ? `
+                            <span class="badge-status" style="font-size:10px; background:#10B981; color:#000; padding:2px 8px; font-weight:700;">[OK] Fix Applied</span>
+                        ` : `
+                            <button class="apply-fix-btn" style="margin-top:0;" onclick="applySingleFix(event, '${v.violation_id || v.node_id}')">[Fix] Apply Suggested Fix</button>
+                        `}
+                    ` : ''}
+                </div>
+            `;
+            itemsContainer.appendChild(card);
+        });
+
+        container.appendChild(bundleEl);
     });
+}
+
+function acceptCategoryOnPage(category, targetPage = null) {
+    const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
+    let count = 0;
+
+    violationsData.forEach(v => {
+        const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+        const vPage = getViolationPage(v);
+        if (vCat === category && (page === null || vPage === page)) {
+            v.suppressed = "true";
+            count++;
+        }
+    });
+
+    if (domData && domData.nodes) {
+        domData.nodes.forEach(node => {
+            const nPage = getNodePage(node);
+            if (page === null || nPage === page) {
+                if (node.violations) {
+                    node.violations.forEach(nv => {
+                        const nvCat = nv.type || (nv.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+                        if (nvCat === category) {
+                            nv.suppressed = "true";
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    renderDOMTree();
+    renderSelectedEditor();
+    renderSVGOverlays();
+    renderViolationsList();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        const pageDesc = page === null ? 'all pages' : `Page ${page}`;
+        banner.textContent = `[OK] Accepted ${count} '${category}' violation(s) on ${pageDesc} as legitimate false positives. Click '[SAVE] Save Annotations' to persist.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+}
+
+function restoreCategoryOnPage(category, targetPage = null) {
+    const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
+    let count = 0;
+
+    violationsData.forEach(v => {
+        const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+        const vPage = getViolationPage(v);
+        if (vCat === category && (page === null || vPage === page)) {
+            v.suppressed = "false";
+            count++;
+        }
+    });
+
+    if (domData && domData.nodes) {
+        domData.nodes.forEach(node => {
+            const nPage = getNodePage(node);
+            if (page === null || nPage === page) {
+                if (node.violations) {
+                    node.violations.forEach(nv => {
+                        const nvCat = nv.type || (nv.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+                        if (nvCat === category) {
+                            nv.suppressed = "false";
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    renderDOMTree();
+    renderSelectedEditor();
+    renderSVGOverlays();
+    renderViolationsList();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        const pageDesc = page === null ? 'all pages' : `Page ${page}`;
+        banner.textContent = `[OK] Restored ${count} '${category}' violation(s) on ${pageDesc} to active state.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+}
+
+function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) {
+    if (evt && evt.stopPropagation) {
+        evt.stopPropagation();
+    }
+
+    const v = violationsData.find(item => item.violation_id === violationId);
+    if (!v) return;
+
+    v.suppressed = shouldSuppress ? "true" : "false";
+
+    if (domData && domData.nodes) {
+        const node = domData.nodes.find(n => n.node_id === v.node_id);
+        if (node && node.violations) {
+            const nv = node.violations.find(item => item.violation_id === violationId || item.rule_type === v.rule_type);
+            if (nv) {
+                nv.suppressed = shouldSuppress ? "true" : "false";
+            }
+        }
+    }
+
+    renderDOMTree();
+    renderSelectedEditor();
+    renderSVGOverlays();
+    renderViolationsList();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = shouldSuppress
+            ? `[OK] Accepted violation '${violationId}' as legitimate false positive.`
+            : `[OK] Re-flagged violation '${violationId}' as active.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    }
+}
+
+function applyAllFixesForCategory(category, targetPage = null) {
+    const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
+    const targets = violationsData.filter(v => {
+        const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+        const vPage = getViolationPage(v);
+        return vCat === category && (page === null || vPage === page) && !v.is_fixed && (v.suggested_correction || v.suggestion);
+    });
+
+    targets.forEach(v => {
+        applySingleFix(null, v.violation_id);
+    });
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = `[OK] Applied ${targets.length} fix(es) for '${category}'. Click '[SAVE] Save Annotations' to persist.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
 }
 
 function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
@@ -79,7 +314,7 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
             targetViol = found;
             targetNodeId = found.node_id;
             targetSnippet = snippet || found.detected_snippet;
-            targetFix = (fix !== null && fix !== undefined) ? fix : found.suggested_correction;
+            targetFix = (fix !== null && fix !== undefined) ? fix : (found.suggested_correction || found.suggestion);
         }
     }
 
@@ -87,7 +322,7 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
         targetViol = violationsData.find(v => v.node_id === targetNodeId && (!targetSnippet || v.detected_snippet === targetSnippet));
         if (targetViol) {
             if (!targetSnippet) targetSnippet = targetViol.detected_snippet;
-            if (targetFix === null || targetFix === undefined) targetFix = targetViol.suggested_correction;
+            if (targetFix === null || targetFix === undefined) targetFix = (targetViol.suggested_correction || targetViol.suggestion);
         }
     }
 
@@ -119,6 +354,14 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
         violationsData.forEach(v => {
             if (v.node_id === targetNodeId && v.detected_snippet === targetSnippet) {
                 v.is_fixed = true;
+            }
+        });
+    }
+
+    if (node.violations) {
+        node.violations.forEach(nv => {
+            if (nv.node_id === targetNodeId || (targetViol && nv.violation_id === targetViol.violation_id)) {
+                nv.is_fixed = true;
             }
         });
     }

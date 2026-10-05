@@ -510,15 +510,12 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
 
         # 5. Static JS Asset
         elif raw_path == "/viewer.js":
-            js_path = os.path.join(SRC_DIR, "visualization", "viewer", "viewer.js")
-            if os.path.exists(js_path):
-                self.send_response(200)
-                self.send_header("Content-Type", "application/javascript; charset=utf-8")
-                self.end_headers()
-                with open(js_path, "rb") as f:
-                    self.wfile.write(f.read())
-                return
-            self.send_error(404, "JavaScript asset not found")
+            from src.visualization.viewer.scripts import get_viewer_js
+            js_content = get_viewer_js()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(js_content.encode("utf-8"))
             return
 
         # 6. Planner / Data Shape Questionnaire

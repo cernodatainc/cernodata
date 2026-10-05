@@ -113,12 +113,27 @@ function renderSelectedEditor() {
                 </div>
                 ${nodeViols.map((v, vIdx) => {
                     const isFixed = !!v.is_fixed || !!node.is_fixed || appliedCorrections || activePresetIndex === 1;
-                    const canFix = !!v.suggested_correction;
+                    const isSupp = isSuppressed(v);
+                    const canFix = !!(v.suggested_correction || v.suggestion);
+                    const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+                    let statusColor = '#F87171';
+                    let statusLabel = escapeHtml(v.severity || 'WARNING');
+                    if (isFixed) {
+                        statusColor = '#10B981';
+                        statusLabel = '[FIXED]';
+                    } else if (isSupp) {
+                        statusColor = '#34D399';
+                        statusLabel = '[ACCEPTED (FALSE POSITIVE)]';
+                    }
+
                     return `
                         <div class="selected-viol-item" style="border-top: ${vIdx > 0 ? '1px solid #451A20' : 'none'}; padding-top: ${vIdx > 0 ? '6px' : '0'}; margin-top: ${vIdx > 0 ? '6px' : '0'};">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:11px; font-weight:600; color:#F87171;">[!] ${escapeHtml(v.rule_type)}</span>
-                                <span style="font-size:9px; font-weight:700; color:${isFixed ? '#10B981' : '#F87171'};">${isFixed ? '[FIXED]' : escapeHtml(v.severity || 'WARNING')}</span>
+                                <div style="display:flex; align-items:center; gap:4px;">
+                                    <span style="font-size:11px; font-weight:600; color:#F87171;">[!] ${escapeHtml(v.rule_type || v.type)}</span>
+                                    <span class="badge-status" style="font-size:9px; background:#4B5563; color:#E5E7EB;">${escapeHtml(cat)}</span>
+                                </div>
+                                <span style="font-size:9px; font-weight:700; color:${statusColor};">${statusLabel}</span>
                             </div>
                             <div style="font-size:10px; color:#FECACA; margin-top:2px;">${escapeHtml(v.description || '')}</div>
                             ${v.detected_snippet ? `
@@ -126,19 +141,35 @@ function renderSelectedEditor() {
                                     Snippet: '${escapeHtml(v.detected_snippet)}'${v.suggested_correction ? ` -> '${escapeHtml(v.suggested_correction)}'` : ''}
                                 </div>
                             ` : ''}
-                            ${canFix ? `
-                                <div style="margin-top:6px;">
+                            ${v.suggestion && v.suggestion !== v.suggested_correction ? `
+                                <div style="font-size:10px; font-family:monospace; margin-top:2px; color:#A7F3D0;">
+                                    Rewrite: '${escapeHtml(v.suggestion)}'
+                                </div>
+                            ` : ''}
+                            <div style="display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                                ${isSupp ? `
+                                    <button class="btn-restore-bundle" onclick="toggleSuppressSingleViolation(event, '${v.violation_id}', false)">
+                                        [Restore] Re-flag as Active
+                                    </button>
+                                ` : `
+                                    ${!isFixed ? `
+                                        <button class="btn-accept-bundle" onclick="toggleSuppressSingleViolation(event, '${v.violation_id}', true)">
+                                            [Accept] Accept as Legitimate
+                                        </button>
+                                    ` : ''}
+                                `}
+                                ${canFix ? `
                                     ${isFixed ? `
                                         <span class="badge-status" style="font-size:10px; background:#10B981; color:#000; padding:2px 8px; font-weight:700;">[OK] Fix Applied</span>
                                     ` : `
-                                        <button class="apply-fix-btn" id="btnApplyFix_${node.node_id}_${vIdx}" onclick="applySingleFix(event, '${v.violation_id || node.node_id}')">
-                                            [Fix] Apply Suggested Fix: '${escapeHtml(v.suggested_correction)}'
+                                        <button class="apply-fix-btn" style="margin-top:0;" id="btnApplyFix_${node.node_id}_${vIdx}" onclick="applySingleFix(event, '${v.violation_id || node.node_id}')">
+                                            [Fix] Apply Suggested Fix: '${escapeHtml(v.suggested_correction || v.suggestion)}'
                                         </button>
                                     `}
-                                </div>
-                            ` : `
-                                <div style="font-size:9px; color:var(--text-muted); margin-top:4px;">(No automated fix - manual review required)</div>
-                            `}
+                                ` : `
+                                    <span style="font-size:9px; color:var(--text-muted);">(No automated fix - manual review required)</span>
+                                `}
+                            </div>
                         </div>
                     `;
                 }).join('')}
@@ -283,7 +314,8 @@ function renderDOMTree() {
     nodesToDisplay.forEach(node => {
         const nodePage = getNodePage(node);
         const isOnCurrentPage = (nodePage === currentPage);
-        const hasViol = violationsData.some(v => v.node_id === node.node_id && !v.is_fixed);
+        const hasActiveViol = violationsData.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v));
+        const hasSuppressedViol = violationsData.some(v => v.node_id === node.node_id && isSuppressed(v));
         const isIncorrect = !!node.is_incorrect_text;
         let displayText = (node.content && node.content.raw_text) ? node.content.raw_text : '';
         let isFixed = !!node.is_fixed;
@@ -298,7 +330,7 @@ function renderDOMTree() {
 
         const isSelected = selectedNodeIds.includes(node.node_id);
         const card = document.createElement('div');
-        card.className = `node-card ${hasViol && !isFixed ? 'has-violation' : ''} ${isIncorrect ? 'is-incorrect' : ''} ${isSelected ? 'selected' : ''}`;
+        card.className = `node-card ${hasActiveViol && !isFixed ? 'has-violation' : ''} ${isIncorrect ? 'is-incorrect' : ''} ${isSelected ? 'selected' : ''}`;
         card.id = `card-${node.node_id}`;
         card.onclick = (e) => handleNodeClick(e, node.node_id);
         card.innerHTML = `
@@ -308,6 +340,7 @@ function renderDOMTree() {
                     <span class="badge-status" style="font-size:9px; background:${isOnCurrentPage ? '#2563EB' : '#374151'}; color:#FFF;">P${nodePage}</span>
                     <span class="node-type">${escapeHtml(node.type)}</span>
                     ${isFixed ? '<span class="node-corrected-badge">FIXED</span>' : ''}
+                    ${!hasActiveViol && hasSuppressedViol ? '<span class="badge-status" style="font-size:9px; background:#065F46; color:#A7F3D0;">ACCEPTED</span>' : ''}
                     ${isIncorrect ? '<span class="node-incorrect-badge">INCORRECT TEXT</span>' : ''}
                 </div>
             </div>

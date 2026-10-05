@@ -694,6 +694,87 @@ select.type-filter {
     border-color: #10B981;
 }
 
+.viol-card.suppressed {
+    background: #11221D;
+    border-color: #047857;
+    opacity: 0.9;
+}
+
+.viol-card.suppressed:hover {
+    background: #143229;
+    border-color: #10B981;
+}
+
+.viol-bundle {
+    background: #1E293B;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.viol-bundle-header {
+    background: #0F172A;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.viol-bundle-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #93C5FD;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.viol-bundle-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.viol-bundle-items {
+    padding: 8px;
+}
+
+.btn-accept-bundle {
+    background: #047857;
+    color: #FFF;
+    border: none;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-accept-bundle:hover {
+    background: #059669;
+}
+
+.btn-restore-bundle {
+    background: #374151;
+    color: #E5E7EB;
+    border: 1px solid #4B5563;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-restore-bundle:hover {
+    background: #4B5563;
+}
+
 .log-box {
     background: #0F172A;
     border: 1px solid var(--border-color);

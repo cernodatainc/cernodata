@@ -140,6 +140,35 @@ class TestDOMPrimitives(unittest.TestCase):
         self.assertEqual(node.bounding_box.x1, 100.0)
         self.assertEqual(node.content["raw_text"], "Section Header")
         self.assertEqual(node.template_hint_applied, "standard_title")
+        self.assertEqual(node.violations, [])
+
+    def test_dom_node_violations_field(self):
+        raw_node = {
+            "node_id": "node_viol_1",
+            "type": "paragraph",
+            "global_page_index": 1,
+            "temp_slice_index": 1,
+            "bounding_box": {"x0": 10.0, "y0": 10.0, "x1": 100.0, "y1": 30.0},
+            "content": {"raw_text": "Sample text with error."},
+            "violations": [
+                {
+                    "type": "diacritic",
+                    "suggestion": "Sample text with error fixed.",
+                    "suppressed": "false",
+                    "rule_type": "ocr_character_substitution"
+                }
+            ]
+        }
+        node = DOMNode.from_dict(raw_node)
+        self.assertEqual(len(node.violations), 1)
+        self.assertEqual(node.violations[0]["type"], "diacritic")
+        self.assertEqual(node.violations[0]["suggestion"], "Sample text with error fixed.")
+        self.assertEqual(node.violations[0]["suppressed"], "false")
+
+        d = node.to_dict()
+        self.assertIn("violations", d)
+        self.assertEqual(len(d["violations"]), 1)
+        self.assertEqual(d["violations"][0]["type"], "diacritic")
 
     def test_document_dom_from_dict_and_json(self):
         raw_doc = {

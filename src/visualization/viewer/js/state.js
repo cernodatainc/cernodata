@@ -72,12 +72,59 @@ function getViolationPage(v) {
     return 1;
 }
 
+function isSuppressed(v) {
+    if (!v) return false;
+    return String(v.suppressed).toLowerCase() === "true" || v.suppressed === true;
+}
+
 function ensureViolationIds() {
     violationsData.forEach((v, idx) => {
         if (!v.violation_id) {
             v.violation_id = `viol_auto_${v.node_id || idx}_${idx}`;
         }
+        if (!v.type) {
+            v.type = (v.rule_type === 'garbage_character_ratio') ? 'symbols' : 'diacritic';
+        }
+        if (v.suppressed === undefined || v.suppressed === null) {
+            v.suppressed = "false";
+        } else {
+            v.suppressed = String(v.suppressed);
+        }
     });
+}
+
+function syncDomAndViolations() {
+    ensureViolationIds();
+    if (domData && domData.nodes) {
+        domData.nodes.forEach(node => {
+            if (!node.violations) {
+                node.violations = [];
+            }
+            if (node.violations.length === 0) {
+                const matching = violationsData.filter(v => v.node_id === node.node_id);
+                if (matching.length > 0) {
+                    node.violations = JSON.parse(JSON.stringify(matching));
+                }
+            } else {
+                node.violations.forEach(nv => {
+                    if (!nv.type) {
+                        nv.type = (nv.rule_type === 'garbage_character_ratio') ? 'symbols' : 'diacritic';
+                    }
+                    if (nv.suppressed === undefined || nv.suppressed === null) {
+                        nv.suppressed = "false";
+                    } else {
+                        nv.suppressed = String(nv.suppressed);
+                    }
+                    const found = violationsData.find(v => (nv.violation_id && v.violation_id === nv.violation_id) || (v.node_id === node.node_id && v.rule_type === nv.rule_type));
+                    if (found) {
+                        found.suppressed = nv.suppressed;
+                        found.type = nv.type;
+                        if (nv.suggestion) found.suggestion = nv.suggestion;
+                    }
+                });
+            }
+        });
+    }
 }
 
 function roundCoord(val) {
@@ -118,7 +165,7 @@ function hydrateViewer(data) {
     violationsData = JSON.parse(JSON.stringify(initialViolationsData));
     decisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
-    ensureViolationIds();
+    syncDomAndViolations();
 
     const docEl = document.getElementById('domSourceFilename');
     if (docEl && (domData.source_filename || pdfSourceFile)) {
