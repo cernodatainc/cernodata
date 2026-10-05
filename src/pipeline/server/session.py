@@ -6,16 +6,21 @@ Thread-safe state container for server sessions, progress tracking, and hydratio
 
 from __future__ import annotations
 
-import base64
 import glob
-import json
 import logging
 import os
 import threading
 from typing import Any, Dict, List, Mapping, Optional
 
 from src.pipeline.planner_models import DocumentPlan
-from src.pipeline.server.common import REPO_ROOT, SRC_DIR, find_previous_runs
+from src.pipeline.server.common import (
+    REPO_ROOT,
+    SRC_DIR,
+    find_previous_runs,
+    load_or_render_page_images,
+    load_run_artifacts,
+    normalize_violations,
+)
 from src.utils import resolve_pdf_path
 
 logger = logging.getLogger("cernodata.server.session")
@@ -88,57 +93,11 @@ class ServerSessionContext:
                 logger.warning("Requested output directory does not exist: %s", full_dir)
                 return {}
 
-            plan_res_path = os.path.join(full_dir, "plan_execution_result.json")
-            plan_path = os.path.join(full_dir, "plan.json")
-            dom_path = os.path.join(full_dir, "document_dom.json")
-            viol_path = os.path.join(full_dir, "quality_violations.json")
-            dec_path = os.path.join(full_dir, "decision_tree.json")
-
-            plan_dict: Optional[Dict[str, Any]] = None
-            decision_dict: Dict[str, Any] = {}
-            dom_dict: Dict[str, Any] = {}
-            viol_list: List[Dict[str, Any]] = []
-
-            if os.path.exists(plan_res_path):
-                try:
-                    with open(plan_res_path, "r", encoding="utf-8") as f:
-                        res_data = json.load(f)
-                        decision_dict = res_data.get("decision", {})
-                        plan_dict = res_data.get("plan")
-                except Exception as e:
-                    logger.warning("Error loading %s: %s", plan_res_path, e)
-
-            if os.path.exists(plan_path) and not plan_dict:
-                try:
-                    with open(plan_path, "r", encoding="utf-8") as f:
-                        plan_dict = json.load(f)
-                except Exception as e:
-                    logger.warning("Error loading %s: %s", plan_path, e)
-
-            if os.path.exists(dec_path) and not decision_dict:
-                try:
-                    with open(dec_path, "r", encoding="utf-8") as f:
-                        decision_dict = json.load(f)
-                except Exception as e:
-                    logger.warning("Error loading %s: %s", dec_path, e)
-
-            if os.path.exists(dom_path):
-                try:
-                    with open(dom_path, "r", encoding="utf-8") as f:
-                        dom_dict = json.load(f)
-                except Exception as e:
-                    logger.warning("Error loading %s: %s", dom_path, e)
-
-            if os.path.exists(viol_path):
-                try:
-                    with open(viol_path, "r", encoding="utf-8") as f:
-                        loaded_viols = json.load(f)
-                        if isinstance(loaded_viols, list):
-                            viol_list = loaded_viols
-                        elif isinstance(loaded_viols, dict):
-                            viol_list = loaded_viols.get("violations", [])
-                except Exception as e:
-                    logger.warning("Error loading %s: %s", viol_path, e)
+            artifacts = load_run_artifacts(full_dir)
+            plan_dict = artifacts["plan"]
+            decision_dict = artifacts["decision"]
+            dom_dict = artifacts["dom"]
+            viol_list = artifacts["violations"]
 
             if plan_dict:
                 try:
@@ -297,12 +256,7 @@ class ServerSessionContext:
                 self.load_previous_run(output_dir)
             elif not self.preset_attempts and not self.current_result:
                 self.load_previous_run(self.output_dir or "output")
-            raw_viols = self.current_result.get("violations") if self.current_result else []
-            v_list = (
-                raw_viols
-                if isinstance(raw_viols, list)
-                else (raw_viols.get("violations", []) if isinstance(raw_viols, dict) else [])
-            )
+            v_list = normalize_violations(self.current_result.get("violations")) if self.current_result else []
             return {
                 "attempts": list(self.preset_attempts),
                 "decision": self.current_result.get("decision") if self.current_result else None,
@@ -322,69 +276,21 @@ class ServerSessionContext:
             target_dir = self.output_dir or "output"
             target_full = target_dir if os.path.isabs(target_dir) else os.path.join(self.repo_root, target_dir)
 
-            dom_file = os.path.join(target_full, "document_dom.json")
-            viol_file = os.path.join(target_full, "quality_violations.json")
-            dec_file = os.path.join(target_full, "decision_tree.json")
-            plan_file = os.path.join(target_full, "plan.json")
-            plan_res_file = os.path.join(target_full, "plan_execution_result.json")
-
-            dom_data: Dict[str, Any] = {
+            artifacts = load_run_artifacts(target_full)
+            dom_data = artifacts["dom"] or {
                 "document_id": "doc_init",
                 "source_filename": self.pdf_path or "Document 8.pdf",
                 "total_pages": 1,
                 "nodes": [],
             }
-            violations_data: List[Dict[str, Any]] = []
-            decision_data: Dict[str, Any] = {
+            violations_data = artifacts["violations"]
+            decision_data = artifacts["decision"] or {
                 "chosen_preset": "docling_fast",
                 "overall_confidence": 1.0,
                 "status": "ACCEPT",
                 "attempts": list(self.preset_attempts),
             }
-            plan_data: Optional[Dict[str, Any]] = None
-
-            if os.path.exists(plan_res_file):
-                try:
-                    with open(plan_res_file, "r", encoding="utf-8") as f:
-                        res_obj = json.load(f)
-                        if "decision" in res_obj:
-                            decision_data = res_obj["decision"]
-                        if "plan" in res_obj:
-                            plan_data = res_obj["plan"]
-                except (json.JSONDecodeError, OSError) as e:
-                    logger.warning("Could not load plan_execution_result from %s: %s", plan_res_file, e)
-
-            if os.path.exists(dom_file):
-                try:
-                    with open(dom_file, "r", encoding="utf-8") as f:
-                        dom_data = json.load(f)
-                except (json.JSONDecodeError, OSError) as e:
-                    logger.warning("Could not load DOM cache from %s: %s", dom_file, e)
-
-            if os.path.exists(viol_file):
-                try:
-                    with open(viol_file, "r", encoding="utf-8") as f:
-                        loaded_v = json.load(f)
-                        if isinstance(loaded_v, list):
-                            violations_data = loaded_v
-                        elif isinstance(loaded_v, dict):
-                            violations_data = loaded_v.get("violations", [])
-                except (json.JSONDecodeError, OSError) as e:
-                    logger.warning("Could not load violations cache from %s: %s", viol_file, e)
-
-            if os.path.exists(dec_file) and not decision_data.get("decision_tree"):
-                try:
-                    with open(dec_file, "r", encoding="utf-8") as f:
-                        decision_data = json.load(f)
-                except (json.JSONDecodeError, OSError) as e:
-                    logger.warning("Could not load decision cache from %s: %s", dec_file, e)
-
-            if os.path.exists(plan_file) and plan_data is None:
-                try:
-                    with open(plan_file, "r", encoding="utf-8") as f:
-                        plan_data = json.load(f)
-                except (json.JSONDecodeError, OSError) as e:
-                    logger.warning("Could not load plan cache from %s: %s", plan_file, e)
+            plan_data = artifacts["plan"]
 
             raw_pdf = (
                 self.pdf_path
@@ -395,33 +301,11 @@ class ServerSessionContext:
             pdf_path = resolve_pdf_path(raw_pdf)
             total_pages = dom_data.get("total_pages", 1) or 1
 
-            from src.visualization.viewer.pdf_renderer import (
-                get_pdf_page_dimensions,
-                render_all_pages_to_base64,
+            page_images, page_dimensions = load_or_render_page_images(
+                pdf_path=pdf_path,
+                target_dir=target_full,
+                total_pages=total_pages,
             )
-
-            page_images: List[str] = []
-            page_dimensions: List[Dict[str, float]] = []
-
-            if os.path.exists(pdf_path):
-                try:
-                    page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
-                    page_dimensions = get_pdf_page_dimensions(pdf_path)
-                except Exception as e:
-                    logger.warning("Could not render page images for %s: %s", pdf_path, e)
-
-            if not page_images:
-                for p in range(1, total_pages + 1):
-                    img_candidate = os.path.join(target_full, f"overlay_page_{p}.png")
-                    if os.path.exists(img_candidate):
-                        try:
-                            with open(img_candidate, "rb") as img_f:
-                                b64 = base64.b64encode(img_f.read()).decode("ascii")
-                                page_images.append(f"data:image/png;base64,{b64}")
-                                if len(page_dimensions) < p:
-                                    page_dimensions.append({"width": 612.0, "height": 792.0})
-                        except Exception as e:
-                            logger.warning("Could not load overlay image %s: %s", img_candidate, e)
 
             if not decision_data.get("attempts") and self.preset_attempts:
                 decision_data["attempts"] = list(self.preset_attempts)
@@ -451,28 +335,14 @@ class ServerSessionContext:
 
             dom_dict = result["dom"]
             decision_dict = result["decision"]
-            raw_v = result.get("violations", [])
-            violations_list = (
-                raw_v
-                if isinstance(raw_v, list)
-                else (raw_v.get("violations", []) if isinstance(raw_v, dict) else [])
-            )
+            violations_list = normalize_violations(result.get("violations", []))
             total_pages = dom_dict.get("total_pages", 1) or 1
 
-            from src.visualization.viewer.pdf_renderer import (
-                get_pdf_page_dimensions,
-                render_all_pages_to_base64,
+            page_images, page_dimensions = load_or_render_page_images(
+                pdf_path=resolved_path,
+                target_dir=self.output_dir or "output",
+                total_pages=total_pages,
             )
-
-            page_images: List[str] = []
-            page_dimensions: List[Dict[str, float]] = []
-
-            if os.path.exists(resolved_path):
-                try:
-                    page_images = render_all_pages_to_base64(resolved_path, total_pages=total_pages)
-                    page_dimensions = get_pdf_page_dimensions(resolved_path)
-                except Exception as e:
-                    logger.warning("Could not render page images for %s: %s", resolved_path, e)
 
             self.viewer_data = {
                 "dom": dom_dict,

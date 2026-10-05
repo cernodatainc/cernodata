@@ -142,6 +142,28 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("executeMergeElements", content_js)
         self.assertIn("mergeDOMNodes", content_js)
 
+        # Test landing CSS and JS
+        status_l_css, content_l_css, headers_l_css = self._get("/landing.css")
+        self.assertEqual(status_l_css, 200)
+        self.assertIn("text/css", headers_l_css.get("Content-Type", ""))
+        self.assertIn(".hub-nav-bar", content_l_css)
+
+        status_l_js, content_l_js, headers_l_js = self._get("/landing.js")
+        self.assertEqual(status_l_js, 200)
+        self.assertIn("application/javascript", headers_l_js.get("Content-Type", ""))
+        self.assertIn("switchNavTab", content_l_js)
+
+        # Test data shape config CSS and JS
+        status_ds_css, content_ds_css, headers_ds_css = self._get("/data_shape_config.css")
+        self.assertEqual(status_ds_css, 200)
+        self.assertIn("text/css", headers_ds_css.get("Content-Type", ""))
+        self.assertIn(".main-container", content_ds_css)
+
+        status_ds_js, content_ds_js, headers_ds_js = self._get("/data_shape_config.js")
+        self.assertEqual(status_ds_js, 200)
+        self.assertIn("application/javascript", headers_ds_js.get("Content-Type", ""))
+        self.assertIn("PRESET_WEIGHTS", content_ds_js)
+
     def test_api_viewer_data_hydration(self) -> None:
         status, content, headers = self._get("/api/viewer_data")
         self.assertEqual(status, 200)

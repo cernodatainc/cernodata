@@ -1011,5 +1011,95 @@ select.type-filter {
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
 }
 
+/* Toolbar & Navigation Layout Classes */
+.brand-doc-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.header-back-btn {
+    text-decoration: none;
+    margin-left: 16px;
+    font-size: 11px;
+    padding: 3px 10px;
+    background: #1E293B;
+    color: #93C5FD;
+    border: 1px solid #3B82F6;
+}
+
+.zoom-btn-sm {
+    font-size: 10px;
+    width: auto;
+    padding: 0 4px;
+}
+
+.page-controls-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-left: 1px solid var(--border-color);
+    padding-left: 10px;
+}
+
+.page-select-dropdown {
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+.control-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.current-page-num {
+    color: #FFF;
+}
+
+.toggle-group-bordered {
+    border-left: 1px solid var(--border-color);
+    padding-left: 10px;
+}
+
+.toggle-corrections-label {
+    color: #69F0AE;
+}
+
+.lang-controls-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-left: 1px solid var(--border-color);
+    padding-left: 12px;
+}
+
+.action-btn-draw-section {
+    background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+    color: #FFF;
+}
+
+.action-btn-decollide {
+    background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+    color: #FFF;
+}
+
+.action-btn-decollide-sm {
+    font-size: 10px;
+    padding: 3px 8px;
+    background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+    color: #FFF;
+}
+
+.filter-controls-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.log-box-plan {
+    color: #A7F3D0;
+}
+
 
 

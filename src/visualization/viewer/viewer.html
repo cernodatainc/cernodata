@@ -18,11 +18,11 @@
             <div class="brand-logo">C</div>
             <div>
                 <div class="brand-title">cernodata Visual Flow &amp; Preset Simulator</div>
-                <div style="font-size: 11px; color: var(--text-muted);">
+                <div class="brand-doc-meta">
                     Document: <span id="domSourceFilename">sample.pdf</span> | ID: <span id="domDocId">doc_init</span><span id="planHeaderSub"></span>
                 </div>
             </div>
-            <a href="/" class="action-btn" style="text-decoration:none; margin-left:16px; font-size:11px; padding:3px 10px; background:#1E293B; color:#93C5FD; border:1px solid #3B82F6;">&lt;- Back to Hub</a>
+            <a href="/" class="action-btn header-back-btn">&lt;- Back to Hub</a>
         </div>
 
         <div class="timeline" id="timelineContainer">
@@ -35,30 +35,30 @@
             <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom Out">-</button>
             <span class="zoom-label" id="zoomDisplay">100%</span>
             <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom In">+</button>
-            <button class="zoom-btn" style="font-size:10px; width:auto; padding:0 4px;" onclick="resetZoom()" title="Reset Zoom">100%</button>
-            <button class="zoom-btn" style="font-size:10px; width:auto; padding:0 4px;" onclick="fitWidthZoom()" title="Fit Width">Fit</button>
+            <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset Zoom">100%</button>
+            <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit Width">Fit</button>
         </div>
 
-        <div class="page-controls" style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-color); padding-left: 10px;">
-            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;">Page:</span>
+        <div class="page-controls page-controls-group">
+            <span class="control-label">Page:</span>
             <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous Page">&lt;</button>
-            <select class="type-filter" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))" style="padding: 2px 6px; font-size: 12px;"></select>
+            <select class="type-filter page-select-dropdown" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))"></select>
             <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next Page">&gt;</button>
-            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;"><span id="currentPageNum" style="color: #FFF;">1</span> / <span id="totalPagesNum">1</span></span>
+            <span class="control-label"><span id="currentPageNum" class="current-page-num">1</span> / <span id="totalPagesNum">1</span></span>
         </div>
 
         <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding Boxes</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality Violations</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score Badge</label></div>
-        <div class="toggle-group" style="border-left: 1px solid var(--border-color); padding-left: 10px;">
-            <label style="color: #69F0AE;"><input type="checkbox" id="toggleCorrections" onchange="toggleAllCorrections()"> Apply Diacritic Fixes</label>
+        <div class="toggle-group toggle-group-bordered">
+            <label class="toggle-corrections-label"><input type="checkbox" id="toggleCorrections" onchange="toggleAllCorrections()"> Apply Diacritic Fixes</label>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border-color); padding-left: 12px;">
-            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;">Detected Lang:</span>
+        <div class="lang-controls-group">
+            <span class="control-label">Detected Lang:</span>
             <span class="badge-status lang" id="detectedLangBadge">P1: en</span>
-            <span style="color: var(--text-muted); font-size: 11px; font-weight: 600;">Override:</span>
+            <span class="control-label">Override:</span>
             <select class="type-filter" id="selectLanguage" onchange="onLanguageChanged()">
                 <option value="auto">Auto-Detect</option>
                 <option value="pl">Polish (pl)</option>
@@ -70,10 +70,10 @@
             <button class="action-btn" id="btnRedoLang" onclick="redoWithSelectedLanguage()">[REDO] Redo Run</button>
         </div>
         <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
-        <button class="action-btn" id="btnDrawSection" onclick="toggleDrawSectionMode()" style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); color: #FFF;" title="Draw and select a custom section on the page to parse with OCR">[+ SECTION] Select Section</button>
-        <button class="action-btn" id="btnDecollidePage" onclick="decollideCurrentPage()" style="background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); color: #FFF;" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
-        <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
-            <span style="color: var(--text-muted);">Filter:</span>
+        <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and select a custom section on the page to parse with OCR">[+ SECTION] Select Section</button>
+        <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
+        <div class="filter-controls-group">
+            <span class="control-label">Filter:</span>
             <select class="type-filter" id="typeFilter" onchange="updateLayers()">
                 <option value="ALL">All Types</option>
                 <option value="heading">Headings</option>
@@ -93,7 +93,7 @@
 
             <div class="score-badge-box" id="scoreBadge">
                 <div class="score-title" id="scoreTitle">Page 1 Confidence Score: 1.0000</div>
-                <div class="score-sub" id="scoreSub" style="color: var(--accent-green)">
+                <div class="score-sub" id="scoreSub">
                     Status: ACCEPT | Overall Confidence: 1.0000 | Violations Flagged: 0
                 </div>
             </div>
@@ -110,14 +110,14 @@
             <div class="tab-content active" id="domTab">
                 <div class="page-action-bar">
                     <span class="page-action-title" id="pageActionTitle">Page 1 Controls:</span>
-                    <button class="action-btn" style="font-size:10px; padding:3px 8px; background:linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); color:#FFF;" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
+                    <button class="action-btn action-btn-decollide-sm" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
                 </div>
                 <div id="selectedEditorContainer"></div>
                 <div id="domListContainer"></div>
             </div>
             <div class="tab-content" id="violTab"><div id="violListContainer"></div></div>
             <div class="tab-content" id="logTab"><div class="log-box"><pre id="logContent"></pre></div></div>
-            <div class="tab-content" id="planTab"><div class="log-box" style="color: #A7F3D0;"><pre id="planContent"></pre></div></div>
+            <div class="tab-content" id="planTab"><div class="log-box log-box-plan"><pre id="planContent"></pre></div></div>
         </div>
     </div>
 

@@ -12,11 +12,28 @@ import webbrowser
 from typing import Any, Optional
 
 from src.pipeline.planner_models import DocumentPlan
-from src.pipeline.server.common import SRC_DIR
+from src.pipeline.server.common import (
+    SRC_DIR,
+    copy_file_if_exists,
+    read_html_template,
+)
 from src.pipeline.server.core import PipelineViewerServer
 from src.pipeline.server.handler import PipelineViewerHandler
 from src.pipeline.server.session import ServerSessionContext
 from src.utils import find_available_port, mkdirs
+
+
+def export_standalone_wizard_assets(output_dir: str, html_content: str) -> None:
+    """Exports standalone copies of HTML, CSS, and JS assets to target directory for offline usage."""
+    mkdirs(output_dir)
+    exported_html_path = os.path.join(output_dir, "data_shape_config.html")
+    with open(exported_html_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    for asset_name in ("data_shape_config.css", "data_shape_config.js"):
+        src_path = os.path.join(SRC_DIR, "visualization", asset_name)
+        dst_path = os.path.join(output_dir, asset_name)
+        copy_file_if_exists(src_path, dst_path)
 
 
 def serve_data_shape_wizard(
@@ -33,20 +50,8 @@ def serve_data_shape_wizard(
     Blocks until user submits plan via browser, then shuts down and returns DocumentPlan.
     """
     actual_port = find_available_port(start_port=port)
-
-    # Locate and read HTML template
-    html_src_path = os.path.join(SRC_DIR, "visualization", "data_shape_config.html")
-    if os.path.exists(html_src_path):
-        with open(html_src_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-    else:
-        html_content = "<html><body><h1>cernodata Data Shape Planner</h1><p>Template missing.</p></body></html>"
-
-    # Also export standalone copy to output directory
-    mkdirs(output_dir)
-    exported_html_path = os.path.join(output_dir, "data_shape_config.html")
-    with open(exported_html_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
+    html_content = read_html_template("data_shape_config.html", fallback_title="cernodata Data Shape Planner")
+    export_standalone_wizard_assets(output_dir=output_dir, html_content=html_content)
 
     session = ServerSessionContext(pdf_path=default_doc or "", language=default_lang or "en", output_dir=output_dir)
     httpd = PipelineViewerServer(("127.0.0.1", actual_port), PipelineViewerHandler, session_context=session)
