@@ -102,7 +102,8 @@ function renderSelectedEditor() {
     }
     const noteVal = node.user_correction_note;
 
-    const nodeViols = violationsData.filter(v => v.node_id === node.node_id);
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const nodeViols = viols.filter(v => v.node_id === node.node_id);
     let violationsHtml = '';
     if (nodeViols.length > 0) {
         violationsHtml = `
@@ -314,8 +315,9 @@ function renderDOMTree() {
     nodesToDisplay.forEach(node => {
         const nodePage = getNodePage(node);
         const isOnCurrentPage = (nodePage === currentPage);
-        const hasActiveViol = violationsData.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v));
-        const hasSuppressedViol = violationsData.some(v => v.node_id === node.node_id && isSuppressed(v));
+        const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+        const hasActiveViol = viols.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v));
+        const hasSuppressedViol = viols.some(v => v.node_id === node.node_id && isSuppressed(v));
         const isIncorrect = !!node.is_incorrect_text;
         let displayText = (node.content && node.content.raw_text) ? node.content.raw_text : '';
         let isFixed = !!node.is_fixed;

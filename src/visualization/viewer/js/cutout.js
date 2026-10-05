@@ -16,7 +16,8 @@ function getEffectiveNodeAngle(nodeId, bbox) {
             return roundCoord((Math.atan2(dy, dx) * 180.0) / Math.PI);
         }
     }
-    const v = violationsData.find(viol => viol.node_id === nodeId && viol.bounding_box && viol.bounding_box.angle);
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const v = viols.find(viol => viol.node_id === nodeId && viol.bounding_box && viol.bounding_box.angle);
     if (v) {
         return v.bounding_box.angle;
     }

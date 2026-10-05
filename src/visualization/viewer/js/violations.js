@@ -9,9 +9,10 @@ function renderViolationsList() {
     const container = document.getElementById('violListContainer');
     if (!container) return;
 
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
     const violationsToDisplay = showAllViolations
-        ? violationsData
-        : violationsData.filter(v => getViolationPage(v) === currentPage);
+        ? viols
+        : viols.filter(v => getViolationPage(v) === currentPage);
 
     const activeCount = violationsToDisplay.filter(v => !v.is_fixed && !isSuppressed(v)).length;
     const countEl = document.getElementById('violCount');
@@ -23,12 +24,12 @@ function renderViolationsList() {
     }
 
     if (violationsToDisplay.length === 0) {
-        if (violationsData.length === 0) {
+        if (viols.length === 0) {
             container.innerHTML = '<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600;">[OK] Zero quality violations detected for current language/preset.</div>';
         } else {
             container.innerHTML = `<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600; padding: 10px;">
                 [OK] Zero quality violations on Page ${currentPage}.<br>
-                <span style="font-size:10px; color: var(--text-muted); font-weight:400;">(Shift-click "Violations" tab to show all ${violationsData.length} violation(s) across all pages)</span>
+                <span style="font-size:10px; color: var(--text-muted); font-weight:400;">(Shift-click "Violations" tab to show all ${viols.length} violation(s) across all pages)</span>
             </div>`;
         }
         return;
@@ -157,7 +158,8 @@ function acceptCategoryOnPage(category, targetPage = null) {
     const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
     let count = 0;
 
-    violationsData.forEach(v => {
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    viols.forEach(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
         if (vCat === category && (page === null || vPage === page)) {
@@ -201,7 +203,8 @@ function restoreCategoryOnPage(category, targetPage = null) {
     const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
     let count = 0;
 
-    violationsData.forEach(v => {
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    viols.forEach(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
         if (vCat === category && (page === null || vPage === page)) {
@@ -246,7 +249,8 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
         evt.stopPropagation();
     }
 
-    const v = violationsData.find(item => item.violation_id === violationId);
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const v = viols.find(item => item.violation_id === violationId);
     if (!v) return;
 
     v.suppressed = shouldSuppress ? "true" : "false";
@@ -279,7 +283,8 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
 
 function applyAllFixesForCategory(category, targetPage = null) {
     const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
-    const targets = violationsData.filter(v => {
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const targets = viols.filter(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
         return vCat === category && (page === null || vPage === page) && !v.is_fixed && (v.suggested_correction || v.suggestion);
@@ -308,8 +313,9 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     let targetSnippet = snippet;
     let targetFix = fix;
 
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
     if (typeof idOrNodeId === 'string') {
-        const found = violationsData.find(v => v.violation_id === idOrNodeId);
+        const found = viols.find(v => v.violation_id === idOrNodeId);
         if (found) {
             targetViol = found;
             targetNodeId = found.node_id;
@@ -319,7 +325,7 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     }
 
     if (!targetViol && targetNodeId) {
-        targetViol = violationsData.find(v => v.node_id === targetNodeId && (!targetSnippet || v.detected_snippet === targetSnippet));
+        targetViol = viols.find(v => v.node_id === targetNodeId && (!targetSnippet || v.detected_snippet === targetSnippet));
         if (targetViol) {
             if (!targetSnippet) targetSnippet = targetViol.detected_snippet;
             if (targetFix === null || targetFix === undefined) targetFix = (targetViol.suggested_correction || targetViol.suggestion);
@@ -351,7 +357,8 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     }
 
     if (targetSnippet) {
-        violationsData.forEach(v => {
+        const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+        viols.forEach(v => {
             if (v.node_id === targetNodeId && v.detected_snippet === targetSnippet) {
                 v.is_fixed = true;
             }

@@ -29,6 +29,7 @@ from typing import Dict, Any
 from src.pipeline.server import (
     PipelineViewerHandler,
     find_available_port,
+    find_previous_runs,
 )
 
 
@@ -137,6 +138,7 @@ class TestPipelineServer(unittest.TestCase):
         self.assertEqual(status_js, 200)
         self.assertIn("application/javascript", headers_js.get("Content-Type", ""))
         self.assertIn("hydrateViewer", content_js)
+        self.assertIn("extractViolationsList", content_js)
         self.assertIn("executeMergeElements", content_js)
         self.assertIn("mergeDOMNodes", content_js)
 
@@ -149,6 +151,7 @@ class TestPipelineServer(unittest.TestCase):
         # Check required hydration payload structure
         self.assertIn("dom", data)
         self.assertIn("violations", data)
+        self.assertIsInstance(data["violations"], list)
         self.assertIn("decision", data)
         self.assertIn("pageImages", data)
         self.assertIn("pageDimensions", data)
@@ -226,3 +229,63 @@ class TestPipelineServer(unittest.TestCase):
         if os.path.exists("test_output_save"):
             import shutil
             shutil.rmtree("test_output_save", ignore_errors=True)
+
+    def test_find_previous_runs_discovers_outputs(self) -> None:
+        runs = find_previous_runs()
+        self.assertIsInstance(runs, list)
+        self.assertGreater(len(runs), 0)
+        run_ids = [r["id"] for r in runs]
+        # output or src/e2e/output should be found
+        self.assertTrue(any("output" in rid for rid in run_ids))
+        first_run = runs[0]
+        self.assertIn("dir_path", first_run)
+        self.assertIn("document_name", first_run)
+        self.assertIn("chosen_preset", first_run)
+        self.assertIn("status", first_run)
+        self.assertIn("overall_confidence", first_run)
+        self.assertIn("label", first_run)
+
+    def test_api_previous_runs_endpoint(self) -> None:
+        status, content, _ = self._get("/api/previous_runs")
+        self.assertEqual(status, 200)
+        data = json.loads(content)
+        self.assertIn("runs", data)
+        self.assertIn("active_run", data)
+        self.assertIsInstance(data["runs"], list)
+        self.assertGreater(len(data["runs"]), 0)
+
+    def test_api_load_run_endpoint_post_and_get(self) -> None:
+        # Test POST /api/load_run
+        status, resp = self._post_json("/api/load_run", {"output_dir": "output"})
+        self.assertEqual(status, 200)
+        self.assertTrue(resp.get("success"))
+        self.assertEqual(resp.get("output_dir"), "output")
+        self.assertIn("run", resp)
+        self.assertIn("results", resp)
+
+        # Test GET /api/load_run?output_dir=output
+        status, content, _ = self._get("/api/load_run?output_dir=output")
+        self.assertEqual(status, 200)
+        get_data = json.loads(content)
+        self.assertTrue(get_data.get("success"))
+        self.assertEqual(get_data.get("output_dir"), "output")
+
+    def test_api_results_and_viewer_data_with_output_dir(self) -> None:
+        # Query results specifying output directory
+        status, content, _ = self._get("/api/results?output_dir=output")
+        self.assertEqual(status, 200)
+        res_data = json.loads(content)
+        self.assertIn("attempts", res_data)
+        self.assertIn("decision", res_data)
+        self.assertIn("output_dir", res_data)
+        self.assertEqual(res_data["output_dir"], "output")
+
+        # Query viewer_data specifying output directory
+        status, content, _ = self._get("/api/viewer_data?output_dir=output")
+        self.assertEqual(status, 200)
+        v_data = json.loads(content)
+        self.assertIn("dom", v_data)
+        self.assertIn("violations", v_data)
+        self.assertIsInstance(v_data["violations"], list)
+        self.assertIn("decision", v_data)
+        self.assertEqual(v_data.get("outputDir"), "output")

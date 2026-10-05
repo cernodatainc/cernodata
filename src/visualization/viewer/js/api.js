@@ -44,7 +44,9 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
             }
 
             domData = data.dom;
-            violationsData = data.violations;
+            violationsData = (typeof extractViolationsList === 'function')
+                ? extractViolationsList(data.violations)
+                : (Array.isArray(data.violations) ? data.violations : (data.violations && data.violations.violations) || []);
             decisionData = data.decision;
             ensureViolationIds();
             activeLanguage = targetLang;
@@ -73,7 +75,8 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         if (simTargetLang === 'en') {
             return basePageScore;
         } else if (simTargetLang === 'pl') {
-            const hasDiacriticViolations = violationsData.some(v => v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution');
+            const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+            const hasDiacriticViolations = viols.some(v => v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution');
             if (hasDiacriticViolations && !appliedCorrections) {
                 return (initialDecisionData.attempts && initialDecisionData.attempts[0])
                     ? (initialDecisionData.attempts[0].overall_confidence || 0.5324)
@@ -84,10 +87,13 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         return basePageScore;
     }
 
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
     if (targetLang === 'en') {
-        violationsData = violationsData.filter(v => v.rule_type !== 'diacritic_conflict' && v.rule_type !== 'ocr_character_substitution');
+        violationsData = viols.filter(v => v.rule_type !== 'diacritic_conflict' && v.rule_type !== 'ocr_character_substitution');
     } else if (targetLang === 'pl') {
-        violationsData = JSON.parse(JSON.stringify(initialViolationsData));
+        violationsData = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)))
+            : JSON.parse(JSON.stringify(initialViolationsData || []));
         ensureViolationIds();
     }
 
@@ -157,7 +163,10 @@ function updatePresetUIState() {
 
     const subEl = document.getElementById('scoreSub');
     if (subEl) {
-        subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violationsData.length}`;
+        const violCount = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(violationsData).length
+            : (Array.isArray(violationsData) ? violationsData.length : 0);
+        subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violCount}`;
         subEl.style.color = isAccepted ? 'var(--accent-green)' : 'var(--accent-red)';
     }
     const badgeEl = document.getElementById('scoreBadge');

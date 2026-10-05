@@ -5,8 +5,16 @@
  * for the interactive viewer.
  */
 
+function extractViolationsList(val) {
+    if (Array.isArray(val)) return val;
+    if (val && typeof val === 'object' && Array.isArray(val.violations)) {
+        return val.violations;
+    }
+    return [];
+}
+
 let initialDomData = (window.VIEWER_DATA && window.VIEWER_DATA.dom) ? window.VIEWER_DATA.dom : { nodes: [] };
-let initialViolationsData = (window.VIEWER_DATA && window.VIEWER_DATA.violations) ? window.VIEWER_DATA.violations : [];
+let initialViolationsData = extractViolationsList(window.VIEWER_DATA && window.VIEWER_DATA.violations);
 let initialDecisionData = (window.VIEWER_DATA && window.VIEWER_DATA.decision) ? window.VIEWER_DATA.decision : {};
 let detectedLanguagesMap = (window.VIEWER_DATA && window.VIEWER_DATA.detectedLanguages) ? window.VIEWER_DATA.detectedLanguages : {};
 let planData = (window.VIEWER_DATA && window.VIEWER_DATA.plan) ? window.VIEWER_DATA.plan : null;
@@ -30,7 +38,7 @@ let activeDrag = null;
 let currentZoom = 1.0;
 
 let domData = JSON.parse(JSON.stringify(initialDomData));
-let violationsData = JSON.parse(JSON.stringify(initialViolationsData));
+let violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
 let decisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
 const TEXTUAL_TYPES = ['paragraph', 'heading', 'header_footer', 'text'];
@@ -78,6 +86,9 @@ function isSuppressed(v) {
 }
 
 function ensureViolationIds() {
+    if (!Array.isArray(violationsData)) {
+        violationsData = extractViolationsList(violationsData);
+    }
     violationsData.forEach((v, idx) => {
         if (!v.violation_id) {
             v.violation_id = `viol_auto_${v.node_id || idx}_${idx}`;
@@ -94,6 +105,9 @@ function ensureViolationIds() {
 }
 
 function syncDomAndViolations() {
+    if (!Array.isArray(violationsData)) {
+        violationsData = extractViolationsList(violationsData);
+    }
     ensureViolationIds();
     if (domData && domData.nodes) {
         domData.nodes.forEach(node => {
@@ -137,7 +151,8 @@ function escapeHtml(str) {
 
 function applyCorrectionsToNodeText(rawText) {
     let text = rawText;
-    initialViolationsData.forEach(v => {
+    const viols = extractViolationsList(initialViolationsData);
+    viols.forEach(v => {
         if (v.detected_snippet && v.suggested_correction) {
             text = text.replace(new RegExp(v.detected_snippet, 'g'), v.suggested_correction);
         }
@@ -149,7 +164,7 @@ function hydrateViewer(data) {
     if (!data) return;
     window.VIEWER_DATA = data;
     initialDomData = data.dom || { nodes: [] };
-    initialViolationsData = data.violations || [];
+    initialViolationsData = extractViolationsList(data.violations);
     initialDecisionData = data.decision || {};
     detectedLanguagesMap = data.detectedLanguages || {};
     planData = data.plan || null;
@@ -162,7 +177,7 @@ function hydrateViewer(data) {
     activeLanguage = data.activeLanguage || "en";
 
     domData = JSON.parse(JSON.stringify(initialDomData));
-    violationsData = JSON.parse(JSON.stringify(initialViolationsData));
+    violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
     decisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
     syncDomAndViolations();

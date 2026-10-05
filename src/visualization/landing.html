@@ -497,13 +497,31 @@
 
     <main class="hub-content">
 
+        <!-- Previous Run Output Selector Bar -->
+        <div class="card" style="padding: 12px 18px; margin-bottom: 16px; background: #0F172A; border-color: #1E3A8A;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
+                    <span style="font-size: 11px; font-weight: 700; color: #60A5FA; text-transform: uppercase; letter-spacing: 0.5px;">Previous Run Output:</span>
+                    <select id="globalRunSelect" class="form-select" style="min-width: 300px; max-width: 560px; flex: 1; padding: 6px 10px; font-size: 12px;" onchange="if(this.value) choosePreviousRun(this.value)">
+                        <option value="">-- Choose output of a previous run --</option>
+                    </select>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="loadSelectedRun()">[LOAD] Load Run Output</button>
+                    <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="loadPreviousRunsList()">[REFRESH] Refresh</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 11px; color: var(--text-muted);">Active Run:</span>
+                    <span class="preset-badge" id="activeRunBadge" style="background: #064E3B; color: #6EE7B7; border: 1px solid #10B981;">output</span>
+                </div>
+            </div>
+        </div>
+
         <!-- 1. Input Selection Section -->
         <section class="tab-section active" id="secInput">
             <div class="card">
                 <div class="card-header">
                     <div>
                         <div class="card-title">1. Document Input &amp; Ingestion Parameters</div>
-                        <div class="card-subtitle">Select the PDF file, OCR language hint, and confidence targets for automated iteration.</div>
+                        <div class="card-subtitle">Select the PDF file, OCR language hint, or browse completed previous outputs.</div>
                     </div>
                     <span class="badge badge-idle" id="inputStatusBadge">Ready</span>
                 </div>
@@ -520,6 +538,12 @@
                         <div class="file-chips" id="docChipsContainer">
                             <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Discovered files:</span>
                             <button class="chip-btn" onclick="selectDocPath('src/e2e/Document 8.pdf')">src/e2e/Document 8.pdf</button>
+                        </div>
+                        <div style="margin-top: 10px; padding: 10px; background: #0B0F19; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <div style="font-size: 11px; font-weight: 600; color: #93C5FD; margin-bottom: 4px;">Choose completed output from a previous run:</div>
+                            <div class="file-chips" id="previousRunsChipsContainer">
+                                <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Loading runs...</span>
+                            </div>
                         </div>
                     </div>
 
@@ -576,8 +600,15 @@
                         <div class="card-title">2. Execution Plan &amp; Preset Strategy Planning</div>
                         <div class="card-subtitle">Configure heuristic weighting to optimize latency, cost, and layout precision before execution.</div>
                     </div>
-                    <a href="/planner" target="_blank" class="btn btn-secondary" style="font-size: 11px;">[POPUP] Open Full Plan Wizard</a>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <select class="form-select" id="planPreviousRunSelect" style="font-size: 11px; padding: 4px 8px; max-width: 280px;" onchange="if(this.value) choosePreviousRun(this.value)">
+                            <option value="">-- Load Plan from Previous Run --</option>
+                        </select>
+                        <a href="/planner" target="_blank" class="btn btn-secondary" style="font-size: 11px;">[POPUP] Open Full Plan Wizard</a>
+                    </div>
                 </div>
+
+                <div id="planLoadedNotice" style="display: none; background: #1E3A8A33; border: 1px solid #3B82F6; border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #93C5FD; margin-bottom: 12px;"></div>
 
                 <div class="form-grid">
                     <div class="form-group">
@@ -700,7 +731,10 @@
                         <div class="card-title">4. Multi-Preset Evaluation &amp; Comparison Results</div>
                         <div class="card-subtitle">Review confidence scores, quality violations, and fallback decisions across candidate presets.</div>
                     </div>
-                    <div style="display:flex; gap:8px;">
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <select class="form-select" id="resultsRunSelect" style="font-size: 11px; padding: 4px 8px; max-width: 280px;" onchange="if(this.value) choosePreviousRun(this.value)">
+                            <option value="">-- Choose Run to Inspect --</option>
+                        </select>
                         <button class="btn btn-secondary" onclick="refreshResultsData()">[REFRESH] Refresh Data</button>
                         <a href="/viewer" target="_blank" class="btn btn-primary">[EXPAND] Open Full Viewer (/viewer)</a>
                     </div>
@@ -994,6 +1028,153 @@
             }
         }
 
+        let activeRunOutputDir = 'output';
+        let availableRuns = [];
+
+        async function loadPreviousRunsList() {
+            try {
+                const resp = await fetch('/api/previous_runs');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                availableRuns = data.runs || [];
+                activeRunOutputDir = data.active_run || 'output';
+
+                updateRunSelectorsUI();
+            } catch (e) {
+                console.log('[WARN] Failed to load previous runs:', e);
+            }
+        }
+
+        function updateRunSelectorsUI() {
+            const globalSel = document.getElementById('globalRunSelect');
+            const planSel = document.getElementById('planPreviousRunSelect');
+            const resultsSel = document.getElementById('resultsRunSelect');
+            const chipsCont = document.getElementById('previousRunsChipsContainer');
+            const activeBadge = document.getElementById('activeRunBadge');
+
+            if (activeBadge) {
+                activeBadge.textContent = activeRunOutputDir;
+            }
+
+            const optionsHtml = '<option value="">-- Choose output of a previous run --</option>' +
+                availableRuns.map(r => {
+                    const selected = (r.dir_path === activeRunOutputDir) ? ' selected' : '';
+                    return `<option value="${escapeHtml(r.dir_path)}"${selected}>${escapeHtml(r.label || r.dir_path)}</option>`;
+                }).join('');
+
+            if (globalSel) globalSel.innerHTML = optionsHtml;
+            if (planSel) {
+                planSel.innerHTML = '<option value="">-- Load Plan from Previous Run --</option>' +
+                    availableRuns.map(r => `<option value="${escapeHtml(r.dir_path)}">${escapeHtml(r.label || r.dir_path)}</option>`).join('');
+            }
+            if (resultsSel) resultsSel.innerHTML = optionsHtml;
+
+            if (chipsCont) {
+                if (availableRuns.length === 0) {
+                    chipsCont.innerHTML = '<span style="font-size: 11px; color: var(--text-muted); align-self: center;">No previous runs found.</span>';
+                } else {
+                    chipsCont.innerHTML = availableRuns.map(r => {
+                        const activeStyle = (r.dir_path === activeRunOutputDir) ? 'border-color: #3B82F6; color: #60A5FA; font-weight:700;' : '';
+                        return `<button class="chip-btn" style="${activeStyle}" onclick="choosePreviousRun('${escapeHtml(r.dir_path)}')">${escapeHtml(r.document_name)} (${escapeHtml(r.dir_path)})</button>`;
+                    }).join('');
+                }
+            }
+        }
+
+        function loadSelectedRun() {
+            const sel = document.getElementById('globalRunSelect');
+            if (sel && sel.value) {
+                choosePreviousRun(sel.value);
+            }
+        }
+
+        async function choosePreviousRun(outputDir) {
+            if (!outputDir) return;
+            try {
+                const resp = await fetch('/api/load_run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ output_dir: outputDir })
+                });
+                if (!resp.ok) {
+                    alert('Failed to load previous run from: ' + outputDir);
+                    return;
+                }
+                const data = await resp.json();
+                activeRunOutputDir = data.output_dir || outputDir;
+                updateRunSelectorsUI();
+
+                const run = data.run || {};
+                const plan = (run && run.plan) ? run.plan : (data.plan || {});
+                const decision = (run && run.decision) ? run.decision : (data.decision || {});
+
+                // 1. Update Input Selection Tab
+                if (run.document_path) {
+                    const inpDoc = document.getElementById('inpPdfPath');
+                    if (inpDoc) inpDoc.value = run.document_path;
+                }
+                if (decision.language) {
+                    const langSel = document.getElementById('inpLanguage');
+                    if (langSel) langSel.value = decision.language;
+                }
+                if (decision.chosen_preset) {
+                    const presetSel = document.getElementById('inpPreset');
+                    if (presetSel) {
+                        for (let opt of presetSel.options) {
+                            if (opt.value === decision.chosen_preset) {
+                                presetSel.value = decision.chosen_preset;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (decision.target_confidence_threshold) {
+                    const inpThresh = document.getElementById('inpThreshold');
+                    if (inpThresh) {
+                        inpThresh.value = decision.target_confidence_threshold;
+                        document.getElementById('thresholdDisplay').textContent = Number(decision.target_confidence_threshold).toFixed(2);
+                    }
+                }
+
+                // 2. Update Planning Tab
+                if (plan && plan.taxonomy && document.getElementById('planTaxonomy')) {
+                    document.getElementById('planTaxonomy').value = plan.taxonomy;
+                }
+                if (plan && plan.target && document.getElementById('planTarget')) {
+                    document.getElementById('planTarget').value = plan.target;
+                }
+                if (plan && plan.hardware && document.getElementById('planHardware')) {
+                    document.getElementById('planHardware').value = plan.hardware;
+                }
+                updateSuggestedPlan();
+
+                const planNotice = document.getElementById('planLoadedNotice');
+                if (planNotice) {
+                    planNotice.style.display = 'block';
+                    planNotice.textContent = `[INFO] Configuration synchronized from previous run: '${outputDir}' (${(plan && plan.taxonomy) || 'N/A'}, primary: ${(plan && plan.primary_preset) || decision.chosen_preset || 'N/A'}).`;
+                }
+
+                // 3. Update Progress tab
+                const consoleEl = document.getElementById('progressLogConsole');
+                if (consoleEl) {
+                    const conf = decision.overall_confidence !== undefined ? Number(decision.overall_confidence).toFixed(4) : '1.0000';
+                    consoleEl.textContent = `--- [LOADED PREVIOUS RUN OUTPUT] ---\nDirectory: ${outputDir}\nDocument: ${run.document_path || 'N/A'}\nChosen Preset: ${decision.chosen_preset || 'N/A'}\nStatus: ${decision.status || 'ACCEPT'}\nConfidence: ${conf}\nQuality Violations: ${run.violations_count || 0}`;
+                }
+                document.getElementById('progressFillBar').style.width = '100%';
+                document.getElementById('progressPercentText').textContent = '100%';
+                document.getElementById('progressCurrentStepText').textContent = `Loaded previous run: ${outputDir}`;
+                document.getElementById('progressStatusBadge').textContent = 'LOADED';
+                document.getElementById('progressStatusBadge').className = 'badge badge-success';
+                document.getElementById('navBadgeProgress').textContent = 'Loaded';
+
+                // 4. Update Preset Results Tab
+                renderResultsTable(data.results || { attempts: run.attempts, decision: decision, violations: data.violations });
+                reloadViewerIframe();
+            } catch (e) {
+                console.log('[ERROR] Failed to switch previous run:', e);
+            }
+        }
+
         async function loadAvailableDocuments() {
             try {
                 const resp = await fetch('/api/documents');
@@ -1085,6 +1266,7 @@
         // Initial setup
         updateSuggestedPlan();
         loadAvailableDocuments();
+        loadPreviousRunsList();
         refreshResultsData();
     </script>
 </body>

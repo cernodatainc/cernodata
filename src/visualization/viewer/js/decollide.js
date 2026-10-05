@@ -272,7 +272,8 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
 
     domData.nodes = domData.nodes.filter(n => n.node_id !== lower.node_id);
 
-    violationsData.forEach(v => {
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    viols.forEach(v => {
         if (v.node_id === lower.node_id) {
             v.node_id = upper.node_id;
         }
