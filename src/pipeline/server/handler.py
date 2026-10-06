@@ -145,17 +145,15 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             if not send_file_response(self, css_path, "text/css; charset=utf-8"):
                 self.send_error(404, "Landing CSS asset not found")
         elif raw_path in ("/landing.js", "landing.js"):
-            js_path = os.path.join(SRC_DIR, "visualization", "landing.js")
-            if not send_file_response(self, js_path, "application/javascript; charset=utf-8"):
-                self.send_error(404, "Landing JS asset not found")
+            from src.visualization.bundler import get_landing_js
+            send_text_response(self, get_landing_js(), content_type="application/javascript; charset=utf-8")
         elif raw_path in ("/data_shape_config.css", "data_shape_config.css"):
             self._serve_data_shape_asset(
                 "data_shape_config.css", "text/css; charset=utf-8", "Data shape config CSS asset not found"
             )
         elif raw_path in ("/data_shape_config.js", "data_shape_config.js"):
-            self._serve_data_shape_asset(
-                "data_shape_config.js", "application/javascript; charset=utf-8", "Data shape config JS asset not found"
-            )
+            from src.visualization.bundler import get_data_shape_config_js
+            send_text_response(self, get_data_shape_config_js(), content_type="application/javascript; charset=utf-8")
         elif raw_path in ("/data_shape_config.html", "/data_shape", "/planner"):
             self._serve_planner_page()
         elif raw_path == "/api/config":

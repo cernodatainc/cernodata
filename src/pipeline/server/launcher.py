@@ -34,15 +34,20 @@ def print_banner(lines: List[str]) -> None:
 
 def export_standalone_wizard_assets(output_dir: str, html_content: str) -> None:
     """Exports standalone copies of HTML, CSS, and JS assets to target directory for offline usage."""
+    from src.visualization.bundler import get_data_shape_config_js
+
     mkdirs(output_dir)
     exported_html_path = os.path.join(output_dir, "data_shape_config.html")
     with open(exported_html_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
-    for asset_name in ("data_shape_config.css", "data_shape_config.js"):
-        src_path = os.path.join(SRC_DIR, "visualization", asset_name)
-        dst_path = os.path.join(output_dir, asset_name)
-        copy_file_if_exists(src_path, dst_path)
+    exported_js_path = os.path.join(output_dir, "data_shape_config.js")
+    with open(exported_js_path, "w", encoding="utf-8") as f:
+        f.write(get_data_shape_config_js())
+
+    css_src = os.path.join(SRC_DIR, "visualization", "data_shape_config.css")
+    css_dst = os.path.join(output_dir, "data_shape_config.css")
+    copy_file_if_exists(css_src, css_dst)
 
 
 def serve_data_shape_wizard(
