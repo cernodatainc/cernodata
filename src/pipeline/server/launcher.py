@@ -23,6 +23,15 @@ from src.pipeline.server.session import ServerSessionContext
 from src.utils import find_available_port, mkdirs
 
 
+def print_banner(lines: list[str]) -> None:
+    """Prints a standardized server startup banner."""
+    sep = "=" * 68
+    print(sep, flush=True)
+    for line in lines:
+        print(line, flush=True)
+    print(sep, flush=True)
+
+
 def export_standalone_wizard_assets(output_dir: str, html_content: str) -> None:
     """Exports standalone copies of HTML, CSS, and JS assets to target directory for offline usage."""
     mkdirs(output_dir)
@@ -65,12 +74,11 @@ def serve_data_shape_wizard(
 
     url = f"http://127.0.0.1:{actual_port}/data_shape_config.html"
 
-    print("=" * 68, flush=True)
-    print("cernodata: Interactive Data Shape & Preset Planner", flush=True)
-    print("=" * 68, flush=True)
-    print(f"Serving data shape questionnaire at: {url}", flush=True)
-    print("Awaiting configuration in browser... (Press Ctrl+C to abort)", flush=True)
-    print("=" * 68, flush=True)
+    print_banner([
+        "cernodata: Interactive Data Shape & Preset Planner",
+        f"Serving data shape questionnaire at: {url}",
+        "Awaiting configuration in browser... (Press Ctrl+C to abort)",
+    ])
 
     if open_browser:
         webbrowser.open(url)
@@ -110,12 +118,12 @@ def start_pipeline_server(
     httpd = PipelineViewerServer(server_address, PipelineViewerHandler, session_context=session)
     url = f"http://localhost:{actual_port}/"
 
-    print("=" * 68)
-    print(f"cernodata Ingestion Hub & Visual Server running at {url}")
-    print(f"Dashboard Landing Page: {url}")
-    print(f"Interactive Visual Flow Viewer: {url}viewer")
-    print(f"Backend Hydration API: {url}api/viewer_data")
-    print("=" * 68)
+    print_banner([
+        f"cernodata Ingestion Hub & Visual Server running at {url}",
+        f"Dashboard Landing Page: {url}",
+        f"Interactive Visual Flow Viewer: {url}viewer",
+        f"Backend Hydration API: {url}api/viewer_data",
+    ])
 
     if open_browser:
         webbrowser.open(url)

@@ -13,7 +13,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from src.parsers.section_ocr import parse_image_ocr, parse_section_from_pdf
@@ -28,9 +28,9 @@ from src.pipeline.planner_options import (
 from src.pipeline.server.common import (
     REPO_ROOT,
     SRC_DIR,
-    calculate_progress_step,
     read_json_payload,
     send_file_response,
+    send_first_existing_file,
     send_html_response,
     send_json_response,
     send_text_response,
@@ -96,14 +96,19 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
         return cls._default_session.get_previous_runs()
 
     @classmethod
-    def load_previous_run(cls, output_dir: str) -> Dict[str, Any]:
-        """Loads and switches default session to an existing output directory."""
-        res = cls._default_session.load_previous_run(output_dir)
+    def _sync_default_session_state(cls) -> None:
+        """Synchronizes legacy handler class attributes with the default session context."""
         cls.pdf_path = cls._default_session.pdf_path
         cls.language = cls._default_session.language
         cls.viewer_data = cls._default_session.viewer_data
         cls.current_result = cls._default_session.current_result
         cls.preset_attempts = cls._default_session.preset_attempts
+
+    @classmethod
+    def load_previous_run(cls, output_dir: str) -> Dict[str, Any]:
+        """Loads and switches default session to an existing output directory."""
+        res = cls._default_session.load_previous_run(output_dir)
+        cls._sync_default_session_state()
         return res
 
     @classmethod
@@ -115,11 +120,14 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
     def update_result_state(cls, result: Mapping[str, Any], pdf_path: str, language: str) -> None:
         """Updates server memory state and hydration dataset from run_pipeline result."""
         cls._default_session.update_result_state(result, pdf_path, language)
-        cls.pdf_path = cls._default_session.pdf_path
-        cls.language = cls._default_session.language
-        cls.viewer_data = cls._default_session.viewer_data
-        cls.current_result = cls._default_session.current_result
-        cls.preset_attempts = cls._default_session.preset_attempts
+        cls._sync_default_session_state()
+
+    def _extract_document_and_language(self, payload: Dict[str, Any]) -> Tuple[str, str]:
+        """Extracts and resolves document path and language from request payload or session state."""
+        raw_pdf = payload.get("pdf_path", self.session.pdf_path) or "src/e2e/Document 8.pdf"
+        pdf_path = resolve_pdf_path(raw_pdf)
+        language = payload.get("language", self.session.language)
+        return pdf_path, language
 
     # -------------------------------------------------------------------------
     # Route Handlers: Static / HTML Content
@@ -139,24 +147,32 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
 
     def _serve_viewer_html(self) -> None:
         """Serves the un-templated viewer HTML shell for client-side hydration."""
-        for candidate in (
+        candidates = [
             os.path.join(SRC_DIR, "visualization", "viewer", "viewer.html"),
             os.path.join(SRC_DIR, "visualization", "viewer", "template.html"),
-        ):
-            if send_file_response(self, candidate, "text/html; charset=utf-8"):
-                return
-        self.send_error(500, "Viewer template not found")
+        ]
+        if not send_first_existing_file(self, candidates, "text/html; charset=utf-8"):
+            self.send_error(500, "Viewer template not found")
 
     def _serve_interactive_viewer_compat(self) -> None:
         """Serves backwards-compatible interactive viewer HTML."""
-        for candidate in (
+        candidates = [
             os.path.join(REPO_ROOT, self.session.output_dir or "output", "interactive_viewer.html"),
             os.path.join(REPO_ROOT, "output", "interactive_viewer.html"),
             os.path.join(SRC_DIR, "visualization", "viewer", "viewer.html"),
-        ):
-            if send_file_response(self, candidate, "text/html; charset=utf-8"):
-                return
-        self.send_error(404, "Interactive viewer not found")
+        ]
+        if not send_first_existing_file(self, candidates, "text/html; charset=utf-8"):
+            self.send_error(404, "Interactive viewer not found")
+
+    def _serve_data_shape_asset(self, filename: str, content_type: str, error_msg: str) -> None:
+        """Serves data shape wizard asset from session output directory or fallback visualization source."""
+        candidates = [
+            os.path.join(REPO_ROOT, self.session.output_dir or "output", filename),
+            os.path.join(REPO_ROOT, "output", filename),
+            os.path.join(SRC_DIR, "visualization", filename),
+        ]
+        if not send_first_existing_file(self, candidates, content_type):
+            self.send_error(404, error_msg)
 
     def _serve_planner_page(self) -> None:
         """Serves data shape questionnaire HTML page."""
@@ -164,16 +180,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
         if html_override:
             send_html_response(self, html_override)
             return
-
-        candidate_paths = [
-            os.path.join(REPO_ROOT, self.session.output_dir or "output", "data_shape_config.html"),
-            os.path.join(REPO_ROOT, "output", "data_shape_config.html"),
-            os.path.join(SRC_DIR, "visualization", "data_shape_config.html"),
-        ]
-        for target_file in candidate_paths:
-            if send_file_response(self, target_file, "text/html; charset=utf-8"):
-                return
-        self.send_error(404, "Planner page not found")
+        self._serve_data_shape_asset("data_shape_config.html", "text/html; charset=utf-8", "Planner page not found")
 
     # -------------------------------------------------------------------------
     # Route Handlers: GET APIs
@@ -251,27 +258,13 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             if not send_file_response(self, js_path, "application/javascript; charset=utf-8"):
                 self.send_error(404, "Landing JS asset not found")
         elif raw_path in ("/data_shape_config.css", "data_shape_config.css"):
-            candidate_paths = [
-                os.path.join(REPO_ROOT, self.session.output_dir or "output", "data_shape_config.css"),
-                os.path.join(REPO_ROOT, "output", "data_shape_config.css"),
-                os.path.join(SRC_DIR, "visualization", "data_shape_config.css"),
-            ]
-            for target_file in candidate_paths:
-                if send_file_response(self, target_file, "text/css; charset=utf-8"):
-                    break
-            else:
-                self.send_error(404, "Data shape config CSS asset not found")
+            self._serve_data_shape_asset(
+                "data_shape_config.css", "text/css; charset=utf-8", "Data shape config CSS asset not found"
+            )
         elif raw_path in ("/data_shape_config.js", "data_shape_config.js"):
-            candidate_paths = [
-                os.path.join(REPO_ROOT, self.session.output_dir or "output", "data_shape_config.js"),
-                os.path.join(REPO_ROOT, "output", "data_shape_config.js"),
-                os.path.join(SRC_DIR, "visualization", "data_shape_config.js"),
-            ]
-            for target_file in candidate_paths:
-                if send_file_response(self, target_file, "application/javascript; charset=utf-8"):
-                    break
-            else:
-                self.send_error(404, "Data shape config JS asset not found")
+            self._serve_data_shape_asset(
+                "data_shape_config.js", "application/javascript; charset=utf-8", "Data shape config JS asset not found"
+            )
         elif raw_path in ("/data_shape_config.html", "/data_shape", "/planner"):
             self._serve_planner_page()
         elif raw_path == "/api/config":
@@ -324,9 +317,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
     def _handle_post_run(self, payload: Dict[str, Any]) -> None:
         """Executes full document pipeline run asynchronously in server executor."""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        raw_pdf = payload.get("pdf_path", self.session.pdf_path) or "src/e2e/Document 8.pdf"
-        pdf_path = resolve_pdf_path(raw_pdf)
-        language = payload.get("language", self.session.language)
+        pdf_path, language = self._extract_document_and_language(payload)
         threshold = float(payload.get("target_threshold", 0.85))
         preset = payload.get("preset", "docling_fast")
         align_skew = bool(payload.get("align_skew", True))
@@ -359,15 +350,7 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
             )
 
         session = self.session
-
-        def on_progress(pct: int, step_desc: str, log_msg: str) -> None:
-            t = datetime.now().strftime("%H:%M:%S")
-            session.update_progress(
-                progress=pct,
-                step_index=calculate_progress_step(pct),
-                current_step=step_desc,
-                log=f"[{t}] {log_msg}",
-            )
+        on_progress = session.make_progress_callback()
 
         def _execute_run() -> PipelineExecutionResult:
             res = run_pipeline(
@@ -415,23 +398,13 @@ class PipelineViewerHandler(SimpleHTTPRequestHandler):
     def _handle_post_rerun(self, payload: Dict[str, Any]) -> None:
         """Executes live pipeline rerun with alternative preset."""
         preset = payload.get("preset", "docling_deep")
-        raw_pdf = payload.get("pdf_path", self.session.pdf_path) or "src/e2e/Document 8.pdf"
-        pdf_path = resolve_pdf_path(raw_pdf)
-        language = payload.get("language", self.session.language)
+        pdf_path, language = self._extract_document_and_language(payload)
 
         print(f"\n[SERVER API] Triggering live pipeline rerun for preset: '{preset}' (PDF: {pdf_path}, Lang: {language})...")
         from src.pipeline.orchestrator import PipelineExecutionResult, run_pipeline
 
         session = self.session
-
-        def on_progress(pct: int, step_desc: str, log_msg: str) -> None:
-            t = datetime.now().strftime("%H:%M:%S")
-            session.update_progress(
-                progress=pct,
-                step_index=calculate_progress_step(pct),
-                current_step=step_desc,
-                log=f"[{t}] {log_msg}",
-            )
+        on_progress = session.make_progress_callback()
 
         def _execute_rerun() -> PipelineExecutionResult:
             res = run_pipeline(

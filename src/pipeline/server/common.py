@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from http.server import SimpleHTTPRequestHandler
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger("cernodata.server.common")
 
@@ -20,17 +20,29 @@ SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file
 REPO_ROOT = os.path.dirname(SRC_DIR)
 
 
-def send_json_response(handler: SimpleHTTPRequestHandler, status_code: int, payload: Any) -> None:
-    """Sends JSON response with Content-Type and Content-Length headers."""
+def send_response_bytes(
+    handler: SimpleHTTPRequestHandler,
+    body: bytes,
+    content_type: str,
+    status_code: int = 200,
+) -> bool:
+    """Sends raw bytes response with specified Content-Type and Content-Length headers."""
     try:
-        body = json.dumps(payload).encode("utf-8")
         handler.send_response(status_code)
-        handler.send_header("Content-Type", "application/json; charset=utf-8")
+        handler.send_header("Content-Type", content_type)
         handler.send_header("Content-Length", str(len(body)))
         handler.end_headers()
         handler.wfile.write(body)
+        return True
     except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
-        logger.debug("Client disconnected before JSON response could be sent: %s", e)
+        logger.debug("Client disconnected before response could be sent: %s", e)
+        return True
+
+
+def send_json_response(handler: SimpleHTTPRequestHandler, status_code: int, payload: Any) -> None:
+    """Sends JSON response with Content-Type and Content-Length headers."""
+    body = json.dumps(payload).encode("utf-8")
+    send_response_bytes(handler, body, content_type="application/json; charset=utf-8", status_code=status_code)
 
 
 def read_json_payload(handler: SimpleHTTPRequestHandler) -> Dict[str, Any]:
@@ -56,15 +68,8 @@ def send_text_response(
     status_code: int = 200,
 ) -> None:
     """Sends text/script/HTML response with specified Content-Type and Content-Length headers."""
-    try:
-        body = content.encode("utf-8") if isinstance(content, str) else content
-        handler.send_response(status_code)
-        handler.send_header("Content-Type", content_type)
-        handler.send_header("Content-Length", str(len(body)))
-        handler.end_headers()
-        handler.wfile.write(body)
-    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
-        logger.debug("Client disconnected before response could be sent: %s", e)
+    body = content.encode("utf-8") if isinstance(content, str) else content
+    send_response_bytes(handler, body, content_type=content_type, status_code=status_code)
 
 
 def send_html_response(handler: SimpleHTTPRequestHandler, content: str | bytes, status_code: int = 200) -> None:
@@ -87,18 +92,23 @@ def send_file_response(
     try:
         with open(file_path, "rb") as f:
             content = f.read()
-        handler.send_response(status_code)
-        handler.send_header("Content-Type", content_type)
-        handler.send_header("Content-Length", str(len(content)))
-        handler.end_headers()
-        handler.wfile.write(content)
-        return True
-    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
-        logger.debug("Client disconnected while sending file %s: %s", file_path, e)
-        return True
+        return send_response_bytes(handler, content, content_type=content_type, status_code=status_code)
     except OSError as e:
         logger.warning("Error reading file %s: %s", file_path, e)
         return False
+
+
+def send_first_existing_file(
+    handler: SimpleHTTPRequestHandler,
+    candidate_paths: Sequence[str],
+    content_type: str,
+    status_code: int = 200,
+) -> bool:
+    """Sends the first existing file among candidate paths, returning True if sent."""
+    for path in candidate_paths:
+        if send_file_response(handler, path, content_type=content_type, status_code=status_code):
+            return True
+    return False
 
 
 def copy_file_if_exists(src_path: str, dst_path: str) -> bool:
@@ -195,6 +205,57 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
         "document_path": doc_path,
         "document_name": doc_name,
     }
+
+
+def create_preset_attempt_record(
+    decision_dict: Dict[str, Any],
+    violations_count: int,
+    step: int = 1,
+    default_action: str = "ACCEPT_OUTPUT",
+) -> Dict[str, Any]:
+    """Constructs a standardized preset attempt record dictionary."""
+    preset_name = decision_dict.get("chosen_preset", "docling_fast")
+    action = decision_dict.get("decision_tree", {}).get("action", default_action)
+    return {
+        "step": step,
+        "preset": preset_name,
+        "overall_confidence": decision_dict.get("overall_confidence", 1.0),
+        "per_page_confidence": decision_dict.get("per_page_confidence", {}),
+        "violations_count": violations_count,
+        "status": decision_dict.get("status", "ACCEPT"),
+        "is_accepted": decision_dict.get("is_accepted", True),
+        "action": action,
+    }
+
+
+def build_viewer_dataset(
+    dom: Dict[str, Any],
+    violations: List[Dict[str, Any]],
+    decision: Dict[str, Any],
+    plan: Optional[Dict[str, Any]],
+    pdf_path: str,
+    language: str,
+    page_images: List[str],
+    page_dimensions: List[Dict[str, float]],
+    total_pages: int,
+    output_dir: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Constructs the canonical dictionary structure required to hydrate interactive visual viewer."""
+    dataset: Dict[str, Any] = {
+        "dom": dom,
+        "violations": violations,
+        "decision": decision,
+        "detectedLanguages": decision.get("detected_languages", {}),
+        "plan": plan,
+        "pdfSourceFile": pdf_path,
+        "activeLanguage": language,
+        "pageImages": page_images,
+        "pageDimensions": page_dimensions,
+        "totalPages": total_pages,
+    }
+    if output_dir is not None:
+        dataset["outputDir"] = output_dir
+    return dataset
 
 
 def load_or_render_page_images(

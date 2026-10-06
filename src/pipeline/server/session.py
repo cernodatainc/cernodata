@@ -6,16 +6,20 @@ Thread-safe state container for server sessions, progress tracking, and hydratio
 
 from __future__ import annotations
 
+from datetime import datetime
 import glob
 import logging
 import os
 import threading
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.server.common import (
     REPO_ROOT,
     SRC_DIR,
+    build_viewer_dataset,
+    calculate_progress_step,
+    create_preset_attempt_record,
     find_previous_runs,
     load_or_render_page_images,
     load_run_artifacts,
@@ -125,17 +129,14 @@ class ServerSessionContext:
             if attempts:
                 self.preset_attempts = list(attempts)
             elif decision_dict:
-                chosen_preset = decision_dict.get("chosen_preset", "docling_fast")
-                self.preset_attempts = [{
-                    "step": 1,
-                    "preset": chosen_preset,
-                    "overall_confidence": decision_dict.get("overall_confidence", 1.0),
-                    "per_page_confidence": decision_dict.get("per_page_confidence", {}),
-                    "violations_count": len(viol_list),
-                    "status": decision_dict.get("status", "ACCEPT"),
-                    "is_accepted": decision_dict.get("is_accepted", True),
-                    "action": decision_dict.get("decision_tree", {}).get("action", "ACCEPT_OUTPUT"),
-                }]
+                self.preset_attempts = [
+                    create_preset_attempt_record(
+                        decision_dict=decision_dict,
+                        violations_count=len(viol_list),
+                        step=1,
+                        default_action="ACCEPT_OUTPUT",
+                    )
+                ]
 
             self.current_result = {
                 "decision": decision_dict,
@@ -201,6 +202,19 @@ class ServerSessionContext:
                 self.progress_state["error"] = error
             if log:
                 self.progress_state.setdefault("logs", []).append(log)
+
+    def make_progress_callback(self) -> Callable[[int, str, str], None]:
+        """Creates a standardized progress callback function wired to this session."""
+        def on_progress(pct: int, step_desc: str, log_msg: str) -> None:
+            t = datetime.now().strftime("%H:%M:%S")
+            self.update_progress(
+                progress=pct,
+                step_index=calculate_progress_step(pct),
+                current_step=step_desc,
+                log=f"[{t}] {log_msg}",
+            )
+
+        return on_progress
 
     def add_log(self, message: str) -> None:
         """Thread-safe appending of a log message."""
@@ -310,19 +324,18 @@ class ServerSessionContext:
             if not decision_data.get("attempts") and self.preset_attempts:
                 decision_data["attempts"] = list(self.preset_attempts)
 
-            self.viewer_data = {
-                "dom": dom_data,
-                "violations": violations_data,
-                "decision": decision_data,
-                "detectedLanguages": decision_data.get("detected_languages", {}),
-                "plan": plan_data,
-                "pdfSourceFile": pdf_path,
-                "activeLanguage": self.language or decision_data.get("language", "en"),
-                "pageImages": page_images,
-                "pageDimensions": page_dimensions,
-                "totalPages": total_pages,
-                "outputDir": target_dir,
-            }
+            self.viewer_data = build_viewer_dataset(
+                dom=dom_data,
+                violations=violations_data,
+                decision=decision_data,
+                plan=plan_data,
+                pdf_path=pdf_path,
+                language=self.language or decision_data.get("language", "en"),
+                page_images=page_images,
+                page_dimensions=page_dimensions,
+                total_pages=total_pages,
+                output_dir=target_dir,
+            )
             return self.viewer_data
 
     def update_result_state(self, result: Mapping[str, Any], pdf_path: str, language: str) -> None:
@@ -344,18 +357,17 @@ class ServerSessionContext:
                 total_pages=total_pages,
             )
 
-            self.viewer_data = {
-                "dom": dom_dict,
-                "violations": violations_list,
-                "decision": decision_dict,
-                "detectedLanguages": decision_dict.get("detected_languages", {}),
-                "plan": result.get("plan"),
-                "pdfSourceFile": resolved_path,
-                "activeLanguage": language,
-                "pageImages": page_images,
-                "pageDimensions": page_dimensions,
-                "totalPages": total_pages,
-            }
+            self.viewer_data = build_viewer_dataset(
+                dom=dom_dict,
+                violations=violations_list,
+                decision=decision_dict,
+                plan=result.get("plan"),
+                pdf_path=resolved_path,
+                language=language,
+                page_images=page_images,
+                page_dimensions=page_dimensions,
+                total_pages=total_pages,
+            )
 
             # Sync preset attempts
             attempts = decision_dict.get("attempts", [])
@@ -363,16 +375,12 @@ class ServerSessionContext:
                 self.preset_attempts = list(attempts)
             else:
                 preset_name = decision_dict.get("chosen_preset", "docling_fast")
-                record = {
-                    "step": len(self.preset_attempts) + 1,
-                    "preset": preset_name,
-                    "overall_confidence": decision_dict.get("overall_confidence", 1.0),
-                    "per_page_confidence": decision_dict.get("per_page_confidence", {}),
-                    "violations_count": len(violations_list),
-                    "status": decision_dict.get("status", "ACCEPT"),
-                    "is_accepted": decision_dict.get("is_accepted", True),
-                    "action": decision_dict.get("decision_tree", {}).get("action", "ACCEPT_PARSE"),
-                }
+                record = create_preset_attempt_record(
+                    decision_dict=decision_dict,
+                    violations_count=len(violations_list),
+                    step=len(self.preset_attempts) + 1,
+                    default_action="ACCEPT_PARSE",
+                )
                 existing_idx = next(
                     (i for i, a in enumerate(self.preset_attempts) if a.get("preset") == preset_name),
                     -1,
