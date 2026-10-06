@@ -43,27 +43,13 @@
             <span>[4] Preset Results</span>
             <span class="hub-tab-badge" id="navBadgeResults">Scores</span>
         </button>
+        <button class="hub-tab-btn" id="tabBtnRuns" onclick="switchNavTab('runs')">
+            <span>[5] Previous Runs</span>
+            <span class="hub-tab-badge" id="navBadgeRuns">Matrix Grid</span>
+        </button>
     </nav>
 
     <main class="hub-content">
-
-        <!-- Previous Run Output Selector Bar -->
-        <div class="card run-selector-card">
-            <div class="run-selector-row">
-                <div class="run-selector-group">
-                    <span class="run-selector-title">Previous Run Output:</span>
-                    <select id="globalRunSelect" class="form-select run-selector-dropdown" onchange="if(this.value) choosePreviousRun(this.value)">
-                        <option value="">-- Choose output of a previous run --</option>
-                    </select>
-                    <button class="btn btn-primary btn-run-action" onclick="loadSelectedRun()">[LOAD] Load Run Output</button>
-                    <button class="btn btn-secondary btn-run-refresh" onclick="loadPreviousRunsList()">[REFRESH] Refresh</button>
-                </div>
-                <div class="active-run-group">
-                    <span class="active-run-label">Active Run:</span>
-                    <span class="preset-badge active-run-badge" id="activeRunBadge">output</span>
-                </div>
-            </div>
-        </div>
 
         <!-- 1. Input Selection Section -->
         <section class="tab-section active" id="secInput">
@@ -323,43 +309,6 @@
                     </table>
                 </div>
 
-                <!-- Previous Runs Page Table Grid Card -->
-                <div class="card runs-grid-card">
-                    <div class="card-header">
-                        <div>
-                            <div class="card-title">Previous Runs by Page Grid</div>
-                            <div class="card-subtitle">Table grid comparison of previous parsing runs for a given file across document pages.</div>
-                        </div>
-                        <div class="runs-grid-controls">
-                            <label class="control-label" for="runsGridDocSelect">Document:</label>
-                            <select class="form-select runs-grid-doc-select" id="runsGridDocSelect" onchange="onRunsGridDocChanged(this.value)">
-                                <option value="">-- Choose Document --</option>
-                            </select>
-                            <button class="btn btn-secondary btn-sm" onclick="loadRunsGrid()">[REFRESH] Refresh Grid</button>
-                        </div>
-                    </div>
-
-                    <div class="runs-grid-table-container">
-                        <table class="comparison-table runs-grid-table" id="runsGridTable">
-                            <thead id="runsGridTableHead">
-                                <tr>
-                                    <th>Parsing Run Identifier</th>
-                                    <th>Page 1</th>
-                                    <th>Overall Score</th>
-                                    <th>Violations</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="runsGridTableBody">
-                                <tr>
-                                    <td colspan="6" class="table-empty-message">Loading previous runs grid...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
                 <div class="viewer-heading-row">
                     <div class="viewer-heading-title">Embedded Interactive Visual Flow &amp; DOM Viewer:</div>
                     <div class="viewer-heading-sub">Hydrated dynamically from backend <span class="viewer-sub-code">/api/viewer_data</span></div>
@@ -367,6 +316,47 @@
 
                 <div class="viewer-frame-container">
                     <iframe class="viewer-frame" id="viewerFrame" src="/viewer" title="cernodata Interactive Visual Flow Viewer"></iframe>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Previous Runs Grid Section -->
+        <section class="tab-section" id="secRuns">
+            <div class="card runs-grid-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">5. Previous Runs by Page Grid</div>
+                        <div class="card-subtitle">Table grid comparison of previous parsing runs across document pages. Click any page cell to immediately bring up that page in the viewer.</div>
+                    </div>
+                    <div class="runs-grid-controls">
+                        <label class="control-label" for="runsGridDocSelect">Document:</label>
+                        <select class="form-select runs-grid-doc-select" id="runsGridDocSelect" onchange="onRunsGridDocChanged(this.value)">
+                            <option value="">-- Choose Document --</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" onclick="loadRunsGrid()">[REFRESH] Refresh Grid</button>
+                        <span class="active-run-label">Active Run:</span>
+                        <span class="preset-badge active-run-badge" id="activeRunBadge">output</span>
+                    </div>
+                </div>
+
+                <div class="runs-grid-table-container">
+                    <table class="comparison-table runs-grid-table" id="runsGridTable">
+                        <thead id="runsGridTableHead">
+                            <tr>
+                                <th>Parsing Run Identifier</th>
+                                <th>Page 1</th>
+                                <th>Overall Score</th>
+                                <th>Violations</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="runsGridTableBody">
+                            <tr>
+                                <td colspan="6" class="table-empty-message">Loading previous runs grid...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>

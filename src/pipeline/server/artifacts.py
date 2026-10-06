@@ -107,6 +107,8 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
         or safe_load_json(os.path.join(run_dir, "decision_tree.json"), {})
     )
     dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "document_dom.json"), {})
+    raw_dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "raw_document_dom.json"), {}) or dom_data
+    diff_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "run_diff.json"), {})
     raw_viols = plan_res_data.get("violations")
     if raw_viols is None:
         raw_viols = safe_load_json(os.path.join(run_dir, "quality_violations.json"), [])
@@ -163,6 +165,8 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
         "plan": plan_data,
         "decision": decision_data,
         "dom": dom_data,
+        "raw_dom": raw_dom_data,
+        "diff": diff_data,
         "violations": violations,
         "chosen_preset": chosen_preset,
         "status": status,
@@ -220,28 +224,18 @@ def build_viewer_dataset(
     page_dimensions: List[Dict[str, float]],
     total_pages: int,
     output_dir: Optional[str] = None,
+    raw_dom: Optional[Dict[str, Any]] = None,
+    diff: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Constructs canonical dataset required to hydrate interactive visual viewer.
-
-    Args:
-        dom: Serialized DocumentDOM mapping.
-        violations: List of serialized violation records.
-        decision: Serialized decision tree evaluation.
-        plan: Serialized execution plan if available.
-        pdf_path: Source document filesystem path.
-        language: Active language hint code.
-        page_images: Base64 data URI image strings per page.
-        page_dimensions: Page width and height dimensions in points.
-        total_pages: Total count of pages in document.
-        output_dir: Run output directory relative path.
-
-    Returns:
-        Canonical JSON-ready dataset dictionary.
+    Stores raw result and diff to eliminate expensive redundant preset reruns.
     """
     det_langs = decision.get("detected_languages") if isinstance(decision, dict) else None
     dataset: Dict[str, Any] = {
         "dom": dom,
+        "raw_dom": raw_dom or dom,
+        "diff": diff or {},
         "violations": violations,
         "decision": decision,
         "detectedLanguages": det_langs if isinstance(det_langs, dict) else {},

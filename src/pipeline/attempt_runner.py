@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.dom import DocumentDOM
 from src.pipeline.execution_models import AttemptRecord
-from src.pipeline.parser_dispatch import DocumentParserDispatcher, parse_document
+from src.pipeline.parser_dispatch import parse_document
 from src.pipeline.pipeline_steps import align_document_skew, evaluate_quality_and_decision_tree
 from src.pipeline.planner_models import IngestionConfig
 

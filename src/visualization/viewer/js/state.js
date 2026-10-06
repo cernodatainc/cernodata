@@ -41,6 +41,10 @@ let domData = JSON.parse(JSON.stringify(initialDomData));
 let violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
 let decisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
+let rawDomData = JSON.parse(JSON.stringify(initialDomData));
+let rawViolationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
+let rawDecisionData = JSON.parse(JSON.stringify(initialDecisionData));
+
 const TEXTUAL_TYPES = ['paragraph', 'heading', 'header_footer', 'text'];
 
 function isTextualType(type) {
@@ -160,7 +164,66 @@ function applyCorrectionsToNodeText(rawText) {
     return text;
 }
 
-function hydrateViewer(data) {
+function computeDomDiff() {
+    const rawNodes = (rawDomData && rawDomData.nodes) || [];
+    const currentNodes = (domData && domData.nodes) || [];
+    const rawMap = new Map();
+    rawNodes.forEach(n => { if (n && n.node_id) rawMap.set(n.node_id, n); });
+    const currMap = new Map();
+    currentNodes.forEach(n => { if (n && n.node_id) currMap.set(n.node_id, n); });
+
+    const added = [];
+    const modified = [];
+    const removed = [];
+
+    for (const [id, curr] of currMap.entries()) {
+        const raw = rawMap.get(id);
+        if (!raw) {
+            added.push(curr);
+        } else {
+            const rawBox = raw.bounding_box || {};
+            const currBox = curr.bounding_box || {};
+            const boxChanged = (
+                rawBox.x0 !== currBox.x0 ||
+                rawBox.y0 !== currBox.y0 ||
+                rawBox.x1 !== currBox.x1 ||
+                rawBox.y1 !== currBox.y1
+            );
+            const textChanged = (
+                ((raw.content && raw.content.raw_text) || '') !==
+                ((curr.content && curr.content.raw_text) || '')
+            );
+            const typeChanged = raw.type !== curr.type;
+            const noteChanged = (raw.user_correction_note || '') !== (curr.user_correction_note || '');
+            if (boxChanged || textChanged || typeChanged || noteChanged) {
+                modified.push({
+                    node_id: id,
+                    raw: raw,
+                    current: curr,
+                    changes: { boxChanged, textChanged, typeChanged, noteChanged }
+                });
+            }
+        }
+    }
+
+    for (const [id, raw] of rawMap.entries()) {
+        if (!currMap.has(id)) {
+            removed.push(raw);
+        }
+    }
+
+    return {
+        added_count: added.length,
+        modified_count: modified.length,
+        removed_count: removed.length,
+        has_changes: (added.length > 0 || modified.length > 0 || removed.length > 0),
+        added,
+        modified,
+        removed
+    };
+}
+
+function hydrateViewer(data, pageNum = null) {
     if (!data) return;
     window.VIEWER_DATA = data;
     initialDomData = data.dom || { nodes: [] };
@@ -175,6 +238,11 @@ function hydrateViewer(data) {
     pageDimensions = data.pageDimensions || [];
     totalPages = data.totalPages || pageImages.length || 1;
     activeLanguage = data.activeLanguage || "en";
+
+    // Preserve pristine raw result alongside working state
+    rawDomData = JSON.parse(JSON.stringify(initialDomData));
+    rawViolationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
+    rawDecisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
     domData = JSON.parse(JSON.stringify(initialDomData));
     violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
@@ -209,9 +277,12 @@ function hydrateViewer(data) {
         selLang.value = activeLanguage;
     }
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetPage = pageNum || parseInt(urlParams.get('page') || '1', 10) || 1;
+
     renderTimelineButtons();
     initPageControls();
-    switchPage(1);
+    switchPage(targetPage);
     renderDecisionLog();
     renderPlanTab();
 }

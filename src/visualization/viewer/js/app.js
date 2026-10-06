@@ -138,19 +138,21 @@ window.addEventListener('keydown', (e) => {
 });
 
 async function startViewer() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const outputDirParam = urlParams.get('output_dir');
+    const targetPageParam = parseInt(urlParams.get('page') || '1', 10) || 1;
+
     if (window.VIEWER_DATA && window.VIEWER_DATA.dom && window.VIEWER_DATA.dom.nodes && window.VIEWER_DATA.dom.nodes.length > 0) {
-        hydrateViewer(window.VIEWER_DATA);
+        hydrateViewer(window.VIEWER_DATA, targetPageParam);
         return;
     }
 
     try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const outputDirParam = urlParams.get('output_dir');
         const fetchUrl = outputDirParam ? `/api/viewer_data?output_dir=${encodeURIComponent(outputDirParam)}` : '/api/viewer_data';
         const resp = await fetch(fetchUrl);
         if (resp.ok) {
             const data = await resp.json();
-            hydrateViewer(data);
+            hydrateViewer(data, targetPageParam);
             return;
         }
     } catch (e) {
@@ -158,7 +160,7 @@ async function startViewer() {
     }
 
     initPageControls();
-    switchPage(1);
+    switchPage(targetPageParam);
 }
 
 const pageImgEl = document.getElementById('pageImg');

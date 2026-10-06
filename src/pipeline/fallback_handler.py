@@ -87,12 +87,12 @@ class FallbackLoopHandler:
             w_dom, w_decision, w_violations = self.attempt_runner.execute_attempt(
                 pdf_path, wiggled_config, curr_score, next_score
             )
-            attempts.append(self.attempt_runner.make_attempt_record(
+            attempts.append(dict(self.attempt_runner.make_attempt_record(
                 len(attempts) + 1, config.preset, w_decision, w_violations,
                 action="PATH_B_WIGGLE_PARAMETERS",
                 reason=f"Wiggled OCR parameters: ocr_scale={wiggled_scale}, force_full_page_ocr={wiggled_force_ocr}.",
                 parameters={"ocr_scale": wiggled_scale, "force_full_page_ocr": wiggled_force_ocr},
-            ))
+            )))
 
             if w_decision.get("is_accepted"):
                 dom, decision, violations = w_dom, w_decision, w_violations
@@ -119,12 +119,12 @@ class FallbackLoopHandler:
                     "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                     "detail": plan_note,
                 }
-                attempts.append(self.attempt_runner.make_attempt_record(
+                attempts.append(dict(self.attempt_runner.make_attempt_record(
                     len(attempts) + 1, next_candidate, fb_decision, fb_violations,
                     action=fb_decision.get("decision_tree", {}).get("action"),
                     reason=fb_decision.get("decision_tree", {}).get("reason"),
                     detail=plan_note,
-                ))
+                )))
                 dom, decision, violations = fb_dom, fb_decision, fb_violations
         elif next_candidate:
             # Path A: Switch to next candidate preset
@@ -154,12 +154,12 @@ class FallbackLoopHandler:
                 "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                 "detail": plan_note,
             }
-            attempts.append(self.attempt_runner.make_attempt_record(
+            attempts.append(dict(self.attempt_runner.make_attempt_record(
                 len(attempts) + 1, next_candidate, fb_decision, fb_violations,
                 action=fb_decision.get("decision_tree", {}).get("action"),
                 reason=fb_decision.get("decision_tree", {}).get("reason"),
                 detail=plan_note,
-            ))
+            )))
             dom, decision, violations = fb_dom, fb_decision, fb_violations
 
         return dom, decision, violations

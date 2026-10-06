@@ -27,29 +27,41 @@ def build_timeline_buttons(decision: Dict[str, Any], plan: Optional[Dict[str, An
     if attempts and len(attempts) > 1:
         att1 = attempts[0]
         att2 = attempts[1]
+        p1 = att1.get("preset", "docling_fast")
+        p2 = att2.get("preset", "docling_deep")
+        if p2 == p1:
+            p2 = "docling_fast" if p1 == "docling_deep" else "docling_deep"
         is_att1_pass = att1.get("is_accepted", False)
         is_att2_pass = att2.get("is_accepted", False)
-        return f'''<button class="step-btn active" id="btnPreset1" onclick="switchPreset(0)">
-                <span>Step 1: {att1.get("preset", "docling_fast")}</span>
+        return f'''<button class="step-btn active" id="btnPreset1" onclick="switchPreset(0, '{p1}')">
+                <span>Step 1: {p1}</span>
                 <span class="badge-status {"pass" if is_att1_pass else "fail"}" id="statusPreset1">{"ACCEPT" if is_att1_pass else "FALLBACK"}</span>
             </button>
-            <button class="step-btn" id="btnPreset2" onclick="switchPreset(1)">
-                <span>Step 2: {att2.get("preset", "docling_deep")}</span>
+            <button class="step-btn" id="btnPreset2" onclick="switchPreset(1, '{p2}')">
+                <span>Step 2: {p2}</span>
                 <span class="badge-status {"pass" if is_att2_pass else "fail"}" id="statusPreset2">{"ACCEPT" if is_att2_pass else "FAIL"}</span>
             </button>'''
 
     is_acc = decision.get("is_accepted", True)
     chosen_preset = decision.get("chosen_preset", (plan.get("primary_preset") if plan else "docling_fast"))
-    preset2_name = "docling_deep"
+    preset2_name = "docling_fast" if chosen_preset == "docling_deep" else "docling_deep"
     if plan and plan.get("fallback_queue"):
-        first_fb = plan["fallback_queue"][0]
-        preset2_name = first_fb.get("preset", "docling_deep") if isinstance(first_fb, dict) else first_fb
+        for first_fb in plan["fallback_queue"]:
+            candidate = first_fb.get("preset", "docling_deep") if isinstance(first_fb, dict) else first_fb
+            if candidate and candidate != chosen_preset:
+                preset2_name = candidate
+                break
+    elif plan and plan.get("preset_order"):
+        for candidate in plan["preset_order"]:
+            if candidate and candidate != chosen_preset:
+                preset2_name = candidate
+                break
 
-    return f'''<button class="step-btn active" id="btnPreset1" onclick="switchPreset(0)">
+    return f'''<button class="step-btn active" id="btnPreset1" onclick="switchPreset(0, '{chosen_preset}')">
                 <span>Step 1: {chosen_preset}</span>
                 <span class="badge-status {"pass" if is_acc else "fail"}" id="statusPreset1">{"ACCEPT" if is_acc else "REJECT"}</span>
             </button>
-            <button class="step-btn fallback" id="btnPreset2" onclick="switchPreset(1)">
+            <button class="step-btn fallback" id="btnPreset2" onclick="switchPreset(1, '{preset2_name}')">
                 <span>Step 2: {preset2_name}</span>
                 <span class="badge-status" id="statusPreset2" style="background:#4B5563; color:#FFF;">Candidate</span>
             </button>'''

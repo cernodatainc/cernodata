@@ -5,8 +5,36 @@
  * and candidate document population across dashboard tabs.
  */
 
+window.runResultsCache = window.runResultsCache || {};
 let activeRunOutputDir = 'output';
 let availableRuns = [];
+
+/**
+ * Prefetches all run results and cached bounding box artifacts into the browser.
+ * Run artifacts are sufficiently lightweight that caching them completely eliminates
+ * roundtrip latency and repeated layout parsing on user selection.
+ *
+ * @param {Array<Object>} runs - List of discovered previous runs.
+ */
+async function prefetchAllRunResults(runs) {
+    if (!runs || !Array.isArray(runs)) return;
+    const fetchPromises = runs.map(async (r) => {
+        const runKey = r.dir_path || r.run_id;
+        if (!runKey || window.runResultsCache[runKey]) return;
+        try {
+            const resp = await fetch(`/api/viewer_data?output_dir=${encodeURIComponent(runKey)}`);
+            if (resp.ok) {
+                const viewerData = await resp.json();
+                window.runResultsCache[runKey] = viewerData;
+                if (r.run_id) window.runResultsCache[r.run_id] = viewerData;
+                if (r.dir_path) window.runResultsCache[r.dir_path] = viewerData;
+            }
+        } catch (err) {
+            console.log('[INFO] Prefetch skipped for run:', runKey, err);
+        }
+    });
+    await Promise.allSettled(fetchPromises);
+}
 
 /**
  * Queries /api/previous_runs to retrieve list of completed pipeline output runs.
@@ -20,6 +48,7 @@ async function loadPreviousRunsList() {
         activeRunOutputDir = data.active_run || 'output';
 
         updateRunSelectorsUI();
+        prefetchAllRunResults(availableRuns);
     } catch (e) {
         console.log('[WARN] Failed to load previous runs:', e);
     }
@@ -78,8 +107,10 @@ function loadSelectedRun() {
  * Loads artifacts from an output directory into the server session and synchronizes all tabs.
  *
  * @param {string} outputDir - Target output directory path to load.
+ * @param {number} [targetPage=1] - Target page to bring up in the viewer.
+ * @param {boolean} [shouldReloadViewer=true] - Whether to reload the viewer iframe immediately.
  */
-async function choosePreviousRun(outputDir) {
+async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer = true) {
     if (!outputDir) return;
     try {
         const resp = await fetch('/api/load_run', {
@@ -166,8 +197,8 @@ async function choosePreviousRun(outputDir) {
         if (typeof loadRunsGrid === 'function') {
             loadRunsGrid(run.document_name);
         }
-        if (typeof reloadViewerIframe === 'function') {
-            reloadViewerIframe();
+        if (shouldReloadViewer && typeof reloadViewerIframe === 'function') {
+            reloadViewerIframe(targetPage);
         }
     } catch (e) {
         console.log('[ERROR] Failed to switch previous run:', e);

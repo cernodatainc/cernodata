@@ -412,6 +412,18 @@ class ApiRoutesMixin:
         with open(dom_file, "w", encoding="utf-8") as f:
             json.dump(dom_data, f, indent=2)
 
+        raw_dom = payload.get("raw_dom")
+        if raw_dom is not None:
+            raw_file = os.path.join(output_dir, "raw_document_dom.json")
+            with open(raw_file, "w", encoding="utf-8") as f:
+                json.dump(raw_dom, f, indent=2)
+
+        diff_data = payload.get("diff")
+        if diff_data is not None:
+            diff_file = os.path.join(output_dir, "run_diff.json")
+            with open(diff_file, "w", encoding="utf-8") as f:
+                json.dump(diff_data, f, indent=2)
+
         nodes_len = len(dom_data.get("nodes", [])) if isinstance(dom_data, dict) else 0
         print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({nodes_len} nodes).")
         send_json_response(self, 200, {"success": True, "path": dom_file})  # type: ignore[arg-type]

@@ -52,13 +52,18 @@ class TestPipelineServer(unittest.TestCase):
         # Ensure output mock exists for discovery tests
         out_dir = os.path.join(os.getcwd(), "output")
         dom_file = os.path.join(out_dir, "document_dom.json")
-        if not os.path.exists(dom_file):
-            cls._created_output_mock = True
-            os.makedirs(out_dir, exist_ok=True)
-            with open(dom_file, "w", encoding="utf-8") as f:
-                json.dump({"document_id": "doc_test", "source_filename": "Document 8.pdf", "total_pages": 1, "nodes": []}, f)
-            with open(os.path.join(out_dir, "plan.json"), "w", encoding="utf-8") as f:
-                json.dump({"document_path": "src/e2e/Document 8.pdf", "primary_preset": "docling_fast", "target_threshold": 0.82}, f)
+        cls._created_output_mock = True
+        os.makedirs(out_dir, exist_ok=True)
+        stale_overlay = os.path.join(out_dir, "overlay_page_1.png")
+        if os.path.exists(stale_overlay):
+            try:
+                os.remove(stale_overlay)
+            except OSError:
+                pass
+        with open(dom_file, "w", encoding="utf-8") as f:
+            json.dump({"document_id": "doc_test", "source_filename": "Document 8.pdf", "total_pages": 1, "nodes": []}, f)
+        with open(os.path.join(out_dir, "plan.json"), "w", encoding="utf-8") as f:
+            json.dump({"document_path": "src/e2e/Document 8.pdf", "primary_preset": "docling_fast", "target_threshold": 0.82}, f)
             with open(os.path.join(out_dir, "plan_execution_result.json"), "w", encoding="utf-8") as f:
                 json.dump({
                     "document_path": "src/e2e/Document 8.pdf",
@@ -114,7 +119,7 @@ class TestPipelineServer(unittest.TestCase):
             parsed = json.loads(res_body) if res_body else {}
             return e.code, parsed
 
-    def test_landing_page_renders_four_navigation_sections(self) -> None:
+    def test_landing_page_renders_five_navigation_sections(self) -> None:
         status, content, headers = self._get("/")
         self.assertEqual(status, 200)
         self.assertIn("text/html", headers.get("Content-Type", ""))
@@ -123,22 +128,28 @@ class TestPipelineServer(unittest.TestCase):
         emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
         self.assertFalse(bool(emoji_pattern.search(content)), "Emoji detected on landing page!")
 
-        # Verify all four required navigation buttons and sections exist
+        # Verify all five required navigation buttons and sections exist
         self.assertIn("tabBtnInput", content)
         self.assertIn("tabBtnPlan", content)
         self.assertIn("tabBtnProgress", content)
         self.assertIn("tabBtnResults", content)
+        self.assertIn("tabBtnRuns", content)
 
         self.assertIn("secInput", content)
         self.assertIn("secPlan", content)
         self.assertIn("secProgress", content)
         self.assertIn("secResults", content)
+        self.assertIn("secRuns", content)
 
         # Verify section titles and contents
         self.assertIn("Input Selection", content)
         self.assertIn("Planning", content)
         self.assertIn("Parsing Progress", content)
         self.assertIn("Preset Results", content)
+        self.assertIn("Previous Runs", content)
+
+        # Verify global picker dropdown bar has been removed
+        self.assertNotIn("run-selector-card", content)
 
     def test_viewer_html_endpoint_serves_untemplated_html(self) -> None:
         status, content, headers = self._get("/viewer")
@@ -199,6 +210,8 @@ class TestPipelineServer(unittest.TestCase):
 
         # Check required hydration payload structure
         self.assertIn("dom", data)
+        self.assertIn("raw_dom", data)
+        self.assertIn("diff", data)
         self.assertIn("violations", data)
         self.assertIsInstance(data["violations"], list)
         self.assertIn("decision", data)
@@ -268,11 +281,27 @@ class TestPipelineServer(unittest.TestCase):
                 }
             ],
         }
-        status, resp = self._post_json("/api/save_dom", {"dom": dom_payload, "output_dir": "test_output_save"})
+        raw_dom_payload = dict(dom_payload)
+        diff_payload = {"added": [], "modified": ["node_1"], "removed": []}
+        status, resp = self._post_json("/api/save_dom", {
+            "dom": dom_payload,
+            "raw_dom": raw_dom_payload,
+            "diff": diff_payload,
+            "output_dir": "test_output_save",
+        })
         self.assertEqual(status, 200)
         self.assertTrue(resp.get("success"))
         self.assertIn("path", resp)
         self.assertTrue(os.path.exists(resp["path"]))
+
+        raw_path = os.path.join("test_output_save", "raw_document_dom.json")
+        diff_path = os.path.join("test_output_save", "run_diff.json")
+        self.assertTrue(os.path.exists(raw_path))
+        self.assertTrue(os.path.exists(diff_path))
+
+        with open(diff_path, "r", encoding="utf-8") as f:
+            saved_diff = json.load(f)
+        self.assertEqual(saved_diff, diff_payload)
 
         # Cleanup
         if os.path.exists("test_output_save"):
@@ -410,3 +439,9 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("dom", rerun_data)
         self.assertIn("violations", rerun_data)
         self.assertIn("decision", rerun_data)
+
+    def test_viewer_html_endpoint_with_page_param(self) -> None:
+        status, content, headers = self._get("/viewer?output_dir=output&page=2")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", headers.get("Content-Type", ""))
+        self.assertIn("/viewer.js", content)

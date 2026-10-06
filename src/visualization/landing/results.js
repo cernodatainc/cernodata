@@ -71,11 +71,31 @@ function renderResultsTable(data) {
 }
 
 /**
- * Reloads the embedded visual viewer iframe with a cache-busting timestamp.
+ * Reloads the embedded visual viewer iframe with output_dir and target page coordinates.
+ * If the run results are cached in memory and the viewer is active, directly hydrates
+ * the viewer to avoid network roundtrips and DOM layout re-parsing.
+ *
+ * @param {number|null} [pageNum=null] - Target page number to navigate to (1-indexed).
  */
-function reloadViewerIframe() {
+function reloadViewerIframe(pageNum = null) {
     const frame = document.getElementById('viewerFrame');
-    if (frame) {
-        frame.src = '/viewer?' + Date.now();
+    if (!frame) return;
+
+    const page = pageNum || (frame.contentWindow && frame.contentWindow.currentPage) || 1;
+    const runDir = (typeof activeRunOutputDir !== 'undefined' && activeRunOutputDir) ? activeRunOutputDir : 'output';
+    const cached = window.runResultsCache && (window.runResultsCache[runDir] || window.runResultsCache[runDir.replace(/\\/g, '/')]);
+
+    if (frame.contentWindow && typeof frame.contentWindow.hydrateViewer === 'function' && cached) {
+        try {
+            frame.contentWindow.hydrateViewer(cached, page);
+            if (typeof frame.contentWindow.switchPage === 'function') {
+                frame.contentWindow.switchPage(page);
+            }
+            return;
+        } catch (e) {
+            console.log('[WARN] Direct frame hydration failed, falling back to URL navigation:', e);
+        }
     }
+
+    frame.src = `/viewer?output_dir=${encodeURIComponent(runDir)}&page=${page}&t=${Date.now()}`;
 }

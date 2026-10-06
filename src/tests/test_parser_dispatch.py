@@ -4,18 +4,17 @@ src/tests/test_parser_dispatch.py
 Unit tests for modular parser adapters, parser registry, and progress notification.
 """
 
-import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.dom import BoundingBox, DOMNode, DocumentDOM
+from src.dom import DocumentDOM
 from src.pipeline.parser_adapters import (
     DoclingPresetAdapter,
     ParserExecutionOptions,
     PyPdfiumPresetAdapter,
 )
 from src.pipeline.parser_registry import ParserPresetRegistry
-from src.pipeline.parser_dispatch import DocumentParserDispatcher, parse_document
+from src.pipeline.parser_dispatch import DocumentParserDispatcher
 from src.pipeline.planner_models import IngestionConfig
 from src.pipeline.progress_notifier import PipelineProgressNotifier
 from src.pipeline.config_resolver import PipelineConfigResolver

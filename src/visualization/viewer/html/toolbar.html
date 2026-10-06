@@ -38,6 +38,7 @@
             <button class="action-btn" id="btnRedoLang" onclick="redoWithSelectedLanguage()">[REDO] Redo Run</button>
         </div>
         <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
+        <button class="action-btn secondary action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">[REVERT] Revert to Raw</button>
         <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and select a custom section on the page to parse with OCR">[+ SECTION] Select Section</button>
         <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
         <div class="filter-controls-group">

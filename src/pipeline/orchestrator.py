@@ -61,7 +61,7 @@ class PipelineOrchestrator:
         dom, decision, violations = self.attempt_runner.execute_attempt(
             pdf_path, config, curr_score, next_score
         )
-        attempts.append(self.attempt_runner.make_attempt_record(1, config.preset, decision, violations))
+        attempts.append(dict(self.attempt_runner.make_attempt_record(1, config.preset, decision, violations)))
         notifier.notify_verification()
 
         # Step 2: Fallback loop handling (Path A or Path B)

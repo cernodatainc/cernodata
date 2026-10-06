@@ -13,8 +13,12 @@ function saveCurrentPresetToClientCache() {
     const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
     const entry = {
         dom: (typeof domData !== 'undefined' && domData) ? JSON.parse(JSON.stringify(domData)) : { nodes: [] },
+        raw_dom: (typeof rawDomData !== 'undefined' && rawDomData) ? JSON.parse(JSON.stringify(rawDomData)) : { nodes: [] },
+        diff: (typeof computeDomDiff === 'function') ? computeDomDiff() : null,
         violations: (typeof violationsData !== 'undefined' && violationsData) ? JSON.parse(JSON.stringify(violationsData)) : [],
+        raw_violations: (typeof rawViolationsData !== 'undefined' && rawViolationsData) ? JSON.parse(JSON.stringify(rawViolationsData)) : [],
         decision: JSON.parse(JSON.stringify(decisionData)),
+        raw_decision: (typeof rawDecisionData !== 'undefined' && rawDecisionData) ? JSON.parse(JSON.stringify(rawDecisionData)) : null,
         activePresetIndex: activePresetIndex
     };
     window.presetCache[`${currentPreset}:${targetLang}`] = entry;
@@ -153,16 +157,24 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
     updatePresetUIState();
 }
 
-function switchPreset(stepIndex) {
+function switchPreset(stepIndex, explicitPreset = null) {
     if (typeof saveCurrentPresetToClientCache === 'function') {
         saveCurrentPresetToClientCache();
     }
-    const presetName = (stepIndex === 1) ? 'docling_deep' : 'docling_fast';
+    const chosenPreset = (decisionData && decisionData.chosen_preset) || (planData ? planData.primary_preset : 'docling_fast') || 'docling_fast';
+    let defaultCandidate = (chosenPreset === 'docling_deep') ? 'docling_fast' : 'docling_deep';
+    let presetName = explicitPreset || ((stepIndex === 0) ? chosenPreset : defaultCandidate);
+    if (stepIndex === 1 && presetName === chosenPreset) {
+        presetName = defaultCandidate;
+    }
     const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
     const cached = window.presetCache[`${presetName}:${targetLang}`] || window.presetCache[presetName];
 
     if (cached) {
         domData = JSON.parse(JSON.stringify(cached.dom));
+        if (cached.raw_dom) {
+            rawDomData = JSON.parse(JSON.stringify(cached.raw_dom));
+        }
         violationsData = (typeof extractViolationsList === 'function')
             ? extractViolationsList(JSON.parse(JSON.stringify(cached.violations)))
             : JSON.parse(JSON.stringify(cached.violations));
@@ -259,11 +271,17 @@ async function saveAnnotations() {
         banner.textContent = `[SAVING] Saving modified DocumentDOM annotations...`;
     }
 
+    const diffPayload = (typeof computeDomDiff === 'function') ? computeDomDiff() : {};
     try {
         const res = await fetch('/api/save_dom', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dom: domData, output_dir: 'output' })
+            body: JSON.stringify({
+                dom: domData,
+                raw_dom: (typeof rawDomData !== 'undefined') ? rawDomData : domData,
+                diff: diffPayload,
+                output_dir: 'output'
+            })
         });
         if (res.ok) {
             const data = await res.json();
@@ -287,6 +305,60 @@ async function saveAnnotations() {
 
     if (banner) {
         banner.textContent = `[OK] Downloaded updated document_dom.json.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+}
+
+/**
+ * Reverts all post-run annotations and modifications back to pristine raw preset result.
+ * Eliminates the need to rerun expensive OCR/deep model extraction presets.
+ */
+function revertToRawResult() {
+    if (typeof rawDomData === 'undefined' || !rawDomData || !rawDomData.nodes) {
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.textContent = '[WARN] No raw preset result available to revert.';
+            setTimeout(() => { banner.style.display = 'none'; }, 3000);
+        }
+        return;
+    }
+
+    const diff = (typeof computeDomDiff === 'function') ? computeDomDiff() : { has_changes: false };
+    if (!diff.has_changes) {
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.textContent = '[INFO] Document is already in pristine raw preset state. No modifications to revert.';
+            setTimeout(() => { banner.style.display = 'none'; }, 3000);
+        }
+        return;
+    }
+
+    domData = JSON.parse(JSON.stringify(rawDomData));
+    violationsData = extractViolationsList(JSON.parse(JSON.stringify(rawViolationsData)));
+    decisionData = JSON.parse(JSON.stringify(rawDecisionData));
+    ensureViolationIds();
+    appliedCorrections = false;
+    const togCorr = document.getElementById('toggleCorrections');
+    if (togCorr) togCorr.checked = false;
+
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
+
+    selectedNodeId = null;
+    selectedNodeIds = [];
+    updatePresetUIState();
+    renderDOMTree();
+    renderViolationsList();
+    renderSelectedEditor();
+    renderSVGOverlays();
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = `[OK] Reverted modifications back to raw preset result (${diff.modified_count || 0} modified, ${diff.added_count || 0} added, ${diff.removed_count || 0} deleted restored).`;
         setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
 }

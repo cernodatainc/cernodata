@@ -44,19 +44,10 @@ function onRunsGridDocChanged(docName) {
  * @param {number} pageNo - Target page number (1-indexed).
  */
 async function chooseRunAndPage(runId, pageNo) {
-    await choosePreviousRun(runId);
-    const frame = document.getElementById('viewerFrame');
-    if (frame && pageNo) {
-        setTimeout(() => {
-            try {
-                if (frame.contentWindow && typeof frame.contentWindow.switchPage === 'function') {
-                    frame.contentWindow.switchPage(pageNo);
-                }
-            } catch (e) {
-                // Cross-origin or frame not ready
-            }
-        }, 500);
-    }
+    const targetPage = parseInt(pageNo, 10) || 1;
+    await choosePreviousRun(runId, targetPage, false);
+    switchNavTab('results');
+    reloadViewerIframe(targetPage);
 }
 
 /**

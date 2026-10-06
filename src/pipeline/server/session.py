@@ -189,6 +189,8 @@ class ServerSessionContext:
                 "violations": viol_list,
                 "plan": plan_dict,
                 "dom": dom_dict,
+                "raw_dom": artifacts.get("raw_dom") or dom_dict,
+                "diff": artifacts.get("diff") or {},
             }
             # Invalidate cached viewer_data so it rehydrates from the newly loaded run
             self.viewer_data = None
@@ -370,6 +372,8 @@ class ServerSessionContext:
                 page_dimensions=page_dimensions,
                 total_pages=total_pages,
                 output_dir=target_dir,
+                raw_dom=artifacts.get("raw_dom"),
+                diff=artifacts.get("diff"),
             )
             return self.viewer_data
 
@@ -403,6 +407,8 @@ class ServerSessionContext:
                 page_dimensions=page_dimensions,
                 total_pages=total_pages,
                 output_dir=self.output_dir or "output",
+                raw_dom=result.get("raw_dom") or dom_dict,
+                diff=result.get("diff") or {},
             )
 
             preset_name = decision_dict.get("chosen_preset") or "docling_fast"

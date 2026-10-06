@@ -26,7 +26,12 @@ function switchNavTab(tabName) {
 
     if (tabName === 'results') {
         if (typeof refreshResultsData === 'function') refreshResultsData();
-        if (typeof reloadViewerIframe === 'function') reloadViewerIframe();
+        const frame = document.getElementById('viewerFrame');
+        if (frame && (!frame.src || frame.src === 'about:blank' || frame.src.endsWith('/'))) {
+            if (typeof reloadViewerIframe === 'function') reloadViewerIframe();
+        }
+    } else if (tabName === 'runs') {
+        if (typeof loadRunsGrid === 'function') loadRunsGrid();
     }
 }
 
