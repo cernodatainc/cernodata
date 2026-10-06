@@ -29,6 +29,7 @@ from typing import Dict, Any
 from src.pipeline.server import (
     PipelineViewerHandler,
     find_available_port,
+    find_previous_runs,
 )
 
 
@@ -137,8 +138,31 @@ class TestPipelineServer(unittest.TestCase):
         self.assertEqual(status_js, 200)
         self.assertIn("application/javascript", headers_js.get("Content-Type", ""))
         self.assertIn("hydrateViewer", content_js)
+        self.assertIn("extractViolationsList", content_js)
         self.assertIn("executeMergeElements", content_js)
         self.assertIn("mergeDOMNodes", content_js)
+
+        # Test landing CSS and JS
+        status_l_css, content_l_css, headers_l_css = self._get("/landing.css")
+        self.assertEqual(status_l_css, 200)
+        self.assertIn("text/css", headers_l_css.get("Content-Type", ""))
+        self.assertIn(".hub-nav-bar", content_l_css)
+
+        status_l_js, content_l_js, headers_l_js = self._get("/landing.js")
+        self.assertEqual(status_l_js, 200)
+        self.assertIn("application/javascript", headers_l_js.get("Content-Type", ""))
+        self.assertIn("switchNavTab", content_l_js)
+
+        # Test data shape config CSS and JS
+        status_ds_css, content_ds_css, headers_ds_css = self._get("/data_shape_config.css")
+        self.assertEqual(status_ds_css, 200)
+        self.assertIn("text/css", headers_ds_css.get("Content-Type", ""))
+        self.assertIn(".main-container", content_ds_css)
+
+        status_ds_js, content_ds_js, headers_ds_js = self._get("/data_shape_config.js")
+        self.assertEqual(status_ds_js, 200)
+        self.assertIn("application/javascript", headers_ds_js.get("Content-Type", ""))
+        self.assertIn("PRESET_WEIGHTS", content_ds_js)
 
     def test_api_viewer_data_hydration(self) -> None:
         status, content, headers = self._get("/api/viewer_data")
@@ -149,6 +173,7 @@ class TestPipelineServer(unittest.TestCase):
         # Check required hydration payload structure
         self.assertIn("dom", data)
         self.assertIn("violations", data)
+        self.assertIsInstance(data["violations"], list)
         self.assertIn("decision", data)
         self.assertIn("pageImages", data)
         self.assertIn("pageDimensions", data)
@@ -226,3 +251,135 @@ class TestPipelineServer(unittest.TestCase):
         if os.path.exists("test_output_save"):
             import shutil
             shutil.rmtree("test_output_save", ignore_errors=True)
+
+    def test_find_previous_runs_discovers_outputs(self) -> None:
+        runs = find_previous_runs()
+        self.assertIsInstance(runs, list)
+        self.assertGreater(len(runs), 0)
+        run_ids = [r["id"] for r in runs]
+        # output or src/e2e/output should be found
+        self.assertTrue(any("output" in rid for rid in run_ids))
+        first_run = runs[0]
+        self.assertIn("dir_path", first_run)
+        self.assertIn("document_name", first_run)
+        self.assertIn("chosen_preset", first_run)
+        self.assertIn("status", first_run)
+        self.assertIn("overall_confidence", first_run)
+        self.assertIn("label", first_run)
+
+    def test_api_previous_runs_endpoint(self) -> None:
+        status, content, _ = self._get("/api/previous_runs")
+        self.assertEqual(status, 200)
+        data = json.loads(content)
+        self.assertIn("runs", data)
+        self.assertIn("active_run", data)
+        self.assertIsInstance(data["runs"], list)
+        self.assertGreater(len(data["runs"]), 0)
+
+    def test_api_load_run_endpoint_post_and_get(self) -> None:
+        # Test POST /api/load_run
+        status, resp = self._post_json("/api/load_run", {"output_dir": "output"})
+        self.assertEqual(status, 200)
+        self.assertTrue(resp.get("success"))
+        self.assertEqual(resp.get("output_dir"), "output")
+        self.assertIn("run", resp)
+        self.assertIn("results", resp)
+
+        # Test GET /api/load_run?output_dir=output
+        status, content, _ = self._get("/api/load_run?output_dir=output")
+        self.assertEqual(status, 200)
+        get_data = json.loads(content)
+        self.assertTrue(get_data.get("success"))
+        self.assertEqual(get_data.get("output_dir"), "output")
+
+    def test_api_results_and_viewer_data_with_output_dir(self) -> None:
+        # Query results specifying output directory
+        status, content, _ = self._get("/api/results?output_dir=output")
+        self.assertEqual(status, 200)
+        res_data = json.loads(content)
+        self.assertIn("attempts", res_data)
+        self.assertIn("decision", res_data)
+        self.assertIn("output_dir", res_data)
+        self.assertEqual(res_data["output_dir"], "output")
+
+        # Query viewer_data specifying output directory
+        status, content, _ = self._get("/api/viewer_data?output_dir=output")
+        self.assertEqual(status, 200)
+        v_data = json.loads(content)
+        self.assertIn("dom", v_data)
+        self.assertIn("violations", v_data)
+        self.assertIsInstance(v_data["violations"], list)
+        self.assertIn("decision", v_data)
+        self.assertEqual(v_data.get("outputDir"), "output")
+
+    def test_previous_run_page_dimensions_accurate(self) -> None:
+        # Load run and check that page dimensions match true A4 coordinates (595.28 x 841.89)
+        # rather than being displaced by an arbitrary 612x792 fallback.
+        status, content, _ = self._get("/api/viewer_data?output_dir=output")
+        self.assertEqual(status, 200)
+        data = json.loads(content)
+        self.assertIn("pageDimensions", data)
+        page_dims = data["pageDimensions"]
+        self.assertIsInstance(page_dims, list)
+        self.assertGreater(len(page_dims), 0)
+        p1 = page_dims[0]
+        self.assertAlmostEqual(p1["width"], 595.28, delta=1.0)
+        self.assertAlmostEqual(p1["height"], 841.89, delta=1.0)
+
+    def test_api_runs_grid_endpoint(self) -> None:
+        status, content, _ = self._get("/api/runs_grid")
+        self.assertEqual(status, 200)
+        grid = json.loads(content)
+        self.assertIn("selected_file", grid)
+        self.assertIn("available_files", grid)
+        self.assertIn("pages", grid)
+        self.assertIn("runs", grid)
+        self.assertIsInstance(grid["pages"], list)
+        self.assertIsInstance(grid["runs"], list)
+        self.assertGreater(len(grid["pages"]), 0)
+        self.assertGreater(len(grid["runs"]), 0)
+
+        # Check horizontal axis has page numbers
+        self.assertEqual(grid["pages"][0], 1)
+
+        # Check vertical axis has parsing run identifiers
+        first_run = grid["runs"][0]
+        self.assertIn("run_id", first_run)
+        self.assertIn("preset", first_run)
+        self.assertIn("pages_data", first_run)
+        self.assertIn("1", first_run["pages_data"])
+        p1_data = first_run["pages_data"]["1"]
+        self.assertIn("confidence", p1_data)
+        self.assertIn("violations_count", p1_data)
+        self.assertIn("is_passed", p1_data)
+
+        # Query with explicit document name
+        doc_name = grid["selected_file"]
+        if doc_name:
+            query = urllib.parse.quote(doc_name)
+            s2, c2, _ = self._get(f"/api/runs_grid?document={query}")
+            self.assertEqual(s2, 200)
+            g2 = json.loads(c2)
+            self.assertEqual(g2["selected_file"], doc_name)
+
+    def test_api_rerun_reuses_cached_preset_result(self) -> None:
+        # Load run 'output' to populate session with Document 8 results (preset: docling_fast)
+        status, resp = self._post_json("/api/load_run", {"output_dir": "output"})
+        self.assertEqual(status, 200)
+        self.assertTrue(resp.get("success"))
+
+        # POST /api/rerun requesting the same preset should hit cache without re-executing pipeline
+        preset = resp["run"]["decision"].get("chosen_preset", "docling_fast")
+        pdf_path = resp["run"].get("document_path", "src/e2e/Document 8.pdf")
+        rerun_status, rerun_data = self._post_json("/api/rerun", {
+            "preset": preset,
+            "pdf_path": pdf_path,
+            "force": False,
+        })
+        self.assertEqual(rerun_status, 200)
+        self.assertTrue(rerun_data.get("success"))
+        self.assertTrue(rerun_data.get("cached"))
+        self.assertEqual(rerun_data.get("preset"), preset)
+        self.assertIn("dom", rerun_data)
+        self.assertIn("violations", rerun_data)
+        self.assertIn("decision", rerun_data)

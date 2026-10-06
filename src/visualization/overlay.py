@@ -110,9 +110,10 @@ class PageVisualizer:
     and quality violation markers.
     """
 
-    def __init__(self, dpi: int = 150) -> None:
+    def __init__(self, dpi: int = 150, draw_bounding_boxes: bool = False) -> None:
         self.dpi = dpi
         self.scale = dpi / 72.0  # PDF points to pixel scale factor
+        self.draw_bounding_boxes = draw_bounding_boxes
 
     def _render_pdf_page_backgrounds(
         self,
@@ -143,11 +144,13 @@ class PageVisualizer:
         dom: DocumentDOM,
         violations: Optional[List[Dict[str, Any]]] = None,
         output_dir: str = "output",
-        decision: Optional[Dict[str, Any]] = None
+        decision: Optional[Dict[str, Any]] = None,
+        draw_bounding_boxes: Optional[bool] = None,
     ) -> List[str]:
         mkdirs(output_dir)
         output_paths = []
         violations = violations or []
+        should_draw_bbox = self.draw_bounding_boxes if draw_bounding_boxes is None else draw_bounding_boxes
 
         page_nodes, page_violations = _group_by_page(dom, violations)
         per_page: Dict[Union[int, str], Any] = decision.get("per_page_confidence", {}) if decision else {}
@@ -164,7 +167,8 @@ class PageVisualizer:
                     p_conf = decision.get("overall_confidence")
 
                 overlay_img = self._draw_nodes_on_image(
-                    pil_img, page_no, page_w, page_h, nodes_for_page, viols_for_page, confidence_score=p_conf
+                    pil_img, page_no, page_w, page_h, nodes_for_page, viols_for_page,
+                    confidence_score=p_conf, draw_bounding_boxes=should_draw_bbox,
                 )
 
                 out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
@@ -182,7 +186,8 @@ class PageVisualizer:
             if p_conf is None and decision:
                 p_conf = decision.get("overall_confidence")
             overlay_img = self._draw_nodes_on_image(
-                pil_img, page_no, 612.0, 792.0, nodes_for_page, viols_for_page, confidence_score=p_conf
+                pil_img, page_no, 612.0, 792.0, nodes_for_page, viols_for_page,
+                confidence_score=p_conf, draw_bounding_boxes=should_draw_bbox,
             )
             out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
             overlay_img.save(out_path)
@@ -198,8 +203,12 @@ class PageVisualizer:
         page_h: float,
         nodes: List[DOMNode],
         violations: List[Dict[str, Any]],
-        confidence_score: Optional[float] = None
+        confidence_score: Optional[float] = None,
+        draw_bounding_boxes: bool = False,
     ) -> Image.Image:
+        if not draw_bounding_boxes:
+            return base_img.convert("RGB")
+
         img_w, img_h = base_img.size
         sx = img_w / page_w if page_w > 0 else self.scale
         sy = img_h / page_h if page_h > 0 else self.scale

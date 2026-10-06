@@ -49,6 +49,32 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(v["detected_snippet"], "piqtku")
         self.assertEqual(v["suggested_correction"], "piątku")
         self.assertEqual(v["rule_type"], "ocr_character_substitution")
+        self.assertEqual(v["type"], "diacritic")
+        self.assertEqual(v["suggestion"], "Infolinia czynna w piątku.")
+        self.assertEqual(v["suppressed"], "false")
+
+        # Verify violations are populated directly on the DOMNode
+        self.assertEqual(len(node.violations), 1)
+        self.assertEqual(node.violations[0]["type"], "diacritic")
+        self.assertEqual(node.violations[0]["suppressed"], "false")
+
+    def test_suppressed_violations_affect_confidence(self):
+        node = DOMNode(
+            node_id="n_viol_supp", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Infolinia czynna w piqtku."}
+        )
+        dom = DocumentDOM(document_id="doc_viol_supp", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        detect_quality_violations(dom, language="pl")
+
+        # Before suppression, confidence is lower due to diacritic anomaly penalty
+        conf_before = evaluate_page_confidence([node], language="pl")
+        self.assertLess(conf_before, 1.0)
+
+        # After accepting / suppressing the diacritic violation on the node
+        node.violations[0]["suppressed"] = "true"
+        conf_after = evaluate_page_confidence([node], language="pl")
+        self.assertEqual(conf_after, 1.0)
 
     def test_none_language_handling(self):
         # Verify compute_language_score handles None language without AttributeError

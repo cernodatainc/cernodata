@@ -5,7 +5,7 @@ DOMNode element primitive for cernodata IR.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from src.dom.bounding_box import BoundingBox
 
 
@@ -18,6 +18,7 @@ class DOMNode:
     bounding_box: BoundingBox
     content: Dict[str, Any] = field(default_factory=dict)
     template_hint_applied: Optional[str] = None
+    violations: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         res = {
@@ -26,7 +27,8 @@ class DOMNode:
             "global_page_index": self.global_page_index,
             "temp_slice_index": self.temp_slice_index,
             "bounding_box": self.bounding_box.to_dict(),
-            "content": self.content
+            "content": self.content,
+            "violations": self.violations
         }
         if self.template_hint_applied:
             res["template_hint_applied"] = self.template_hint_applied
@@ -54,4 +56,5 @@ class DOMNode:
             bounding_box=bbox,
             content=dict(data.get("content", {})),
             template_hint_applied=data.get("template_hint_applied"),
+            violations=list(data.get("violations", [])),
         )

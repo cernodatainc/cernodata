@@ -8,7 +8,7 @@ and flagging incorrect parsed text.
 
 import os
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 from src.utils import mkdirs
 from src.dom import DocumentDOM
@@ -27,7 +27,7 @@ def generate_interactive_html(
     pdf_path: str,
     dom: DocumentDOM,
     decision: Dict[str, Any],
-    violations: List[Dict[str, Any]],
+    violations: Union[List[Dict[str, Any]], Dict[str, Any]],
     output_path: str = os.path.join("output", "interactive_viewer.html"),
     plan: Optional[Dict[str, Any]] = None
 ) -> str:
@@ -38,8 +38,15 @@ def generate_interactive_html(
     img_data_uri = page_images[0] if page_images else page_to_base64(pdf_path, page_index=0)
     page_dimensions = get_pdf_page_dimensions(pdf_path)
 
+    if isinstance(violations, dict):
+        violations_list = violations.get("violations", [])
+    elif isinstance(violations, list):
+        violations_list = violations
+    else:
+        violations_list = []
+
     dom_json = json.dumps(dom.to_dict())
-    violations_json = json.dumps(violations)
+    violations_json = json.dumps(violations_list)
     decision_json = json.dumps(decision)
     plan_json = json.dumps(plan) if plan else "null"
 
@@ -52,7 +59,7 @@ def generate_interactive_html(
     html_content = build_viewer_html(
         dom=dom,
         decision=decision,
-        violations=violations,
+        violations=violations_list,
         img_data_uri=img_data_uri,
         dom_json=dom_json,
         violations_json=violations_json,

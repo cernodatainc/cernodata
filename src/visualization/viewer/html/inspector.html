@@ -4,17 +4,25 @@
                 <button class="tab-btn" id="tabBtnViol" data-name="violations" onclick="showTab(event, 'violTab')" title="Click: Show selected page | Shift+Click: Show all pages"><span id="violTabLabel">Violations</span> (<span id="violCount">{{ violations_count }}</span>)</button>
                 <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision Log</button>
                 <button class="tab-btn" id="tabBtnPlan" onclick="showTab(event, 'planTab')">Plan</button>
+                <button class="tab-btn" id="tabBtnRuns" onclick="showTab(event, 'runsTab')">Runs Grid</button>
             </div>
 
             <div class="tab-content active" id="domTab">
                 <div class="page-action-bar">
                     <span class="page-action-title" id="pageActionTitle">Page 1 Controls:</span>
-                    <button class="action-btn" style="font-size:10px; padding:3px 8px; background:linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%); color:#FFF;" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
+                    <button class="action-btn action-btn-decollide-sm" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
                 </div>
                 <div id="selectedEditorContainer"></div>
                 <div id="domListContainer"></div>
             </div>
             <div class="tab-content" id="violTab"><div id="violListContainer"></div></div>
             <div class="tab-content" id="logTab"><div class="log-box"><pre id="logContent"></pre></div></div>
-            <div class="tab-content" id="planTab"><div class="log-box" style="color: #A7F3D0;"><pre id="planContent"></pre></div></div>
+            <div class="tab-content" id="planTab"><div class="log-box log-box-plan"><pre id="planContent"></pre></div></div>
+            <div class="tab-content" id="runsTab">
+                <div class="page-action-bar">
+                    <span class="page-action-title">Previous Runs by Page Grid:</span>
+                    <button class="action-btn" onclick="loadViewerRunsGrid()">[REFRESH] Refresh Grid</button>
+                </div>
+                <div id="viewerRunsGridContainer" class="viewer-runs-grid-box"></div>
+            </div>
         </div>

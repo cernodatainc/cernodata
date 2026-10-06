@@ -116,13 +116,18 @@ class DocumentDOM:
             elif t1 or t2:
                 merged_content["raw_text"] = t1 or t2
 
+        merged_violations = list(upper.violations) + [
+            v for v in lower.violations if v not in upper.violations
+        ]
+
         merged_node = DOMNode(
             node_id=upper.node_id,
             type=res_type,
             global_page_index=upper.global_page_index,
             temp_slice_index=upper.temp_slice_index,
             bounding_box=merged_bbox,
-            content=merged_content
+            content=merged_content,
+            violations=merged_violations,
         )
 
         new_nodes: List[DOMNode] = []

@@ -58,8 +58,19 @@ def evaluate_page_confidence(
     for node in nodes:
         raw_text = node.content.get("raw_text", "")
 
-        char_score = max(0.0, 1.0 - (compute_garbage_ratio(raw_text) * garbage_multiplier))
-        lang_score = compute_language_score(raw_text, language=language, diacritic_hit=hit)
+        suppressed_types = {
+            str(v.get("type", "")): True
+            for v in getattr(node, "violations", [])
+            if str(v.get("suppressed", "false")).lower() in ("true", "1")
+        }
+
+        if suppressed_types.get("symbols"):
+            char_score = 1.0
+        else:
+            char_score = max(0.0, 1.0 - (compute_garbage_ratio(raw_text) * garbage_multiplier))
+
+        effective_hit = 0.0 if suppressed_types.get("diacritic") else hit
+        lang_score = compute_language_score(raw_text, language=language, diacritic_hit=effective_hit)
 
         combined_text_score = char_score * lang_score
 
@@ -71,7 +82,7 @@ def evaluate_page_confidence(
 
         node_scores.append(score)
 
-        if config:
+        if config and not suppressed_types.get("diacritic"):
             diacritic_anomalies_count += len(config.find_anomalous_substitutions(raw_text))
             diacritic_anomalies_count += len(config.find_diacritic_conflicts(raw_text))
 

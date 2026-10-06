@@ -11,7 +11,6 @@ from typing import List
 
 _VIEWER_DIR = os.path.dirname(os.path.abspath(__file__))
 _JS_DIR = os.path.join(_VIEWER_DIR, "js")
-_JS_PATH = os.path.join(_VIEWER_DIR, "viewer.js")
 
 JS_MODULE_ORDER: List[str] = [
     "state.js",
@@ -38,11 +37,8 @@ def bundle_viewer_js() -> str:
 
 
 def get_viewer_js() -> str:
-    """Returns client script content from modular JS sources or viewer.js."""
-    if os.path.exists(_JS_DIR):
-        return bundle_viewer_js()
-    with open(_JS_PATH, "r", encoding="utf-8") as f:
-        return f.read()
+    """Returns client script content assembled from subdivided modular JS sources."""
+    return bundle_viewer_js()
 
 
 def build_viewer_script(

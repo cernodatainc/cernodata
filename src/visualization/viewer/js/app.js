@@ -144,7 +144,10 @@ async function startViewer() {
     }
 
     try {
-        const resp = await fetch('/api/viewer_data');
+        const urlParams = new URLSearchParams(window.location.search);
+        const outputDirParam = urlParams.get('output_dir');
+        const fetchUrl = outputDirParam ? `/api/viewer_data?output_dir=${encodeURIComponent(outputDirParam)}` : '/api/viewer_data';
+        const resp = await fetch(fetchUrl);
         if (resp.ok) {
             const data = await resp.json();
             hydrateViewer(data);
@@ -156,6 +159,18 @@ async function startViewer() {
 
     initPageControls();
     switchPage(1);
+}
+
+const pageImgEl = document.getElementById('pageImg');
+if (pageImgEl) {
+    pageImgEl.addEventListener('load', () => {
+        if (typeof updateSvgViewBox === 'function') {
+            updateSvgViewBox();
+        }
+        if (typeof renderSVGOverlays === 'function') {
+            renderSVGOverlays();
+        }
+    });
 }
 
 startViewer();

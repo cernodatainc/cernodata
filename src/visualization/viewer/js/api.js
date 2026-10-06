@@ -5,6 +5,22 @@
  * and DocumentDOM annotation persistence.
  */
 
+window.presetCache = window.presetCache || {};
+
+function saveCurrentPresetToClientCache() {
+    if (typeof decisionData === 'undefined' || !decisionData) return;
+    const currentPreset = decisionData.chosen_preset || ((activePresetIndex === 1) ? 'docling_deep' : 'docling_fast');
+    const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
+    const entry = {
+        dom: (typeof domData !== 'undefined' && domData) ? JSON.parse(JSON.stringify(domData)) : { nodes: [] },
+        violations: (typeof violationsData !== 'undefined' && violationsData) ? JSON.parse(JSON.stringify(violationsData)) : [],
+        decision: JSON.parse(JSON.stringify(decisionData)),
+        activePresetIndex: activePresetIndex
+    };
+    window.presetCache[`${currentPreset}:${targetLang}`] = entry;
+    window.presetCache[currentPreset] = entry;
+}
+
 function onLanguageChanged() {
     const sel = document.getElementById('selectLanguage').value;
     const banner = document.getElementById('statusBanner');
@@ -22,7 +38,32 @@ async function redoWithSelectedLanguage() {
 }
 
 async function rerunBackendPipeline(presetName, langOverride = null) {
-    const targetLang = langOverride || document.getElementById('selectLanguage').value || activeLanguage;
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
+    const targetLang = langOverride || (document.getElementById('selectLanguage') ? document.getElementById('selectLanguage').value : null) || activeLanguage;
+    const clientCached = window.presetCache[`${presetName}:${targetLang}`] || (!langOverride ? window.presetCache[presetName] : null);
+
+    if (clientCached) {
+        domData = JSON.parse(JSON.stringify(clientCached.dom));
+        violationsData = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(JSON.parse(JSON.stringify(clientCached.violations)))
+            : JSON.parse(JSON.stringify(clientCached.violations));
+        decisionData = JSON.parse(JSON.stringify(clientCached.decision));
+        ensureViolationIds();
+        activeLanguage = targetLang;
+        activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;
+        updatePresetUIState();
+
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.textContent = `[INFO] Applied preset '${presetName}' from cache (Language: ${targetLang}).`;
+            setTimeout(() => { banner.style.display = 'none'; }, 2500);
+        }
+        return;
+    }
+
     const banner = document.getElementById('statusBanner');
     if (banner) {
         banner.style.display = 'block';
@@ -39,17 +80,23 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         if (res.ok) {
             const data = await res.json();
             if (banner) {
-                banner.textContent = `[OK] Live pipeline finished. Applied preset '${presetName}' (Language: ${targetLang}).`;
+                const tag = data.cached ? '[CACHE HIT]' : '[OK]';
+                banner.textContent = `${tag} Applied preset '${presetName}' (Language: ${targetLang}).`;
                 setTimeout(() => { banner.style.display = 'none'; }, 4000);
             }
 
             domData = data.dom;
-            violationsData = data.violations;
+            violationsData = (typeof extractViolationsList === 'function')
+                ? extractViolationsList(data.violations)
+                : (Array.isArray(data.violations) ? data.violations : (data.violations && data.violations.violations) || []);
             decisionData = data.decision;
             ensureViolationIds();
             activeLanguage = targetLang;
             activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;
 
+            if (typeof saveCurrentPresetToClientCache === 'function') {
+                saveCurrentPresetToClientCache();
+            }
             updatePresetUIState();
             return;
         }
@@ -73,7 +120,8 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         if (simTargetLang === 'en') {
             return basePageScore;
         } else if (simTargetLang === 'pl') {
-            const hasDiacriticViolations = violationsData.some(v => v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution');
+            const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+            const hasDiacriticViolations = viols.some(v => v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution');
             if (hasDiacriticViolations && !appliedCorrections) {
                 return (initialDecisionData.attempts && initialDecisionData.attempts[0])
                     ? (initialDecisionData.attempts[0].overall_confidence || 0.5324)
@@ -84,10 +132,13 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         return basePageScore;
     }
 
+    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
     if (targetLang === 'en') {
-        violationsData = violationsData.filter(v => v.rule_type !== 'diacritic_conflict' && v.rule_type !== 'ocr_character_substitution');
+        violationsData = viols.filter(v => v.rule_type !== 'diacritic_conflict' && v.rule_type !== 'ocr_character_substitution');
     } else if (targetLang === 'pl') {
-        violationsData = JSON.parse(JSON.stringify(initialViolationsData));
+        violationsData = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)))
+            : JSON.parse(JSON.stringify(initialViolationsData || []));
         ensureViolationIds();
     }
 
@@ -103,7 +154,32 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
 }
 
 function switchPreset(stepIndex) {
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
     const presetName = (stepIndex === 1) ? 'docling_deep' : 'docling_fast';
+    const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
+    const cached = window.presetCache[`${presetName}:${targetLang}`] || window.presetCache[presetName];
+
+    if (cached) {
+        domData = JSON.parse(JSON.stringify(cached.dom));
+        violationsData = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(JSON.parse(JSON.stringify(cached.violations)))
+            : JSON.parse(JSON.stringify(cached.violations));
+        decisionData = JSON.parse(JSON.stringify(cached.decision));
+        ensureViolationIds();
+        activePresetIndex = stepIndex;
+        updatePresetUIState();
+
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.textContent = `[INFO] Switched to preset '${presetName}' (Loaded from cache).`;
+            setTimeout(() => { banner.style.display = 'none'; }, 2500);
+        }
+        return;
+    }
+
     rerunBackendPipeline(presetName);
 }
 
@@ -157,7 +233,10 @@ function updatePresetUIState() {
 
     const subEl = document.getElementById('scoreSub');
     if (subEl) {
-        subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violationsData.length}`;
+        const violCount = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(violationsData).length
+            : (Array.isArray(violationsData) ? violationsData.length : 0);
+        subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violCount}`;
         subEl.style.color = isAccepted ? 'var(--accent-green)' : 'var(--accent-red)';
     }
     const badgeEl = document.getElementById('scoreBadge');

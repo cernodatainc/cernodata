@@ -119,8 +119,9 @@ function renderSVGOverlays() {
         if (filterType !== 'ALL' && node.type !== filterType) return;
         const bbox = node.bounding_box;
         const corners = getBoxCorners(bbox);
-        const nodeViols = violationsData.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
-        const hasUnfixedViol = nodeViols.some(v => !v.is_fixed);
+        const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+        const nodeViols = viols.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
+        const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v));
         const hasViol = hasUnfixedViol && !appliedCorrections && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
