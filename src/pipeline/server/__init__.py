@@ -7,21 +7,28 @@ Provides thread-safe session tracking, dynamic viewer data hydration, and intera
 
 from __future__ import annotations
 
-from src.pipeline.server.common import (
-    REPO_ROOT,
-    SRC_DIR,
-    build_runs_grid,
+from src.pipeline.server.artifacts import (
     build_viewer_dataset,
     calculate_progress_step,
-    copy_file_if_exists,
     create_preset_attempt_record,
-    find_previous_runs,
+    extract_decision_from_html,
     load_or_render_page_images,
     load_run_artifacts,
     normalize_violations,
+    safe_load_json,
+)
+from src.pipeline.server.core import PipelineViewerServer
+from src.pipeline.server.discovery import (
+    build_runs_grid,
+    find_previous_runs,
+)
+from src.pipeline.server.handler import PipelineViewerHandler
+from src.pipeline.server.http_utils import (
+    REPO_ROOT,
+    SRC_DIR,
+    copy_file_if_exists,
     read_html_template,
     read_json_payload,
-    safe_load_json,
     send_file_response,
     send_first_existing_file,
     send_html_response,
@@ -29,8 +36,6 @@ from src.pipeline.server.common import (
     send_response_bytes,
     send_text_response,
 )
-from src.pipeline.server.core import PipelineViewerServer
-from src.pipeline.server.handler import PipelineViewerHandler
 from src.pipeline.server.launcher import (
     export_standalone_wizard_assets,
     main,
@@ -38,6 +43,10 @@ from src.pipeline.server.launcher import (
     serve_data_shape_wizard,
     start_pipeline_server,
 )
+from src.pipeline.server.preset_cache import PresetCache
+from src.pipeline.server.progress import ProgressTracker
+from src.pipeline.server.routes_api import ApiRoutesMixin
+from src.pipeline.server.routes_static import StaticRoutesMixin
 from src.pipeline.server.session import ServerSessionContext
 from src.utils import find_available_port, resolve_pdf_path
 
@@ -55,6 +64,7 @@ __all__ = [
     "read_html_template",
     "safe_load_json",
     "normalize_violations",
+    "extract_decision_from_html",
     "load_run_artifacts",
     "load_or_render_page_images",
     "calculate_progress_step",
@@ -62,6 +72,10 @@ __all__ = [
     "build_viewer_dataset",
     "build_runs_grid",
     "find_previous_runs",
+    "ProgressTracker",
+    "PresetCache",
+    "StaticRoutesMixin",
+    "ApiRoutesMixin",
     "ServerSessionContext",
     "PipelineViewerServer",
     "PipelineViewerHandler",

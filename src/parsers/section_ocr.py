@@ -8,195 +8,32 @@ PDF crops, and extensible custom OCR engine backends.
 
 from __future__ import annotations
 
-import base64
-import io
 import os
-from typing import Any, Callable, Optional, TypedDict, Union
-from PIL import Image
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
+
 import numpy as np
+from PIL import Image
 
 from src.dom.bounding_box import BoundingBox
-from src.parsers.pdf_utils import open_pdf, HAS_PYPDFIUM
+from src.parsers.ocr_imaging import crop_pdf_region, normalize_to_pil
+from src.parsers.ocr_models import (
+    OCRLine,
+    OCRResult,
+    create_ocr_result,
+    normalize_bbox_coords,
+)
 
 HAS_RAPIDOCR = False
 try:
-    from rapidocr import RapidOCR, EngineType
+    from rapidocr import EngineType, RapidOCR
+
     HAS_RAPIDOCR = True
 except ImportError:
     HAS_RAPIDOCR = False
 
-
-class OCRLine(TypedDict, total=False):
-    """Structured line item produced by OCR extraction."""
-    text: str
-    confidence: float
-    bbox: Optional[list[list[float]]]
-
-
-class OCRResult(TypedDict, total=False):
-    """Standardized OCR extraction result container."""
-    success: bool
-    text: str
-    confidence: float
-    lines: list[OCRLine]
-    error: Optional[str]
-
-
-def create_ocr_result(
-    success: bool = True,
-    text: str = "",
-    confidence: float = 0.0,
-    lines: Optional[list[OCRLine]] = None,
-    error: Optional[str] = None,
-) -> OCRResult:
-    """Constructs a standardized OCR result dictionary."""
-    return {
-        "success": success,
-        "text": text,
-        "confidence": confidence,
-        "lines": lines if lines is not None else [],
-        "error": error,
-    }
-
-
-# Backwards compatibility alias
+# Backwards compatibility aliases
 _ocr_result = create_ocr_result
-
-
-def normalize_to_pil(
-    image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray]
-) -> Image.Image:
-    """
-    Normalizes supported image inputs to an RGB PIL Image.
-
-    Supported inputs:
-        - PIL Image (converted to RGB)
-        - Numpy array (2D grayscale or 3D RGB)
-        - Raw bytes/bytearray (PNG, JPEG, etc.)
-        - File system path (str or os.PathLike) pointing to an existing image file
-        - Base64 data URI string ('data:image/png;base64,...') or raw base64 string
-    """
-    if isinstance(image_input, Image.Image):
-        return image_input.convert("RGB")
-    if isinstance(image_input, np.ndarray):
-        arr = image_input if image_input.ndim == 2 else image_input[:, :, :3]
-        return Image.fromarray(arr).convert("RGB")
-    if isinstance(image_input, (str, os.PathLike)):
-        str_val = os.fspath(image_input).strip()
-        if os.path.isfile(str_val):
-            return Image.open(str_val).convert("RGB")
-        b64_str = str_val
-        if "," in b64_str and ";base64" in b64_str:
-            b64_str = b64_str.split(",", 1)[1]
-        try:
-            raw_bytes = base64.b64decode(b64_str)
-            return Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-        except Exception as ex:
-            raise ValueError(f"Unable to parse image from string/path: {ex}") from ex
-    if isinstance(image_input, (bytes, bytearray)):
-        return Image.open(io.BytesIO(image_input)).convert("RGB")
-    raise TypeError(f"Unsupported image input type: {type(image_input)}")
-
-
-# Backwards compatibility alias
 _normalize_to_pil = normalize_to_pil
-
-
-def normalize_bbox_coords(
-    bbox: Union[BoundingBox, dict[str, float], tuple[float, float, float, float], list[float]]
-) -> tuple[float, float, float, float]:
-    """
-    Extracts (x0, y0, x1, y1) coordinates from BoundingBox, coordinate dictionary, or 4-element sequence.
-    """
-    if isinstance(bbox, BoundingBox):
-        return float(bbox.x0), float(bbox.y0), float(bbox.x1), float(bbox.y1)
-    if isinstance(bbox, dict):
-        if "x0" in bbox and "x1" in bbox:
-            return (
-                float(bbox.get("x0", 0.0)),
-                float(bbox.get("y0", 0.0)),
-                float(bbox.get("x1", 0.0)),
-                float(bbox.get("y1", 0.0)),
-            )
-        if "left" in bbox and "right" in bbox:
-            return (
-                float(bbox.get("left", 0.0)),
-                float(bbox.get("top", 0.0)),
-                float(bbox.get("right", 0.0)),
-                float(bbox.get("bottom", 0.0)),
-            )
-        return (
-            float(bbox.get("x0", 0.0)),
-            float(bbox.get("y0", 0.0)),
-            float(bbox.get("x1", 0.0)),
-            float(bbox.get("y1", 0.0)),
-        )
-    if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
-        return float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
-    raise TypeError(f"Unsupported bounding box coordinate specification: {type(bbox)}")
-
-
-def crop_pdf_region(
-    pdf_path: str,
-    page_number: int,
-    bbox: Union[BoundingBox, dict[str, float], tuple[float, float, float, float], list[float]],
-    scale: float = 2.0,
-) -> Image.Image:
-    """
-    Renders and crops a specific bounding box region from a PDF page into a PIL Image.
-
-    Args:
-        pdf_path: Path to the source PDF.
-        page_number: 1-indexed page number.
-        bbox: BoundingBox object, coordinate dict, or (x0, y0, x1, y1) tuple/list.
-        scale: Resolution scale factor for rendering.
-
-    Returns:
-        RGB PIL Image of the cropped region.
-
-    Raises:
-        RuntimeError: If pypdfium2 is unavailable or rendering fails.
-        FileNotFoundError: If PDF file does not exist.
-        ValueError: If bounding box coordinates or page number are invalid.
-        IndexError: If page index is out of range.
-    """
-    if not HAS_PYPDFIUM:
-        raise RuntimeError("pypdfium2 is not installed.")
-
-    if not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"PDF file does not exist: {pdf_path}")
-
-    x0, y0, x1, y1 = normalize_bbox_coords(bbox)
-    if x1 <= x0 or y1 <= y0:
-        raise ValueError(f"Invalid bounding box coordinates: [{x0}, {y0}, {x1}, {y1}]")
-
-    with open_pdf(pdf_path) as pdf:
-        if pdf is None:
-            raise RuntimeError(f"Failed to open PDF: {pdf_path}")
-
-        page_idx = max(0, page_number - 1)
-        if page_idx >= len(pdf):
-            raise IndexError(f"Page index {page_number} out of range (total pages: {len(pdf)}).")
-
-        page = pdf[page_idx]
-        page_w, page_h = page.get_size()
-        try:
-            full_pil = page.render(scale=scale).to_pil().convert("RGB")
-        except Exception as ex:
-            raise RuntimeError(f"Failed to render page: {ex}") from ex
-
-    scale_x = full_pil.width / page_w
-    scale_y = full_pil.height / page_h
-
-    crop_x0 = max(0, int(round(x0 * scale_x)))
-    crop_y0 = max(0, int(round(y0 * scale_y)))
-    crop_x1 = min(full_pil.width, int(round(x1 * scale_x)))
-    crop_y1 = min(full_pil.height, int(round(y1 * scale_y)))
-
-    if crop_x1 <= crop_x0 or crop_y1 <= crop_y0:
-        raise ValueError("Cropped bounding box is empty after scaling.")
-
-    return full_pil.crop((crop_x0, crop_y0, crop_x1, crop_y1))
 
 
 class SectionOCRParser:
@@ -214,7 +51,7 @@ class SectionOCRParser:
         engine: Optional[Any] = None,
         engine_factory: Optional[Callable[[], Any]] = None,
     ) -> None:
-        self.language = language.lower().strip() if language else ""
+        self.language: str = language.lower().strip() if language else ""
         self._engine: Optional[Any] = engine
         self._engine_factory: Optional[Callable[[], Any]] = engine_factory
         self._init_attempted: bool = engine is not None
@@ -270,7 +107,7 @@ class SectionOCRParser:
         """Executes raw inference with the underlying OCR engine on a PIL Image."""
         return engine(np.array(pil_image))
 
-    def _parse_engine_result(self, result: Any) -> tuple[str, float, list[OCRLine]]:
+    def _parse_engine_result(self, result: Any) -> Tuple[str, float, List[OCRLine]]:
         """
         Extracts and standardizes raw OCR engine output into joined text,
         average confidence score, and structured line records.
@@ -290,9 +127,9 @@ class SectionOCRParser:
         if txts is None and isinstance(result, (list, tuple)) and len(result) > 0:
             first = result[0]
             if isinstance(first, (list, tuple)):
-                parsed_txts = []
-                parsed_scores = []
-                parsed_boxes = []
+                parsed_txts: List[Any] = []
+                parsed_scores: List[Any] = []
+                parsed_boxes: List[Any] = []
                 for entry in first:
                     if isinstance(entry, (list, tuple)) and len(entry) >= 2:
                         parsed_boxes.append(entry[0])
@@ -309,8 +146,8 @@ class SectionOCRParser:
         if not txts:
             return "", 0.0, []
 
-        lines: list[OCRLine] = []
-        valid_scores: list[float] = []
+        lines: List[OCRLine] = []
+        valid_scores: List[float] = []
 
         txt_list = list(txts) if isinstance(txts, (list, tuple)) else [str(txts)]
         score_list = list(scores) if isinstance(scores, (list, tuple)) else [1.0] * len(txt_list)
@@ -325,7 +162,7 @@ class SectionOCRParser:
             valid_scores.append(sc)
 
             box_val = box_list[i] if i < len(box_list) else None
-            box_coords: Optional[list[list[float]]] = None
+            box_coords: Optional[List[List[float]]] = None
             if box_val is not None:
                 try:
                     box_coords = [[float(p[0]), float(p[1])] for p in box_val]
@@ -346,7 +183,7 @@ class SectionOCRParser:
     def parse_image(
         self,
         image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ) -> OCRResult:
         """
         Parses an image containing a document section using OCR.
@@ -389,15 +226,15 @@ class SectionOCRParser:
             success=True,
             text=joined_text,
             confidence=avg_confidence,
-            lines=lines
+            lines=lines,
         )
 
     def crop_section_image(
         self,
         pdf_path: str,
         page_number: int,
-        bbox: Union[BoundingBox, dict[str, float], tuple[float, float, float, float], list[float]],
-        scale: float = 2.0
+        bbox: Union[BoundingBox, dict[str, float], Tuple[float, float, float, float], Sequence[float]],
+        scale: float = 2.0,
     ) -> Image.Image:
         """Extracts and crops an image region from a PDF page."""
         return crop_pdf_region(pdf_path, page_number, bbox, scale=scale)
@@ -406,9 +243,9 @@ class SectionOCRParser:
         self,
         pdf_path: str,
         page_number: int,
-        bbox: Union[BoundingBox, dict[str, float], tuple[float, float, float, float], list[float]],
+        bbox: Union[BoundingBox, dict[str, float], Tuple[float, float, float, float], Sequence[float]],
         language: Optional[str] = None,
-        scale: float = 2.0
+        scale: float = 2.0,
     ) -> OCRResult:
         """
         Extracts and crops a specific section bounding box from a PDF page and runs OCR.
@@ -449,7 +286,7 @@ def set_default_section_parser(parser: Optional[SectionOCRParser]) -> None:
 
 def parse_image_ocr(
     image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
-    language: str = "en"
+    language: str = "en",
 ) -> OCRResult:
     """Module-level convenience function for targeted image OCR."""
     parser = get_default_section_parser()
@@ -459,9 +296,9 @@ def parse_image_ocr(
 def parse_section_from_pdf(
     pdf_path: str,
     page_number: int,
-    bbox: Union[BoundingBox, dict[str, float], tuple[float, float, float, float], list[float]],
+    bbox: Union[BoundingBox, dict[str, float], Tuple[float, float, float, float], Sequence[float]],
     language: str = "en",
-    scale: float = 2.0
+    scale: float = 2.0,
 ) -> OCRResult:
     """Module-level convenience function for cropping a section from a PDF and running OCR."""
     parser = get_default_section_parser()

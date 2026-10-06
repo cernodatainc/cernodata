@@ -1,12 +1,12 @@
 """
 src/pipeline/server/session.py
 
-Thread-safe state container for server sessions, progress tracking, and hydration data.
+Thread-safe state container orchestrating server sessions, run artifacts,
+and interactive visual viewer data.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 import glob
 import logging
 import os
@@ -14,25 +14,27 @@ import threading
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from src.pipeline.planner_models import DocumentPlan
-from src.pipeline.server.common import (
-    REPO_ROOT,
-    SRC_DIR,
-    build_runs_grid,
+from src.pipeline.server.artifacts import (
     build_viewer_dataset,
-    calculate_progress_step,
     create_preset_attempt_record,
-    find_previous_runs,
     load_or_render_page_images,
     load_run_artifacts,
     normalize_violations,
 )
+from src.pipeline.server.discovery import build_runs_grid, find_previous_runs
+from src.pipeline.server.http_utils import REPO_ROOT, SRC_DIR
+from src.pipeline.server.preset_cache import PresetCache
+from src.pipeline.server.progress import ProgressTracker
 from src.utils import resolve_pdf_path
 
 logger = logging.getLogger("cernodata.server.session")
 
 
 class ServerSessionContext:
-    """Thread-safe state container for server sessions, progress tracking, and hydration data."""
+    """
+    Thread-safe state container orchestrating pipeline sessions, loaded execution runs,
+    real-time progress monitoring, and interactive viewer data hydration.
+    """
 
     def __init__(
         self,
@@ -42,7 +44,7 @@ class ServerSessionContext:
         src_dir: Optional[str] = None,
         output_dir: str = "output",
     ) -> None:
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
         self.pdf_path: str = pdf_path
         self.language: str = language
         self.repo_root: str = repo_root or REPO_ROOT
@@ -51,20 +53,36 @@ class ServerSessionContext:
         self.viewer_data: Optional[Dict[str, Any]] = None
         self.current_result: Optional[Dict[str, Any]] = None
         self.preset_attempts: List[Dict[str, Any]] = []
-        self.preset_results: Dict[str, Dict[str, Any]] = {}
         self.submitted_plan: Optional[DocumentPlan] = None
-        self.progress_state: Dict[str, Any] = {
-            "status": "idle",
-            "progress": 0,
-            "step_index": 0,
-            "current_step": "Idle - ready to execute",
-            "logs": ["[INIT] Server ready. Waiting to trigger pipeline."],
-            "completed": False,
-            "error": None,
-        }
+
+        self._progress_tracker: ProgressTracker = ProgressTracker(lock=self._lock)
+        self._preset_cache: PresetCache = PresetCache(lock=self._lock)
+
+    @property
+    def progress_state(self) -> Dict[str, Any]:
+        """Provides direct access to the progress tracker's current state."""
+        return self._progress_tracker.progress_state
+
+    @progress_state.setter
+    def progress_state(self, val: Dict[str, Any]) -> None:
+        self._progress_tracker.progress_state = val
+
+    @property
+    def preset_results(self) -> Dict[str, Dict[str, Any]]:
+        """Provides direct access to cached preset results dictionary."""
+        return self._preset_cache.preset_results
+
+    @preset_results.setter
+    def preset_results(self, val: Dict[str, Dict[str, Any]]) -> None:
+        self._preset_cache.preset_results = val
 
     def get_available_documents(self) -> List[str]:
-        """Finds candidate PDF documents in repository."""
+        """
+        Finds candidate PDF documents in repository workspace.
+
+        Returns:
+            List of repository-relative PDF file paths.
+        """
         docs: List[str] = []
         patterns = [
             os.path.join(self.repo_root, "src", "e2e", "*.pdf"),
@@ -86,11 +104,24 @@ class ServerSessionContext:
         return docs
 
     def get_previous_runs(self) -> List[Dict[str, Any]]:
-        """Finds completed output runs available in repository."""
+        """
+        Finds completed output runs available in repository.
+
+        Returns:
+            List of discovered run metadata dictionaries.
+        """
         return find_previous_runs(self.repo_root)
 
     def load_previous_run(self, output_dir: str) -> Dict[str, Any]:
-        """Loads artifacts from an output directory into session state."""
+        """
+        Loads artifacts from an output directory into active session state.
+
+        Args:
+            output_dir: Directory path relative to repo root or absolute path.
+
+        Returns:
+            Summary of loaded artifacts and run attributes.
+        """
         with self._lock:
             norm_rel = output_dir.replace("\\", "/").strip()
             self.output_dir = norm_rel
@@ -168,26 +199,23 @@ class ServerSessionContext:
 
             # Cache loaded preset result for instant reuse without redundant reruns
             if dom_dict:
-                cached_res = dict(self.current_result)
-                keys_to_cache = self._make_cache_keys(self.pdf_path, chosen_preset, self.language)
-                for cand in candidate_pdf_names:
-                    keys_to_cache.extend(self._make_cache_keys(cand, chosen_preset, self.language))
-                for k in keys_to_cache:
-                    self.preset_results[k] = cached_res
+                self._preset_cache.put(
+                    pdf_path=self.pdf_path,
+                    preset=chosen_preset,
+                    result=self.current_result,
+                    language=self.language,
+                    candidate_paths=candidate_pdf_names,
+                )
 
-            self.progress_state = {
-                "status": "completed",
-                "progress": 100,
-                "step_index": 5,
-                "current_step": f"Loaded Previous Run ({status_val})",
-                "logs": [
-                    f"[LOAD] Successfully loaded previous run artifacts from '{self.output_dir}'.",
-                    f"[INFO] Document: '{self.pdf_path or dom_dict.get('source_filename', 'N/A')}', Chosen Preset: '{chosen_preset}', Confidence: {conf_val}, Status: '{status_val}'.",
-                    f"[INFO] DOM Nodes: {len(dom_dict.get('nodes', []))}, Quality Violations: {len(viol_list)}.",
-                ],
-                "completed": True,
-                "error": None,
-            }
+            self._progress_tracker.set_loaded_run(
+                output_dir=self.output_dir,
+                document_display=self.pdf_path or dom_dict.get("source_filename", "N/A"),
+                preset=chosen_preset,
+                confidence=conf_val,
+                status=status_val,
+                nodes_count=len(dom_dict.get("nodes", [])),
+                violations_count=len(viol_list),
+            )
 
             return {
                 "output_dir": self.output_dir,
@@ -198,12 +226,13 @@ class ServerSessionContext:
                 "attempts": list(self.preset_attempts),
             }
 
+    # -------------------------------------------------------------------------
+    # Progress Tracker Delegation
+    # -------------------------------------------------------------------------
+
     def get_progress(self) -> Dict[str, Any]:
         """Thread-safe retrieval of current progress state."""
-        with self._lock:
-            state = dict(self.progress_state)
-            state["logs"] = list(self.progress_state.get("logs", []))
-            return state
+        return self._progress_tracker.get_progress()
 
     def update_progress(
         self,
@@ -216,59 +245,31 @@ class ServerSessionContext:
         error: Optional[str] = None,
     ) -> None:
         """Thread-safe update of progress state and log history."""
-        with self._lock:
-            self.progress_state["progress"] = progress
-            self.progress_state["step_index"] = step_index
-            self.progress_state["current_step"] = current_step
-            self.progress_state["status"] = status
-            self.progress_state["completed"] = completed
-            if error is not None:
-                self.progress_state["error"] = error
-            if log:
-                self.progress_state.setdefault("logs", []).append(log)
+        self._progress_tracker.update_progress(
+            progress=progress,
+            step_index=step_index,
+            current_step=current_step,
+            log=log,
+            status=status,
+            completed=completed,
+            error=error,
+        )
 
     def make_progress_callback(self) -> Callable[[int, str, str], None]:
         """Creates a standardized progress callback function wired to this session."""
-        def on_progress(pct: int, step_desc: str, log_msg: str) -> None:
-            t = datetime.now().strftime("%H:%M:%S")
-            self.update_progress(
-                progress=pct,
-                step_index=calculate_progress_step(pct),
-                current_step=step_desc,
-                log=f"[{t}] {log_msg}",
-            )
-
-        return on_progress
+        return self._progress_tracker.make_progress_callback()
 
     def add_log(self, message: str) -> None:
         """Thread-safe appending of a log message."""
-        with self._lock:
-            self.progress_state.setdefault("logs", []).append(message)
+        self._progress_tracker.add_log(message)
 
     def reset_progress(self, initial_step: str = "Starting...", log: Optional[str] = None) -> None:
         """Thread-safe reset of progress state to initiate a new run."""
-        with self._lock:
-            logs: List[str] = []
-            if log:
-                logs.append(log)
-            self.progress_state = {
-                "status": "running",
-                "progress": 10,
-                "step_index": 1,
-                "current_step": initial_step,
-                "logs": logs,
-                "completed": False,
-                "error": None,
-            }
+        self._progress_tracker.reset_progress(initial_step=initial_step, log=log)
 
     def set_error(self, error_msg: str, log: Optional[str] = None) -> None:
         """Thread-safe recording of an execution error."""
-        with self._lock:
-            self.progress_state["status"] = "error"
-            self.progress_state["error"] = error_msg
-            self.progress_state["completed"] = False
-            if log:
-                self.progress_state.setdefault("logs", []).append(log)
+        self._progress_tracker.set_error(error_msg=error_msg, log=log)
 
     def set_completed(
         self,
@@ -278,14 +279,16 @@ class ServerSessionContext:
         log: Optional[str] = None,
     ) -> None:
         """Thread-safe recording of a successful pipeline run completion."""
-        with self._lock:
-            self.progress_state["status"] = "completed"
-            self.progress_state["completed"] = True
-            self.progress_state["progress"] = 100
-            self.progress_state["step_index"] = 5
-            self.progress_state["current_step"] = f"Step 5: Decision Tree Complete ({status})"
-            if log:
-                self.progress_state.setdefault("logs", []).append(log)
+        self._progress_tracker.set_completed(
+            status=status,
+            confidence=confidence,
+            violations_count=violations_count,
+            log=log,
+        )
+
+    # -------------------------------------------------------------------------
+    # Results & Viewer Hydration
+    # -------------------------------------------------------------------------
 
     def get_results(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe retrieval of preset comparison results."""
@@ -425,20 +428,16 @@ class ServerSessionContext:
                     self.preset_attempts.append(record)
 
             # Cache executed preset result for reuse
-            for k in self._make_cache_keys(resolved_path, preset_name, language):
-                self.preset_results[k] = dict(result)
+            self._preset_cache.put(
+                pdf_path=resolved_path,
+                preset=preset_name,
+                result=self.current_result,
+                language=language,
+            )
 
     def _make_cache_keys(self, pdf_path: str, preset: str, language: Optional[str] = None) -> List[str]:
-        """Constructs canonical lookup keys for caching preset runs."""
-        doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
-        preset_clean = preset.strip().lower() if preset else "docling_fast"
-        keys: List[str] = []
-        if doc_base:
-            keys.append(f"{doc_base}:{preset_clean}")
-            if language:
-                keys.insert(0, f"{doc_base}:{preset_clean}:{language.strip().lower()}")
-        keys.append(preset_clean)
-        return keys
+        """Constructs canonical lookup keys delegating to PresetCache."""
+        return self._preset_cache.make_cache_keys(pdf_path, preset, language)
 
     def get_cached_preset_result(
         self,
@@ -451,15 +450,15 @@ class ServerSessionContext:
         Checks in-memory preset cache, current session result, and completed previous runs on disk.
         """
         with self._lock:
-            target_keys = self._make_cache_keys(pdf_path, preset, language)
-            for k in target_keys:
-                if k in self.preset_results:
-                    return dict(self.preset_results[k])
+            # 1. In-memory cache check
+            cached = self._preset_cache.get(pdf_path, preset, language)
+            if cached is not None:
+                return cached
 
             doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
             preset_clean = preset.strip().lower() if preset else "docling_fast"
 
-            # Check if current_result matches requested preset and document
+            # 2. Check if current_result matches requested preset and document
             if self.current_result:
                 curr_dec = self.current_result.get("decision", {})
                 curr_preset = (curr_dec.get("chosen_preset") or "").strip().lower()
@@ -467,28 +466,14 @@ class ServerSessionContext:
                 if curr_preset == preset_clean and (not doc_base or not curr_doc or curr_doc == doc_base):
                     return dict(self.current_result)
 
-            # Search completed previous runs in repository
-            runs = self.get_previous_runs()
-            for r in runs:
-                r_doc = os.path.basename(r.get("document_path") or r.get("document_name") or "").strip().lower()
-                r_preset = (r.get("chosen_preset") or "").strip().lower()
-                if (not doc_base or r_doc == doc_base) and r_preset == preset_clean:
-                    dir_path = r.get("dir_path")
-                    if dir_path:
-                        full_dir = dir_path if os.path.isabs(dir_path) else os.path.join(self.repo_root, dir_path)
-                        artifacts = load_run_artifacts(full_dir)
-                        if artifacts.get("dom") and artifacts.get("decision"):
-                            res: Dict[str, Any] = {
-                                "dom": artifacts["dom"],
-                                "decision": artifacts["decision"],
-                                "violations": artifacts["violations"],
-                                "plan": artifacts.get("plan"),
-                            }
-                            for k in target_keys:
-                                self.preset_results[k] = res
-                            return res
-
-            return None
+            # 3. Search completed previous runs in repository on disk
+            return self._preset_cache.find_in_previous_runs(
+                pdf_path=pdf_path,
+                preset=preset,
+                previous_runs=self.get_previous_runs(),
+                repo_root=self.repo_root,
+                language=language,
+            )
 
     def get_runs_grid(self, document_name: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe retrieval of previous runs table grid for a given document."""
