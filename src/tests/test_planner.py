@@ -187,11 +187,11 @@ class TestPlanner(unittest.TestCase):
             language="pl",
             target_threshold=0.82
         )
-        with patch("src.pipeline.orchestrator.parse_document", return_value=mock_dom), \
-             patch("src.pipeline.orchestrator.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.orchestrator.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
+             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
             res = run_pipeline(
                 pdf_path="test.pdf",
                 plan=plan,
@@ -288,11 +288,11 @@ class TestPlanner(unittest.TestCase):
             visualize=False,
             output_dir="test_output"
         )
-        with patch("src.pipeline.orchestrator.parse_document", return_value=mock_dom), \
-             patch("src.pipeline.orchestrator.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.orchestrator.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
+             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
             res = run_pipeline(
                 pdf_path="test.pdf",
                 config=cfg,

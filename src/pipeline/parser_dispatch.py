@@ -4,17 +4,46 @@ src/pipeline/parser_dispatch.py
 Document parser resolution and dispatching for document ingestion presets.
 """
 
+from __future__ import annotations
+
 import os
 from typing import Optional
 
 from src.dom import DocumentDOM
-from src.parsers import DoclingParser, PyPdfiumParser
+from src.pipeline.parser_adapters import (
+    DoclingPresetAdapter,
+    ParserExecutionOptions,
+    ParserPresetAdapter,
+    PyPdfiumPresetAdapter,
+)
+from src.pipeline.parser_registry import (
+    ParserPresetRegistry,
+    get_default_parser_registry,
+)
 from src.pipeline.planner_models import IngestionConfig
 from src.utils import resolve_pdf_path
 
+__all__ = [
+    "DocumentParserDispatcher",
+    "parse_document",
+    "ParserExecutionOptions",
+    "ParserPresetAdapter",
+    "PyPdfiumPresetAdapter",
+    "DoclingPresetAdapter",
+    "ParserPresetRegistry",
+    "get_default_parser_registry",
+]
+
 
 class DocumentParserDispatcher:
-    """Dispatches document parsing requests to the appropriate parser engine."""
+    """Dispatches document parsing requests through the configured parser preset registry."""
+
+    def __init__(self, registry: Optional[ParserPresetRegistry] = None) -> None:
+        self._registry = registry or get_default_parser_registry()
+
+    @property
+    def registry(self) -> ParserPresetRegistry:
+        return self._registry
 
     def parse(
         self,
@@ -28,29 +57,21 @@ class DocumentParserDispatcher:
         config: Optional[IngestionConfig] = None,
     ) -> DocumentDOM:
         """Parses PDF document using the specified preset into DocumentDOM IR."""
-        if config is not None:
-            language = config.language
-            preset = config.preset
-            ocr_scale = config.ocr_scale if config.ocr_scale is not None else ocr_scale
-            force_full_page_ocr = config.force_full_page_ocr
-            do_table_structure = config.do_table_structure
-
-        resolved_path = resolve_pdf_path(pdf_path)
-        if not os.path.exists(resolved_path):
-            raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
-
-        if preset == "pypdfium_rapidocr":
-            scale = ocr_scale if ocr_scale is not None else 2.0
-            return PyPdfiumParser(language=language, scale=scale).parse(resolved_path)
-
-        return DoclingParser(
+        options = ParserExecutionOptions.from_inputs(
             language=language,
             preset=preset,
             ocr_engine=ocr_engine,
             ocr_scale=ocr_scale,
             force_full_page_ocr=force_full_page_ocr,
             do_table_structure=do_table_structure,
-        ).parse(resolved_path)
+            config=config,
+        )
+
+        resolved_path = resolve_pdf_path(pdf_path)
+        if not os.path.exists(resolved_path):
+            raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
+
+        return self._registry.execute(resolved_path, options)
 
 
 _default_dispatcher = DocumentParserDispatcher()

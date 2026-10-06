@@ -5,15 +5,19 @@ Confidence-guided fallback orchestration, parameter wiggling, and preset switchi
 """
 
 from dataclasses import replace
-from typing import Dict, Any, List, Tuple, Optional, Callable
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.dom import DocumentDOM
+from src.pipeline.attempt_runner import AttemptRunner
 from src.pipeline.planner_models import DocumentPlan, IngestionConfig
-from src.pipeline.attempt_runner import execute_attempt, make_attempt_record
+from src.pipeline.progress_notifier import PipelineProgressNotifier
 
 
 class FallbackLoopHandler:
     """Manages confidence-guided fallback iteration loops (Path A and Path B)."""
+
+    def __init__(self, attempt_runner: Optional[AttemptRunner] = None) -> None:
+        self.attempt_runner = attempt_runner or AttemptRunner()
 
     def resolve_candidate_scores(
         self,
@@ -48,21 +52,12 @@ class FallbackLoopHandler:
         part_of_plan: bool,
         curr_score: float,
         next_score: float,
-        execute_attempt_fn: Callable[..., Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]] = execute_attempt,
-        make_attempt_record_fn: Callable[..., Dict[str, Any]] = make_attempt_record,
-        notify_fn: Optional[Callable[[int, str, str], None]] = None,
+        notifier: Optional[PipelineProgressNotifier] = None,
     ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
         """
         Executes dual-path fallback loops if primary preset output is not accepted.
         Supports Path B (parameter wiggling) and Path A (preset switching).
         """
-        def notify(pct: int, step_desc: str, log_msg: str) -> None:
-            if notify_fn is not None:
-                try:
-                    notify_fn(pct, step_desc, log_msg)
-                except Exception:
-                    pass
-
         if config.preset == "docling_deep":
             decision["chosen_preset"] = "docling_deep"
             decision["decision_tree"] = {
@@ -79,7 +74,9 @@ class FallbackLoopHandler:
 
         # Path B: Parameter Wiggling on current preset if delta is large
         if action == "PATH_B_WIGGLE_PARAMETERS":
-            notify(70, "Step 4: Parameter Wiggling", f"Target threshold not met. Wiggling OCR parameters for '{config.preset}'...")
+            if notifier is not None:
+                notifier.notify_parameter_wiggling(config.preset)
+
             wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
             wiggled_force_ocr = True
             wiggled_config = replace(
@@ -87,10 +84,10 @@ class FallbackLoopHandler:
                 ocr_scale=wiggled_scale,
                 force_full_page_ocr=wiggled_force_ocr,
             )
-            w_dom, w_decision, w_violations = execute_attempt_fn(
+            w_dom, w_decision, w_violations = self.attempt_runner.execute_attempt(
                 pdf_path, wiggled_config, curr_score, next_score
             )
-            attempts.append(make_attempt_record_fn(
+            attempts.append(self.attempt_runner.make_attempt_record(
                 len(attempts) + 1, config.preset, w_decision, w_violations,
                 action="PATH_B_WIGGLE_PARAMETERS",
                 reason=f"Wiggled OCR parameters: ocr_scale={wiggled_scale}, force_full_page_ocr={wiggled_force_ocr}.",
@@ -107,9 +104,11 @@ class FallbackLoopHandler:
             elif next_candidate:
                 # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
                 plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
-                notify(75, "Step 4: Switching Preset", f"Wiggling exhausted. Switching to fallback preset '{next_candidate}'...")
+                if notifier is not None:
+                    notifier.notify_preset_switching(next_candidate, reason="Wiggling exhausted.")
+
                 fallback_config = replace(config, preset=next_candidate)
-                fb_dom, fb_decision, fb_violations = execute_attempt_fn(
+                fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
                     pdf_path, fallback_config
                 )
                 fb_decision["decision_tree"] = {
@@ -120,7 +119,7 @@ class FallbackLoopHandler:
                     "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                     "detail": plan_note,
                 }
-                attempts.append(make_attempt_record_fn(
+                attempts.append(self.attempt_runner.make_attempt_record(
                     len(attempts) + 1, next_candidate, fb_decision, fb_violations,
                     action=fb_decision.get("decision_tree", {}).get("action"),
                     reason=fb_decision.get("decision_tree", {}).get("reason"),
@@ -134,9 +133,14 @@ class FallbackLoopHandler:
             else:
                 plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
 
-            notify(75, "Step 4: Switching Preset", f"Target threshold not met ({decision.get('overall_confidence')} < {config.target_threshold}). Switching to fallback '{next_candidate}'...")
+            if notifier is not None:
+                notifier.notify_preset_switching(
+                    next_candidate,
+                    reason=f"Target threshold not met ({decision.get('overall_confidence')} < {config.target_threshold})."
+                )
+
             fallback_config = replace(config, preset=next_candidate)
-            fb_dom, fb_decision, fb_violations = execute_attempt_fn(
+            fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
                 pdf_path, fallback_config
             )
             fb_decision["decision_tree"] = {
@@ -150,7 +154,7 @@ class FallbackLoopHandler:
                 "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
                 "detail": plan_note,
             }
-            attempts.append(make_attempt_record_fn(
+            attempts.append(self.attempt_runner.make_attempt_record(
                 len(attempts) + 1, next_candidate, fb_decision, fb_violations,
                 action=fb_decision.get("decision_tree", {}).get("action"),
                 reason=fb_decision.get("decision_tree", {}).get("reason"),

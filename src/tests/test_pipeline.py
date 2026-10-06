@@ -64,11 +64,11 @@ class TestPipelineEngine(unittest.TestCase):
         )
         dom_good = DocumentDOM(document_id="doc_good", source_filename="test.pdf", total_pages=1, nodes=[node_good])
 
-        with patch("src.pipeline.orchestrator.parse_document", side_effect=[dom_bad, dom_good]), \
-             patch("src.pipeline.orchestrator.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.orchestrator.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.orchestrator.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.orchestrator.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch("src.pipeline.attempt_runner.parse_document", side_effect=[dom_bad, dom_good]), \
+             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
 
             res = run_pipeline(pdf_path="test.pdf", language="pl", preset="docling_fast")
             decision = res["decision"]

@@ -28,7 +28,7 @@ from src.pipeline.server.http_utils import send_json_response
 from src.utils import mkdirs, resolve_pdf_path
 
 if TYPE_CHECKING:
-    from src.pipeline.orchestrator import PipelineExecutionResult
+    from src.pipeline.execution_models import PipelineExecutionResult
     from src.pipeline.server.session import ServerSessionContext
 
 logger = logging.getLogger("cernodata.server.routes_api")
