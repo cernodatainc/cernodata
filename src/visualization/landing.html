@@ -132,6 +132,9 @@
                         <label class="checkbox-label checkbox-label-spaced">
                             <input type="checkbox" id="inpVisualize" checked> Generate Visual Overlays
                         </label>
+                        <label class="checkbox-label checkbox-label-spaced">
+                            <input type="checkbox" id="inpForceRerun"> Force Rerun (Bypass Previous Results)
+                        </label>
                     </div>
                 </div>
 
@@ -318,6 +321,43 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Previous Runs Page Table Grid Card -->
+                <div class="card runs-grid-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Previous Runs by Page Grid</div>
+                            <div class="card-subtitle">Table grid comparison of previous parsing runs for a given file across document pages.</div>
+                        </div>
+                        <div class="runs-grid-controls">
+                            <label class="control-label" for="runsGridDocSelect">Document:</label>
+                            <select class="form-select runs-grid-doc-select" id="runsGridDocSelect" onchange="onRunsGridDocChanged(this.value)">
+                                <option value="">-- Choose Document --</option>
+                            </select>
+                            <button class="btn btn-secondary btn-sm" onclick="loadRunsGrid()">[REFRESH] Refresh Grid</button>
+                        </div>
+                    </div>
+
+                    <div class="runs-grid-table-container">
+                        <table class="comparison-table runs-grid-table" id="runsGridTable">
+                            <thead id="runsGridTableHead">
+                                <tr>
+                                    <th>Parsing Run Identifier</th>
+                                    <th>Page 1</th>
+                                    <th>Overall Score</th>
+                                    <th>Violations</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="runsGridTableBody">
+                                <tr>
+                                    <td colspan="6" class="table-empty-message">Loading previous runs grid...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="viewer-heading-row">

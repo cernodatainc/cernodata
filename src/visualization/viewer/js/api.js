@@ -5,6 +5,22 @@
  * and DocumentDOM annotation persistence.
  */
 
+window.presetCache = window.presetCache || {};
+
+function saveCurrentPresetToClientCache() {
+    if (typeof decisionData === 'undefined' || !decisionData) return;
+    const currentPreset = decisionData.chosen_preset || ((activePresetIndex === 1) ? 'docling_deep' : 'docling_fast');
+    const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
+    const entry = {
+        dom: (typeof domData !== 'undefined' && domData) ? JSON.parse(JSON.stringify(domData)) : { nodes: [] },
+        violations: (typeof violationsData !== 'undefined' && violationsData) ? JSON.parse(JSON.stringify(violationsData)) : [],
+        decision: JSON.parse(JSON.stringify(decisionData)),
+        activePresetIndex: activePresetIndex
+    };
+    window.presetCache[`${currentPreset}:${targetLang}`] = entry;
+    window.presetCache[currentPreset] = entry;
+}
+
 function onLanguageChanged() {
     const sel = document.getElementById('selectLanguage').value;
     const banner = document.getElementById('statusBanner');
@@ -22,7 +38,32 @@ async function redoWithSelectedLanguage() {
 }
 
 async function rerunBackendPipeline(presetName, langOverride = null) {
-    const targetLang = langOverride || document.getElementById('selectLanguage').value || activeLanguage;
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
+    const targetLang = langOverride || (document.getElementById('selectLanguage') ? document.getElementById('selectLanguage').value : null) || activeLanguage;
+    const clientCached = window.presetCache[`${presetName}:${targetLang}`] || (!langOverride ? window.presetCache[presetName] : null);
+
+    if (clientCached) {
+        domData = JSON.parse(JSON.stringify(clientCached.dom));
+        violationsData = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(JSON.parse(JSON.stringify(clientCached.violations)))
+            : JSON.parse(JSON.stringify(clientCached.violations));
+        decisionData = JSON.parse(JSON.stringify(clientCached.decision));
+        ensureViolationIds();
+        activeLanguage = targetLang;
+        activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;
+        updatePresetUIState();
+
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.textContent = `[INFO] Applied preset '${presetName}' from cache (Language: ${targetLang}).`;
+            setTimeout(() => { banner.style.display = 'none'; }, 2500);
+        }
+        return;
+    }
+
     const banner = document.getElementById('statusBanner');
     if (banner) {
         banner.style.display = 'block';
@@ -39,7 +80,8 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         if (res.ok) {
             const data = await res.json();
             if (banner) {
-                banner.textContent = `[OK] Live pipeline finished. Applied preset '${presetName}' (Language: ${targetLang}).`;
+                const tag = data.cached ? '[CACHE HIT]' : '[OK]';
+                banner.textContent = `${tag} Applied preset '${presetName}' (Language: ${targetLang}).`;
                 setTimeout(() => { banner.style.display = 'none'; }, 4000);
             }
 
@@ -52,6 +94,9 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
             activeLanguage = targetLang;
             activePresetIndex = (presetName === 'docling_deep') ? 1 : 0;
 
+            if (typeof saveCurrentPresetToClientCache === 'function') {
+                saveCurrentPresetToClientCache();
+            }
             updatePresetUIState();
             return;
         }
@@ -109,7 +154,32 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
 }
 
 function switchPreset(stepIndex) {
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
     const presetName = (stepIndex === 1) ? 'docling_deep' : 'docling_fast';
+    const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
+    const cached = window.presetCache[`${presetName}:${targetLang}`] || window.presetCache[presetName];
+
+    if (cached) {
+        domData = JSON.parse(JSON.stringify(cached.dom));
+        violationsData = (typeof extractViolationsList === 'function')
+            ? extractViolationsList(JSON.parse(JSON.stringify(cached.violations)))
+            : JSON.parse(JSON.stringify(cached.violations));
+        decisionData = JSON.parse(JSON.stringify(cached.decision));
+        ensureViolationIds();
+        activePresetIndex = stepIndex;
+        updatePresetUIState();
+
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.textContent = `[INFO] Switched to preset '${presetName}' (Loaded from cache).`;
+            setTimeout(() => { banner.style.display = 'none'; }, 2500);
+        }
+        return;
+    }
+
     rerunBackendPipeline(presetName);
 }
 

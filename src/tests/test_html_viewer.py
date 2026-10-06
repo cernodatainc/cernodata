@@ -80,6 +80,7 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("toggleShowAllViolations", content)
             self.assertIn("tabBtnDom", content)
             self.assertIn("tabBtnViol", content)
+            self.assertIn("tabBtnRuns", content)
             self.assertIn('data-name="dom page"', content)
             self.assertIn('data-name="violations"', content)
             self.assertIn("viol-bundle", content)

@@ -4,6 +4,7 @@
                 <button class="tab-btn" id="tabBtnViol" data-name="violations" onclick="showTab(event, 'violTab')" title="Click: Show selected page | Shift+Click: Show all pages"><span id="violTabLabel">Violations</span> (<span id="violCount">{{ violations_count }}</span>)</button>
                 <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision Log</button>
                 <button class="tab-btn" id="tabBtnPlan" onclick="showTab(event, 'planTab')">Plan</button>
+                <button class="tab-btn" id="tabBtnRuns" onclick="showTab(event, 'runsTab')">Runs Grid</button>
             </div>
 
             <div class="tab-content active" id="domTab">
@@ -17,4 +18,11 @@
             <div class="tab-content" id="violTab"><div id="violListContainer"></div></div>
             <div class="tab-content" id="logTab"><div class="log-box"><pre id="logContent"></pre></div></div>
             <div class="tab-content" id="planTab"><div class="log-box log-box-plan"><pre id="planContent"></pre></div></div>
+            <div class="tab-content" id="runsTab">
+                <div class="page-action-bar">
+                    <span class="page-action-title">Previous Runs by Page Grid:</span>
+                    <button class="action-btn" onclick="loadViewerRunsGrid()">[REFRESH] Refresh Grid</button>
+                </div>
+                <div id="viewerRunsGridContainer" class="viewer-runs-grid-box"></div>
+            </div>
         </div>

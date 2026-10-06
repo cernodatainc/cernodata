@@ -17,6 +17,7 @@ from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.server.common import (
     REPO_ROOT,
     SRC_DIR,
+    build_runs_grid,
     build_viewer_dataset,
     calculate_progress_step,
     create_preset_attempt_record,
@@ -50,6 +51,7 @@ class ServerSessionContext:
         self.viewer_data: Optional[Dict[str, Any]] = None
         self.current_result: Optional[Dict[str, Any]] = None
         self.preset_attempts: List[Dict[str, Any]] = []
+        self.preset_results: Dict[str, Dict[str, Any]] = {}
         self.submitted_plan: Optional[DocumentPlan] = None
         self.progress_state: Dict[str, Any] = {
             "status": "idle",
@@ -103,17 +105,30 @@ class ServerSessionContext:
             dom_dict = artifacts["dom"]
             viol_list = artifacts["violations"]
 
+            candidate_pdf_names: List[str] = []
             if plan_dict:
                 try:
                     self.submitted_plan = DocumentPlan.from_dict(plan_dict)
                     if self.submitted_plan.document_path:
-                        self.pdf_path = resolve_pdf_path(self.submitted_plan.document_path)
+                        candidate_pdf_names.append(str(self.submitted_plan.document_path))
                     if self.submitted_plan.language:
                         self.language = self.submitted_plan.language
                 except Exception as e:
                     logger.warning("Could not parse DocumentPlan from %s: %s", norm_rel, e)
-            elif dom_dict.get("source_filename"):
-                self.pdf_path = resolve_pdf_path(dom_dict["source_filename"])
+
+            if dom_dict.get("source_filename"):
+                candidate_pdf_names.append(str(dom_dict["source_filename"]))
+
+            found_pdf = False
+            for cand in candidate_pdf_names:
+                resolved = resolve_pdf_path(cand)
+                if os.path.exists(resolved):
+                    self.pdf_path = resolved
+                    found_pdf = True
+                    break
+
+            if not found_pdf and candidate_pdf_names:
+                self.pdf_path = resolve_pdf_path(candidate_pdf_names[0])
 
             if not decision_dict and dom_dict:
                 decision_dict = {
@@ -150,6 +165,15 @@ class ServerSessionContext:
             conf_val = decision_dict.get("overall_confidence", 1.0)
             status_val = decision_dict.get("status", "ACCEPT")
             chosen_preset = decision_dict.get("chosen_preset", "docling_fast")
+
+            # Cache loaded preset result for instant reuse without redundant reruns
+            if dom_dict:
+                cached_res = dict(self.current_result)
+                keys_to_cache = self._make_cache_keys(self.pdf_path, chosen_preset, self.language)
+                for cand in candidate_pdf_names:
+                    keys_to_cache.extend(self._make_cache_keys(cand, chosen_preset, self.language))
+                for k in keys_to_cache:
+                    self.preset_results[k] = cached_res
 
             self.progress_state = {
                 "status": "completed",
@@ -306,13 +330,21 @@ class ServerSessionContext:
             }
             plan_data = artifacts["plan"]
 
-            raw_pdf = (
-                self.pdf_path
-                or dom_data.get("source_filename")
-                or (plan_data.get("document_path") if plan_data else None)
-                or "src/e2e/Document 8.pdf"
-            )
-            pdf_path = resolve_pdf_path(raw_pdf)
+            candidates = [
+                self.pdf_path,
+                dom_data.get("source_filename"),
+                (plan_data.get("document_path") if plan_data else None),
+                "src/e2e/Document 8.pdf",
+            ]
+            pdf_path = ""
+            for cand in candidates:
+                if cand:
+                    res = resolve_pdf_path(str(cand))
+                    if os.path.exists(res):
+                        pdf_path = res
+                        break
+            if not pdf_path:
+                pdf_path = resolve_pdf_path(str(candidates[0] or "src/e2e/Document 8.pdf"))
             total_pages = dom_data.get("total_pages", 1) or 1
 
             page_images, page_dimensions = load_or_render_page_images(
@@ -367,14 +399,16 @@ class ServerSessionContext:
                 page_images=page_images,
                 page_dimensions=page_dimensions,
                 total_pages=total_pages,
+                output_dir=self.output_dir or "output",
             )
+
+            preset_name = decision_dict.get("chosen_preset") or "docling_fast"
 
             # Sync preset attempts
             attempts = decision_dict.get("attempts", [])
             if attempts:
                 self.preset_attempts = list(attempts)
             else:
-                preset_name = decision_dict.get("chosen_preset", "docling_fast")
                 record = create_preset_attempt_record(
                     decision_dict=decision_dict,
                     violations_count=len(violations_list),
@@ -389,3 +423,78 @@ class ServerSessionContext:
                     self.preset_attempts[existing_idx] = record
                 else:
                     self.preset_attempts.append(record)
+
+            # Cache executed preset result for reuse
+            for k in self._make_cache_keys(resolved_path, preset_name, language):
+                self.preset_results[k] = dict(result)
+
+    def _make_cache_keys(self, pdf_path: str, preset: str, language: Optional[str] = None) -> List[str]:
+        """Constructs canonical lookup keys for caching preset runs."""
+        doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
+        preset_clean = preset.strip().lower() if preset else "docling_fast"
+        keys: List[str] = []
+        if doc_base:
+            keys.append(f"{doc_base}:{preset_clean}")
+            if language:
+                keys.insert(0, f"{doc_base}:{preset_clean}:{language.strip().lower()}")
+        keys.append(preset_clean)
+        return keys
+
+    def get_cached_preset_result(
+        self,
+        pdf_path: str,
+        preset: str,
+        language: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves previously computed or loaded pipeline result for a document and preset if available.
+        Checks in-memory preset cache, current session result, and completed previous runs on disk.
+        """
+        with self._lock:
+            target_keys = self._make_cache_keys(pdf_path, preset, language)
+            for k in target_keys:
+                if k in self.preset_results:
+                    return dict(self.preset_results[k])
+
+            doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
+            preset_clean = preset.strip().lower() if preset else "docling_fast"
+
+            # Check if current_result matches requested preset and document
+            if self.current_result:
+                curr_dec = self.current_result.get("decision", {})
+                curr_preset = (curr_dec.get("chosen_preset") or "").strip().lower()
+                curr_doc = os.path.basename(self.pdf_path).strip().lower() if self.pdf_path else ""
+                if curr_preset == preset_clean and (not doc_base or not curr_doc or curr_doc == doc_base):
+                    return dict(self.current_result)
+
+            # Search completed previous runs in repository
+            runs = self.get_previous_runs()
+            for r in runs:
+                r_doc = os.path.basename(r.get("document_path") or r.get("document_name") or "").strip().lower()
+                r_preset = (r.get("chosen_preset") or "").strip().lower()
+                if (not doc_base or r_doc == doc_base) and r_preset == preset_clean:
+                    dir_path = r.get("dir_path")
+                    if dir_path:
+                        full_dir = dir_path if os.path.isabs(dir_path) else os.path.join(self.repo_root, dir_path)
+                        artifacts = load_run_artifacts(full_dir)
+                        if artifacts.get("dom") and artifacts.get("decision"):
+                            res: Dict[str, Any] = {
+                                "dom": artifacts["dom"],
+                                "decision": artifacts["decision"],
+                                "violations": artifacts["violations"],
+                                "plan": artifacts.get("plan"),
+                            }
+                            for k in target_keys:
+                                self.preset_results[k] = res
+                            return res
+
+            return None
+
+    def get_runs_grid(self, document_name: Optional[str] = None) -> Dict[str, Any]:
+        """Thread-safe retrieval of previous runs table grid for a given document."""
+        with self._lock:
+            runs = self.get_previous_runs()
+            target = document_name
+            if not target and self.pdf_path:
+                target = os.path.basename(self.pdf_path)
+            return build_runs_grid(runs, target_file=target)

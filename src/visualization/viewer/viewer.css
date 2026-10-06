@@ -1101,5 +1101,14 @@ select.type-filter {
     color: #A7F3D0;
 }
 
+.viewer-runs-grid-box {
+    padding: 10px;
+    background: #111827;
+    border-radius: 6px;
+    border: 1px solid #374151;
+    margin-top: 10px;
+    overflow-x: auto;
+}
+
 
 

@@ -161,4 +161,16 @@ async function startViewer() {
     switchPage(1);
 }
 
+const pageImgEl = document.getElementById('pageImg');
+if (pageImgEl) {
+    pageImgEl.addEventListener('load', () => {
+        if (typeof updateSvgViewBox === 'function') {
+            updateSvgViewBox();
+        }
+        if (typeof renderSVGOverlays === 'function') {
+            renderSVGOverlays();
+        }
+    });
+}
+
 startViewer();

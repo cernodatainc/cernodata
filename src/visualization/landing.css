@@ -770,3 +770,111 @@ header {
     font-size: 11px;
     color: #D1D5DB;
 }
+
+/* Previous Runs Table Grid */
+.runs-grid-card {
+    margin-top: 24px;
+    background: #111827;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.runs-grid-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.runs-grid-doc-select {
+    font-size: 12px;
+    padding: 4px 10px;
+    background: #1E293B;
+    border: 1px solid #374151;
+    color: #F3F4F6;
+    border-radius: 4px;
+}
+
+.runs-grid-table-container {
+    overflow-x: auto;
+    margin-top: 14px;
+    border: 1px solid #374151;
+    border-radius: 6px;
+}
+
+.runs-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.runs-grid-table th {
+    background: #1F2937;
+    color: #9CA3AF;
+    padding: 8px 12px;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    white-space: nowrap;
+}
+
+.runs-grid-table th:first-child {
+    text-align: left;
+}
+
+.runs-grid-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #283548;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.runs-grid-table td:first-child {
+    text-align: left;
+}
+
+.grid-run-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.grid-run-id {
+    font-family: monospace;
+    font-weight: 600;
+    color: #60A5FA;
+}
+
+.grid-page-cell {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.grid-page-cell:hover {
+    background: rgba(59, 130, 246, 0.15);
+}
+
+.page-cell-score {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.page-cell-meta {
+    font-size: 10px;
+    margin-top: 2px;
+}
+
+.cell-viols-count {
+    color: #F87171;
+    font-weight: 600;
+}
+
+.cell-viols-zero {
+    color: #6B7280;
+}
+
+.cell-score-none {
+    color: #4B5563;
+    font-family: monospace;
+}

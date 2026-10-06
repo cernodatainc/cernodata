@@ -69,17 +69,20 @@ def export_pipeline_artifacts(
     with open(violations_output_path, "w", encoding="utf-8") as f:
         json.dump(violations_report, f, indent=2)
 
-    plan_result_path = None
-    if plan:
-        plan_result_path = os.path.join(output_dir, "plan_execution_result.json")
-        execution_report = {
-            "plan": plan,
-            "decision": decision,
-            "total_violations": len(violations),
-            "chosen_preset": decision.get("chosen_preset"),
-            "status": decision.get("status")
-        }
-        with open(plan_result_path, "w", encoding="utf-8") as f:
-            json.dump(execution_report, f, indent=2)
+    # Always persist execution result and decision tree to avoid stale run artifacts
+    plan_result_path = os.path.join(output_dir, "plan_execution_result.json")
+    execution_report = {
+        "plan": plan,
+        "decision": decision,
+        "total_violations": len(violations),
+        "chosen_preset": decision.get("chosen_preset"),
+        "status": decision.get("status"),
+    }
+    with open(plan_result_path, "w", encoding="utf-8") as f:
+        json.dump(execution_report, f, indent=2)
+
+    decision_tree_path = os.path.join(output_dir, "decision_tree.json")
+    with open(decision_tree_path, "w", encoding="utf-8") as f:
+        json.dump(decision, f, indent=2)
 
     return dom_output_path, violations_output_path, plan_result_path

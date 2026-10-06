@@ -11,8 +11,9 @@ import glob
 import json
 import logging
 import os
+import re
 from http.server import SimpleHTTPRequestHandler
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 logger = logging.getLogger("cernodata.server.common")
 
@@ -47,12 +48,16 @@ def send_json_response(handler: SimpleHTTPRequestHandler, status_code: int, payl
 
 def read_json_payload(handler: SimpleHTTPRequestHandler) -> Dict[str, Any]:
     """Reads and decodes JSON request payload from HTTP request body."""
-    content_length = int(handler.headers.get("Content-Length", 0))
+    try:
+        content_length = int(handler.headers.get("Content-Length", 0))
+    except (ValueError, TypeError):
+        return {}
     if content_length <= 0:
         return {}
     try:
         body = handler.rfile.read(content_length).decode("utf-8")
-        return json.loads(body) if body else {}
+        parsed = json.loads(body) if body else {}
+        return parsed if isinstance(parsed, dict) else {}
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         logger.warning("Malformed JSON request payload received: %s", e)
         return {}
@@ -63,7 +68,7 @@ def read_json_payload(handler: SimpleHTTPRequestHandler) -> Dict[str, Any]:
 
 def send_text_response(
     handler: SimpleHTTPRequestHandler,
-    content: str | bytes,
+    content: Union[str, bytes],
     content_type: str = "text/html; charset=utf-8",
     status_code: int = 200,
 ) -> None:
@@ -72,7 +77,7 @@ def send_text_response(
     send_response_bytes(handler, body, content_type=content_type, status_code=status_code)
 
 
-def send_html_response(handler: SimpleHTTPRequestHandler, content: str | bytes, status_code: int = 200) -> None:
+def send_html_response(handler: SimpleHTTPRequestHandler, content: Union[str, bytes], status_code: int = 200) -> None:
     """Sends HTML response with Content-Type and Content-Length headers."""
     send_text_response(handler, content, content_type="text/html; charset=utf-8", status_code=status_code)
 
@@ -106,7 +111,7 @@ def send_first_existing_file(
 ) -> bool:
     """Sends the first existing file among candidate paths, returning True if sent."""
     for path in candidate_paths:
-        if send_file_response(handler, path, content_type=content_type, status_code=status_code):
+        if path and send_file_response(handler, path, content_type=content_type, status_code=status_code):
             return True
     return False
 
@@ -161,12 +166,30 @@ def normalize_violations(raw_violations: Any) -> List[Dict[str, Any]]:
     return []
 
 
+def _extract_decision_from_html(html_path: str) -> Optional[Dict[str, Any]]:
+    """Extracts embedded decision JSON object from interactive viewer HTML."""
+    if not os.path.exists(html_path):
+        return None
+    try:
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        match = re.search(r"decision:\s*(\{.*?\})\s*,\s*(?:detectedLanguages|violations):", content, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group(1))
+            if isinstance(parsed, dict):
+                return parsed
+    except Exception as e:
+        logger.debug("Could not extract decision from %s: %s", html_path, e)
+    return None
+
+
 def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
     """
     Loads and coalesces pipeline execution artifacts from an output directory.
     Returns structured dictionary containing plan, decision, dom, violations, and metadata.
     """
-    plan_res_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "plan_execution_result.json"), {})
+    plan_res_path = os.path.join(run_dir, "plan_execution_result.json")
+    plan_res_data: Dict[str, Any] = safe_load_json(plan_res_path, {})
     plan_data: Optional[Dict[str, Any]] = plan_res_data.get("plan") or safe_load_json(os.path.join(run_dir, "plan.json"))
     decision_data: Dict[str, Any] = (
         plan_res_data.get("decision")
@@ -177,6 +200,37 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
     if raw_viols is None:
         raw_viols = safe_load_json(os.path.join(run_dir, "quality_violations.json"), [])
     violations = normalize_violations(raw_viols)
+
+    html_path = os.path.join(run_dir, "interactive_viewer.html")
+    html_decision = _extract_decision_from_html(html_path)
+    if html_decision:
+        plan_mtime = os.path.getmtime(plan_res_path) if os.path.exists(plan_res_path) else 0.0
+        html_mtime = os.path.getmtime(html_path)
+        dec_page_count = len(decision_data.get("per_page_confidence", {})) if decision_data else 0
+        html_page_count = len(html_decision.get("per_page_confidence", {}))
+
+        # Favor HTML decision if plan_execution_result was missing, HTML is newer, or HTML has more page scores
+        if not decision_data or html_mtime > plan_mtime or html_page_count > dec_page_count:
+            decision_data = html_decision
+
+    total_pages = int(dom_data.get("total_pages", 1) or 1)
+    per_page_conf = dict(decision_data.get("per_page_confidence", {}))
+    missing_pages = [p for p in range(1, total_pages + 1) if str(p) not in per_page_conf and p not in per_page_conf]
+
+    if missing_pages and dom_data.get("nodes"):
+        try:
+            from src.dom import DocumentDOM
+            from src.quality import evaluate_document_confidence
+            temp_dom = DocumentDOM.from_dict(dom_data)
+            metrics = evaluate_document_confidence(temp_dom, language=decision_data.get("language") or "en")
+            for p, sc in metrics.get("per_page_confidence", {}).items():
+                if str(p) not in per_page_conf and p not in per_page_conf:
+                    per_page_conf[str(p)] = sc
+            decision_data["per_page_confidence"] = per_page_conf
+            if (decision_data.get("overall_confidence") == 1.0 or not decision_data.get("overall_confidence")) and violations:
+                decision_data["overall_confidence"] = metrics.get("overall_confidence", 1.0)
+        except Exception as e:
+            logger.debug("Could not compute fallback per-page confidence: %s", e)
 
     chosen_preset = decision_data.get("chosen_preset") or plan_res_data.get("chosen_preset", "N/A")
     status = decision_data.get("status") or plan_res_data.get("status", "ACCEPT")
@@ -214,15 +268,20 @@ def create_preset_attempt_record(
     default_action: str = "ACCEPT_OUTPUT",
 ) -> Dict[str, Any]:
     """Constructs a standardized preset attempt record dictionary."""
-    preset_name = decision_dict.get("chosen_preset", "docling_fast")
-    action = decision_dict.get("decision_tree", {}).get("action", default_action)
+    preset_name = decision_dict.get("chosen_preset") or "docling_fast"
+    tree = decision_dict.get("decision_tree")
+    action = tree.get("action", default_action) if isinstance(tree, dict) else default_action
+    conf = decision_dict.get("overall_confidence")
+    overall_confidence = float(conf) if conf is not None else 1.0
+    status = decision_dict.get("status") or "ACCEPT"
+    per_page_conf = decision_dict.get("per_page_confidence")
     return {
         "step": step,
         "preset": preset_name,
-        "overall_confidence": decision_dict.get("overall_confidence", 1.0),
-        "per_page_confidence": decision_dict.get("per_page_confidence", {}),
+        "overall_confidence": overall_confidence,
+        "per_page_confidence": per_page_conf if isinstance(per_page_conf, dict) else {},
         "violations_count": violations_count,
-        "status": decision_dict.get("status", "ACCEPT"),
+        "status": status,
         "is_accepted": decision_dict.get("is_accepted", True),
         "action": action,
     }
@@ -241,20 +300,20 @@ def build_viewer_dataset(
     output_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Constructs the canonical dictionary structure required to hydrate interactive visual viewer."""
+    det_langs = decision.get("detected_languages") if isinstance(decision, dict) else None
     dataset: Dict[str, Any] = {
         "dom": dom,
         "violations": violations,
         "decision": decision,
-        "detectedLanguages": decision.get("detected_languages", {}),
+        "detectedLanguages": det_langs if isinstance(det_langs, dict) else {},
         "plan": plan,
         "pdfSourceFile": pdf_path,
         "activeLanguage": language,
         "pageImages": page_images,
         "pageDimensions": page_dimensions,
         "totalPages": total_pages,
+        "outputDir": output_dir or "output",
     }
-    if output_dir is not None:
-        dataset["outputDir"] = output_dir
     return dataset
 
 
@@ -270,7 +329,8 @@ def load_or_render_page_images(
     page_images: List[str] = []
     page_dimensions: List[Dict[str, float]] = []
 
-    if os.path.exists(pdf_path):
+    # 1. Direct rendering from PDF if it exists on disk
+    if pdf_path and os.path.exists(pdf_path):
         try:
             from src.visualization.viewer.pdf_renderer import (
                 get_pdf_page_dimensions,
@@ -282,7 +342,25 @@ def load_or_render_page_images(
         except Exception as e:
             logger.warning("Could not render page images for %s: %s", pdf_path, e)
 
+    # 2. If page dimensions still missing, inspect interactive_viewer.html in target_dir
+    if not page_dimensions:
+        viewer_html_path = os.path.join(target_dir, "interactive_viewer.html")
+        if os.path.exists(viewer_html_path):
+            try:
+                with open(viewer_html_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+                dim_match = re.search(r"pageDimensions:\s*(\[[^\]]*\])", html_content)
+                if dim_match:
+                    parsed_dims = json.loads(dim_match.group(1))
+                    if isinstance(parsed_dims, list) and len(parsed_dims) > 0:
+                        page_dimensions = parsed_dims
+            except Exception as e:
+                logger.debug("Could not parse pageDimensions from interactive_viewer.html: %s", e)
+
+    # 3. Fall back to pre-rendered overlay images
     if not page_images:
+        from PIL import Image
+
         for p in range(1, total_pages + 1):
             img_candidate = os.path.join(target_dir, f"overlay_page_{p}.png")
             if os.path.exists(img_candidate):
@@ -290,10 +368,20 @@ def load_or_render_page_images(
                     with open(img_candidate, "rb") as img_f:
                         b64 = base64.b64encode(img_f.read()).decode("ascii")
                         page_images.append(f"data:image/png;base64,{b64}")
-                        if len(page_dimensions) < p:
-                            page_dimensions.append({"width": 612.0, "height": 792.0})
+
+                    if len(page_dimensions) < p:
+                        with Image.open(img_candidate) as pil_img:
+                            w_px, h_px = pil_img.size
+                            # Default PageVisualizer scale is 150 DPI / 72.0 points
+                            pt_w = round(w_px * 72.0 / 150.0, 2)
+                            pt_h = round(h_px * 72.0 / 150.0, 2)
+                            page_dimensions.append({"width": pt_w, "height": pt_h})
                 except Exception as e:
                     logger.warning("Could not load overlay image %s: %s", img_candidate, e)
+
+    # 4. Final safety fallback to standard A4 (595.28 x 841.89)
+    while len(page_dimensions) < len(page_images):
+        page_dimensions.append({"width": 595.28, "height": 841.89})
 
     return page_images, page_dimensions
 
@@ -326,7 +414,7 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
         os.path.join(root, "src", "e2e", "output_*"),
         os.path.join(root, "output_*"),
     ]
-    seen_dirs: set[str] = set()
+    seen_dirs: Set[str] = set()
     runs: List[Dict[str, Any]] = []
 
     for pattern in patterns:
@@ -372,21 +460,142 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             score_str = f"{overall_confidence:.4f}" if overall_confidence is not None else "1.0000"
             label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
 
-            runs.append({
-                "id": norm_rel,
-                "dir_path": norm_rel,
-                "document_name": doc_name,
-                "document_path": doc_path,
-                "chosen_preset": chosen_preset,
-                "status": status,
-                "overall_confidence": overall_confidence if overall_confidence is not None else 1.0,
-                "violations_count": violations_count,
-                "timestamp": timestamp,
-                "has_viewer": os.path.exists(os.path.join(match, "interactive_viewer.html")),
-                "has_dom": bool(dom_data),
-                "has_plan": plan_data is not None,
-                "label": label,
-            })
+            total_pages = int(dom_data.get("total_pages", 1) or 1)
+            decision_data = artifacts.get("decision", {})
+            per_page_conf = decision_data.get("per_page_confidence", {})
+
+            per_page_viols: Dict[str, int] = {}
+            for v in violations:
+                p_num = str(v.get("global_page_index") or v.get("page") or 1)
+                per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
+
+            per_page_nodes: Dict[str, int] = {}
+            for n in dom_data.get("nodes", []):
+                p_num = str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
+                per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
+
+            attempts = decision_data.get("attempts", [])
+            if attempts and len(attempts) > 1:
+                for att in attempts:
+                    att_preset = att.get("preset", chosen_preset)
+                    att_conf = att.get("overall_confidence", overall_confidence)
+                    att_status = att.get("status", status)
+                    att_viols = att.get("violations_count", violations_count)
+                    att_page_conf = att.get("per_page_confidence", per_page_conf)
+                    att_step = att.get("step", 1)
+                    att_id = f"{norm_rel}:step_{att_step}"
+                    conf_str = f"{float(att_conf):.4f}" if att_conf is not None else "1.0000"
+                    att_label = f"{doc_name} [{att_preset} (Step {att_step}) | {att_status} {conf_str} | {att_viols} viols] ({norm_rel})"
+
+                    runs.append({
+                        "id": att_id,
+                        "dir_path": norm_rel,
+                        "document_name": doc_name,
+                        "document_path": doc_path,
+                        "chosen_preset": att_preset,
+                        "status": att_status,
+                        "overall_confidence": att_conf if att_conf is not None else 1.0,
+                        "violations_count": att_viols,
+                        "timestamp": timestamp,
+                        "has_viewer": os.path.exists(os.path.join(match, "interactive_viewer.html")),
+                        "has_dom": bool(dom_data),
+                        "has_plan": plan_data is not None,
+                        "total_pages": total_pages,
+                        "per_page_confidence": att_page_conf,
+                        "per_page_violations": per_page_viols,
+                        "per_page_nodes": per_page_nodes,
+                        "label": att_label,
+                    })
+            else:
+                runs.append({
+                    "id": norm_rel,
+                    "dir_path": norm_rel,
+                    "document_name": doc_name,
+                    "document_path": doc_path,
+                    "chosen_preset": chosen_preset,
+                    "status": status,
+                    "overall_confidence": overall_confidence if overall_confidence is not None else 1.0,
+                    "violations_count": violations_count,
+                    "timestamp": timestamp,
+                    "has_viewer": os.path.exists(os.path.join(match, "interactive_viewer.html")),
+                    "has_dom": bool(dom_data),
+                    "has_plan": plan_data is not None,
+                    "total_pages": total_pages,
+                    "per_page_confidence": per_page_conf,
+                    "per_page_violations": per_page_viols,
+                    "per_page_nodes": per_page_nodes,
+                    "label": label,
+                })
 
     runs.sort(key=lambda r: (r["dir_path"] != "output", r["dir_path"]))
     return runs
+
+
+def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Builds a table grid structure of previous runs for a given file.
+    Horizontal axis: page numbers (1..max_pages).
+    Vertical axis: parsing run identifiers (run_id / preset).
+    """
+    available_files: List[str] = sorted(list({
+        str(r.get("document_name")) for r in runs if r.get("document_name")
+    }))
+
+    selected_file = target_file
+    if not selected_file or selected_file not in available_files:
+        selected_file = available_files[0] if available_files else ""
+
+    file_runs = [r for r in runs if r.get("document_name") == selected_file] if selected_file else list(runs)
+
+    # Determine maximum page count across all runs for this file
+    max_pages = 1
+    for r in file_runs:
+        max_pages = max(max_pages, int(r.get("total_pages", 1) or 1))
+        for p_key in r.get("per_page_confidence", {}).keys():
+            try:
+                max_pages = max(max_pages, int(p_key))
+            except (ValueError, TypeError):
+                pass
+        for p_key in r.get("per_page_violations", {}).keys():
+            try:
+                max_pages = max(max_pages, int(p_key))
+            except (ValueError, TypeError):
+                pass
+
+    pages = list(range(1, max_pages + 1))
+
+    matrix_rows: List[Dict[str, Any]] = []
+    for r in file_runs:
+        pages_data: Dict[str, Dict[str, Any]] = {}
+        for p in pages:
+            p_str = str(p)
+            conf = r.get("per_page_confidence", {}).get(p_str)
+            if conf is None:
+                conf = r.get("per_page_confidence", {}).get(p)
+            viols = r.get("per_page_violations", {}).get(p_str, 0)
+            nodes = r.get("per_page_nodes", {}).get(p_str, 0)
+            pages_data[p_str] = {
+                "page": p,
+                "confidence": conf,
+                "violations_count": viols,
+                "nodes_count": nodes,
+                "is_passed": (conf is not None and conf >= 0.85) if conf is not None else (r.get("status") == "ACCEPT"),
+            }
+
+        matrix_rows.append({
+            "run_id": r.get("id", r.get("dir_path", "output")),
+            "dir_path": r.get("dir_path", "output"),
+            "preset": r.get("chosen_preset", "docling_fast"),
+            "status": r.get("status", "ACCEPT"),
+            "overall_confidence": r.get("overall_confidence", 1.0),
+            "violations_count": r.get("violations_count", 0),
+            "timestamp": r.get("timestamp", ""),
+            "pages_data": pages_data,
+        })
+
+    return {
+        "selected_file": selected_file,
+        "available_files": available_files,
+        "pages": pages,
+        "runs": matrix_rows,
+    }

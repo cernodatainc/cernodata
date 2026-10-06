@@ -180,6 +180,10 @@ function hydrateViewer(data) {
     violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
     decisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
+
     syncDomAndViolations();
 
     const docEl = document.getElementById('domSourceFilename');

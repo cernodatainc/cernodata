@@ -10,7 +10,7 @@ import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Type
 
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.server.session import ServerSessionContext
@@ -34,7 +34,7 @@ class PipelineViewerServer(ThreadingHTTPServer):
     def __init__(
         self,
         server_address: Tuple[str, int],
-        RequestHandlerClass: type[SimpleHTTPRequestHandler],
+        RequestHandlerClass: Type[SimpleHTTPRequestHandler],
         session_context: Optional[ServerSessionContext] = None,
         max_workers: int = 4,
     ) -> None:

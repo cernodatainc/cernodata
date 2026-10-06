@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 import webbrowser
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.server.common import (
@@ -23,7 +23,7 @@ from src.pipeline.server.session import ServerSessionContext
 from src.utils import find_available_port, mkdirs
 
 
-def print_banner(lines: list[str]) -> None:
+def print_banner(lines: List[str]) -> None:
     """Prints a standardized server startup banner."""
     sep = "=" * 68
     print(sep, flush=True)

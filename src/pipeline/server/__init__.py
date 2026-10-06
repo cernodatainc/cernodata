@@ -10,6 +10,7 @@ from __future__ import annotations
 from src.pipeline.server.common import (
     REPO_ROOT,
     SRC_DIR,
+    build_runs_grid,
     build_viewer_dataset,
     calculate_progress_step,
     copy_file_if_exists,
@@ -59,6 +60,7 @@ __all__ = [
     "calculate_progress_step",
     "create_preset_attempt_record",
     "build_viewer_dataset",
+    "build_runs_grid",
     "find_previous_runs",
     "ServerSessionContext",
     "PipelineViewerServer",
