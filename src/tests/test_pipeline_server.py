@@ -38,6 +38,7 @@ class TestPipelineServer(unittest.TestCase):
     server_thread: threading.Thread
     port: int
     base_url: str
+    _created_output_mock: bool = False
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -48,11 +49,37 @@ class TestPipelineServer(unittest.TestCase):
         cls.base_url = f"http://127.0.0.1:{cls.port}"
         time.sleep(0.3)
 
+        # Ensure output mock exists for discovery tests
+        out_dir = os.path.join(os.getcwd(), "output")
+        dom_file = os.path.join(out_dir, "document_dom.json")
+        if not os.path.exists(dom_file):
+            cls._created_output_mock = True
+            os.makedirs(out_dir, exist_ok=True)
+            with open(dom_file, "w", encoding="utf-8") as f:
+                json.dump({"document_id": "doc_test", "source_filename": "Document 8.pdf", "total_pages": 1, "nodes": []}, f)
+            with open(os.path.join(out_dir, "plan.json"), "w", encoding="utf-8") as f:
+                json.dump({"document_path": "src/e2e/Document 8.pdf", "primary_preset": "docling_fast", "target_threshold": 0.82}, f)
+            with open(os.path.join(out_dir, "plan_execution_result.json"), "w", encoding="utf-8") as f:
+                json.dump({
+                    "document_path": "src/e2e/Document 8.pdf",
+                    "chosen_preset": "docling_fast",
+                    "status": "ACCEPT",
+                    "overall_confidence": 0.95,
+                    "per_page_confidence": {"1": 0.95},
+                    "decision": {"chosen_preset": "docling_fast", "status": "ACCEPT", "overall_confidence": 0.95, "per_page_confidence": {"1": 0.95}},
+                    "violations": []
+                }, f)
+            with open(os.path.join(out_dir, "quality_violations.json"), "w", encoding="utf-8") as f:
+                json.dump([], f)
+
     @classmethod
     def tearDownClass(cls) -> None:
         if hasattr(cls, "server"):
             cls.server.shutdown()
             cls.server.server_close()
+        if cls._created_output_mock:
+            import shutil
+            shutil.rmtree(os.path.join(os.getcwd(), "output"), ignore_errors=True)
 
     def _get(self, path: str) -> tuple[int, str, Dict[str, str]]:
         url = f"{self.base_url}{path}"

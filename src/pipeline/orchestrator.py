@@ -5,39 +5,27 @@ End-to-end pipeline runner orchestrating parsing, text skew alignment, quality e
 Supports executing custom and planner-generated execution plans.
 """
 
-import os
-from dataclasses import replace
-from typing import Dict, Any, List, Tuple, Optional, Union, TypedDict, Callable
+from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 
 from src.utils import resolve_pdf_path
 from src.dom import DocumentDOM
-from src.parsers import DoclingParser, PyPdfiumParser
-from src.quality import detect_quality_violations, apply_text_skew_alignment
-from src.pipeline.decision_tree import DecisionTreeEngine, DEFAULT_TARGET_CONFIDENCE_THRESHOLD
+from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner_models import DocumentPlan, IngestionConfig
+from src.pipeline.execution_models import PipelineExecutionResult, AttemptRecord
+from src.pipeline.parser_dispatch import parse_document
+from src.pipeline.pipeline_steps import align_document_skew, evaluate_quality_and_decision_tree
+from src.pipeline.attempt_runner import AttemptRunner, execute_attempt, make_attempt_record
+from src.pipeline.fallback_handler import FallbackLoopHandler
 from src.pipeline.artifact_exporter import (
     render_visual_overlays,
     export_interactive_html_viewer,
     export_pipeline_artifacts,
 )
 
-
-class PipelineExecutionResult(TypedDict, total=False):
-    """Strongly-typed execution result container for pipeline extraction runs."""
-    dom: Dict[str, Any]
-    decision: Dict[str, Any]
-    violations: List[Dict[str, Any]]
-    dom_json_path: str
-    violations_json_path: str
-    plan_result_path: Optional[str]
-    html_viewer_path: Optional[str]
-    rendered_images: List[str]
-    plan: Optional[Dict[str, Any]]
-
-
 __all__ = [
     "IngestionConfig",
     "PipelineExecutionResult",
+    "AttemptRecord",
     "parse_document",
     "align_document_skew",
     "evaluate_quality_and_decision_tree",
@@ -46,77 +34,8 @@ __all__ = [
     "export_pipeline_artifacts",
     "execute_pipeline",
     "run_pipeline",
+    "PipelineOrchestrator",
 ]
-
-
-def parse_document(
-    pdf_path: str,
-    language: Optional[str] = "en",
-    preset: str = "docling_fast",
-    ocr_engine: str = "auto",
-    ocr_scale: Optional[float] = None,
-    force_full_page_ocr: bool = False,
-    do_table_structure: bool = True,
-    config: Optional[IngestionConfig] = None,
-) -> DocumentDOM:
-    """Parses PDF document using the specified preset into DocumentDOM IR."""
-    if config is not None:
-        language = config.language
-        preset = config.preset
-        ocr_scale = config.ocr_scale if config.ocr_scale is not None else ocr_scale
-        force_full_page_ocr = config.force_full_page_ocr
-        do_table_structure = config.do_table_structure
-
-    resolved_path = resolve_pdf_path(pdf_path)
-    if not os.path.exists(resolved_path):
-        raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
-
-    if preset == "pypdfium_rapidocr":
-        scale = ocr_scale if ocr_scale is not None else 2.0
-        return PyPdfiumParser(language=language, scale=scale).parse(resolved_path)
-
-    return DoclingParser(
-        language=language,
-        preset=preset,
-        ocr_engine=ocr_engine,
-        ocr_scale=ocr_scale,
-        force_full_page_ocr=force_full_page_ocr,
-        do_table_structure=do_table_structure,
-    ).parse(resolved_path)
-
-
-def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> DocumentDOM:
-    """Auto-detects and applies local text line skew orientation angles per node."""
-    if align_skew:
-        return apply_text_skew_alignment(dom, pdf_path)
-    return dom
-
-
-def evaluate_quality_and_decision_tree(
-    dom: DocumentDOM,
-    target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-    language: Optional[str] = "en",
-    preset: str = "docling_fast",
-    current_preset_score: float = 0.90,
-    next_preset_score: float = 0.72,
-    config: Optional[IngestionConfig] = None,
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """Extracts quality violation records and evaluates confidence scores against target threshold."""
-    if config is not None:
-        target_threshold = config.target_threshold
-        language = config.language
-        preset = config.preset
-
-    violations = detect_quality_violations(dom, language=language)
-    engine = DecisionTreeEngine(
-        target_threshold=target_threshold,
-        current_preset_score=current_preset_score,
-        next_preset_score=next_preset_score,
-        language=language,
-    )
-    decision = engine.evaluate(dom)
-    decision["chosen_preset"] = preset
-    return decision, violations
 
 
 def _execute_attempt(
@@ -148,22 +67,107 @@ def _make_attempt_record(
     parameters: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Builds a structured attempt record for tracking iteration history."""
-    record: Dict[str, Any] = {
-        "step": step,
-        "preset": preset,
-        "overall_confidence": decision.get("overall_confidence"),
-        "per_page_confidence": decision.get("per_page_confidence"),
-        "status": decision.get("status"),
-        "is_accepted": decision.get("is_accepted", False),
-        "violations_count": len(violations),
-        "action": action or decision.get("decision_tree", {}).get("action"),
-        "reason": reason or decision.get("decision_tree", {}).get("reason"),
-    }
-    if detail is not None:
-        record["detail"] = detail
-    if parameters is not None:
-        record["parameters"] = parameters
-    return record
+    return make_attempt_record(
+        step=step,
+        preset=preset,
+        decision=decision,
+        violations=violations,
+        action=action,
+        reason=reason,
+        detail=detail,
+        parameters=parameters,
+    )
+
+
+class PipelineOrchestrator:
+    """Coordinates end-to-end document extraction, fallback loops, and artifact generation."""
+
+    def __init__(
+        self,
+        fallback_handler: Optional[FallbackLoopHandler] = None,
+    ) -> None:
+        self.fallback_handler = fallback_handler or FallbackLoopHandler()
+
+    def execute(
+        self,
+        pdf_path: str,
+        config: IngestionConfig,
+        plan: Optional[DocumentPlan] = None,
+        progress_callback: Optional[Callable[[int, str, str], None]] = None,
+    ) -> PipelineExecutionResult:
+        """Executes end-to-end extraction pipeline with concrete configuration and optional fallback orchestration."""
+        def notify(pct: int, step_desc: str, log_msg: str) -> None:
+            if progress_callback is not None:
+                try:
+                    progress_callback(pct, step_desc, log_msg)
+                except Exception:
+                    pass
+
+        plan_obj = plan
+        resolved_path = resolve_pdf_path(pdf_path)
+        notify(20, "Step 1: Document Validation & Subdivision", f"Ingestion initiated for '{resolved_path}' (Preset: {config.preset}, Lang: {config.language}).")
+
+        pdf_path = resolved_path
+        attempts: List[Dict[str, Any]] = []
+
+        next_candidate, part_of_plan, curr_score, next_score = self.fallback_handler.resolve_candidate_scores(
+            config=config,
+            plan=plan_obj,
+        )
+
+        # Step 1: Initial Parse with Primary Preset
+        notify(40, f"Step 2: Executing Preset '{config.preset}'", f"Running extraction with preset '{config.preset}'...")
+        dom, decision, violations = _execute_attempt(
+            pdf_path, config, curr_score, next_score
+        )
+        attempts.append(_make_attempt_record(1, config.preset, decision, violations))
+        notify(65, "Step 3: Document Skew Alignment & Verification", "Document parsed. Analyzing layout geometry and quality rules...")
+
+        # Step 2: Fallback loop handling (Path A or Path B)
+        dom, decision, violations = self.fallback_handler.handle_fallback(
+            pdf_path=pdf_path,
+            config=config,
+            dom=dom,
+            decision=decision,
+            violations=violations,
+            attempts=attempts,
+            next_candidate=next_candidate,
+            part_of_plan=part_of_plan,
+            curr_score=curr_score,
+            next_score=next_score,
+            execute_attempt_fn=_execute_attempt,
+            make_attempt_record_fn=_make_attempt_record,
+            notify_fn=notify,
+        )
+
+        decision["attempts"] = attempts
+
+        plan_dict = plan_obj.to_dict() if plan_obj else None
+        notify(88, "Step 5: Exporting Artifacts & Overlays", "Saving DocumentDOM, quality violations, and rendering visual overlays...")
+        rendered_images = render_visual_overlays(pdf_path, dom, violations, config.visualize, config.output_dir, decision=decision)
+        dom_json_path, violations_json_path, plan_result_path = export_pipeline_artifacts(
+            dom, decision, violations, config.language, config.output_dir, plan=plan_dict
+        )
+        html_viewer_path = export_interactive_html_viewer(pdf_path, dom, decision, violations, config.output_dir, plan=plan_dict)
+
+        status_str = str(decision.get("status", "ACCEPT"))
+        score_val = float(decision.get("overall_confidence", 1.0) or 1.0)
+        notify(100, f"Step 5: Decision Tree Complete ({status_str})", f"Run complete: Status '{status_str}', Confidence: {score_val:.4f}, Violations: {len(violations)}.")
+
+        return {
+            "dom": dom.to_dict(),
+            "decision": decision,
+            "violations": violations,
+            "dom_json_path": dom_json_path,
+            "violations_json_path": violations_json_path,
+            "plan_result_path": plan_result_path,
+            "html_viewer_path": html_viewer_path,
+            "rendered_images": rendered_images,
+            "plan": plan_dict,
+        }
+
+
+_default_orchestrator = PipelineOrchestrator()
 
 
 def execute_pipeline(
@@ -173,157 +177,12 @@ def execute_pipeline(
     progress_callback: Optional[Callable[[int, str, str], None]] = None,
 ) -> PipelineExecutionResult:
     """Executes end-to-end extraction pipeline with concrete configuration and optional fallback orchestration."""
-    def notify(pct: int, step_desc: str, log_msg: str) -> None:
-        if progress_callback is not None:
-            try:
-                progress_callback(pct, step_desc, log_msg)
-            except Exception:
-                pass
-
-    plan_obj = plan
-    resolved_path = resolve_pdf_path(pdf_path)
-    notify(20, "Step 1: Document Validation & Subdivision", f"Ingestion initiated for '{resolved_path}' (Preset: {config.preset}, Lang: {config.language}).")
-
-    pdf_path = resolved_path
-    attempts: List[Dict[str, Any]] = []
-
-    # Determine candidate scores and potential fallback candidate
-    next_candidate = None
-    part_of_plan = False
-    if plan_obj and plan_obj.fallback_queue:
-        first_fb = plan_obj.fallback_queue[0]
-        next_candidate = first_fb.get("preset") if isinstance(first_fb, dict) else first_fb
-        part_of_plan = True
-    elif config.preset in ("docling_fast", "pypdfium_rapidocr"):
-        next_candidate = "docling_deep"
-
-    curr_score = plan_obj.scores.get(config.preset, 0.90) if plan_obj else 0.90
-    next_score = plan_obj.scores.get(next_candidate, 0.72) if (plan_obj and next_candidate) else 0.72
-
-    # Step 1: Initial Parse with Primary Preset
-    notify(40, f"Step 2: Executing Preset '{config.preset}'", f"Running extraction with preset '{config.preset}'...")
-    dom, decision, violations = _execute_attempt(
-        pdf_path, config, curr_score, next_score
+    return _default_orchestrator.execute(
+        pdf_path=pdf_path,
+        config=config,
+        plan=plan,
+        progress_callback=progress_callback,
     )
-    attempts.append(_make_attempt_record(1, config.preset, decision, violations))
-    notify(65, "Step 3: Document Skew Alignment & Verification", "Document parsed. Analyzing layout geometry and quality rules...")
-
-    if config.preset == "docling_deep":
-        decision["chosen_preset"] = "docling_deep"
-        decision["decision_tree"] = {
-            "action": "ACCEPT_OUTPUT",
-            "preset_executed": "docling_deep",
-            "reason": "Executed using 'docling_deep' preset. All OCR diacritics restored."
-        }
-    elif not decision.get("is_accepted"):
-        action = decision.get("decision_tree", {}).get("action")
-
-        # Path B: Parameter Wiggling on current preset if delta is large
-        if action == "PATH_B_WIGGLE_PARAMETERS":
-            notify(70, "Step 4: Parameter Wiggling", f"Target threshold not met. Wiggling OCR parameters for '{config.preset}'...")
-            wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
-            wiggled_force_ocr = True
-            wiggled_config = replace(
-                config,
-                ocr_scale=wiggled_scale,
-                force_full_page_ocr=wiggled_force_ocr,
-            )
-            w_dom, w_decision, w_violations = _execute_attempt(
-                pdf_path, wiggled_config, curr_score, next_score
-            )
-            attempts.append(_make_attempt_record(
-                len(attempts) + 1, config.preset, w_decision, w_violations,
-                action="PATH_B_WIGGLE_PARAMETERS",
-                reason=f"Wiggled OCR parameters: ocr_scale={wiggled_scale}, force_full_page_ocr={wiggled_force_ocr}.",
-                parameters={"ocr_scale": wiggled_scale, "force_full_page_ocr": wiggled_force_ocr}
-            ))
-
-            if w_decision.get("is_accepted"):
-                dom, decision, violations = w_dom, w_decision, w_violations
-                decision["decision_tree"] = {
-                    "action": "ACCEPT_OUTPUT",
-                    "preset_executed": config.preset,
-                    "reason": f"Preset '{config.preset}' reached target threshold after parameter wiggling."
-                }
-            elif next_candidate:
-                # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
-                plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
-                notify(75, "Step 4: Switching Preset", f"Wiggling exhausted. Switching to fallback preset '{next_candidate}'...")
-                fallback_config = replace(config, preset=next_candidate)
-                fb_dom, fb_decision, fb_violations = _execute_attempt(
-                    pdf_path, fallback_config
-                )
-                fb_decision["decision_tree"] = {
-                    "action": "PATH_A_SWITCH_PRESET",
-                    "preset_executed": next_candidate,
-                    "fallback_triggered": True,
-                    "reason": plan_note,
-                    "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
-                    "detail": plan_note
-                }
-                attempts.append(_make_attempt_record(
-                    len(attempts) + 1, next_candidate, fb_decision, fb_violations,
-                    action=fb_decision.get("decision_tree", {}).get("action"),
-                    reason=fb_decision.get("decision_tree", {}).get("reason"),
-                    detail=plan_note
-                ))
-                dom, decision, violations = fb_dom, fb_decision, fb_violations
-        elif next_candidate:
-            # Path A: Switch to next candidate preset
-            if part_of_plan:
-                plan_note = f"Executed plan fallback '{next_candidate}'."
-            else:
-                plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
-
-            notify(75, "Step 4: Switching Preset", f"Target threshold not met ({decision.get('overall_confidence')} < {config.target_threshold}). Switching to fallback '{next_candidate}'...")
-            fallback_config = replace(config, preset=next_candidate)
-            fb_dom, fb_decision, fb_violations = _execute_attempt(
-                pdf_path, fallback_config
-            )
-            fb_decision["decision_tree"] = {
-                "action": "PATH_A_SWITCH_PRESET",
-                "preset_executed": next_candidate,
-                "fallback_triggered": True,
-                "reason": (
-                    f"Initial preset '{config.preset}' fell below threshold "
-                    f"({decision.get('overall_confidence')} < {config.target_threshold}). {plan_note}"
-                ),
-                "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
-                "detail": plan_note
-            }
-            attempts.append(_make_attempt_record(
-                len(attempts) + 1, next_candidate, fb_decision, fb_violations,
-                action=fb_decision.get("decision_tree", {}).get("action"),
-                reason=fb_decision.get("decision_tree", {}).get("reason"),
-                detail=plan_note
-            ))
-            dom, decision, violations = fb_dom, fb_decision, fb_violations
-
-    decision["attempts"] = attempts
-
-    plan_dict = plan_obj.to_dict() if plan_obj else None
-    notify(88, "Step 5: Exporting Artifacts & Overlays", "Saving DocumentDOM, quality violations, and rendering visual overlays...")
-    rendered_images = render_visual_overlays(pdf_path, dom, violations, config.visualize, config.output_dir, decision=decision)
-    dom_json_path, violations_json_path, plan_result_path = export_pipeline_artifacts(
-        dom, decision, violations, config.language, config.output_dir, plan=plan_dict
-    )
-    html_viewer_path = export_interactive_html_viewer(pdf_path, dom, decision, violations, config.output_dir, plan=plan_dict)
-
-    status_str = str(decision.get("status", "ACCEPT"))
-    score_val = float(decision.get("overall_confidence", 1.0) or 1.0)
-    notify(100, f"Step 5: Decision Tree Complete ({status_str})", f"Run complete: Status '{status_str}', Confidence: {score_val:.4f}, Violations: {len(violations)}.")
-
-    return {
-        "dom": dom.to_dict(),
-        "decision": decision,
-        "violations": violations,
-        "dom_json_path": dom_json_path,
-        "violations_json_path": violations_json_path,
-        "plan_result_path": plan_result_path,
-        "html_viewer_path": html_viewer_path,
-        "rendered_images": rendered_images,
-        "plan": plan_dict
-    }
 
 
 def run_pipeline(
@@ -376,4 +235,3 @@ def run_pipeline(
         plan=plan_obj,
         progress_callback=progress_callback,
     )
-
