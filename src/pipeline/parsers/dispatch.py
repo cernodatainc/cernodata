@@ -7,7 +7,6 @@ Document parser resolution and dispatching for document ingestion presets.
 from __future__ import annotations
 
 import os
-import sys
 from typing import Optional
 
 from src.dom import DocumentDOM
@@ -68,9 +67,7 @@ class DocumentParserDispatcher:
             config=config,
         )
 
-        legacy = sys.modules.get("src.pipeline.parser_dispatch")
-        resolver = getattr(legacy, "resolve_pdf_path", resolve_pdf_path) if legacy else resolve_pdf_path
-        resolved_path = resolver(pdf_path)
+        resolved_path = resolve_pdf_path(pdf_path)
         if not os.path.exists(resolved_path):
             raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
 

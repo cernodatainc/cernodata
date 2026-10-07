@@ -14,6 +14,7 @@ from src.quality.language import (
     detect_document_languages
 )
 from src.quality.evaluator import (
+    DocumentConfidenceMetrics,
     evaluate_page_confidence,
     evaluate_document_confidence,
     load_quality_config
@@ -22,6 +23,7 @@ from src.quality.violations import detect_quality_violations
 from src.quality.skew import detect_node_text_skew, apply_text_skew_alignment
 
 __all__ = [
+    "DocumentConfidenceMetrics",
     "LanguageConfig",
     "get_language_config",
     "register_language_config",

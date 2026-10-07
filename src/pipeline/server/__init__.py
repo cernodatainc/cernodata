@@ -45,7 +45,7 @@ from src.pipeline.server.launcher import (
 )
 from src.pipeline.server.preset_cache import PresetCache
 from src.pipeline.server.progress import ProgressTracker
-from src.pipeline.server.routes_api import ApiRoutesMixin
+from src.pipeline.server.routes import ApiRoutesMixin
 from src.pipeline.server.routes_static import StaticRoutesMixin
 from src.pipeline.server.session import ServerSessionContext
 from src.utils import find_available_port, resolve_pdf_path

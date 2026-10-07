@@ -11,7 +11,7 @@ import threading
 from typing import Any, Callable, Dict, List, Optional
 
 from src.pipeline.execution_models import AttemptRecord
-from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.planner.models import DocumentPlan
 from src.pipeline.server.artifacts import ViewerDataset
 from src.pipeline.server.http_utils import REPO_ROOT, SRC_DIR
 from src.pipeline.server.preset_cache import PresetCache

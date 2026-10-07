@@ -102,10 +102,6 @@ def extract_decision_from_html(html_path: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-# Backward compatibility alias
-_extract_decision_from_html = extract_decision_from_html
-
-
 def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
     """
     Loads and coalesces pipeline execution artifacts from an output directory.

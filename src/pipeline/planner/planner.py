@@ -28,28 +28,18 @@ class PresetPlanner:
         taxonomy: Optional[str] = None,
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
-        *args: Any,
-        **kwargs: Any,
     ) -> Dict[str, float]:
-        """Calculates preset suitability scores based on strongly-typed PlannerCriteria or backward-compatible arguments."""
+        """Calculates preset suitability scores based on strongly-typed PlannerCriteria or dimension arguments."""
         if isinstance(criteria, PlannerCriteria):
             resolved_criteria = criteria
         elif isinstance(taxonomy, PlannerCriteria):
             resolved_criteria = taxonomy
         else:
             tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
-            # Handle backwards-compatible positional call: (taxonomy, hardware, target, security)
-            if args:
-                actual_target = security
-                actual_security = str(args[0])
-            else:
-                actual_target = target
-                actual_security = security
-
             resolved_criteria = PlannerCriteria(
                 taxonomy=tax,
-                target=actual_target,
-                security=actual_security,
+                target=target,
+                security=security,
             )
 
         scores: Dict[str, float] = {}

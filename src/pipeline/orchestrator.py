@@ -13,7 +13,7 @@ from src.pipeline.config_resolver import PipelineConfigResolver
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.execution_models import PipelineExecutionResult
 from src.pipeline.fallback_handler import FallbackLoopHandler
-from src.pipeline.planner_models import DocumentPlan, IngestionConfig
+from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 from src.pipeline.progress_notifier import PipelineProgressNotifier
 from src.utils import resolve_pdf_path
 

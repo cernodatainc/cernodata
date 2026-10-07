@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.dom import DocumentDOM
 from src.pipeline.attempt_runner import AttemptRunner
-from src.pipeline.planner_models import DocumentPlan, IngestionConfig
+from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 from src.pipeline.progress_notifier import PipelineProgressNotifier
 
 

@@ -10,7 +10,7 @@ import os
 import threading
 from typing import Any, Dict
 
-from src.pipeline.planner_models import DocumentPlan, PlannerCriteria
+from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
 from src.utils import mkdirs

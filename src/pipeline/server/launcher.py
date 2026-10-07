@@ -11,7 +11,7 @@ import os
 import webbrowser
 from typing import Any, List, Optional
 
-from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.planner.models import DocumentPlan
 from src.pipeline.server.common import (
     SRC_DIR,
     copy_file_if_exists,

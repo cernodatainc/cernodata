@@ -6,7 +6,7 @@ Configuration and run retrieval API endpoints for cernodata HTTP server.
 
 from __future__ import annotations
 
-from src.pipeline.planner_options import (
+from src.pipeline.planner.options import (
     DEFAULT_PRESET_WEIGHTS,
     SECURITY_OPTIONS,
     TARGET_OPTIONS,
@@ -53,16 +53,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             "default_lang": default_lang,
             "default_threshold": default_thresh,
             "preset_weights": DEFAULT_PRESET_WEIGHTS,
-            "dimensions": [
-                {
-                    "key": d.key,
-                    "title": d.title,
-                    "description": d.description,
-                    "options": d.options,
-                    "default": d.default,
-                }
-                for d in WIZARD_DIMENSIONS
-            ],
+            "dimensions": [d.to_dict() for d in WIZARD_DIMENSIONS],
             "taxonomy_options": TAXONOMY_OPTIONS,
             "target_options": TARGET_OPTIONS,
             "security_options": SECURITY_OPTIONS,

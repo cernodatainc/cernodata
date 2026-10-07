@@ -10,12 +10,43 @@ from __future__ import annotations
 import glob
 import logging
 import os
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Dict, List, Optional, Set
 
 from src.pipeline.server.artifacts import load_run_artifacts
 from src.pipeline.server.http_utils import REPO_ROOT
 
 logger = logging.getLogger("cernodata.server.discovery")
+
+
+@dataclass
+class RunMetadata:
+    """Strongly-typed metadata container for discovered pipeline execution outputs."""
+    id: str
+    dir_path: str
+    document_name: str
+    document_path: str
+    chosen_preset: str
+    status: str
+    overall_confidence: float
+    violations_count: int
+    timestamp: str
+    has_viewer: bool
+    has_dom: bool
+    has_plan: bool
+    total_pages: int
+    per_page_confidence: Dict[str, float] = field(default_factory=dict)
+    per_page_violations: Dict[str, int] = field(default_factory=dict)
+    per_page_nodes: Dict[str, int] = field(default_factory=dict)
+    label: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializes metadata record to dictionary for API backwards compatibility."""
+        return asdict(self)
+
+    def evolve(self, **changes: Any) -> RunMetadata:
+        """Derives a new record copying unchanged fields and updating only specified deltas."""
+        return replace(self, **changes)
 
 
 def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -113,6 +144,31 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
                 p_num = str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
                 per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
 
+            has_viewer = os.path.exists(os.path.join(match, "interactive_viewer.html"))
+            has_dom = bool(dom_data)
+            has_plan = plan_data is not None
+            conf_val = overall_confidence if overall_confidence is not None else 1.0
+
+            base_run = RunMetadata(
+                id=norm_rel,
+                dir_path=norm_rel,
+                document_name=doc_name,
+                document_path=doc_path,
+                chosen_preset=chosen_preset,
+                status=status,
+                overall_confidence=conf_val,
+                violations_count=violations_count,
+                timestamp=timestamp,
+                has_viewer=has_viewer,
+                has_dom=has_dom,
+                has_plan=has_plan,
+                total_pages=total_pages,
+                per_page_confidence=per_page_conf,
+                per_page_violations=per_page_viols,
+                per_page_nodes=per_page_nodes,
+                label=label,
+            )
+
             attempts = decision_data.get("attempts", [])
             if attempts and len(attempts) > 1:
                 for att in attempts:
@@ -144,45 +200,19 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
                         f"{att_status} {conf_str} | {att_viols} viols] ({norm_rel})"
                     )
 
-                    runs.append({
-                        "id": att_id,
-                        "dir_path": norm_rel,
-                        "document_name": doc_name,
-                        "document_path": doc_path,
-                        "chosen_preset": att_preset,
-                        "status": att_status,
-                        "overall_confidence": att_conf if att_conf is not None else 1.0,
-                        "violations_count": att_viols,
-                        "timestamp": timestamp,
-                        "has_viewer": os.path.exists(os.path.join(match, "interactive_viewer.html")),
-                        "has_dom": bool(dom_data),
-                        "has_plan": plan_data is not None,
-                        "total_pages": total_pages,
-                        "per_page_confidence": att_page_conf,
-                        "per_page_violations": att_page_viols,
-                        "per_page_nodes": per_page_nodes,
-                        "label": att_label,
-                    })
+                    step_run = base_run.evolve(
+                        id=att_id,
+                        chosen_preset=att_preset,
+                        status=att_status,
+                        overall_confidence=float(att_conf) if att_conf is not None else 1.0,
+                        violations_count=int(att_viols),
+                        per_page_confidence=att_page_conf,
+                        per_page_violations=att_page_viols,
+                        label=att_label,
+                    )
+                    runs.append(step_run.to_dict())
             else:
-                runs.append({
-                    "id": norm_rel,
-                    "dir_path": norm_rel,
-                    "document_name": doc_name,
-                    "document_path": doc_path,
-                    "chosen_preset": chosen_preset,
-                    "status": status,
-                    "overall_confidence": overall_confidence if overall_confidence is not None else 1.0,
-                    "violations_count": violations_count,
-                    "timestamp": timestamp,
-                    "has_viewer": os.path.exists(os.path.join(match, "interactive_viewer.html")),
-                    "has_dom": bool(dom_data),
-                    "has_plan": plan_data is not None,
-                    "total_pages": total_pages,
-                    "per_page_confidence": per_page_conf,
-                    "per_page_violations": per_page_viols,
-                    "per_page_nodes": per_page_nodes,
-                    "label": label,
-                })
+                runs.append(base_run.to_dict())
 
     runs.sort(key=lambda r: (r["dir_path"] != "output", r["dir_path"]))
     return runs
@@ -234,27 +264,44 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
         pages_data: Dict[str, Dict[str, Any]] = {}
         for p in pages:
             p_str = str(p)
-            conf = r.get("per_page_confidence", {}).get(p_str)
+            page_conf = r.get("per_page_confidence", {})
+            conf = page_conf.get(p_str)
             if conf is None:
-                conf = r.get("per_page_confidence", {}).get(p)
+                conf = page_conf.get(p)
+
             viols = r.get("per_page_violations", {}).get(p_str, 0)
             nodes = r.get("per_page_nodes", {}).get(p_str, 0)
+
+            if conf is not None:
+                is_passed = conf >= 0.85
+            else:
+                is_passed = (r.get("status") == "ACCEPT")
+
             pages_data[p_str] = {
                 "page": p,
                 "confidence": conf,
                 "violations_count": viols,
                 "nodes_count": nodes,
-                "is_passed": (conf is not None and conf >= 0.85) if conf is not None else (r.get("status") == "ACCEPT"),
+                "is_passed": is_passed,
             }
 
+        run_id = str(r.get("id") or r.get("dir_path") or "output")
+        dir_path = str(r.get("dir_path") or "output")
+        preset = str(r.get("chosen_preset") or "docling_fast")
+        status_val = str(r.get("status") or "ACCEPT")
+        raw_conf = r.get("overall_confidence")
+        overall_conf = float(raw_conf) if raw_conf is not None else 1.0
+        violations_cnt = int(r.get("violations_count") or 0)
+        timestamp_val = str(r.get("timestamp") or "")
+
         matrix_rows.append({
-            "run_id": r.get("id", r.get("dir_path", "output")),
-            "dir_path": r.get("dir_path", "output"),
-            "preset": r.get("chosen_preset", "docling_fast"),
-            "status": r.get("status", "ACCEPT"),
-            "overall_confidence": r.get("overall_confidence", 1.0),
-            "violations_count": r.get("violations_count", 0),
-            "timestamp": r.get("timestamp", ""),
+            "run_id": run_id,
+            "dir_path": dir_path,
+            "preset": preset,
+            "status": status_val,
+            "overall_confidence": overall_conf,
+            "violations_count": violations_cnt,
+            "timestamp": timestamp_val,
             "pages_data": pages_data,
         })
 

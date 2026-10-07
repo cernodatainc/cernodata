@@ -7,12 +7,21 @@ Page-level (S_i) and document-level (S) confidence score evaluators.
 import functools
 import json
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TypedDict
 from collections import Counter
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio
 from src.quality.language import compute_language_score, detect_page_language
 from src.quality.language_config import get_language_config
+
+
+class DocumentConfidenceMetrics(TypedDict, total=False):
+    """Strongly-typed metrics dictionary evaluating confidence and detected languages across pages."""
+    overall_confidence: float
+    per_page_confidence: Dict[int, float]
+    detected_languages: Dict[int, str]
+    detected_language_confidences: Dict[int, float]
+    primary_detected_language: str
 
 
 @functools.lru_cache(maxsize=1)
@@ -97,7 +106,7 @@ def evaluate_page_confidence(
 
 def evaluate_document_confidence(
     dom: DocumentDOM, language: Optional[str] = "en", diacritic_hit: Optional[float] = None
-) -> Dict[str, Any]:
+) -> DocumentConfidenceMetrics:
     """
     Evaluates confidence score across all pages in a DocumentDOM.
     """
@@ -126,10 +135,11 @@ def evaluate_document_confidence(
     if page_languages:
         primary_detected = Counter(page_languages.values()).most_common(1)[0][0]
 
-    return {
+    metrics: DocumentConfidenceMetrics = {
         "overall_confidence": overall_confidence,
         "per_page_confidence": page_scores,
         "detected_languages": page_languages,
         "detected_language_confidences": page_confidences,
-        "primary_detected_language": primary_detected
+        "primary_detected_language": primary_detected,
     }
+    return metrics

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from src.pipeline.planner_models import DocumentPlan, PlannerCriteria
+from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 

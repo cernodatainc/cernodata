@@ -7,7 +7,7 @@ Input resolution and normalization for pipeline execution requests.
 from typing import Any, Dict, Optional, Tuple, Union
 
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
-from src.pipeline.planner_models import DocumentPlan, IngestionConfig
+from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 
 
 class PipelineConfigResolver:

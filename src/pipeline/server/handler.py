@@ -36,6 +36,10 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
     hydration API, and execution endpoints.
     """
 
+    def log_message(self, format: str, *args: Any) -> None:
+        """Suppresses standard HTTP access logs to keep terminal output clean."""
+        logger.debug("%s - " + format, self.address_string(), *args)
+
     def handle(self) -> None:
         """Handles request while catching normal client socket aborts."""
         try:

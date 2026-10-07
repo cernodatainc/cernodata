@@ -13,7 +13,6 @@ For domain-specific implementations, see:
 from __future__ import annotations
 
 from src.pipeline.server.artifacts import (
-    _extract_decision_from_html,
     build_viewer_dataset,
     calculate_progress_step,
     create_preset_attempt_record,
@@ -44,7 +43,6 @@ from src.pipeline.server.http_utils import (
 __all__ = [
     "REPO_ROOT",
     "SRC_DIR",
-    "_extract_decision_from_html",
     "build_runs_grid",
     "build_viewer_dataset",
     "calculate_progress_step",

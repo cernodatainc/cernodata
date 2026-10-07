@@ -12,7 +12,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from src.pipeline.execution_models import AttemptRecord
-from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.planner.models import DocumentPlan
 from src.pipeline.server.artifacts import (
     ViewerDataset,
     create_preset_attempt_record,

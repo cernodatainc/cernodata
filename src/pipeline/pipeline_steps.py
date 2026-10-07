@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Tuple, Optional
 from src.dom import DocumentDOM
 from src.quality import detect_quality_violations, apply_text_skew_alignment
 from src.pipeline.decision_tree import DecisionTreeEngine, DEFAULT_TARGET_CONFIDENCE_THRESHOLD
-from src.pipeline.planner_models import IngestionConfig
+from src.pipeline.planner.models import IngestionConfig
 
 
 def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> DocumentDOM:

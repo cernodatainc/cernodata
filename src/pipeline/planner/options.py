@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Tuple
 
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "planner_config.json")
@@ -35,6 +35,10 @@ class WizardDimension:
     description: str
     options: List[Tuple[str, str]]
     default: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializes dimension attributes to standard dictionary."""
+        return asdict(self)
 
 
 WIZARD_DIMENSIONS: List[WizardDimension] = [
