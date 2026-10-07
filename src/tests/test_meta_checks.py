@@ -326,6 +326,27 @@ class TestMetaChecks(unittest.TestCase):
         self.assertIsInstance(results["yellow_flags"], list)
         self.assertTrue(results["is_passed"])
 
+    def test_planner_silo_and_dependency_graph(self) -> None:
+        """Verifies that dependency graph builder generates valid DOT and confirms planner silo."""
+        from pathlib import Path
+        from src.dependency_graph import (
+            build_dependency_graph,
+            generate_dot_graph,
+            verify_planner_silo,
+        )
+
+        repo_root = Path(__file__).resolve().parents[2]
+        graph = build_dependency_graph(repo_root)
+        self.assertIn("src.pipeline.planner", graph)
+
+        violations = verify_planner_silo(graph)
+        self.assertEqual(violations, [], f"Planner silo violations detected: {violations}")
+
+        dot_output = generate_dot_graph(graph)
+        self.assertIn("digraph", dot_output)
+        self.assertIn("cluster_planner", dot_output)
+
 
 if __name__ == "__main__":
     unittest.main()
+

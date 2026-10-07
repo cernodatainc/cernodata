@@ -1,7 +1,7 @@
 """
-src/pipeline/parser_dispatch.py
+src/pipeline/parsers/__init__.py
 
-Backwards-compatibility shim forwarding to src.pipeline.parsers.dispatch.
+Pipeline parser dispatching, preset adapters, and extensible parser registry.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ from src.pipeline.parsers.registry import (
     ParserPresetRegistry,
     get_default_parser_registry,
 )
-from src.utils import resolve_pdf_path
 
 __all__ = [
     "DoclingPresetAdapter",
@@ -31,5 +30,4 @@ __all__ = [
     "PyPdfiumPresetAdapter",
     "get_default_parser_registry",
     "parse_document",
-    "resolve_pdf_path",
 ]

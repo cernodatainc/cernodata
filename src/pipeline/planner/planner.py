@@ -153,9 +153,11 @@ class PresetPlanner:
         port: int = 8000,
         open_browser: bool = True,
     ) -> DocumentPlan:
-        """Interactive in-browser data shape configuration wizard delegating to serve_data_shape_wizard."""
-        from src.pipeline.planner.server import serve_data_shape_wizard
-        return serve_data_shape_wizard(
+        """Interactive in-browser data shape configuration wizard delegating to server launcher."""
+        import importlib
+        server_launcher = importlib.import_module("src.pipeline.server.launcher")
+        runner = getattr(server_launcher, "serve_data_shape_wizard")
+        return runner(
             planner=self,
             default_doc=default_doc,
             default_lang=default_lang,
