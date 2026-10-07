@@ -96,14 +96,6 @@ def _check_diacritic_violations(
     return violations
 
 
-def _check_polish_diacritic_violations(node: DOMNode, raw_text: str, lang: str, counter: int) -> List[Dict[str, Any]]:
-    """Backward compatibility wrapper for Polish diacritic violations."""
-    if lang != "pl":
-        return []
-    config = get_language_config("pl")
-    return _check_diacritic_violations(node, raw_text, config, counter)
-
-
 def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations and anomalies.

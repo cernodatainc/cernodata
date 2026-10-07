@@ -64,9 +64,8 @@ def build_dependency_graph(repo_root: Path) -> Dict[str, Set[str]]:
 def verify_planner_silo(graph: Dict[str, Set[str]]) -> List[str]:
     """Verifies that planner modules are strictly siloed from orchestrator and viewer."""
     violations: List[str] = []
-    planner_shims = {"src.pipeline.planner_models", "src.pipeline.planner_options", "src.pipeline.planner_wizard"}
     for mod_id, dependencies in graph.items():
-        is_planner = mod_id == "src.pipeline.planner" or mod_id.startswith("src.pipeline.planner.") or mod_id in planner_shims
+        is_planner = mod_id == "src.pipeline.planner" or mod_id.startswith("src.pipeline.planner.")
         if not is_planner:
             continue
         for dep in dependencies:

@@ -19,9 +19,6 @@ from src.visualization.viewer import (
     build_viewer_html,
 )
 
-# Backwards compatibility re-exports
-_page_to_base64 = page_to_base64
-
 
 def generate_interactive_html(
     pdf_path: str,

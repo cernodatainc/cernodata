@@ -12,7 +12,7 @@ from src.dom import DocumentDOM, DOMNode, BoundingBox
 from src.parsers.docling_parser import DoclingParser
 from src.parsers.pypdfium_parser import PyPdfiumParser
 from src.pipeline.planner import PresetPlanner
-from src.pipeline.parser_dispatch import parse_document
+from src.pipeline.parsers.dispatch import parse_document
 from src.pipeline.orchestrator import run_pipeline
 
 

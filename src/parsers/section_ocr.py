@@ -31,10 +31,6 @@ try:
 except ImportError:
     HAS_RAPIDOCR = False
 
-# Backwards compatibility aliases
-_ocr_result = create_ocr_result
-_normalize_to_pil = normalize_to_pil
-
 
 class SectionOCRParser:
     """

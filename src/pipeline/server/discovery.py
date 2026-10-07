@@ -40,6 +40,74 @@ class RunMetadata:
     per_page_nodes: Dict[str, int] = field(default_factory=dict)
     label: str = ""
 
+    @classmethod
+    def from_run_artifacts(
+        cls,
+        norm_rel: str,
+        match: str,
+        artifacts: Dict[str, Any],
+    ) -> RunMetadata:
+        """Constructs canonical RunMetadata directly from load_run_artifacts output."""
+        plan_data = artifacts.get("plan")
+        dom_data = artifacts.get("dom") or {}
+        violations = artifacts.get("violations") or []
+        decision_data = artifacts.get("decision") or {}
+
+        active_violations = [
+            v for v in violations
+            if str(v.get("suppressed", "false")).lower() not in ("true", "1")
+            and not v.get("accepted")
+            and not v.get("is_fixed")
+        ]
+        violations_count = len(active_violations)
+
+        overall_confidence = artifacts.get("overall_confidence")
+        status = artifacts.get("status", "ACCEPT")
+
+        diff_data = artifacts.get("diff") or {}
+        diff_scoring = diff_data.get("scoring") or {}
+        if diff_scoring:
+            if diff_scoring.get("current_overall_confidence") is not None:
+                overall_confidence = float(diff_scoring["current_overall_confidence"])
+            if diff_scoring.get("status"):
+                status = str(diff_scoring["status"])
+
+        conf_val = float(overall_confidence) if overall_confidence is not None else 1.0
+        doc_name = str(artifacts.get("document_name") or "Unknown")
+        chosen_preset = str(artifacts.get("chosen_preset") or "docling_fast")
+        score_str = f"{conf_val:.4f}"
+        label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
+
+        per_page_viols: Dict[str, int] = {}
+        for v in active_violations:
+            p_num = str(v.get("global_page_index") or v.get("page") or 1)
+            per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
+
+        per_page_nodes: Dict[str, int] = {}
+        for n in dom_data.get("nodes", []):
+            p_num = str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
+            per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
+
+        return cls(
+            id=norm_rel,
+            dir_path=norm_rel,
+            document_name=doc_name,
+            document_path=str(artifacts.get("document_path") or ""),
+            chosen_preset=chosen_preset,
+            status=status,
+            overall_confidence=conf_val,
+            violations_count=violations_count,
+            timestamp=str(plan_data.get("created_at") or "") if plan_data else "",
+            has_viewer=os.path.exists(os.path.join(match, "interactive_viewer.html")),
+            has_dom=bool(dom_data),
+            has_plan=plan_data is not None,
+            total_pages=int(dom_data.get("total_pages", 1) or 1),
+            per_page_confidence=decision_data.get("per_page_confidence") or {},
+            per_page_violations=per_page_viols,
+            per_page_nodes=per_page_nodes,
+            label=label,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Serializes metadata record to dictionary for API backwards compatibility."""
         return asdict(self)
@@ -102,101 +170,39 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             seen_dirs.add(norm_rel)
 
             artifacts = load_run_artifacts(match)
-            plan_data = artifacts["plan"]
-            dom_data = artifacts["dom"]
-            violations = artifacts["violations"]
-            chosen_preset = artifacts["chosen_preset"]
-            status = artifacts["status"]
-            overall_confidence = artifacts["overall_confidence"]
-            doc_name = artifacts["document_name"]
-            doc_path = artifacts["document_path"]
-            timestamp = plan_data.get("created_at", "") if plan_data else ""
-            active_violations = [
-                v for v in violations
-                if str(v.get("suppressed", "false")).lower() not in ("true", "1")
-                and not v.get("accepted")
-                and not v.get("is_fixed")
-            ]
-            violations_count = len(active_violations)
+            base_run = RunMetadata.from_run_artifacts(norm_rel, match, artifacts)
 
-            diff_data = artifacts.get("diff", {})
-            diff_scoring = diff_data.get("scoring", {})
-            if diff_scoring:
-                if diff_scoring.get("current_overall_confidence") is not None:
-                    overall_confidence = float(diff_scoring["current_overall_confidence"])
-                if diff_scoring.get("status"):
-                    status = str(diff_scoring["status"])
-
-            score_str = f"{overall_confidence:.4f}" if overall_confidence is not None else "1.0000"
-            label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
-
-            total_pages = int(dom_data.get("total_pages", 1) or 1)
-            decision_data = artifacts.get("decision", {})
-            per_page_conf = decision_data.get("per_page_confidence", {})
-
-            per_page_viols: Dict[str, int] = {}
-            for v in active_violations:
-                p_num = str(v.get("global_page_index") or v.get("page") or 1)
-                per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
-
-            per_page_nodes: Dict[str, int] = {}
-            for n in dom_data.get("nodes", []):
-                p_num = str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
-                per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
-
-            has_viewer = os.path.exists(os.path.join(match, "interactive_viewer.html"))
-            has_dom = bool(dom_data)
-            has_plan = plan_data is not None
-            conf_val = overall_confidence if overall_confidence is not None else 1.0
-
-            base_run = RunMetadata(
-                id=norm_rel,
-                dir_path=norm_rel,
-                document_name=doc_name,
-                document_path=doc_path,
-                chosen_preset=chosen_preset,
-                status=status,
-                overall_confidence=conf_val,
-                violations_count=violations_count,
-                timestamp=timestamp,
-                has_viewer=has_viewer,
-                has_dom=has_dom,
-                has_plan=has_plan,
-                total_pages=total_pages,
-                per_page_confidence=per_page_conf,
-                per_page_violations=per_page_viols,
-                per_page_nodes=per_page_nodes,
-                label=label,
-            )
+            decision_data = artifacts.get("decision") or {}
 
             attempts = decision_data.get("attempts", [])
             if attempts and len(attempts) > 1:
                 for att in attempts:
-                    att_preset = att.get("preset", chosen_preset)
+                    att_preset = att.get("preset", base_run.chosen_preset)
                     att_step = att.get("step", 1)
                     att_id = f"{norm_rel}:step_{att_step}"
-                    is_active = (att_preset == chosen_preset)
+                    is_active = (att_preset == base_run.chosen_preset)
 
                     att_conf = att.get("overall_confidence")
                     if att_conf is None:
-                        att_conf = overall_confidence if is_active else 1.0
+                        att_conf = base_run.overall_confidence if is_active else 1.0
 
-                    att_status = att.get("status") or (status if is_active else "ACCEPT")
+                    att_status = att.get("status") or (base_run.status if is_active else "ACCEPT")
 
                     att_viols = att.get("violations_count")
                     if att_viols is None:
-                        att_viols = violations_count if is_active else 0
+                        att_viols = base_run.violations_count if is_active else 0
 
                     att_page_conf = att.get("per_page_confidence")
                     if not att_page_conf:
-                        att_page_conf = per_page_conf if is_active else {}
+                        att_page_conf = base_run.per_page_confidence if is_active else {}
 
                     att_page_viols = att.get("per_page_violations")
                     if not att_page_viols:
-                        att_page_viols = per_page_viols if is_active else {}
+                        att_page_viols = base_run.per_page_violations if is_active else {}
+
                     conf_str = f"{float(att_conf):.4f}" if att_conf is not None else "1.0000"
                     att_label = (
-                        f"{doc_name} [{att_preset} (Step {att_step}) | "
+                        f"{base_run.document_name} [{att_preset} (Step {att_step}) | "
                         f"{att_status} {conf_str} | {att_viols} viols] ({norm_rel})"
                     )
 

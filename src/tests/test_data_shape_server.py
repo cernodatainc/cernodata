@@ -18,9 +18,9 @@ import urllib.parse
 
 from src.utils import mkdirs
 from src.pipeline.planner import PresetPlanner, DocumentPlan
-from src.pipeline.planner_server import (
-    DataShapeServer,
-    DataShapeHandler,
+from src.pipeline.server import (
+    PipelineViewerHandler,
+    PipelineViewerServer,
     find_available_port,
 )
 
@@ -73,7 +73,7 @@ class TestDataShapeServer(unittest.TestCase):
 
     def test_server_endpoints(self):
         port = find_available_port(start_port=9200, max_attempts=20)
-        httpd = DataShapeServer(("127.0.0.1", port), DataShapeHandler)
+        httpd = PipelineViewerServer(("127.0.0.1", port), PipelineViewerHandler)
         httpd.planner = self.planner
         httpd.default_doc = "sample_test.pdf"
         httpd.default_lang = "pl"

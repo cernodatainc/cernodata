@@ -17,21 +17,10 @@ from src.dom import BoundingBox, DOMNode, DocumentDOM
 logger = logging.getLogger("cernodata.docling_parser")
 from src.parsers.docling_helpers import (
     LANG_CODE_MAP,
-    fallback_top_left_bbox,
+    build_node_content,
     extract_page_no_and_bbox,
     resolve_node_type,
-    figure_caption,
-    resolve_raw_text,
-    build_node_content,
 )
-
-# Backwards compatibility re-exports
-_fallback_top_left_bbox = fallback_top_left_bbox
-_extract_page_no_and_bbox = extract_page_no_and_bbox
-_resolve_node_type = resolve_node_type
-_figure_caption = figure_caption
-_resolve_raw_text = resolve_raw_text
-_build_node_content = build_node_content
 
 HAS_DOCLING = False
 try:
@@ -176,3 +165,18 @@ class DoclingParser:
             total_pages = max(total_pages, page_no)
 
         return DocumentDOM(document_id=doc_id, source_filename=source_filename, total_pages=total_pages, nodes=nodes)
+
+
+# Backwards-compatible aliases for legacy test suites
+from src.parsers.docling_helpers import (
+    resolve_node_type as _resolve_node_type,
+    build_node_content as _build_node_content,
+    resolve_raw_text as _resolve_raw_text,
+)
+
+__all__ = [
+    "DoclingParser",
+    "_resolve_node_type",
+    "_build_node_content",
+    "_resolve_raw_text",
+]

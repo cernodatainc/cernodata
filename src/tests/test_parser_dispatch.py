@@ -8,14 +8,14 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.dom import DocumentDOM
-from src.pipeline.parser_adapters import (
+from src.pipeline.parsers.adapters import (
     DoclingPresetAdapter,
     ParserExecutionOptions,
     PyPdfiumPresetAdapter,
 )
-from src.pipeline.parser_registry import ParserPresetRegistry
-from src.pipeline.parser_dispatch import DocumentParserDispatcher
-from src.pipeline.planner_models import IngestionConfig
+from src.pipeline.parsers.registry import ParserPresetRegistry
+from src.pipeline.parsers.dispatch import DocumentParserDispatcher
+from src.pipeline.planner.models import IngestionConfig
 from src.pipeline.progress_notifier import PipelineProgressNotifier
 from src.pipeline.config_resolver import PipelineConfigResolver
 
@@ -72,7 +72,7 @@ class TestModularParserDispatch(unittest.TestCase):
         mock_registry.execute.return_value = mock_dom
 
         dispatcher = DocumentParserDispatcher(registry=mock_registry)
-        with patch("src.pipeline.parser_dispatch.resolve_pdf_path", return_value="dummy.pdf"), \
+        with patch("src.pipeline.parsers.dispatch.resolve_pdf_path", return_value="dummy.pdf"), \
              patch("os.path.exists", return_value=True):
             res = dispatcher.parse("dummy.pdf", preset="pypdfium_rapidocr")
             self.assertIs(res, mock_dom)

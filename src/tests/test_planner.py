@@ -9,8 +9,7 @@ import os
 import unittest
 from unittest.mock import patch
 from src.dom import DocumentDOM, DOMNode, BoundingBox
-from src.pipeline.planner import PresetPlanner, DocumentPlan
-from src.pipeline.planner_models import PlannerCriteria, IngestionConfig
+from src.pipeline.planner import PresetPlanner, DocumentPlan, PlannerCriteria, IngestionConfig
 from src.pipeline.orchestrator import run_pipeline
 
 
