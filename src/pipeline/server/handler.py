@@ -21,7 +21,7 @@ from src.pipeline.server.http_utils import (
     send_json_response,
     send_text_response,
 )
-from src.pipeline.server.routes_api import ApiRoutesMixin
+from src.pipeline.server.routes import ApiRoutesMixin
 from src.pipeline.server.routes_static import StaticRoutesMixin
 from src.pipeline.server.session import ServerSessionContext
 
