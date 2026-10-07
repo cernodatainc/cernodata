@@ -224,8 +224,29 @@ function renderRunsGrid(gridData) {
                 <td class="${overallScoreClass}">${overallStr}</td>
                 <td>${r.violations_count || 0}</td>
                 <td><span class="badge ${statusBadgeClass}">${escapeHtml(r.status || 'ACCEPT')}</span></td>
-                <td><button class="btn btn-sm btn-primary" onclick="choosePreviousRun('${escapeHtml(r.run_id || r.dir_path)}')">[LOAD] Load Run</button></td>
+                <td>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button class="btn btn-sm btn-primary" onclick="choosePreviousRun('${escapeHtml(r.run_id || r.dir_path)}')">[LOAD] Load Run</button>
+                        <button class="btn btn-sm btn-secondary" onclick="forceRerunGridRun('${escapeHtml(r.run_id || r.dir_path)}', '${escapeHtml(r.preset || 'docling_fast')}', '${escapeHtml(selectedFile)}')">[RERUN] Force Rerun</button>
+                    </div>
+                </td>
             </tr>
         `;
     }).join('');
 }
+
+/**
+ * Triggers forced pipeline re-evaluation bypassing cache for a run in the grid.
+ *
+ * @param {string} runId - Run identifier or directory path.
+ * @param {string} presetName - Preset identifier.
+ * @param {string} docName - Document filename.
+ */
+async function forceRerunGridRun(runId, presetName, docName) {
+    if (typeof triggerForceRerunPreset === 'function') {
+        await triggerForceRerunPreset(presetName, docName);
+    } else if (typeof triggerRerunWithPreset === 'function') {
+        await triggerRerunWithPreset(presetName);
+    }
+}
+

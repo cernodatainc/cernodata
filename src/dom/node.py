@@ -19,19 +19,40 @@ class DOMNode:
     content: Dict[str, Any] = field(default_factory=dict)
     template_hint_applied: Optional[str] = None
     violations: List[Dict[str, Any]] = field(default_factory=list)
+    is_merged: bool = False
+    merged_from: Optional[List[Dict[str, Any]]] = None
+    merged_at: Optional[str] = None
+    user_correction_note: Optional[str] = None
+    is_incorrect_text: Optional[bool] = None
+    ocr_confidence: Optional[float] = None
+    is_custom: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        res = {
+        res: Dict[str, Any] = {
             "node_id": self.node_id,
             "type": self.type,
             "global_page_index": self.global_page_index,
             "temp_slice_index": self.temp_slice_index,
             "bounding_box": self.bounding_box.to_dict(),
             "content": self.content,
-            "violations": self.violations
+            "violations": self.violations,
         }
         if self.template_hint_applied:
             res["template_hint_applied"] = self.template_hint_applied
+        if self.is_merged:
+            res["is_merged"] = self.is_merged
+        if self.merged_from:
+            res["merged_from"] = self.merged_from
+        if self.merged_at:
+            res["merged_at"] = self.merged_at
+        if self.user_correction_note:
+            res["user_correction_note"] = self.user_correction_note
+        if self.is_incorrect_text is not None:
+            res["is_incorrect_text"] = self.is_incorrect_text
+        if self.ocr_confidence is not None:
+            res["ocr_confidence"] = self.ocr_confidence
+        if self.is_custom:
+            res["is_custom"] = self.is_custom
         return res
 
     @classmethod
@@ -57,4 +78,12 @@ class DOMNode:
             content=dict(data.get("content", {})),
             template_hint_applied=data.get("template_hint_applied"),
             violations=list(data.get("violations", [])),
+            is_merged=bool(data.get("is_merged", False)),
+            merged_from=data.get("merged_from"),
+            merged_at=data.get("merged_at"),
+            user_correction_note=data.get("user_correction_note"),
+            is_incorrect_text=data.get("is_incorrect_text"),
+            ocr_confidence=data.get("ocr_confidence"),
+            is_custom=data.get("is_custom"),
         )
+

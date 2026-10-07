@@ -79,7 +79,8 @@ def build_viewer_html(
     plan_json: str,
     plan: Optional[Dict[str, Any]] = None,
     page_images: Optional[List[str]] = None,
-    page_dimensions: Optional[List[Dict[str, float]]] = None
+    page_dimensions: Optional[List[Dict[str, float]]] = None,
+    output_dir: Optional[str] = None
 ) -> str:
     """Assembles the interactive HTML application from template.html, viewer.css, and viewer.js."""
     template = load_viewer_asset("template.html")
@@ -121,6 +122,9 @@ def build_viewer_html(
     total_pages = dom.total_pages or len(page_images) or 1
     page_images_json = json.dumps(page_images)
     page_dimensions_json = json.dumps(page_dimensions or [])
+    pdf_source_file = json.dumps(dom.source_filename)
+    output_dir_json = json.dumps(output_dir or "output")
+    active_lang_json = json.dumps(active_lang)
 
     replacements = {
         "<!-- __VIEWER_CSS__ -->": css_content,
@@ -148,10 +152,11 @@ def build_viewer_html(
         "<!-- __DECISION_JSON__ -->": decision_json,
         "<!-- __DETECTED_LANGS_JSON__ -->": detected_langs_json,
         "<!-- __PLAN_JSON__ -->": plan_json,
-        "<!-- __PDF_SOURCE_FILE__ -->": json.dumps(dom.source_filename),
-        "<!-- __ACTIVE_LANG__ -->": json.dumps(active_lang),
+        "<!-- __PDF_SOURCE_FILE__ -->": pdf_source_file,
+        "<!-- __ACTIVE_LANG__ -->": active_lang_json,
         "<!-- __PAGE_IMAGES_JSON__ -->": page_images_json,
         "<!-- __PAGE_DIMENSIONS_JSON__ -->": page_dimensions_json,
+        "<!-- __OUTPUT_DIR_JSON__ -->": output_dir_json,
         "<!-- __VIEWER_JS__ -->": js_content,
     }
 

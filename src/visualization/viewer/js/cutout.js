@@ -375,6 +375,7 @@ async function triggerCutoutSecondPass(nodeId) {
         renderDOMTree();
         renderSelectedEditor();
         renderSVGOverlays();
+        await saveAnnotations(true);
 
         if (banner) {
             banner.className = 'status-banner';

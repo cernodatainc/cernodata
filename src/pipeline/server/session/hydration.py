@@ -44,13 +44,26 @@ class ViewerHydrationMixin:
         """Method stub implemented by RunLoaderMixin."""
         raise NotImplementedError
 
+    def get_previous_runs(self) -> List[Dict[str, Any]]:
+        """Method stub implemented by DocumentsMixin."""
+        raise NotImplementedError
+
     def get_results(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe retrieval of preset comparison results."""
         with self._lock:
             if output_dir and output_dir != self.output_dir:
                 self.load_previous_run(output_dir)
             elif not self.preset_attempts and not self.current_result:
-                self.load_previous_run(self.output_dir or "output")
+                target_to_load = self.output_dir or "output"
+                target_full = target_to_load if os.path.isabs(target_to_load) else os.path.join(self.repo_root, target_to_load)
+                if not os.path.exists(target_full):
+                    try:
+                        prev = self.get_previous_runs()
+                        if prev and prev[0].get("dir_path"):
+                            target_to_load = prev[0]["dir_path"]
+                    except Exception:
+                        pass
+                self.load_previous_run(target_to_load)
             v_list = normalize_violations(self.current_result.get("violations")) if self.current_result else []
             return {
                 "attempts": list(self.preset_attempts),
@@ -74,14 +87,29 @@ class ViewerHydrationMixin:
             target_full = target_dir if os.path.isabs(target_dir) else os.path.join(self.repo_root, target_dir)
 
             artifacts = load_run_artifacts(target_full)
-            dom_data = artifacts.dom or (self.current_result.get("dom") if self.current_result else None)
+            dom_data = artifacts.dom or (self.current_result.get("dom") if self.current_result and not output_dir else None)
             if not dom_data:
+                # If target directory is the unexecuted default 'output', attempt fallback to existing completed runs
+                if (not output_dir or output_dir == "output") and (self.output_dir == "output" or not self.output_dir):
+                    try:
+                        previous_runs = self.get_previous_runs()
+                        for prev_entry in previous_runs:
+                            prev_dir = prev_entry.get("dir_path")
+                            if prev_dir and prev_dir != "output":
+                                prev_full = prev_dir if os.path.isabs(prev_dir) else os.path.join(self.repo_root, prev_dir)
+                                prev_artifacts = load_run_artifacts(prev_full)
+                                if prev_artifacts.dom:
+                                    self.load_previous_run(prev_dir)
+                                    return self.get_viewer_data(output_dir=prev_dir)
+                    except Exception:
+                        pass
+
                 raise ValueError(
                     f"DocumentDOM artifact is missing or empty in run directory '{target_full}'. "
                     "Ensure pipeline has produced document_dom.json before hydrating viewer."
                 )
 
-            decision_data = artifacts.decision or (self.current_result.get("decision") if self.current_result else None)
+            decision_data = artifacts.decision or (self.current_result.get("decision") if self.current_result and not output_dir else None)
             if not decision_data:
                 raise ValueError(
                     f"Decision artifact is missing or empty in run directory '{target_full}'. "

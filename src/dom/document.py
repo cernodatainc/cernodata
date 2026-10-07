@@ -6,6 +6,7 @@ DocumentDOM tree container primitive.
 
 import os
 import json
+import datetime
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from src.dom.bounding_box import BoundingBox
@@ -128,6 +129,9 @@ class DocumentDOM:
             bounding_box=merged_bbox,
             content=merged_content,
             violations=merged_violations,
+            is_merged=True,
+            merged_from=[upper.to_dict(), lower.to_dict()],
+            merged_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
 
         new_nodes: List[DOMNode] = []

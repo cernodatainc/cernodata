@@ -1056,14 +1056,7 @@ select.type-filter {
     color: #FFF;
 }
 
-.toggle-group-bordered {
-    border-left: 1px solid var(--border-color);
-    padding-left: 10px;
-}
 
-.toggle-corrections-label {
-    color: #69F0AE;
-}
 
 .lang-controls-group {
     display: flex;
@@ -1076,6 +1069,17 @@ select.type-filter {
 .action-btn-draw-section {
     background: linear-gradient(135deg, #059669 0%, #10B981 100%);
     color: #FFF;
+}
+
+.action-btn-draw-section-sm {
+    font-size: 10px;
+    padding: 3px 8px;
+    background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+    color: #FFF;
+}
+
+.svg-overlay.draw-section-active * {
+    pointer-events: none;
 }
 
 .action-btn-decollide {

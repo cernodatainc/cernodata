@@ -2,15 +2,7 @@
 src/tests/test_pipeline_server.py
 
 Unit and integration tests for the unified pipeline HTTP server (src/pipeline/server.py).
-Tests:
-- Thin landing page serving and section navigation
-- Un-templated HTML viewer serving and static asset delivery (CSS, JS)
-- Backend hydration via /api/viewer_data
-- Real-time progress monitoring via /api/progress
-- Preset comparison results via /api/results
-- Document discovery via /api/documents
-- Pipeline configuration and score calculation APIs
-- DOM saving and updates via /api/save_dom
+Validates landing page, HTML viewer, /api/viewer_data hydration, progress, and preset execution.
 """
 
 from __future__ import annotations
@@ -21,10 +13,10 @@ import re
 import threading
 import time
 import unittest
-import urllib.request
 import urllib.parse
+import urllib.request
 from http.server import HTTPServer
-from typing import Dict, Any
+from typing import Any, Dict
 
 from src.pipeline.server import (
     PipelineViewerHandler,
@@ -276,15 +268,11 @@ class TestPipelineServer(unittest.TestCase):
             "document_id": "test_save_doc",
             "source_filename": "test.pdf",
             "total_pages": 1,
-            "nodes": [
-                {
-                    "node_id": "node_1",
-                    "page_number": 1,
-                    "type": "text",
-                    "text": "Saved text",
-                    "bbox": [10.0, 10.0, 100.0, 50.0],
-                }
-            ],
+            "nodes": [{
+                "node_id": "node_1", "page_number": 1, "type": "text", "text": "Saved text",
+                "bbox": [10.0, 10.0, 100.0, 50.0], "is_merged": True,
+                "merged_from": [{"node_id": "orig_1"}, {"node_id": "orig_2"}], "is_custom": True,
+            }],
         }
         raw_dom_payload = dict(dom_payload)
         diff_payload = {
@@ -324,6 +312,11 @@ class TestPipelineServer(unittest.TestCase):
         self.assertTrue(resp.get("success"))
         self.assertIn("path", resp)
         self.assertTrue(os.path.exists(resp["path"]))
+        with open(resp["path"], "r", encoding="utf-8") as f:
+            saved_dom = json.load(f)
+        self.assertTrue(saved_dom["nodes"][0]["is_merged"])
+        self.assertEqual(len(saved_dom["nodes"][0]["merged_from"]), 2)
+        self.assertTrue(saved_dom["nodes"][0]["is_custom"])
 
         raw_path = os.path.join("test_output_save", "raw_document_dom.json")
         diff_path = os.path.join("test_output_save", "run_diff.json")
@@ -409,6 +402,12 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIsInstance(v_data["violations"], list)
         self.assertIn("decision", v_data)
         self.assertEqual(v_data.get("outputDir"), "output")
+
+        # Query viewer_data with nonexistent output directory returns 404 JSON gracefully
+        status_404, content_404, _ = self._get("/api/viewer_data?output_dir=nonexistent_test_dir_12345")
+        self.assertEqual(status_404, 404)
+        err_data = json.loads(content_404)
+        self.assertIn("error", err_data)
 
     def test_previous_run_page_dimensions_accurate(self) -> None:
         # Load run and check that page dimensions match true A4 coordinates (595.28 x 841.89)

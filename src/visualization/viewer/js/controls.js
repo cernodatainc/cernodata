@@ -227,14 +227,7 @@ function updateLayers() {
     document.getElementById('scoreBadge').style.display = showScore ? 'block' : 'none';
 }
 
-/**
- * Toggles global correction preview mode.
- */
-function toggleAllCorrections() {
-    appliedCorrections = document.getElementById('toggleCorrections').checked;
-    renderDOMTree();
-    renderSVGOverlays();
-}
+
 
 /**
  * Switches the active sidebar tab and updates panel contents.
@@ -364,6 +357,9 @@ function renderViewerRunsGrid(gridData) {
                 ${pageCells}
                 <td class="${overallCls}">${overall}</td>
                 <td><span class="badge-status ${isAccept ? 'pass' : 'fail'}" style="font-size:10px;">${escapeHtml(r.status)}</span></td>
+                <td>
+                    <button class="action-btn" style="padding:2px 8px; font-size:10px; margin:0; white-space:nowrap;" onclick="forceRerunFromViewerGrid('${escapeHtml(r.preset)}', '${escapeHtml(selFile || '')}')">[RERUN] Force Rerun</button>
+                </td>
             </tr>
         `;
     }).join('');
@@ -377,6 +373,7 @@ function renderViewerRunsGrid(gridData) {
                         ${pageHeaders}
                         <th>Overall</th>
                         <th>Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -433,6 +430,9 @@ function renderViewerRunsGridFallback() {
                 ${pageCells}
                 <td class="${overallCls}">${overall}</td>
                 <td><span class="badge-status ${isAccept ? 'pass' : 'fail'}" style="font-size:10px;">${escapeHtml(att.status || 'ACCEPT')}</span></td>
+                <td>
+                    <button class="action-btn" style="padding:2px 8px; font-size:10px; margin:0; white-space:nowrap;" onclick="forceRerunFromViewerGrid('${escapeHtml(att.preset || 'docling_fast')}')">[RERUN] Force Rerun</button>
+                </td>
             </tr>
         `;
     }).join('');
@@ -446,6 +446,7 @@ function renderViewerRunsGridFallback() {
                         ${pageHeaders}
                         <th>Overall</th>
                         <th>Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -89,9 +89,11 @@ function toggleDrawSectionMode() {
     const btn = document.getElementById('btnDrawSection');
     const visualPane = document.getElementById('visualPane');
     const banner = document.getElementById('statusBanner');
+    const svg = document.getElementById('svgOverlay');
     if (isDrawSectionMode) {
         if (btn) btn.classList.add('active');
         if (visualPane) visualPane.style.cursor = 'crosshair';
+        if (svg) svg.classList.add('draw-section-active');
         if (banner) {
             banner.className = 'status-banner';
             banner.style.display = 'block';
@@ -100,6 +102,7 @@ function toggleDrawSectionMode() {
     } else {
         if (btn) btn.classList.remove('active');
         if (visualPane) visualPane.style.cursor = 'default';
+        if (svg) svg.classList.remove('draw-section-active');
         if (banner) banner.style.display = 'none';
         if (drawRectEl && drawRectEl.parentNode) {
             drawRectEl.parentNode.removeChild(drawRectEl);
@@ -122,7 +125,7 @@ function renderSVGOverlays() {
         }
     };
     svg.onmousedown = (e) => {
-        if (isDrawSectionMode && (e.target === svg || e.target.id === 'pageImg')) {
+        if (isDrawSectionMode) {
             e.preventDefault();
             e.stopPropagation();
             drawStartPt = getSvgCoordinates(e);
@@ -153,7 +156,7 @@ function renderSVGOverlays() {
         const viols = getViolationsList();
         const nodeViols = viols.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
         const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v));
-        const hasViol = hasUnfixedViol && !appliedCorrections && activePresetIndex === 0;
+        const hasViol = hasUnfixedViol && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
 
@@ -169,8 +172,15 @@ function renderSVGOverlays() {
                 class: classNames.join(' '),
                 id: `svg-${node.node_id}`
             });
-            poly.onmousedown = (e) => onPolygonMouseDown(e, node.node_id);
-            poly.onclick = (e) => { e.stopPropagation(); handleNodeClick(e, node.node_id); };
+            poly.onmousedown = (e) => {
+                if (isDrawSectionMode) return;
+                onPolygonMouseDown(e, node.node_id);
+            };
+            poly.onclick = (e) => {
+                if (isDrawSectionMode) return;
+                e.stopPropagation();
+                handleNodeClick(e, node.node_id);
+            };
             svg.appendChild(poly);
 
             if (isSelected) {
@@ -199,7 +209,7 @@ function renderSVGOverlays() {
         if ((showViol || isSelected) && nodeViols.length > 0) {
             nodeViols.forEach((viol, vIdx) => {
                 const g = createSvgElem('g', {});
-                const isFixed = !!viol.is_fixed || !!node.is_fixed || appliedCorrections || activePresetIndex === 1;
+                const isFixed = !!viol.is_fixed || !!node.is_fixed || activePresetIndex === 1;
                 const labelText = isFixed
                     ? `[FIXED] '${viol.detected_snippet}' -> '${viol.suggested_correction || ''}'`
                     : `[!] VIOLATION: '${viol.detected_snippet}' -> '${viol.suggested_correction || ''}'`;
@@ -339,6 +349,7 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
  * @param {string} nodeId - Identifier of target DOM node.
  */
 function onPolygonMouseDown(evt, nodeId) {
+    if (isDrawSectionMode) return;
     if (!selectedNodeIds.includes(nodeId)) return;
     evt.stopPropagation();
     const node = domData.nodes.find(n => n.node_id === nodeId);

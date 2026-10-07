@@ -44,8 +44,8 @@ let showAllDomNodes = false;
 let showAllViolations = false;
 
 let activePresetIndex = 0;
-let appliedCorrections = false;
 let activeLanguage = (window.VIEWER_DATA && window.VIEWER_DATA.activeLanguage) ? window.VIEWER_DATA.activeLanguage : "en";
+let outputDir = (window.VIEWER_DATA && window.VIEWER_DATA.outputDir) ? window.VIEWER_DATA.outputDir : "output";
 let selectedNodeId = null;
 let selectedNodeIds = [];
 let isCutoutUnskewed = false;
@@ -509,9 +509,12 @@ function hydrateViewer(data, pageNum = null) {
     pageDimensions = data.pageDimensions || [];
     totalPages = data.totalPages || pageImages.length || 1;
     activeLanguage = data.activeLanguage || "en";
+    if (data.outputDir) {
+        outputDir = data.outputDir;
+    }
 
     // Preserve pristine raw result alongside working state
-    rawDomData = JSON.parse(JSON.stringify(initialDomData));
+    rawDomData = (data.raw_dom && data.raw_dom.nodes) ? JSON.parse(JSON.stringify(data.raw_dom)) : JSON.parse(JSON.stringify(initialDomData));
     rawViolationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
     rawDecisionData = JSON.parse(JSON.stringify(initialDecisionData));
 

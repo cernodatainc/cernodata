@@ -88,6 +88,9 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("acceptCategoryOnPage", content)
             self.assertIn("restoreCategoryOnPage", content)
             self.assertIn("toggleSuppressSingleViolation", content)
+            self.assertIn("forceRerunFromViewerGrid", content)
+            self.assertNotIn("btnRedoLang", content)
+            self.assertNotIn("toggleCorrections", content)
 
         if os.path.exists(out_path):
             os.remove(out_path)

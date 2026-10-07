@@ -75,6 +75,45 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
         if isinstance(decision_data, dict) and "attempts" in decision_data:
             self.session.preset_attempts = list(decision_data["attempts"])
 
+        # Keep server-side preset cache synchronized with saved DOM
+        if self.session.current_result:
+            pdf_path = self.session.pdf_path or dom_data.get("source_filename") or ""
+            chosen_preset = (
+                (decision_data.get("chosen_preset") if isinstance(decision_data, dict) else None)
+                or (self.session.current_result.get("decision", {}).get("chosen_preset") if isinstance(self.session.current_result.get("decision"), dict) else None)
+                or "docling_fast"
+            )
+            self.session._preset_cache.put(
+                pdf_path=pdf_path,
+                preset=chosen_preset,
+                result=self.session.current_result,
+                language=self.session.language,
+            )
+
+        # Update interactive_viewer.html on disk if it exists in the output directory
+        html_candidates = [os.path.join(output_dir, "interactive_viewer.html")]
+        if hasattr(self.session, "repo_root") and self.session.repo_root:
+            html_candidates.append(os.path.join(self.session.repo_root, output_dir, "interactive_viewer.html"))
+        for h_path in html_candidates:
+            if os.path.exists(h_path):
+                try:
+                    with open(h_path, "r", encoding="utf-8") as f:
+                        h_content = f.read()
+                    import re
+                    dom_str = json.dumps(dom_data)
+                    new_h = re.sub(
+                        r"(window\.VIEWER_DATA\s*=\s*\{[\s\S]*?dom:\s*)(?:\{[\s\S]*?\}|null)(\s*,\s*(?:raw_dom|violations):)",
+                        lambda m: f"{m.group(1)}{dom_str}{m.group(2)}",
+                        h_content,
+                        count=1,
+                    )
+                    if new_h != h_content:
+                        with open(h_path, "w", encoding="utf-8") as f:
+                            f.write(new_h)
+                except Exception as exc:
+                    print(f"\n[SERVER API] Note: Could not update interactive_viewer.html: {exc}")
+
         nodes_len = len(dom_data.get("nodes", [])) if isinstance(dom_data, dict) else 0
         print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({nodes_len} nodes).")
         send_json_response(self, 200, {"success": True, "path": dom_file})  # type: ignore[arg-type]
+

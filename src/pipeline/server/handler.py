@@ -165,9 +165,15 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
         elif raw_path == "/api/config":
             self._handle_api_config()
         elif raw_path in ("/api/previous_runs", "/api/runs"):
+            runs = self.session.get_previous_runs()
+            active_run = self.session.output_dir
+            if (active_run == "output" or not active_run) and runs:
+                target_full = os.path.join(self.session.repo_root, "output")
+                if not os.path.exists(target_full) and runs[0].get("dir_path"):
+                    active_run = str(runs[0]["dir_path"])
             send_json_response(self, 200, {
-                "runs": self.session.get_previous_runs(),
-                "active_run": self.session.output_dir,
+                "runs": runs,
+                "active_run": active_run,
             })
         elif raw_path == "/api/load_run":
             self._handle_load_run(query_params.get("output_dir", [""])[0])
@@ -177,10 +183,22 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             send_json_response(self, 200, self.session.get_progress())
         elif raw_path == "/api/results":
             res_target_dir: Optional[str] = query_params.get("output_dir", [""])[0] or None
-            send_json_response(self, 200, self.session.get_results(output_dir=res_target_dir))
+            try:
+                send_json_response(self, 200, self.session.get_results(output_dir=res_target_dir))
+            except Exception as e:
+                logger.warning("Results retrieval failed for '%s': %s", res_target_dir, e)
+                send_json_response(self, 500, {"error": str(e), "attempts": [], "decision": None, "violations": []})
         elif raw_path == "/api/viewer_data":
             v_target_dir: Optional[str] = query_params.get("output_dir", [""])[0] or None
-            send_json_response(self, 200, self.session.get_viewer_data(output_dir=v_target_dir))
+            try:
+                viewer_data = self.session.get_viewer_data(output_dir=v_target_dir)
+                send_json_response(self, 200, viewer_data)
+            except (ValueError, FileNotFoundError) as e:
+                logger.info("Viewer data unavailable for '%s': %s", v_target_dir or self.session.output_dir, e)
+                send_json_response(self, 404, {"error": str(e), "viewer_data": None})
+            except Exception as e:
+                logger.error("Unexpected error retrieving viewer data: %s", e)
+                send_json_response(self, 500, {"error": str(e)})
         elif raw_path == "/api/runs_grid":
             target_doc: Optional[str] = (
                 query_params.get("document", [""])[0]
@@ -193,22 +211,25 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
 
     def do_POST(self) -> None:
         """Dispatches POST requests with parsed JSON payloads to execution handlers."""
+        parsed_url = urlparse(self.path)
+        raw_path = parsed_url.path
         payload = read_json_payload(self)
 
-        if self.path == "/api/load_run":
+        if raw_path == "/api/load_run":
             target_dir = payload.get("output_dir") or payload.get("run_id") or "output"
             self._handle_load_run(target_dir)
-        elif self.path == "/api/run":
+        elif raw_path == "/api/run":
             self._handle_post_run(payload)
-        elif self.path == "/api/rerun":
+        elif raw_path == "/api/rerun":
             self._handle_post_rerun(payload)
-        elif self.path == "/api/calculate_scores":
+        elif raw_path == "/api/calculate_scores":
             self._handle_post_calculate_scores(payload)
-        elif self.path == "/api/submit_plan":
+        elif raw_path == "/api/submit_plan":
             self._handle_post_submit_plan(payload)
-        elif self.path == "/api/save_dom":
+        elif raw_path == "/api/save_dom":
             self._handle_post_save_dom(payload)
-        elif self.path in ("/api/parse_section_ocr", "/api/ocr_section"):
+        elif raw_path in ("/api/parse_section_ocr", "/api/ocr_section"):
             self._handle_post_parse_ocr(payload)
         else:
-            self.send_error(404, "Endpoint not found")
+            self.send_error(404, f"Endpoint not found: {raw_path}")
+

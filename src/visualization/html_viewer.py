@@ -66,6 +66,7 @@ def generate_interactive_html(
         plan=plan,
         page_images=page_images,
         page_dimensions=page_dimensions,
+        output_dir=os.path.dirname(output_path) or "output",
     )
 
     with open(output_path, "w", encoding="utf-8") as f:

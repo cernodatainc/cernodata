@@ -102,7 +102,7 @@ function onMergeConfigChanged() {
 /**
  * Handles UI trigger to merge the 2 currently selected DOM nodes.
  */
-function executeMergeElements() {
+async function executeMergeElements() {
     if (selectedNodeIds.length !== 2) return;
     const n1 = selectedNodeIds[0];
     const n2 = selectedNodeIds[1];
@@ -115,7 +115,7 @@ function executeMergeElements() {
     const contentAction = actionEl ? actionEl.value : 'concat';
     const mergedText = textEl ? textEl.value : null;
 
-    mergeDOMNodes(n1, n2, { targetType, contentAction, mergedText });
+    await mergeDOMNodes(n1, n2, { targetType, contentAction, mergedText });
 }
 
 /**
@@ -125,9 +125,9 @@ function executeMergeElements() {
  * @param {string} nodeId1 - First node identifier.
  * @param {string} nodeId2 - Second node identifier.
  * @param {Object} [options={}] - Options specifying targetType, contentAction, and custom mergedText.
- * @returns {Object|null} Consolidated upper node object or null on failure.
+ * @returns {Promise<Object|null>} Consolidated upper node object or null on failure.
  */
-function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
+async function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     const n1 = domData.nodes.find(n => n.node_id === nodeId1);
     const n2 = domData.nodes.find(n => n.node_id === nodeId2);
     if (!n1 || !n2) return null;
@@ -211,7 +211,7 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     renderSVGOverlays();
 
     if (typeof saveAnnotations === 'function') {
-        saveAnnotations(true);
+        await saveAnnotations(true);
     }
 
     const banner = document.getElementById('statusBanner');
@@ -229,9 +229,9 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
  * and re-associating their violations.
  *
  * @param {string} nodeId - Consolidated node ID to unmerge.
- * @returns {Array<Object>|null} Array of restored component nodes or null on failure.
+ * @returns {Promise<Array<Object>|null>} Array of restored component nodes or null on failure.
  */
-function unmergeDOMNode(nodeId) {
+async function unmergeDOMNode(nodeId) {
     if (!domData || !domData.nodes) return null;
     const target = domData.nodes.find(n => n.node_id === nodeId);
     if (!target || !target.merged_from || !Array.isArray(target.merged_from) || target.merged_from.length === 0) {
@@ -272,7 +272,7 @@ function unmergeDOMNode(nodeId) {
     renderSVGOverlays();
 
     if (typeof saveAnnotations === 'function') {
-        saveAnnotations(true);
+        await saveAnnotations(true);
     }
 
     const banner = document.getElementById('statusBanner');

@@ -30,25 +30,39 @@ function saveCurrentPresetToClientCache() {
 }
 
 /**
- * Handles language selection dropdown change event and notifies user.
+ * Handles language selection dropdown change event and updates active language.
  */
 function onLanguageChanged() {
     const sel = document.getElementById('selectLanguage').value;
+    activeLanguage = (sel === 'auto') ? (primaryDetectedLanguage || 'en') : sel;
     const banner = document.getElementById('statusBanner');
     if (banner) {
         banner.style.display = 'block';
-        banner.textContent = `[INFO] Language override selected: '${sel}'. Click '[REDO] Redo Run' to re-evaluate with this language.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+        banner.textContent = `[INFO] Language override set to '${sel}'.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 3000);
     }
 }
 
 /**
- * Re-executes or simulates pipeline processing for currently selected language.
+ * Forces pipeline re-evaluation bypassing cache for a preset from the Runs Grid.
+ *
+ * @param {string} presetName - Target pipeline preset.
+ * @param {string|null} [docName=null] - Optional document filename.
  */
-async function redoWithSelectedLanguage() {
-    const selectedLang = document.getElementById('selectLanguage').value;
-    const presetName = (activePresetIndex === 1) ? 'docling_deep' : 'docling_fast';
-    await rerunBackendPipeline(presetName, selectedLang);
+async function forceRerunFromViewerGrid(presetName, docName = null) {
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = `[FORCE RERUN] Initiating forced re-evaluation for preset '${presetName}'...`;
+    }
+    const targetDoc = docName || (domData && domData.source_filename) || pdfSourceFile || '';
+    if (targetDoc && !pdfSourceFile) {
+        pdfSourceFile = targetDoc;
+    }
+    await rerunBackendPipeline(presetName, activeLanguage, true);
+    if (typeof loadViewerRunsGrid === 'function') {
+        loadViewerRunsGrid();
+    }
 }
 
 /**
@@ -57,13 +71,14 @@ async function redoWithSelectedLanguage() {
  *
  * @param {string} presetName - Target pipeline preset ('docling_fast', 'docling_deep').
  * @param {string|null} [langOverride=null] - Optional language code override.
+ * @param {boolean} [force=false] - Whether to bypass preset cache and force live re-evaluation.
  */
-async function rerunBackendPipeline(presetName, langOverride = null) {
-    if (typeof saveCurrentPresetToClientCache === 'function') {
+async function rerunBackendPipeline(presetName, langOverride = null, force = false) {
+    if (!force && typeof saveCurrentPresetToClientCache === 'function') {
         saveCurrentPresetToClientCache();
     }
     const targetLang = langOverride || (document.getElementById('selectLanguage') ? document.getElementById('selectLanguage').value : null) || activeLanguage;
-    const clientCached = window.presetCache[`${presetName}:${targetLang}`] || (!langOverride ? window.presetCache[presetName] : null);
+    const clientCached = !force && (window.presetCache[`${presetName}:${targetLang}`] || (!langOverride ? window.presetCache[presetName] : null));
 
     if (clientCached) {
         domData = JSON.parse(JSON.stringify(clientCached.dom));
@@ -86,14 +101,15 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
     const banner = document.getElementById('statusBanner');
     if (banner) {
         banner.style.display = 'block';
-        banner.textContent = `[RUNNING] Running backend pipeline for preset '${presetName}' with language '${targetLang}'...`;
+        const prefix = force ? '[FORCE RERUN]' : '[RUNNING]';
+        banner.textContent = `${prefix} Running backend pipeline for preset '${presetName}' with language '${targetLang}'...`;
     }
 
     try {
         const res = await fetch('/api/rerun', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ preset: presetName, language: targetLang, pdf_path: pdfSourceFile })
+            body: JSON.stringify({ preset: presetName, language: targetLang, pdf_path: pdfSourceFile, force: force, force_rerun: force })
         });
 
         if (res.ok) {
@@ -138,8 +154,8 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
             return basePageScore;
         } else if (simTargetLang === 'pl') {
             const viols = getViolationsList();
-            const hasDiacriticViolations = viols.some(v => v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution');
-            if (hasDiacriticViolations && !appliedCorrections) {
+            const hasDiacriticViolations = viols.some(v => (v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution') && !v.is_fixed && !isSuppressed(v));
+            if (hasDiacriticViolations) {
                 return (initialDecisionData.attempts && initialDecisionData.attempts[0])
                     ? (initialDecisionData.attempts[0].overall_confidence || 0.5324)
                     : 0.5324;
@@ -251,9 +267,6 @@ function updatePresetUIState() {
             st2.textContent = 'ACTIVE (PASSED)';
             st2.style.background = 'var(--accent-green)';
             st2.style.color = '#000';
-            appliedCorrections = true;
-            const togCorr = document.getElementById('toggleCorrections');
-            if (togCorr) togCorr.checked = true;
         } else {
             st2.textContent = 'Candidate';
             st2.style.background = '#4B5563';
@@ -297,6 +310,52 @@ async function saveAnnotations(quiet = false) {
         ? outputDir
         : ((window.VIEWER_DATA && window.VIEWER_DATA.outputDir) || 'output');
     const cleanOutDir = outDir.split(':step_')[0];
+    function updateAllClientCaches() {
+        if (typeof saveCurrentPresetToClientCache === 'function') {
+            saveCurrentPresetToClientCache();
+        }
+        if (window.VIEWER_DATA) {
+            window.VIEWER_DATA.dom = JSON.parse(JSON.stringify(domData));
+            window.VIEWER_DATA.violations = JSON.parse(JSON.stringify(violationsData));
+            window.VIEWER_DATA.decision = JSON.parse(JSON.stringify(decisionData));
+            window.VIEWER_DATA.diff = diffPayload;
+            window.VIEWER_DATA.outputDir = cleanOutDir;
+        }
+        initialDomData = JSON.parse(JSON.stringify(domData));
+        initialViolationsData = extractViolationsList(JSON.parse(JSON.stringify(violationsData)));
+        initialDecisionData = JSON.parse(JSON.stringify(decisionData));
+
+        if (window.parent && window.parent.runResultsCache) {
+            const keysToUpdate = [
+                cleanOutDir,
+                outDir,
+                cleanOutDir.replace(/\\/g, '/'),
+                outDir.replace(/\\/g, '/'),
+                cleanOutDir.replace(/\//g, '\\'),
+                outDir.replace(/\//g, '\\')
+            ];
+            keysToUpdate.forEach(k => {
+                const c = window.parent.runResultsCache[k];
+                if (c) {
+                    c.dom = JSON.parse(JSON.stringify(domData));
+                    c.violations = JSON.parse(JSON.stringify(violationsData));
+                    c.decision = JSON.parse(JSON.stringify(decisionData));
+                    c.diff = diffPayload;
+                }
+            });
+            Object.values(window.parent.runResultsCache).forEach(entry => {
+                if (entry && (entry.outputDir === cleanOutDir || entry.outputDir === outDir)) {
+                    entry.dom = JSON.parse(JSON.stringify(domData));
+                    entry.violations = JSON.parse(JSON.stringify(violationsData));
+                    entry.decision = JSON.parse(JSON.stringify(decisionData));
+                    entry.diff = diffPayload;
+                }
+            });
+        }
+    }
+
+    updateAllClientCaches();
+
     try {
         const res = await fetch('/api/save_dom', {
             method: 'POST',
@@ -312,18 +371,7 @@ async function saveAnnotations(quiet = false) {
         });
         if (res.ok) {
             const data = await res.json();
-            if (typeof saveCurrentPresetToClientCache === 'function') {
-                saveCurrentPresetToClientCache();
-            }
-            if (window.parent && window.parent.runResultsCache) {
-                const parentCache = window.parent.runResultsCache[cleanOutDir] || window.parent.runResultsCache[outDir];
-                if (parentCache) {
-                    parentCache.dom = JSON.parse(JSON.stringify(domData));
-                    parentCache.violations = JSON.parse(JSON.stringify(violationsData));
-                    parentCache.decision = JSON.parse(JSON.stringify(decisionData));
-                    parentCache.diff = diffPayload;
-                }
-            }
+            updateAllClientCaches();
             if (!quiet && banner) {
                 banner.textContent = `[OK] Annotations saved successfully to '${data.path}'.`;
                 setTimeout(() => { banner.style.display = 'none'; }, 4000);
@@ -382,9 +430,6 @@ function revertToRawResult() {
     violationsData = extractViolationsList(JSON.parse(JSON.stringify(rawViolationsData)));
     decisionData = JSON.parse(JSON.stringify(rawDecisionData));
     ensureViolationIds();
-    appliedCorrections = false;
-    const togCorr = document.getElementById('toggleCorrections');
-    if (togCorr) togCorr.checked = false;
 
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();

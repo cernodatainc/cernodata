@@ -82,6 +82,9 @@ class TestDOMPrimitives(unittest.TestCase):
         self.assertEqual(merged.bounding_box.x0, 10.0)
         self.assertEqual(merged.bounding_box.y0, 10.0)
         self.assertEqual(merged.bounding_box.y1, 90.0)
+        self.assertTrue(merged.is_merged)
+        self.assertEqual(len(merged.merged_from), 2)
+        self.assertIsNotNone(merged.merged_at)
 
     def test_merge_nodes_different_types_with_user_selection(self):
         n1 = DOMNode(
@@ -220,6 +223,41 @@ class TestDOMPrimitives(unittest.TestCase):
             self.assertEqual(loaded.document_id, "doc_save")
             self.assertEqual(len(loaded.nodes), 1)
             self.assertEqual(loaded.nodes[0].content["raw_text"], "Persisted line.")
+
+    def test_merged_and_custom_node_serialization_persistence(self):
+        import tempfile
+        merged_node = DOMNode(
+            node_id="merged_1",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(5, 5, 50, 50),
+            content={"raw_text": "Combined text"},
+            is_merged=True,
+            merged_from=[{"node_id": "p1"}, {"node_id": "p2"}],
+            merged_at="2026-10-08T00:00:00Z",
+            user_correction_note="User note",
+            is_incorrect_text=False,
+            ocr_confidence=0.97,
+            is_custom=True,
+        )
+        dom = DocumentDOM(document_id="doc_merged_persist", source_filename="test.pdf", total_pages=1, nodes=[merged_node])
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_path = os.path.join(tmp_dir, "dom_merged.json")
+            dom.save(file_path)
+            self.assertTrue(os.path.exists(file_path))
+
+            loaded = DocumentDOM.load(file_path)
+            self.assertEqual(len(loaded.nodes), 1)
+            n = loaded.nodes[0]
+            self.assertTrue(n.is_merged)
+            self.assertEqual(len(n.merged_from), 2)
+            self.assertEqual(n.merged_at, "2026-10-08T00:00:00Z")
+            self.assertEqual(n.user_correction_note, "User note")
+            self.assertFalse(n.is_incorrect_text)
+            self.assertEqual(n.ocr_confidence, 0.97)
+            self.assertTrue(n.is_custom)
 
     def test_dom_enums(self):
         self.assertEqual(DOMNodeType.PARAGRAPH, "paragraph")

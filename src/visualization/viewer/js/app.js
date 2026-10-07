@@ -110,11 +110,15 @@ window.addEventListener('mouseup', (evt) => {
                 content: {
                     raw_text: ''
                 },
-                user_correction_note: ''
+                user_correction_note: '',
+                is_custom: true
             };
             domData.nodes.push(newNode);
             toggleDrawSectionMode();
+            renderDOMTree();
+            renderSVGOverlays();
             handleNodeClick(null, newNodeId);
+            saveAnnotations(true);
             // Proactively trigger OCR for newly drawn section
             triggerCutoutSecondPass(newNodeId);
             return;

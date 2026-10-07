@@ -62,6 +62,8 @@ class RunLoaderMixin:
             full_dir = norm_rel if os.path.isabs(norm_rel) else os.path.join(self.repo_root, norm_rel)
             if not os.path.exists(full_dir):
                 logger.warning("Requested output directory does not exist: %s", full_dir)
+                self.current_result = None
+                self.preset_attempts = []
                 return {}
 
             artifacts = load_run_artifacts(full_dir)
@@ -81,7 +83,7 @@ class RunLoaderMixin:
                 except Exception as e:
                     logger.warning("Could not parse DocumentPlan from %s: %s", norm_rel, e)
 
-            if dom_dict.get("source_filename"):
+            if dom_dict and dom_dict.get("source_filename"):
                 candidate_pdf_names.append(str(dom_dict["source_filename"]))
 
             found_pdf = False

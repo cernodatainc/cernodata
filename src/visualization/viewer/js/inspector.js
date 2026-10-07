@@ -115,7 +115,7 @@ function renderSelectedEditor() {
 
     const viols = getViolationsList();
     const nodeViols = viols.filter(v => v.node_id === node.node_id);
-    const violationsHtml = renderNodeViolationsComponent(nodeViols, node, appliedCorrections, activePresetIndex);
+    const violationsHtml = renderNodeViolationsComponent(nodeViols, node, activePresetIndex);
 
     container.innerHTML = renderSingleNodeEditorComponent(node, {
         bbox,
@@ -197,6 +197,37 @@ function updateCorrectionNote(nodeId, text) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
     node.user_correction_note = text;
+    if (node.content) {
+        node.content.raw_text = text;
+    } else {
+        node.content = { raw_text: text };
+    }
+    renderDOMTree();
+}
+
+/**
+ * Deletes a DOM node, updates the DOM tree and SVG overlays, and persists changes.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
+async function deleteDOMNode(nodeId) {
+    if (!domData || !domData.nodes) return;
+    const idx = domData.nodes.findIndex(n => n.node_id === nodeId);
+    if (idx === -1) return;
+    domData.nodes.splice(idx, 1);
+    clearSelection();
+    renderDOMTree();
+    renderSVGOverlays();
+    if (typeof saveAnnotations === 'function') {
+        await saveAnnotations(true);
+    }
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = `[OK] Deleted element '${nodeId}'. Persisted.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    }
 }
 
 /**
@@ -234,7 +265,7 @@ function renderDOMTree() {
         let displayText = (node.content && node.content.raw_text) ? node.content.raw_text : '';
         let isFixed = !!node.is_fixed;
 
-        if (appliedCorrections || activePresetIndex === 1) {
+        if (activePresetIndex === 1) {
             const corrected = applyCorrectionsToNodeText(displayText);
             if (corrected !== displayText) {
                 displayText = corrected;

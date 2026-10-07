@@ -50,6 +50,13 @@ class DOMNodeSchema(BaseModel):
     content: Dict[str, Any] = Field(default_factory=dict)
     template_hint_applied: Optional[str] = None
     violations: List[Dict[str, Any]] = Field(default_factory=list)
+    is_merged: bool = False
+    merged_from: Optional[List[Dict[str, Any]]] = None
+    merged_at: Optional[str] = None
+    user_correction_note: Optional[str] = None
+    is_incorrect_text: Optional[bool] = None
+    ocr_confidence: Optional[float] = None
+    is_custom: Optional[bool] = None
 
     @model_validator(mode="before")
     @classmethod

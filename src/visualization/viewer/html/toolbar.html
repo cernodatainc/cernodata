@@ -19,10 +19,6 @@
         <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality Violations</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
         <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score Badge</label></div>
-        <div class="toggle-group toggle-group-bordered">
-            <label class="toggle-corrections-label"><input type="checkbox" id="toggleCorrections" onchange="toggleAllCorrections()"> Apply Diacritic Fixes</label>
-        </div>
-
         <div class="lang-controls-group">
             <span class="control-label">Detected Lang:</span>
             <span class="badge-status lang" id="detectedLangBadge">P1: {{ primary_detected }}</span>
@@ -35,11 +31,10 @@
                 <option value="fr" {{ fr_selected }}>French (fr)</option>
                 <option value="es" {{ es_selected }}>Spanish (es)</option>
             </select>
-            <button class="action-btn" id="btnRedoLang" onclick="redoWithSelectedLanguage()">[REDO] Redo Run</button>
         </div>
         <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
         <button class="action-btn secondary action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">[REVERT] Revert to Raw</button>
-        <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and select a custom section on the page to parse with OCR">[+ SECTION] Select Section</button>
+        <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">[+ SECTION] Add Section</button>
         <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
         <div class="filter-controls-group">
             <span class="control-label">Filter:</span>

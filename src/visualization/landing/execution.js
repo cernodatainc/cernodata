@@ -284,3 +284,45 @@ async function triggerRerunWithPreset(presetName) {
         stopProgressPolling();
     }
 }
+
+/**
+ * Triggers forced re-evaluation and pipeline rerun for target preset, bypassing all caches.
+ *
+ * @param {string} presetName - Preset identifier ('docling_fast', 'docling_deep').
+ * @param {string|null} [docName=null] - Document filename.
+ */
+async function triggerForceRerunPreset(presetName, docName = null) {
+    const pdfPath = docName || (document.getElementById('inpPdfPath') ? document.getElementById('inpPdfPath').value.trim() : '') || 'src/e2e/Document 8.pdf';
+    const language = (document.getElementById('inpLanguage') ? document.getElementById('inpLanguage').value : '') || 'pl';
+
+    appendLog(`[FORCE RERUN] Triggering live forced rerun with preset '${presetName}' for '${pdfPath}' (bypassing caches)...`);
+    switchNavTab('progress');
+    resetProgressUI();
+    startProgressPolling();
+
+    try {
+        const resp = await fetch('/api/rerun', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preset: presetName, pdf_path: pdfPath, language: language, force: true, force_rerun: true })
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            appendLog(`[ERROR] Force rerun failed: ${err.error || resp.statusText}`);
+            updateProgressStatus('ERROR', 'Force rerun failure');
+            stopProgressPolling();
+            return;
+        }
+        const result = await resp.json();
+        appendLog(`[SUCCESS] Force rerun completed for preset '${presetName}'.`);
+        onPipelineCompleted(result);
+        if (typeof loadRunsGrid === 'function') {
+            loadRunsGrid(pdfPath);
+        }
+    } catch (e) {
+        appendLog(`[ERROR] Network error during force rerun: ${e.message}`);
+        updateProgressStatus('ERROR', e.message);
+        stopProgressPolling();
+    }
+}
+

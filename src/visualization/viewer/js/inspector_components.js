@@ -27,11 +27,10 @@ function renderEmptySelectionComponent() {
  *
  * @param {Array<Object>} nodeViols - Violations belonging to target node.
  * @param {Object} node - Target DOM node.
- * @param {boolean} appliedCorrections - Whether corrections are globally active.
  * @param {number} activePresetIndex - Active timeline preset index.
  * @returns {string} HTML markup.
  */
-function renderNodeViolationsComponent(nodeViols, node, appliedCorrections, activePresetIndex) {
+function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
     if (!nodeViols || nodeViols.length === 0) return '';
     return `
         <div class="selected-violations-box">
@@ -40,7 +39,7 @@ function renderNodeViolationsComponent(nodeViols, node, appliedCorrections, acti
                 <span class="badge-status" style="font-size:9px; background:#7F1D1D; color:#FECACA;">Violation Inspector</span>
             </div>
             ${nodeViols.map((v, vIdx) => {
-                const isFixed = !!v.is_fixed || !!node.is_fixed || appliedCorrections || activePresetIndex === 1;
+                const isFixed = !!v.is_fixed || !!node.is_fixed || activePresetIndex === 1;
                 const isSupp = isSuppressed(v);
                 const canFix = !!(v.suggested_correction || v.suggestion);
                 const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
@@ -211,6 +210,9 @@ function renderSingleNodeEditorComponent(node, options) {
             <div style="margin-top:6px;">
                 <label style="font-size:10px; color:var(--text-muted); font-weight:600;">Parsed Text / Correction Note (Defaulted to Content):</label>
                 <textarea class="note-area" placeholder="Parsed text / manual correction note..." oninput="updateCorrectionNote('${node.node_id}', this.value)">${escapeHtml(noteVal)}</textarea>
+            </div>
+            <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                <button class="action-btn" style="background:#DC2626; color:#FFF; font-size:10px; padding:3px 10px;" onclick="deleteDOMNode('${node.node_id}')">[DELETE] Delete Element</button>
             </div>
             <div style="margin-top:8px; font-size:10px; color:var(--text-muted); border-top:1px solid #334155; padding-top:6px;">
                 Tip: Hold Shift and click another box to multi-select and auto-decollide them.

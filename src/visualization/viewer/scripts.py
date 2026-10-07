@@ -50,7 +50,8 @@ def build_viewer_script(
     detected_langs_json: str,
     plan_json: str,
     pdf_source_file: str,
-    active_lang: str
+    active_lang: str,
+    output_dir: str = "output"
 ) -> str:
     """Constructs script tag with hydrated VIEWER_DATA and viewer.js payload."""
     js_content = get_viewer_js()
@@ -63,7 +64,8 @@ def build_viewer_script(
             detectedLanguages: {detected_langs_json},
             plan: {plan_json},
             pdfSourceFile: {json.dumps(pdf_source_file)},
-            activeLanguage: {json.dumps(active_lang)}
+            activeLanguage: {json.dumps(active_lang)},
+            outputDir: {json.dumps(output_dir)}
         }};
     </script>
     <script>
