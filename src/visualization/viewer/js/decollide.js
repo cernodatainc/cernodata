@@ -32,16 +32,9 @@ function renderTwoNodeDecollideEditor(container) {
     const hOverlap = Math.max(0, Math.min(bUpper.x1, bLower.x1) - Math.max(bUpper.x0, bLower.x0));
     const vOverlap = Math.max(0, bUpper.y1 - bLower.y0);
     const hasCollision = (vOverlap > 0 && hOverlap > 0);
+    const gap = bLower.y0 - bUpper.y1;
 
-    const statusBadge = hasCollision
-        ? `<div class="collision-status-badge overlap">
-                <span>[!] Skew Overlap: ${vOverlap.toFixed(2)} pt</span>
-                <span>Horiz: ${hOverlap.toFixed(2)} pt</span>
-           </div>`
-        : `<div class="collision-status-badge clean">
-                <span>[OK] No Overlap Detected</span>
-                <span>Gap: ${(bLower.y0 - bUpper.y1).toFixed(2)} pt</span>
-           </div>`;
+    const statusBadge = renderCollisionStatusBadgeComponent(hasCollision, vOverlap, hOverlap, gap);
 
     const upperText = (upper.content && upper.content.raw_text) ? upper.content.raw_text.trim() : '';
     const lowerText = (lower.content && lower.content.raw_text) ? lower.content.raw_text.trim() : '';
@@ -57,126 +50,23 @@ function renderTwoNodeDecollideEditor(container) {
 
     let mergeHtml = '';
     if (sameType && bothTextual) {
-        mergeHtml = `
-            <div class="merge-editor-card">
-                <div class="merge-editor-title">
-                    <span>[MERGE] Merge Elements (${escapeHtml(upper.type)})</span>
-                    <span class="badge-status" style="font-size:9px; background:#065F46; color:#6EE7B7;">Textual</span>
-                </div>
-                <div class="merge-editor-subtitle">
-                    Both elements are textual (${escapeHtml(upper.type)}). Text will be merged in reading order.
-                </div>
-                <div class="merge-field-group">
-                    <label class="merge-field-label">Merged Text Preview (editable):</label>
-                    <textarea id="mergeMergedText" class="merge-textarea" rows="3">${escapeHtml(defaultMergedText)}</textarea>
-                </div>
-                <button class="btn-merge textual" id="btnMergeElements" onclick="executeMergeElements()">
-                    [MERGE] Merge Textual Elements
-                </button>
-            </div>
-        `;
+        mergeHtml = renderMergeTextualEditorComponent(upper, lower, defaultMergedText);
     } else if (!sameType) {
-        mergeHtml = `
-            <div class="merge-editor-card" style="border-color:#F59E0B;">
-                <div class="merge-editor-title" style="color:#FBBF24;">
-                    <span>[MERGE] Merge Elements (Different Types)</span>
-                    <span class="badge-status" style="font-size:9px; background:#78350F; color:#FDE68A;">${escapeHtml(upper.type)} vs ${escapeHtml(lower.type)}</span>
-                </div>
-                <div class="merge-editor-subtitle">
-                    Both elements are of different types. Select what happens to the merged element:
-                </div>
-                <div class="merge-field-group">
-                    <label class="merge-field-label">Resulting Element Type:</label>
-                    <select id="mergeTargetType" class="type-filter" style="width: 100%;" onchange="onMergeConfigChanged()">
-                        <option value="${escapeHtml(upper.type)}" selected>Keep '${escapeHtml(upper.type)}' (from ${escapeHtml(upper.node_id)})</option>
-                        <option value="${escapeHtml(lower.type)}">Keep '${escapeHtml(lower.type)}' (from ${escapeHtml(lower.node_id)})</option>
-                        <option value="paragraph">paragraph</option>
-                        <option value="heading">heading</option>
-                        <option value="table_grid">table_grid</option>
-                        <option value="figure">figure</option>
-                        <option value="header_footer">header_footer</option>
-                    </select>
-                </div>
-                <div class="merge-field-group">
-                    <label class="merge-field-label">Content / Text Handling:</label>
-                    <select id="mergeContentAction" class="type-filter" style="width: 100%;" onchange="onMergeConfigChanged()">
-                        <option value="concat" selected>Merge text from both elements (${escapeHtml(upper.node_id)} + ${escapeHtml(lower.node_id)})</option>
-                        <option value="keep_upper">Keep only ${escapeHtml(upper.node_id)} content ('${escapeHtml(upper.type)}')</option>
-                        <option value="keep_lower">Keep only ${escapeHtml(lower.node_id)} content ('${escapeHtml(lower.type)}')</option>
-                        <option value="custom">Custom text</option>
-                    </select>
-                </div>
-                <div class="merge-field-group">
-                    <label class="merge-field-label">Resulting Text Preview (editable):</label>
-                    <textarea id="mergeMergedText" class="merge-textarea" rows="3">${escapeHtml(defaultMergedText)}</textarea>
-                </div>
-                <button class="btn-merge different-type" id="btnMergeElements" onclick="executeMergeElements()">
-                    [MERGE] Merge Elements as Selected
-                </button>
-            </div>
-        `;
+        mergeHtml = renderMergeDifferentTypesEditorComponent(upper, lower, defaultMergedText);
     } else {
-        mergeHtml = `
-            <div class="merge-editor-card">
-                <div class="merge-editor-title">
-                    <span>[MERGE] Merge Elements (${escapeHtml(upper.type)})</span>
-                    <span class="badge-status" style="font-size:9px; background:#1F2937; color:#9CA3AF;">Non-textual</span>
-                </div>
-                <div class="merge-editor-subtitle">
-                    Both elements are of type '${escapeHtml(upper.type)}'. Merging will combine their bounding boxes and properties.
-                </div>
-                <div class="merge-field-group">
-                    <label class="merge-field-label">Resulting Element Type:</label>
-                    <select id="mergeTargetType" class="type-filter" style="width: 100%;">
-                        <option value="${escapeHtml(upper.type)}" selected>${escapeHtml(upper.type)}</option>
-                        <option value="figure">figure</option>
-                        <option value="table_grid">table_grid</option>
-                        <option value="paragraph">paragraph</option>
-                    </select>
-                </div>
-                <button class="btn-merge different-type" id="btnMergeElements" onclick="executeMergeElements()">
-                    [MERGE] Combine Bounding Boxes into Single Element
-                </button>
-            </div>
-        `;
+        mergeHtml = renderMergeNonTextualEditorComponent(upper, lower);
     }
 
-    container.innerHTML = `
-        <div class="multi-editor-box">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <h4>Shift-Selection: 2 Boxes</h4>
-                <button style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="clearSelection()">Clear</button>
-            </div>
-            ${statusBadge}
-            <button class="btn-decollide" onclick="decollideSelectedPair()" ${!hasCollision ? 'style="background:#2563EB;"' : ''}>
-                ${hasCollision ? '[AUTO-DECOLLIDE] De-collide Selected Boxes' : 'Evenly Space / Align Boundary'}
-            </button>
-            ${mergeHtml}
-            <div class="pair-node-item" style="border-left: 3px solid #60A5FA;">
-                <div class="pair-node-header">
-                    <span>Upper: ${escapeHtml(upper.node_id)} (${escapeHtml(upper.type)})</span>
-                    <span class="pair-node-coords">Y: [${bUpper.y0}, ${bUpper.y1}]</span>
-                </div>
-                <div class="cutout-display-box" style="margin-bottom:4px;">
-                    <img id="cutoutPreviewImg_${upper.node_id}" class="cutout-img" alt="Upper Cutout" />
-                </div>
-                <div class="pair-node-text">${escapeHtml(upper.content.raw_text || '(no text)')}</div>
-            </div>
-            <div class="pair-node-item" style="border-left: 3px solid #A78BFA;">
-                <div class="pair-node-header">
-                    <span>Lower: ${escapeHtml(lower.node_id)} (${escapeHtml(lower.type)})</span>
-                    <span class="pair-node-coords">Y: [${bLower.y0}, ${bLower.y1}]</span>
-                </div>
-                <div class="cutout-display-box" style="margin-bottom:4px;">
-                    <img id="cutoutPreviewImg_${lower.node_id}" class="cutout-img" alt="Lower Cutout" />
-                </div>
-                <div class="pair-node-text">${escapeHtml(lower.content.raw_text || '(no text)')}</div>
-            </div>
-            <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">
-                Boundary split calculates the median inter-line position and adjusts top/bottom edges cleanly without manual adjustment.
-            </div>
-        </div>
-    `;
+    container.innerHTML = renderTwoNodeDecollideCardComponent(
+        upper,
+        lower,
+        bUpper,
+        bLower,
+        statusBadge,
+        mergeHtml,
+        hasCollision
+    );
+
     renderCutoutPreview(upper.node_id, upper.bounding_box, 'cutoutPreviewImg_' + upper.node_id);
     renderCutoutPreview(lower.node_id, lower.bounding_box, 'cutoutPreviewImg_' + lower.node_id);
 }
