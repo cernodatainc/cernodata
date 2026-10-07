@@ -9,12 +9,25 @@ let isDrawSectionMode = false;
 let drawStartPt = null;
 let drawRectEl = null;
 
+/**
+ * Creates an SVG DOM element with namespace and applies attribute key-value pairs.
+ *
+ * @param {string} tag - SVG tag name (e.g. 'rect', 'polygon', 'text').
+ * @param {Object.<string, string|number>} attrs - Attribute dictionary.
+ * @returns {SVGElement} Instantiated SVG element.
+ */
 function createSvgElem(tag, attrs) {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    for (let k in attrs) el.setAttribute(k, attrs[k]);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
     return el;
 }
 
+/**
+ * Transforms screen mouse coordinates to SVG canvas internal coordinate system.
+ *
+ * @param {MouseEvent} evt - Mouse event with clientX and clientY.
+ * @returns {SVGPoint} Scaled point in SVG coordinates.
+ */
 function getSvgCoordinates(evt) {
     const svg = document.getElementById('svgOverlay');
     const pt = svg.createSVGPoint();
@@ -23,6 +36,12 @@ function getSvgCoordinates(evt) {
     return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
 
+/**
+ * Calculates 4 corner coordinates for a bounding box, applying angle rotation if present.
+ *
+ * @param {Object} bbox - Bounding box definition with x0, y0, x1, y1, angle, and optional quad.
+ * @returns {Array<{x: number, y: number}>} Array of 4 corner points [TL, TR, BR, BL].
+ */
 function getBoxCorners(bbox) {
     if (bbox.quad && bbox.quad.length === 4) {
         return bbox.quad.map(pt => ({ x: pt[0], y: pt[1] }));
@@ -48,6 +67,12 @@ function getBoxCorners(bbox) {
     });
 }
 
+/**
+ * Recalculates bounding box envelope coordinates and optional quad polygon from corner array.
+ *
+ * @param {Object} node - DOM node object whose bounding_box is being updated.
+ * @param {Array<{x: number, y: number}>} corners - 4 modified corner points.
+ */
 function updateBboxFromCorners(node, corners) {
     node.bounding_box.quad = corners.map(pt => [roundCoord(pt.x), roundCoord(pt.y)]);
     node.bounding_box.x0 = roundCoord(Math.min(...corners.map(p => p.x)));
@@ -56,6 +81,9 @@ function updateBboxFromCorners(node, corners) {
     node.bounding_box.y1 = roundCoord(Math.max(...corners.map(p => p.y)));
 }
 
+/**
+ * Toggles interactive rectangle drawing mode for creating new user-defined sections.
+ */
 function toggleDrawSectionMode() {
     isDrawSectionMode = !isDrawSectionMode;
     const btn = document.getElementById('btnDrawSection');
@@ -81,6 +109,9 @@ function toggleDrawSectionMode() {
     }
 }
 
+/**
+ * Renders all SVG bounding box polygons, selection resize handles, and violation callout badges.
+ */
 function renderSVGOverlays() {
     const svg = document.getElementById('svgOverlay');
     if (!svg) return;
@@ -119,7 +150,7 @@ function renderSVGOverlays() {
         if (filterType !== 'ALL' && node.type !== filterType) return;
         const bbox = node.bounding_box;
         const corners = getBoxCorners(bbox);
-        const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+        const viols = getViolationsList();
         const nodeViols = viols.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
         const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v));
         const hasViol = hasUnfixedViol && !appliedCorrections && activePresetIndex === 0;
@@ -193,10 +224,24 @@ function renderSVGOverlays() {
     });
 }
 
+/**
+ * Convenience alias for rendering quadrilateral resizing handles on selected node.
+ *
+ * @param {SVGElement} svg - Target SVG overlay canvas.
+ * @param {Object} node - DOM node object.
+ * @param {Array<{x: number, y: number}>|null} corners - Optional corner array.
+ */
 function renderResizeHandles(svg, node, corners) {
     return renderQuadResizeHandles(svg, node, corners || getBoxCorners(node.bounding_box));
 }
 
+/**
+ * Renders corner handles (crosshair) and edge midpoint handles (ew/ns-resize) on bounding box.
+ *
+ * @param {SVGElement} svg - Target SVG overlay canvas.
+ * @param {Object} node - DOM node object.
+ * @param {Array<{x: number, y: number}>} corners - 4 corner coordinates.
+ */
 function renderQuadResizeHandles(svg, node, corners) {
     const hs = 9;
 
@@ -237,6 +282,13 @@ function renderQuadResizeHandles(svg, node, corners) {
     });
 }
 
+/**
+ * Initiates dragging interaction on a specific corner handle.
+ *
+ * @param {MouseEvent} evt - MouseDown event.
+ * @param {number} cornerIndex - Corner index (0..3).
+ * @param {string} nodeId - Identifier of target DOM node.
+ */
 function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
     evt.stopPropagation();
     evt.preventDefault();
@@ -255,6 +307,13 @@ function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
     };
 }
 
+/**
+ * Initiates dragging interaction on a specific edge midpoint handle.
+ *
+ * @param {MouseEvent} evt - MouseDown event.
+ * @param {number} edgeIndex - Edge index (0..3).
+ * @param {string} nodeId - Identifier of target DOM node.
+ */
 function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
     evt.stopPropagation();
     evt.preventDefault();
@@ -273,6 +332,12 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
     };
 }
 
+/**
+ * Initiates dragging interaction to translate/move an entire bounding box.
+ *
+ * @param {MouseEvent} evt - MouseDown event.
+ * @param {string} nodeId - Identifier of target DOM node.
+ */
 function onPolygonMouseDown(evt, nodeId) {
     if (!selectedNodeIds.includes(nodeId)) return;
     evt.stopPropagation();

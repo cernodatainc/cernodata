@@ -7,6 +7,10 @@
 
 window.presetCache = window.presetCache || {};
 
+/**
+ * Caches current DOM, violations, and decision state into client memory
+ * keyed by active preset and language.
+ */
 function saveCurrentPresetToClientCache() {
     const targetAttempt = (decisionData && decisionData.attempts && decisionData.attempts[activePresetIndex]) || null;
     const currentPreset = (targetAttempt && targetAttempt.preset) || ((activePresetIndex === 1) ? 'docling_deep' : (decisionData.chosen_preset || 'docling_fast'));
@@ -25,6 +29,9 @@ function saveCurrentPresetToClientCache() {
     window.presetCache[currentPreset] = entry;
 }
 
+/**
+ * Handles language selection dropdown change event and notifies user.
+ */
 function onLanguageChanged() {
     const sel = document.getElementById('selectLanguage').value;
     const banner = document.getElementById('statusBanner');
@@ -35,12 +42,22 @@ function onLanguageChanged() {
     }
 }
 
+/**
+ * Re-executes or simulates pipeline processing for currently selected language.
+ */
 async function redoWithSelectedLanguage() {
     const selectedLang = document.getElementById('selectLanguage').value;
     const presetName = (activePresetIndex === 1) ? 'docling_deep' : 'docling_fast';
     await rerunBackendPipeline(presetName, selectedLang);
 }
 
+/**
+ * Dispatches POST /api/rerun request to execute or retrieve cached results for preset.
+ * Falls back to offline client-side simulation when backend server is unavailable.
+ *
+ * @param {string} presetName - Target pipeline preset ('docling_fast', 'docling_deep').
+ * @param {string|null} [langOverride=null] - Optional language code override.
+ */
 async function rerunBackendPipeline(presetName, langOverride = null) {
     if (typeof saveCurrentPresetToClientCache === 'function') {
         saveCurrentPresetToClientCache();
@@ -50,9 +67,7 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
 
     if (clientCached) {
         domData = JSON.parse(JSON.stringify(clientCached.dom));
-        violationsData = (typeof extractViolationsList === 'function')
-            ? extractViolationsList(JSON.parse(JSON.stringify(clientCached.violations)))
-            : JSON.parse(JSON.stringify(clientCached.violations));
+        violationsData = extractViolationsList(JSON.parse(JSON.stringify(clientCached.violations)));
         decisionData = JSON.parse(JSON.stringify(clientCached.decision));
         ensureViolationIds();
         activeLanguage = targetLang;
@@ -90,9 +105,7 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
             }
 
             domData = data.dom;
-            violationsData = (typeof extractViolationsList === 'function')
-                ? extractViolationsList(data.violations)
-                : (Array.isArray(data.violations) ? data.violations : (data.violations && data.violations.violations) || []);
+            violationsData = extractViolationsList(data.violations);
             decisionData = data.decision;
             ensureViolationIds();
             activeLanguage = targetLang;
@@ -124,7 +137,7 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         if (simTargetLang === 'en') {
             return basePageScore;
         } else if (simTargetLang === 'pl') {
-            const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+            const viols = getViolationsList();
             const hasDiacriticViolations = viols.some(v => v.rule_type === 'diacritic_conflict' || v.rule_type === 'ocr_character_substitution');
             if (hasDiacriticViolations && !appliedCorrections) {
                 return (initialDecisionData.attempts && initialDecisionData.attempts[0])
@@ -136,13 +149,11 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
         return basePageScore;
     }
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     if (targetLang === 'en') {
         violationsData = viols.filter(v => v.rule_type !== 'diacritic_conflict' && v.rule_type !== 'ocr_character_substitution');
     } else if (targetLang === 'pl') {
-        violationsData = (typeof extractViolationsList === 'function')
-            ? extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)))
-            : JSON.parse(JSON.stringify(initialViolationsData || []));
+        violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
         ensureViolationIds();
     }
 
@@ -157,6 +168,12 @@ async function rerunBackendPipeline(presetName, langOverride = null) {
     updatePresetUIState();
 }
 
+/**
+ * Switches the active preset view between Step 1 (primary) and Step 2 (fallback).
+ *
+ * @param {number} stepIndex - Step index (0 for primary, 1 for fallback).
+ * @param {string|null} [explicitPreset=null] - Optional preset identifier.
+ */
 function switchPreset(stepIndex, explicitPreset = null) {
     if (typeof saveCurrentPresetToClientCache === 'function') {
         saveCurrentPresetToClientCache();
@@ -175,9 +192,7 @@ function switchPreset(stepIndex, explicitPreset = null) {
         if (cached.raw_dom) {
             rawDomData = JSON.parse(JSON.stringify(cached.raw_dom));
         }
-        violationsData = (typeof extractViolationsList === 'function')
-            ? extractViolationsList(JSON.parse(JSON.stringify(cached.violations)))
-            : JSON.parse(JSON.stringify(cached.violations));
+        violationsData = extractViolationsList(JSON.parse(JSON.stringify(cached.violations)));
         decisionData = JSON.parse(JSON.stringify(cached.decision));
         ensureViolationIds();
         activePresetIndex = stepIndex;
@@ -195,6 +210,9 @@ function switchPreset(stepIndex, explicitPreset = null) {
     rerunBackendPipeline(presetName);
 }
 
+/**
+ * Updates UI headers, step badges, score indicators, and tree panels to match active preset.
+ */
 function updatePresetUIState() {
     const btnP1 = document.getElementById('btnPreset1');
     const btnP2 = document.getElementById('btnPreset2');
@@ -245,9 +263,7 @@ function updatePresetUIState() {
 
     const subEl = document.getElementById('scoreSub');
     if (subEl) {
-        const violCount = (typeof extractViolationsList === 'function')
-            ? extractViolationsList(violationsData).length
-            : (Array.isArray(violationsData) ? violationsData.length : 0);
+        const violCount = getViolationsList().length;
         subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violCount}`;
         subEl.style.color = isAccepted ? 'var(--accent-green)' : 'var(--accent-red)';
     }
@@ -264,6 +280,11 @@ function updatePresetUIState() {
     renderSVGOverlays();
 }
 
+/**
+ * Persists user modifications, bounding box adjustments, and corrections to the server via POST /api/save_dom.
+ *
+ * @param {boolean} [quiet=false] - Whether to suppress status banner feedback.
+ */
 async function saveAnnotations(quiet = false) {
     const banner = document.getElementById('statusBanner');
     if (!quiet && banner) {

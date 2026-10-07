@@ -5,11 +5,42 @@
  * category-level false-positive acceptance, and automated fix application.
  */
 
+/**
+ * Updates suppression and acceptance state on a violation object and its matching
+ * node-level violation entry in domData.
+ *
+ * @param {Object} v - Violation object to update.
+ * @param {boolean} shouldSuppress - Whether the violation should be suppressed.
+ */
+function setViolationSuppressed(v, shouldSuppress) {
+    if (!v) return;
+    const suppStr = shouldSuppress ? "true" : "false";
+    v.suppressed = suppStr;
+    v.accepted = Boolean(shouldSuppress);
+
+    if (domData && domData.nodes) {
+        const node = domData.nodes.find(n => n.node_id === v.node_id);
+        if (node && node.violations) {
+            const nv = node.violations.find(item =>
+                (v.violation_id && item.violation_id === v.violation_id) ||
+                item.rule_type === v.rule_type
+            );
+            if (nv) {
+                nv.suppressed = suppStr;
+                nv.accepted = Boolean(shouldSuppress);
+            }
+        }
+    }
+}
+
+/**
+ * Renders the categorized list of quality violations for the current page or entire document.
+ */
 function renderViolationsList() {
     const container = document.getElementById('violListContainer');
     if (!container) return;
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     const violationsToDisplay = showAllViolations
         ? viols
         : viols.filter(v => getViolationPage(v) === currentPage);
@@ -154,29 +185,24 @@ function renderViolationsList() {
     });
 }
 
+/**
+ * Suppresses all violations in the given category on target page (or all pages)
+ * as accepted false positives.
+ *
+ * @param {string} category - Violation category name ('symbols', 'diacritic').
+ * @param {number|null} [targetPage=null] - Specific 1-indexed page or null for active context.
+ */
 function acceptCategoryOnPage(category, targetPage = null) {
     const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
     let count = 0;
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     viols.forEach(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
         if (vCat === category && (page === null || vPage === page)) {
-            v.suppressed = "true";
-            v.accepted = true;
+            setViolationSuppressed(v, true);
             count++;
-
-            if (domData && domData.nodes) {
-                const node = domData.nodes.find(n => n.node_id === v.node_id);
-                if (node && node.violations) {
-                    const nv = node.violations.find(item => item.violation_id === v.violation_id || item.rule_type === v.rule_type);
-                    if (nv) {
-                        nv.suppressed = "true";
-                        nv.accepted = true;
-                    }
-                }
-            }
         }
     });
 
@@ -206,29 +232,23 @@ function acceptCategoryOnPage(category, targetPage = null) {
     }
 }
 
+/**
+ * Restores previously suppressed violations in a category back to active flagged state.
+ *
+ * @param {string} category - Violation category name ('symbols', 'diacritic').
+ * @param {number|null} [targetPage=null] - Specific 1-indexed page or null for active context.
+ */
 function restoreCategoryOnPage(category, targetPage = null) {
     const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
     let count = 0;
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     viols.forEach(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
         if (vCat === category && (page === null || vPage === page)) {
-            v.suppressed = "false";
-            v.accepted = false;
+            setViolationSuppressed(v, false);
             count++;
-
-            if (domData && domData.nodes) {
-                const node = domData.nodes.find(n => n.node_id === v.node_id);
-                if (node && node.violations) {
-                    const nv = node.violations.find(item => item.violation_id === v.violation_id || item.rule_type === v.rule_type);
-                    if (nv) {
-                        nv.suppressed = "false";
-                        nv.accepted = false;
-                    }
-                }
-            }
         }
     });
 
@@ -258,28 +278,23 @@ function restoreCategoryOnPage(category, targetPage = null) {
     }
 }
 
+/**
+ * Toggles suppression state of an individual violation by ID.
+ *
+ * @param {Event|null} evt - Triggering click event.
+ * @param {string} violationId - Unique violation identifier.
+ * @param {boolean} [shouldSuppress=true] - Target suppression state.
+ */
 function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) {
     if (evt && evt.stopPropagation) {
         evt.stopPropagation();
     }
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     const v = viols.find(item => item.violation_id === violationId);
     if (!v) return;
 
-    v.suppressed = shouldSuppress ? "true" : "false";
-    v.accepted = !!shouldSuppress;
-
-    if (domData && domData.nodes) {
-        const node = domData.nodes.find(n => n.node_id === v.node_id);
-        if (node && node.violations) {
-            const nv = node.violations.find(item => item.violation_id === violationId || item.rule_type === v.rule_type);
-            if (nv) {
-                nv.suppressed = shouldSuppress ? "true" : "false";
-                nv.accepted = !!shouldSuppress;
-            }
-        }
-    }
+    setViolationSuppressed(v, shouldSuppress);
 
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();
@@ -308,9 +323,15 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
     }
 }
 
+/**
+ * Batch-applies all automated fixes for fixable violations within a category.
+ *
+ * @param {string} category - Violation category name.
+ * @param {number|null} [targetPage=null] - Specific 1-indexed page or null for active context.
+ */
 function applyAllFixesForCategory(category, targetPage = null) {
     const page = targetPage !== null ? targetPage : (showAllViolations ? null : currentPage);
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     const targets = viols.filter(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
@@ -330,6 +351,14 @@ function applyAllFixesForCategory(category, targetPage = null) {
     }
 }
 
+/**
+ * Applies a single suggested fix to a DOM node and flags the violation as resolved.
+ *
+ * @param {Event|null} evt - Triggering event.
+ * @param {string} idOrNodeId - Violation ID or Node ID.
+ * @param {string|null} [snippet=null] - Detected snippet string to replace.
+ * @param {string|null} [fix=null] - Replacement correction string.
+ */
 function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     if (evt && evt.stopPropagation) {
         evt.stopPropagation();
@@ -340,7 +369,7 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     let targetSnippet = snippet;
     let targetFix = fix;
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     if (typeof idOrNodeId === 'string') {
         const found = viols.find(v => v.violation_id === idOrNodeId);
         if (found) {
@@ -384,7 +413,7 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     }
 
     if (targetSnippet) {
-        const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+        const viols = getViolationsList();
         viols.forEach(v => {
             if (v.node_id === targetNodeId && v.detected_snippet === targetSnippet) {
                 v.is_fixed = true;

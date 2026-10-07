@@ -11,10 +11,11 @@ import glob
 import logging
 import os
 from dataclasses import asdict, dataclass, field, replace
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
-from src.pipeline.server.artifacts import RunArtifacts, load_run_artifacts
+from src.pipeline.server.artifacts import RunArtifacts
 from src.pipeline.server.http_utils import REPO_ROOT
+from src.schemas import ValidatedRunArtifacts, load_validated_run_artifacts
 
 logger = logging.getLogger("cernodata.server.discovery")
 
@@ -45,56 +46,105 @@ class RunMetadata:
         cls,
         norm_rel: str,
         match: str,
-        artifacts: RunArtifacts,
+        artifacts: Union[ValidatedRunArtifacts, RunArtifacts],
     ) -> RunMetadata:
-        """Constructs canonical RunMetadata directly from load_run_artifacts output."""
+        """Constructs canonical RunMetadata directly from validated artifacts."""
+        if isinstance(artifacts, ValidatedRunArtifacts):
+            active_violations = artifacts.active_violations
+            violations_count = len(active_violations)
+            overall_confidence = artifacts.overall_confidence
+            status = artifacts.status
+
+            diff_data = artifacts.diff
+            diff_scoring = diff_data.get("scoring") or {}
+            if diff_scoring:
+                if diff_scoring.get("current_overall_confidence") is not None:
+                    overall_confidence = float(diff_scoring["current_overall_confidence"])
+                if diff_scoring.get("status"):
+                    status = str(diff_scoring["status"])
+
+            conf_val = float(overall_confidence)
+            doc_name = artifacts.document_name or "Unknown"
+            chosen_preset = artifacts.chosen_preset or "docling_fast"
+            score_str = f"{conf_val:.4f}"
+            label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
+
+            per_page_viols: Dict[str, int] = {}
+            for v_schema in active_violations:
+                p_num = str(v_schema.global_page_index)
+                per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
+
+            per_page_nodes: Dict[str, int] = {}
+            for n in artifacts.dom.nodes:
+                p_num = str(n.global_page_index)
+                per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
+
+            return cls(
+                id=norm_rel,
+                dir_path=norm_rel,
+                document_name=doc_name,
+                document_path=artifacts.document_path or "",
+                chosen_preset=chosen_preset,
+                status=status,
+                overall_confidence=conf_val,
+                violations_count=violations_count,
+                timestamp=artifacts.plan.created_at if artifacts.plan else "",
+                has_viewer=os.path.exists(os.path.join(match, "interactive_viewer.html")),
+                has_dom=True,
+                has_plan=artifacts.plan is not None,
+                total_pages=artifacts.dom.total_pages,
+                per_page_confidence=artifacts.decision.per_page_confidence,
+                per_page_violations=per_page_viols,
+                per_page_nodes=per_page_nodes,
+                label=label,
+            )
+
+        # Fallback path for legacy RunArtifacts
         plan_data = artifacts.plan
         dom_data = artifacts.dom
         violations = artifacts.violations
         decision_data = artifacts.decision
 
-        active_violations = [
-            v for v in violations
-            if str(v.get("suppressed", "false")).lower() not in ("true", "1")
-            and not v.get("accepted")
-            and not v.get("is_fixed")
+        active_viols = [
+            item for item in violations
+            if str(item.get("suppressed", "false")).lower() not in ("true", "1")
+            and not item.get("accepted")
+            and not item.get("is_fixed")
         ]
-        violations_count = len(active_violations)
+        violations_count = len(active_viols)
 
-        overall_confidence = artifacts.overall_confidence
+        legacy_conf = artifacts.overall_confidence
         status = artifacts.status
 
         diff_data = artifacts.diff
         diff_scoring = diff_data.get("scoring") or {}
         if diff_scoring:
             if diff_scoring.get("current_overall_confidence") is not None:
-                overall_confidence = float(diff_scoring["current_overall_confidence"])
+                legacy_conf = float(diff_scoring["current_overall_confidence"])
             if diff_scoring.get("status"):
                 status = str(diff_scoring["status"])
 
-        conf_val = float(overall_confidence) if overall_confidence is not None else 1.0
+        conf_val = float(legacy_conf) if legacy_conf is not None else 1.0
         doc_name = artifacts.document_name or "Unknown"
         chosen_preset = artifacts.chosen_preset or "docling_fast"
         score_str = f"{conf_val:.4f}"
         label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
 
-        per_page_viols: Dict[str, int] = {}
-        for v in active_violations:
-            p_num = str(v.get("global_page_index") or v.get("page") or 1)
-            per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
+        per_page_viols_leg: Dict[str, int] = {}
+        for v_dict in active_viols:
+            p_num = str(v_dict.get("global_page_index") or v_dict.get("page") or 1)
+            per_page_viols_leg[p_num] = per_page_viols_leg.get(p_num, 0) + 1
 
-        per_page_nodes: Dict[str, int] = {}
+        per_page_nodes_leg: Dict[str, int] = {}
         for n in dom_data.get("nodes", []):
             p_num = str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
-            per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
-
-        document_path = artifacts.document_path or ""
+            per_page_nodes_leg[p_num] = per_page_nodes_leg.get(p_num, 0) + 1
 
         return cls(
             id=norm_rel,
             dir_path=norm_rel,
             document_name=doc_name,
-            document_path=document_path,
+            document_path=artifacts.document_path or "",
             chosen_preset=chosen_preset,
             status=status,
             overall_confidence=conf_val,
@@ -105,8 +155,8 @@ class RunMetadata:
             has_plan=plan_data is not None,
             total_pages=int(dom_data.get("total_pages", 1) or 1),
             per_page_confidence=decision_data.get("per_page_confidence") or {},
-            per_page_violations=per_page_viols,
-            per_page_nodes=per_page_nodes,
+            per_page_violations=per_page_viols_leg,
+            per_page_nodes=per_page_nodes_leg,
             label=label,
         )
 
@@ -171,36 +221,33 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
 
             seen_dirs.add(norm_rel)
 
-            artifacts = load_run_artifacts(match)
-            base_run = RunMetadata.from_run_artifacts(norm_rel, match, artifacts)
+            validated_artifacts = load_validated_run_artifacts(match)
+            if validated_artifacts is None:
+                # Corrupted or incomplete run failing schema contracts is dropped
+                continue
 
-            decision_data = artifacts.decision
+            base_run = RunMetadata.from_run_artifacts(norm_rel, match, validated_artifacts)
 
-            attempts = decision_data.get("attempts", [])
+            attempts = validated_artifacts.decision.attempts
             if attempts and len(attempts) > 1:
                 for att in attempts:
-                    att_preset = att.get("preset", base_run.chosen_preset)
-                    att_step = att.get("step", 1)
+                    att_preset = att.preset or base_run.chosen_preset
+                    att_step = att.step
                     att_id = f"{norm_rel}:step_{att_step}"
                     is_active = (att_preset == base_run.chosen_preset)
 
-                    att_conf = att.get("overall_confidence")
+                    att_conf = att.overall_confidence
                     if att_conf is None:
                         att_conf = base_run.overall_confidence if is_active else 1.0
 
-                    att_status = att.get("status") or (base_run.status if is_active else "ACCEPT")
+                    att_status = att.status or (base_run.status if is_active else "ACCEPT")
 
-                    att_viols = att.get("violations_count")
+                    att_viols = att.violations_count
                     if att_viols is None:
                         att_viols = base_run.violations_count if is_active else 0
 
-                    att_page_conf = att.get("per_page_confidence")
-                    if not att_page_conf:
-                        att_page_conf = base_run.per_page_confidence if is_active else {}
-
-                    att_page_viols = att.get("per_page_violations")
-                    if not att_page_viols:
-                        att_page_viols = base_run.per_page_violations if is_active else {}
+                    att_page_conf = att.per_page_confidence or (base_run.per_page_confidence if is_active else {})
+                    att_page_viols = base_run.per_page_violations if is_active else {}
 
                     conf_str = f"{float(att_conf):.4f}" if att_conf is not None else "1.0000"
                     att_label = (

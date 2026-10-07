@@ -5,6 +5,13 @@
  * and targeted section OCR re-parsing.
  */
 
+/**
+ * Computes or retrieves the effective rotation angle in degrees for a bounding box.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {Object} bbox - Bounding box object.
+ * @returns {number} Angle in degrees.
+ */
 function getEffectiveNodeAngle(nodeId, bbox) {
     if (bbox && bbox.angle !== undefined && bbox.angle !== null && bbox.angle !== 0) {
         return bbox.angle;
@@ -16,7 +23,7 @@ function getEffectiveNodeAngle(nodeId, bbox) {
             return roundCoord((Math.atan2(dy, dx) * 180.0) / Math.PI);
         }
     }
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     const v = viols.find(viol => viol.node_id === nodeId && viol.bounding_box && viol.bounding_box.angle);
     if (v) {
         return v.bounding_box.angle;
@@ -30,6 +37,11 @@ function getEffectiveNodeAngle(nodeId, bbox) {
     return 0.0;
 }
 
+/**
+ * Toggles between unskewed affine-rectified crop and raw skewed oriented polygon cutout.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
 function toggleCutoutUnskew(nodeId) {
     isCutoutUnskewed = !isCutoutUnskewed;
     const node = domData.nodes.find(n => n.node_id === nodeId);
@@ -46,6 +58,19 @@ function toggleCutoutUnskew(nodeId) {
     }
 }
 
+/**
+ * Warps a source image triangle (s0, s1, s2) onto a destination canvas triangle (d0, d1, d2)
+ * using an affine 2D transform matrix.
+ *
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context.
+ * @param {HTMLImageElement} img - Source page image.
+ * @param {{x: number, y: number}} s0 - Source vertex 0.
+ * @param {{x: number, y: number}} s1 - Source vertex 1.
+ * @param {{x: number, y: number}} s2 - Source vertex 2.
+ * @param {{x: number, y: number}} d0 - Destination vertex 0.
+ * @param {{x: number, y: number}} d1 - Destination vertex 1.
+ * @param {{x: number, y: number}} d2 - Destination vertex 2.
+ */
 function renderTriangleWarp(ctx, img, s0, s1, s2, d0, d1, d2) {
     const X1 = s1.x - s0.x, Y1 = s1.y - s0.y;
     const X2 = s2.x - s0.x, Y2 = s2.y - s0.y;
@@ -74,6 +99,13 @@ function renderTriangleWarp(ctx, img, s0, s1, s2, d0, d1, d2) {
     ctx.restore();
 }
 
+/**
+ * Calculates quadrilateral polygon vertices representing the skewed footprint of a bounding box.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {Object} bbox - Bounding box object.
+ * @returns {Array<{x: number, y: number}>} Array of 4 vertices [TL, TR, BR, BL].
+ */
 function getNodeSkewCorners(nodeId, bbox) {
     if (bbox.quad && bbox.quad.length === 4) {
         return bbox.quad.map(pt => ({ x: pt[0], y: pt[1] }));
@@ -113,6 +145,14 @@ function getNodeSkewCorners(nodeId, bbox) {
     }
 }
 
+/**
+ * Extracts and renders a high-resolution image crop of a bounding box into target <img> element.
+ *
+ * @param {string} nodeId - Node identifier.
+ * @param {Object} bbox - Bounding box definition.
+ * @param {string} targetImgId - DOM element ID of the target preview image.
+ * @param {boolean} [unskew=isCutoutUnskewed] - Whether to apply perspective rectification.
+ */
 function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewed) {
     const pageImg = document.getElementById('pageImg');
     const targetImg = document.getElementById(targetImgId);
@@ -193,6 +233,13 @@ function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewe
     }
 }
 
+/**
+ * Extracts base64 encoded PNG data URI of a node's cropped canvas.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {boolean} [unskew=isCutoutUnskewed] - Whether to rectify skewed angle.
+ * @returns {string|null} Base64 PNG data URI string or null.
+ */
 function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return null;
@@ -264,6 +311,11 @@ function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
     }
 }
 
+/**
+ * Triggers backend targeted OCR re-extraction pass for the selected section.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
 async function triggerCutoutSecondPass(nodeId) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;

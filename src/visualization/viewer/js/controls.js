@@ -4,18 +4,33 @@
  * Navigation, zoom, layer visibility, tab switching, and timeline controls.
  */
 
+/**
+ * Toggles whether DOM elements across all document pages are shown in the inspector.
+ *
+ * @param {boolean|null} [force=null] - Optional boolean override to force on/off.
+ * @returns {boolean} Updated display flag value.
+ */
 function toggleShowAllDom(force = null) {
     showAllDomNodes = (force !== null) ? Boolean(force) : !showAllDomNodes;
     renderDOMTree();
     return showAllDomNodes;
 }
 
+/**
+ * Toggles whether violations across all document pages are shown in the violations tab.
+ *
+ * @param {boolean|null} [force=null] - Optional boolean override to force on/off.
+ * @returns {boolean} Updated display flag value.
+ */
 function toggleShowAllViolations(force = null) {
     showAllViolations = (force !== null) ? Boolean(force) : !showAllViolations;
     renderViolationsList();
     return showAllViolations;
 }
 
+/**
+ * Clears and hides legacy timeline preset buttons container.
+ */
 function renderTimelineButtons() {
     const container = document.getElementById('timelineContainer');
     if (!container) return;
@@ -23,6 +38,9 @@ function renderTimelineButtons() {
     container.style.display = 'none';
 }
 
+/**
+ * Initializes page selector dropdown and page navigation label numbers.
+ */
 function initPageControls() {
     const pageSelect = document.getElementById('pageSelect');
     if (pageSelect) {
@@ -42,6 +60,9 @@ function initPageControls() {
     updateNavButtonsState();
 }
 
+/**
+ * Synchronizes disabled state of Prev/Next page navigation buttons.
+ */
 function updateNavButtonsState() {
     const btnPrev = document.getElementById('btnPrevPage');
     if (btnPrev) btnPrev.disabled = (currentPage <= 1);
@@ -49,22 +70,36 @@ function updateNavButtonsState() {
     if (btnNext) btnNext.disabled = (currentPage >= totalPages);
 }
 
+/**
+ * Page dropdown change handler.
+ *
+ * @param {number|string} pageNum - Target page number selected by user.
+ */
 function onPageSelectChanged(pageNum) {
-    switchPage(pageNum);
+    switchPage(parseInt(pageNum, 10));
 }
 
+/**
+ * Navigates viewer to the previous page if available.
+ */
 function prevPage() {
     if (currentPage > 1) {
         switchPage(currentPage - 1);
     }
 }
 
+/**
+ * Navigates viewer to the next page if available.
+ */
 function nextPage() {
     if (currentPage < totalPages) {
         switchPage(currentPage + 1);
     }
 }
 
+/**
+ * Adjusts SVG overlay canvas viewBox to match underlying page image aspect ratio and PDF points.
+ */
 function updateSvgViewBox() {
     const svg = document.getElementById('svgOverlay');
     if (!svg) return;
@@ -81,6 +116,11 @@ function updateSvgViewBox() {
     }
 }
 
+/**
+ * Switches the active document view to the specified page number.
+ *
+ * @param {number} pageNum - 1-indexed page number to navigate to.
+ */
 function switchPage(pageNum) {
     if (pageNum < 1 || pageNum > totalPages) return;
     currentPage = pageNum;
@@ -109,6 +149,9 @@ function switchPage(pageNum) {
     renderSelectedEditor();
 }
 
+/**
+ * Updates floating page confidence score and detected language pill badge.
+ */
 function updatePageScoreBadge() {
     const attempts = decisionData.attempts || [];
     const currentAttempt = (attempts.length > 1) ? (attempts[activePresetIndex] || attempts[attempts.length - 1]) : null;
@@ -138,16 +181,27 @@ function updatePageScoreBadge() {
     }
 }
 
+/**
+ * Adjusts current canvas zoom factor by delta increment.
+ *
+ * @param {number} delta - Zoom step delta (e.g. +0.1 or -0.1).
+ */
 function adjustZoom(delta) {
     currentZoom = Math.min(2.5, Math.max(0.5, currentZoom + delta));
     applyZoom();
 }
 
+/**
+ * Resets canvas zoom factor to default 100%.
+ */
 function resetZoom() {
     currentZoom = 1.0;
     applyZoom();
 }
 
+/**
+ * Automatically fits canvas zoom factor to client container width.
+ */
 function fitWidthZoom() {
     const pane = document.getElementById('visualPane');
     const availableW = pane.clientWidth - 40;
@@ -155,24 +209,39 @@ function fitWidthZoom() {
     applyZoom();
 }
 
+/**
+ * Applies currentZoom transform scaling to canvasContainer DOM element.
+ */
 function applyZoom() {
     const container = document.getElementById('canvasContainer');
     container.style.transform = `scale(${currentZoom})`;
     document.getElementById('zoomDisplay').textContent = `${Math.round(currentZoom * 100)}%`;
 }
 
+/**
+ * Updates overlay and badge layers based on checkbox toggle state.
+ */
 function updateLayers() {
     renderSVGOverlays();
     const showScore = document.getElementById('toggleScore').checked;
     document.getElementById('scoreBadge').style.display = showScore ? 'block' : 'none';
 }
 
+/**
+ * Toggles global correction preview mode.
+ */
 function toggleAllCorrections() {
     appliedCorrections = document.getElementById('toggleCorrections').checked;
     renderDOMTree();
     renderSVGOverlays();
 }
 
+/**
+ * Switches the active sidebar tab and updates panel contents.
+ *
+ * @param {Event|null} evt - Click event.
+ * @param {string} tabId - DOM element ID of target tab pane.
+ */
 function showTab(evt, tabId) {
     if (tabId === 'domTab') {
         if (evt && evt.shiftKey) {
@@ -209,6 +278,9 @@ function showTab(evt, tabId) {
     }
 }
 
+/**
+ * Fetches run comparison matrix data for the current document from /api/runs_grid.
+ */
 async function loadViewerRunsGrid() {
     const cont = document.getElementById('viewerRunsGridContainer');
     if (!cont) return;
@@ -230,6 +302,11 @@ async function loadViewerRunsGrid() {
     renderViewerRunsGridFallback();
 }
 
+/**
+ * Live notification handler updating runs grid in viewer when a score change occurs.
+ *
+ * @param {Object} updateMsg - Live update message payload.
+ */
 function updateViewerRunsGridLiveEntry(updateMsg) {
     if (!updateMsg) return;
     const cont = document.getElementById('viewerRunsGridContainer');
@@ -237,6 +314,11 @@ function updateViewerRunsGridLiveEntry(updateMsg) {
     renderViewerRunsGridFallback();
 }
 
+/**
+ * Renders two-dimensional run comparison matrix table inside viewer sidebar.
+ *
+ * @param {Object} gridData - Structured comparison payload returned by server.
+ */
 function renderViewerRunsGrid(gridData) {
     const cont = document.getElementById('viewerRunsGridContainer');
     if (!cont) return;
@@ -305,6 +387,9 @@ function renderViewerRunsGrid(gridData) {
     `;
 }
 
+/**
+ * Fallback renderer displaying in-memory attempt comparisons when API is offline.
+ */
 function renderViewerRunsGridFallback() {
     const cont = document.getElementById('viewerRunsGridContainer');
     if (!cont) return;

@@ -5,6 +5,11 @@
  * and element merging for textual and non-textual DOM elements.
  */
 
+/**
+ * Renders pairwise collision inspector and merge configuration editor for 2 selected nodes.
+ *
+ * @param {HTMLElement} container - Target container DOM element for the editor.
+ */
 function renderTwoNodeDecollideEditor(container) {
     const node1 = domData.nodes.find(n => n.node_id === selectedNodeIds[0]);
     const node2 = domData.nodes.find(n => n.node_id === selectedNodeIds[1]);
@@ -176,6 +181,9 @@ function renderTwoNodeDecollideEditor(container) {
     renderCutoutPreview(lower.node_id, lower.bounding_box, 'cutoutPreviewImg_' + lower.node_id);
 }
 
+/**
+ * Synchronizes merged text preview textarea when merge content handling dropdown changes.
+ */
 function onMergeConfigChanged() {
     const actionEl = document.getElementById('mergeContentAction');
     const textEl = document.getElementById('mergeMergedText');
@@ -201,6 +209,9 @@ function onMergeConfigChanged() {
     }
 }
 
+/**
+ * Handles UI trigger to merge the 2 currently selected DOM nodes.
+ */
 function executeMergeElements() {
     if (selectedNodeIds.length !== 2) return;
     const n1 = selectedNodeIds[0];
@@ -217,6 +228,15 @@ function executeMergeElements() {
     mergeDOMNodes(n1, n2, { targetType, contentAction, mergedText });
 }
 
+/**
+ * Merges two DOM nodes into a single consolidated element, recalculating bounding envelope
+ * and preserving audit history for undo support.
+ *
+ * @param {string} nodeId1 - First node identifier.
+ * @param {string} nodeId2 - Second node identifier.
+ * @param {Object} [options={}] - Options specifying targetType, contentAction, and custom mergedText.
+ * @returns {Object|null} Consolidated upper node object or null on failure.
+ */
 function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     const n1 = domData.nodes.find(n => n.node_id === nodeId1);
     const n2 = domData.nodes.find(n => n.node_id === nodeId2);
@@ -278,7 +298,7 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
 
     domData.nodes = domData.nodes.filter(n => n.node_id !== lower.node_id);
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     viols.forEach(v => {
         if (v.node_id === lower.node_id) {
             v.node_id = upper.node_id;
@@ -314,6 +334,13 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     return upper;
 }
 
+/**
+ * Reverts a previous element merge, restoring the original component nodes
+ * and re-associating their violations.
+ *
+ * @param {string} nodeId - Consolidated node ID to unmerge.
+ * @returns {Array<Object>|null} Array of restored component nodes or null on failure.
+ */
 function unmergeDOMNode(nodeId) {
     if (!domData || !domData.nodes) return null;
     const target = domData.nodes.find(n => n.node_id === nodeId);
@@ -327,9 +354,7 @@ function unmergeDOMNode(nodeId) {
 
     domData.nodes.splice(targetIdx, 1, ...restoredNodes);
 
-    const viols = (typeof extractViolationsList === 'function')
-        ? extractViolationsList(violationsData)
-        : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     restoredNodes.forEach(rn => {
         if (rn.violations && Array.isArray(rn.violations)) {
             rn.violations.forEach(rv => {
@@ -372,6 +397,10 @@ function unmergeDOMNode(nodeId) {
     return restoredNodes;
 }
 
+/**
+ * Resolves vertical overlap between the 2 currently selected bounding boxes
+ * by adjusting their top and bottom boundaries to a shared split line.
+ */
 function decollideSelectedPair() {
     if (selectedNodeIds.length !== 2) return;
     const node1 = domData.nodes.find(n => n.node_id === selectedNodeIds[0]);
@@ -408,6 +437,13 @@ function decollideSelectedPair() {
     }
 }
 
+/**
+ * Sweeps all bounding boxes on the target page and automatically decollides
+ * vertically overlapping adjacent pairs.
+ *
+ * @param {number|null} [pageIndex=null] - 1-indexed target page number or null for currentPage.
+ * @returns {number} Count of decollided box pairs.
+ */
 function decollideCurrentPage(pageIndex = null) {
     const targetPage = (typeof pageIndex === 'number' && pageIndex > 0) ? pageIndex : currentPage;
     const pageNodes = domData.nodes.filter(n => (n.global_page_index === targetPage || n.temp_slice_index === targetPage));

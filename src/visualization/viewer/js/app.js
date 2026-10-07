@@ -128,6 +128,7 @@ window.addEventListener('mouseup', (evt) => {
     }
 });
 
+// Keyboard navigation for page flipping
 window.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
@@ -137,6 +138,11 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
+/**
+ * Initializes and starts the visual inspection viewer.
+ * Hydrates state from window.VIEWER_DATA if injected, or fetches
+ * asynchronously from /api/viewer_data using URL search parameters.
+ */
 async function startViewer() {
     const urlParams = new URLSearchParams(window.location.search);
     const outputDirParam = urlParams.get('output_dir');

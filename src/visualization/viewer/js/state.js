@@ -5,12 +5,27 @@
  * for the interactive viewer.
  */
 
+/**
+ * Safely extracts an array of violations from varied payload shapes.
+ *
+ * @param {Array<Object>|Object|null|undefined} val - Raw violations data or container object.
+ * @returns {Array<Object>} Normalized array of violation objects.
+ */
 function extractViolationsList(val) {
     if (Array.isArray(val)) return val;
     if (val && typeof val === 'object' && Array.isArray(val.violations)) {
         return val.violations;
     }
     return [];
+}
+
+/**
+ * Convenience getter returning the current active violations array.
+ *
+ * @returns {Array<Object>} Current normalized violations list.
+ */
+function getViolationsList() {
+    return extractViolationsList(violationsData);
 }
 
 let initialDomData = (window.VIEWER_DATA && window.VIEWER_DATA.dom) ? window.VIEWER_DATA.dom : { nodes: [] };
@@ -47,10 +62,22 @@ let rawDecisionData = JSON.parse(JSON.stringify(initialDecisionData));
 
 const TEXTUAL_TYPES = ['paragraph', 'heading', 'header_footer', 'text'];
 
+/**
+ * Checks whether a given node type represents textual content.
+ *
+ * @param {string} type - Node type string.
+ * @returns {boolean} True if textual type.
+ */
 function isTextualType(type) {
     return TEXTUAL_TYPES.includes(type);
 }
 
+/**
+ * Determines whether a DOM node is considered textual based on type or content.
+ *
+ * @param {Object} node - DOM node object.
+ * @returns {boolean} True if the node contains or represents text.
+ */
 function isTextualNode(node) {
     if (!node) return false;
     if (isTextualType(node.type)) return true;
@@ -58,6 +85,12 @@ function isTextualNode(node) {
     return text.length > 0;
 }
 
+/**
+ * Retrieves the 1-indexed page number of a DOM node across varying schema versions.
+ *
+ * @param {Object} node - DOM node object.
+ * @returns {number} 1-indexed page index.
+ */
 function getNodePage(node) {
     if (!node) return 1;
     if (node.global_page_index !== undefined && node.global_page_index !== null) {
@@ -72,6 +105,12 @@ function getNodePage(node) {
     return 1;
 }
 
+/**
+ * Retrieves the 1-indexed page number for a violation, falling back to parent node page.
+ *
+ * @param {Object} v - Violation object.
+ * @returns {number} 1-indexed page index.
+ */
 function getViolationPage(v) {
     if (!v) return 1;
     if (v.global_page_index !== undefined && v.global_page_index !== null) {
@@ -87,11 +126,21 @@ function getViolationPage(v) {
     return 1;
 }
 
+/**
+ * Evaluates whether a violation is marked as suppressed (accepted false positive).
+ *
+ * @param {Object} v - Violation object.
+ * @returns {boolean} True if suppressed.
+ */
 function isSuppressed(v) {
     if (!v) return false;
     return String(v.suppressed).toLowerCase() === "true" || v.suppressed === true;
 }
 
+/**
+ * Ensures all violation objects have unique identifiers, normalized type categories,
+ * and canonical suppressed string states.
+ */
 function ensureViolationIds() {
     if (!Array.isArray(violationsData)) {
         violationsData = extractViolationsList(violationsData);
@@ -111,6 +160,10 @@ function ensureViolationIds() {
     });
 }
 
+/**
+ * Synchronizes suppression and category state bidirectionally between
+ * global violationsData and DOM node embedded violation arrays.
+ */
 function syncDomAndViolations() {
     if (!Array.isArray(violationsData)) {
         violationsData = extractViolationsList(violationsData);
@@ -154,14 +207,32 @@ function syncDomAndViolations() {
     }
 }
 
+/**
+ * Rounds coordinate values to two decimal points for clean rendering and persistence.
+ *
+ * @param {number} val - Raw floating point coordinate.
+ * @returns {number} Rounded coordinate.
+ */
 function roundCoord(val) {
     return Math.round(val * 100) / 100;
 }
 
+/**
+ * Escapes unsafe HTML characters to prevent XSS.
+ *
+ * @param {string|number|null|undefined} str - Raw string or value.
+ * @returns {string} Sanitized string safe for HTML rendering.
+ */
 function escapeHtml(str) {
     return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Applies known snippet corrections to raw text string.
+ *
+ * @param {string} rawText - Uncorrected text string.
+ * @returns {string} Text string with all suggested replacements applied.
+ */
 function applyCorrectionsToNodeText(rawText) {
     let text = rawText;
     const viols = extractViolationsList(initialViolationsData);
@@ -173,6 +244,12 @@ function applyCorrectionsToNodeText(rawText) {
     return text;
 }
 
+/**
+ * Computes structured DOM and quality violation diff between the pristine raw parse
+ * and current user-annotated document state.
+ *
+ * @returns {Object} Structured diff summary containing added, modified, removed, and scoring metrics.
+ */
 function computeDomDiff() {
     const rawNodes = (rawDomData && rawDomData.nodes) || [];
     const currentNodes = (domData && domData.nodes) || [];
@@ -225,12 +302,8 @@ function computeDomDiff() {
         }
     }
 
-    const rawViolsList = (typeof extractViolationsList === 'function')
-        ? extractViolationsList(rawViolationsData)
-        : (Array.isArray(rawViolationsData) ? rawViolationsData : []);
-    const currViolsList = (typeof extractViolationsList === 'function')
-        ? extractViolationsList(violationsData)
-        : (Array.isArray(violationsData) ? violationsData : []);
+    const rawViolsList = extractViolationsList(rawViolationsData);
+    const currViolsList = getViolationsList();
 
     const rawSuppressedMap = new Map();
     rawViolsList.forEach(v => {
@@ -282,12 +355,16 @@ function computeDomDiff() {
     };
 }
 
+/**
+ * Dynamically recomputes per-page and overall pipeline confidence scores
+ * based on resolved or suppressed quality violations.
+ *
+ * @returns {Object|null} Recomputed scoring metrics map or null if decisionData unavailable.
+ */
 function recalculateScoring() {
     if (!decisionData) return null;
 
-    const viols = (typeof extractViolationsList === 'function')
-        ? extractViolationsList(violationsData)
-        : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
 
     const rawDecision = (typeof rawDecisionData !== 'undefined' && rawDecisionData) ? rawDecisionData : decisionData;
     const rawPerPage = (rawDecision && rawDecision.per_page_confidence) || {};
@@ -411,6 +488,12 @@ function recalculateScoring() {
     };
 }
 
+/**
+ * Hydrates viewer state with external data payload and navigates to target page.
+ *
+ * @param {Object} data - Viewer data payload containing dom, violations, decision, etc.
+ * @param {number|null} [pageNum=null] - Target page index to display.
+ */
 function hydrateViewer(data, pageNum = null) {
     if (!data) return;
     window.VIEWER_DATA = data;

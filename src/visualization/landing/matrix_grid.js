@@ -9,6 +9,12 @@ let currentRunsGridDoc = '';
 window.liveRunOverrides = window.liveRunOverrides || {};
 window.currentGridData = null;
 
+/**
+ * Applies live in-memory execution overrides (e.g. updated confidence or violation counts)
+ * to run comparison grid data.
+ *
+ * @param {Object} gridData - Comparison grid payload containing runs list.
+ */
 function applyLiveOverridesToGrid(gridData) {
     if (!gridData || !gridData.runs) return;
     const overrides = window.liveRunOverrides || {};
@@ -51,6 +57,12 @@ function applyLiveOverridesToGrid(gridData) {
     });
 }
 
+/**
+ * Handles incoming RUN_RESULT_UPDATED messages by updating overrides, local cache,
+ * and refreshing the active runs grid view if loaded.
+ *
+ * @param {Object} updateMsg - Live run update event payload.
+ */
 function updateRunsGridLiveEntry(updateMsg) {
     if (!updateMsg) return;
     window.liveRunOverrides = window.liveRunOverrides || {};

@@ -5,6 +5,13 @@
  * manual coordinate adjustment, and decision log & plan tabs.
  */
 
+/**
+ * Handles element selection click on tree card or overlay polygon.
+ * Supports Shift+click for pairwise multi-selection.
+ *
+ * @param {MouseEvent|null} evt - Triggering click event.
+ * @param {string|null} nodeId - Identifier of target DOM node.
+ */
 function handleNodeClick(evt, nodeId) {
     if (!nodeId) {
         clearSelection();
@@ -48,6 +55,12 @@ function handleNodeClick(evt, nodeId) {
     renderSVGOverlays();
 }
 
+/**
+ * Programmatically selects a node and navigates to its page if necessary.
+ *
+ * @param {string} nodeId - Identifier of target DOM node.
+ * @param {number|null} [pageIndex=null] - Target 1-indexed page index.
+ */
 function selectNode(nodeId, pageIndex = null) {
     if (pageIndex && pageIndex !== currentPage) {
         switchPage(pageIndex);
@@ -56,6 +69,9 @@ function selectNode(nodeId, pageIndex = null) {
     handleNodeClick(evt, nodeId);
 }
 
+/**
+ * Clears current node selection state and hides active editor pane.
+ */
 function clearSelection() {
     selectedNodeIds = [];
     selectedNodeId = null;
@@ -64,6 +80,9 @@ function clearSelection() {
     renderSVGOverlays();
 }
 
+/**
+ * Renders the right-hand inspector pane for the currently selected node(s).
+ */
 function renderSelectedEditor() {
     const container = document.getElementById('selectedEditorContainer');
     if (!container) return;
@@ -102,7 +121,7 @@ function renderSelectedEditor() {
     }
     const noteVal = node.user_correction_note;
 
-    const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+    const viols = getViolationsList();
     const nodeViols = viols.filter(v => v.node_id === node.node_id);
     let violationsHtml = '';
     if (nodeViols.length > 0) {
@@ -248,6 +267,11 @@ function renderSelectedEditor() {
     renderCutoutPreview(node.node_id, node.bounding_box, 'cutoutPreviewImg_' + node.node_id, isCutoutUnskewed);
 }
 
+/**
+ * Resets a custom quadrilateral polygon to an axis-aligned rectangle.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
 function resetQuadToRect(nodeId) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
@@ -256,6 +280,9 @@ function resetQuadToRect(nodeId) {
     renderSVGOverlays();
 }
 
+/**
+ * Updates node bounding box when coordinate number inputs are manually edited.
+ */
 function onManualCoordChange() {
     if (!selectedNodeId) return;
     const node = domData.nodes.find(n => n.node_id === selectedNodeId);
@@ -280,6 +307,11 @@ function onManualCoordChange() {
     renderSVGOverlays();
 }
 
+/**
+ * Toggles user flag marking a node as containing incorrect parsed text.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
 function toggleIncorrectText(nodeId) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
@@ -292,12 +324,21 @@ function toggleIncorrectText(nodeId) {
     renderSVGOverlays();
 }
 
+/**
+ * Updates manual user correction note text for a node.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {string} text - User entered correction text.
+ */
 function updateCorrectionNote(nodeId, text) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
     node.user_correction_note = text;
 }
 
+/**
+ * Renders the hierarchical DOM element tree cards for the active page.
+ */
 function renderDOMTree() {
     const container = document.getElementById('domListContainer');
     if (!container) return;
@@ -326,7 +367,7 @@ function renderDOMTree() {
     nodesToDisplay.forEach(node => {
         const nodePage = getNodePage(node);
         const isOnCurrentPage = (nodePage === currentPage);
-        const viols = (typeof extractViolationsList === 'function') ? extractViolationsList(violationsData) : (Array.isArray(violationsData) ? violationsData : []);
+        const viols = getViolationsList();
         const hasActiveViol = viols.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v));
         const hasSuppressedViol = viols.some(v => v.node_id === node.node_id && isSuppressed(v));
         const isIncorrect = !!node.is_incorrect_text;
@@ -364,6 +405,9 @@ function renderDOMTree() {
     });
 }
 
+/**
+ * Formats and renders raw decision JSON payload into the decision log tab.
+ */
 function renderDecisionLog() {
     const el = document.getElementById('logContent');
     if (el) {
@@ -371,6 +415,9 @@ function renderDecisionLog() {
     }
 }
 
+/**
+ * Formats and renders raw DocumentPlan JSON payload into the plan tab.
+ */
 function renderPlanTab() {
     const el = document.getElementById('planContent');
     if (el) {

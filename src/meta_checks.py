@@ -132,6 +132,16 @@ DEFAULT_MUTED_CASES: List[MutedCase] = [
         violation_type="file_length",
         justification="Monolithic planner wizard stylesheet pending modular component breakdown.",
     ),
+    MutedCase(
+        file_pattern="src/visualization/viewer/js/state.js",
+        violation_type="file_length",
+        justification="Central viewer state container with DOM diffing, dynamic score recalculation, and hydration routines.",
+    ),
+    MutedCase(
+        file_pattern="src/visualization/viewer/js/decollide.js",
+        violation_type="file_length",
+        justification="Pairwise bounding box decollision, multi-node overlap inspection, and element merge editor.",
+    ),
 ]
 
 
