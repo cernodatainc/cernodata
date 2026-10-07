@@ -60,7 +60,6 @@ async function loadPreviousRunsList() {
 function updateRunSelectorsUI() {
     const globalSel = document.getElementById('globalRunSelect');
     const planSel = document.getElementById('planPreviousRunSelect');
-    const resultsSel = document.getElementById('resultsRunSelect');
     const chipsCont = document.getElementById('previousRunsChipsContainer');
     const activeBadge = document.getElementById('activeRunBadge');
 
@@ -79,7 +78,6 @@ function updateRunSelectorsUI() {
         planSel.innerHTML = '<option value="">-- Load Plan from Previous Run --</option>' +
             availableRuns.map(r => `<option value="${escapeHtml(r.dir_path)}">${escapeHtml(r.label || r.dir_path)}</option>`).join('');
     }
-    if (resultsSel) resultsSel.innerHTML = optionsHtml;
 
     if (chipsCont) {
         if (availableRuns.length === 0) {

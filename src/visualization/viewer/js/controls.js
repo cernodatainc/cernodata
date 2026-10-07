@@ -19,61 +19,8 @@ function toggleShowAllViolations(force = null) {
 function renderTimelineButtons() {
     const container = document.getElementById('timelineContainer');
     if (!container) return;
-
-    const attempts = decisionData.attempts || [];
-    if (attempts && attempts.length > 1) {
-        const att1 = attempts[0];
-        const att2 = attempts[1];
-        const p1Name = att1.preset || 'docling_fast';
-        let p2Name = att2.preset || 'docling_deep';
-        if (p2Name === p1Name) {
-            p2Name = (p1Name === 'docling_deep') ? 'docling_fast' : 'docling_deep';
-        }
-        const isAtt1Pass = !!att1.is_accepted;
-        const isAtt2Pass = !!att2.is_accepted;
-        container.innerHTML = `
-            <button class="step-btn ${activePresetIndex === 0 ? 'active' : ''}" id="btnPreset1" onclick="switchPreset(0, '${escapeHtml(p1Name)}')">
-                <span>Step 1: ${escapeHtml(p1Name)}</span>
-                <span class="badge-status ${isAtt1Pass ? 'pass' : 'fail'}" id="statusPreset1">${isAtt1Pass ? 'ACCEPT' : 'FALLBACK'}</span>
-            </button>
-            <button class="step-btn ${activePresetIndex === 1 ? 'active' : ''}" id="btnPreset2" onclick="switchPreset(1, '${escapeHtml(p2Name)}')">
-                <span>Step 2: ${escapeHtml(p2Name)}</span>
-                <span class="badge-status ${isAtt2Pass ? 'pass' : 'fail'}" id="statusPreset2">${isAtt2Pass ? 'ACCEPT' : 'FAIL'}</span>
-            </button>
-        `;
-        return;
-    }
-
-    const isAcc = (decisionData.is_accepted !== undefined) ? decisionData.is_accepted : true;
-    const chosenPreset = decisionData.chosen_preset || (planData ? planData.primary_preset : 'docling_fast') || 'docling_fast';
-    let preset2Name = (chosenPreset === 'docling_deep') ? 'docling_fast' : 'docling_deep';
-    if (planData && planData.fallback_queue && planData.fallback_queue.length > 0) {
-        for (const fb of planData.fallback_queue) {
-            const pCandidate = (typeof fb === 'object' && fb.preset) ? fb.preset : fb;
-            if (pCandidate && pCandidate !== chosenPreset) {
-                preset2Name = pCandidate;
-                break;
-            }
-        }
-    } else if (planData && planData.preset_order && planData.preset_order.length > 0) {
-        for (const pCandidate of planData.preset_order) {
-            if (pCandidate && pCandidate !== chosenPreset) {
-                preset2Name = pCandidate;
-                break;
-            }
-        }
-    }
-
-    container.innerHTML = `
-        <button class="step-btn ${activePresetIndex === 0 ? 'active' : ''}" id="btnPreset1" onclick="switchPreset(0, '${escapeHtml(chosenPreset)}')">
-            <span>Step 1: ${escapeHtml(chosenPreset)}</span>
-            <span class="badge-status ${isAcc ? 'pass' : 'fail'}" id="statusPreset1">${isAcc ? 'ACCEPT' : 'REJECT'}</span>
-        </button>
-        <button class="step-btn fallback ${activePresetIndex === 1 ? 'active' : ''}" id="btnPreset2" onclick="switchPreset(1, '${escapeHtml(preset2Name)}')">
-            <span>Step 2: ${escapeHtml(preset2Name)}</span>
-            <span class="badge-status" id="statusPreset2" style="background:#4B5563; color:#FFF;">Candidate</span>
-        </button>
-    `;
+    container.innerHTML = '';
+    container.style.display = 'none';
 }
 
 function initPageControls() {

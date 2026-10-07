@@ -17,7 +17,10 @@ import unittest
 from src.meta_checks import (
     DEFAULT_MAX_LINES,
     DEFAULT_MUTED_CASES,
+    DEFAULT_WARN_LINES,
+    FileLengthWarning,
     MutedCase,
+    check_file_length_warnings,
     check_file_lengths,
     check_inline_css_and_js,
     run_meta_checks,
@@ -99,6 +102,31 @@ class TestMetaChecks(unittest.TestCase):
         _, violations = check_file_lengths(self.test_dir, max_lines=500, muted_cases=invalid_mutes)
         self.assertEqual(len(violations), 1)
         self.assertIn("invalid/trivial mute justification", violations[0].message)
+
+    def test_check_file_length_warnings_flags_yellow_range(self) -> None:
+        self.assertEqual(DEFAULT_WARN_LINES, 250)
+        self._create_file("short_file.py", "x = 1\n" * 100)
+        self._create_file("yellow_flag.py", "x = 1\n" * 300)
+        self._create_file("over_limit.py", "x = 1\n" * 550)
+
+        warnings = check_file_length_warnings(self.test_dir, warn_lines=250, max_lines=500)
+        self.assertEqual(len(warnings), 1)
+        self.assertIsInstance(warnings[0], FileLengthWarning)
+        self.assertEqual(warnings[0].file.rel_path, "yellow_flag.py")
+        self.assertEqual(warnings[0].warn_threshold, 250)
+        self.assertEqual(warnings[0].max_threshold, 500)
+        self.assertIn("yellow flag: 250-500 lines", warnings[0].message)
+
+    def test_surface_longest_files_shows_flags(self) -> None:
+        self._create_file("small.py", "x = 1\n" * 50)
+        self._create_file("warning.py", "x = 1\n" * 300)
+        self._create_file("critical.py", "x = 1\n" * 550)
+
+        longest, report = surface_longest_files(self.test_dir, top_n=3, warn_lines=250, max_lines=500)
+        self.assertEqual(len(longest), 3)
+        self.assertIn("[RED FLAG]", report)
+        self.assertIn("[YELLOW FLAG]", report)
+        self.assertIn("[OK]", report)
 
     # =========================================================================
     # Inline CSS & Inline JS Checks
@@ -295,6 +323,7 @@ class TestMetaChecks(unittest.TestCase):
             [],
             f"Unmuted inline CSS/JS violations found: {results['inline_violations']}",
         )
+        self.assertIsInstance(results["yellow_flags"], list)
         self.assertTrue(results["is_passed"])
 
 

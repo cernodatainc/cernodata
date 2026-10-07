@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
+DEFAULT_WARN_LINES: int = 250
 DEFAULT_MAX_LINES: int = 500
 MIN_JUSTIFICATION_LENGTH: int = 15
 
@@ -39,6 +40,15 @@ class FileInfo:
     path: str
     rel_path: str
     line_count: int
+
+
+@dataclass(frozen=True)
+class FileLengthWarning:
+    """Warning record for a file in the yellow-flag range (warn_lines to max_lines)."""
+    file: FileInfo
+    warn_threshold: int
+    max_threshold: int
+    message: str
 
 
 @dataclass(frozen=True)
@@ -158,6 +168,8 @@ def scan_file_lengths(
 def surface_longest_files(
     target_dir: str,
     top_n: int = 10,
+    warn_lines: int = DEFAULT_WARN_LINES,
+    max_lines: int = DEFAULT_MAX_LINES,
     extensions: Optional[Sequence[str]] = None,
     exclude_dirs: Optional[Sequence[str]] = None,
 ) -> Tuple[List[FileInfo], str]:
@@ -169,9 +181,39 @@ def surface_longest_files(
         "-" * 72,
     ]
     for idx, item in enumerate(top_files, 1):
-        lines.append(f"{idx:2d}. {item.line_count:5d} lines | {item.rel_path}")
+        if item.line_count > max_lines:
+            flag = "[RED FLAG]"
+        elif item.line_count >= warn_lines:
+            flag = "[YELLOW FLAG]"
+        else:
+            flag = "[OK]"
+        lines.append(f"{idx:2d}. {item.line_count:5d} lines | {flag:<13} | {item.rel_path}")
     lines.append("-" * 72)
     return top_files, "\n".join(lines)
+
+
+def check_file_length_warnings(
+    target_dir: str,
+    warn_lines: int = DEFAULT_WARN_LINES,
+    max_lines: int = DEFAULT_MAX_LINES,
+    extensions: Optional[Sequence[str]] = None,
+    exclude_dirs: Optional[Sequence[str]] = None,
+) -> List[FileLengthWarning]:
+    """Surfaces files in the yellow flag zone (between warn_lines and max_lines)."""
+    all_files = scan_file_lengths(target_dir, extensions=extensions, exclude_dirs=exclude_dirs)
+    warnings: List[FileLengthWarning] = []
+    for item in all_files:
+        if warn_lines <= item.line_count <= max_lines:
+            warnings.append(FileLengthWarning(
+                file=item,
+                warn_threshold=warn_lines,
+                max_threshold=max_lines,
+                message=(
+                    f"File '{item.rel_path}' has {item.line_count} lines "
+                    f"(yellow flag: {warn_lines}-{max_lines} lines; approaching {max_lines} limit)."
+                ),
+            ))
+    return warnings
 
 
 def check_file_lengths(
@@ -359,6 +401,7 @@ def check_inline_css_and_js(
 def run_meta_checks(
     target_dir: Optional[str] = None,
     max_lines: int = DEFAULT_MAX_LINES,
+    warn_lines: int = DEFAULT_WARN_LINES,
     muted_cases: Optional[Sequence[MutedCase]] = None,
     include_event_handlers: bool = False,
 ) -> Dict[str, Any]:
@@ -367,12 +410,18 @@ def run_meta_checks(
     mutes = muted_cases if muted_cases is not None else DEFAULT_MUTED_CASES
     longest_files, length_viols = check_file_lengths(base_dir, max_lines, muted_cases=mutes)
     inline_viols = check_inline_css_and_js(base_dir, muted_cases=mutes, include_event_handlers=include_event_handlers)
+    yellow_flags = check_file_length_warnings(base_dir, warn_lines=warn_lines, max_lines=max_lines)
 
     return {
         "is_passed": (len(length_viols) == 0 and len(inline_viols) == 0),
         "target_dir": base_dir,
         "max_lines": max_lines,
+        "warn_lines": warn_lines,
         "longest_files": [{"path": f.rel_path, "lines": f.line_count} for f in longest_files],
+        "yellow_flags": [
+            {"file": w.file.rel_path, "lines": w.file.line_count, "threshold": w.warn_threshold, "message": w.message}
+            for w in yellow_flags
+        ],
         "length_violations": [
             {"file": v.file.rel_path, "lines": v.file.line_count, "threshold": v.threshold, "message": v.message}
             for v in length_viols
@@ -385,28 +434,53 @@ def run_meta_checks(
 
 
 __all__ = [
-    "DEFAULT_MAX_LINES", "MIN_JUSTIFICATION_LENGTH", "DEFAULT_MUTED_CASES",
-    "FileInfo", "FileLengthViolation", "InlineViolation", "MutedCase",
+    "DEFAULT_WARN_LINES", "DEFAULT_MAX_LINES", "MIN_JUSTIFICATION_LENGTH", "DEFAULT_MUTED_CASES",
+    "FileInfo", "FileLengthWarning", "FileLengthViolation", "InlineViolation", "MutedCase",
     "scan_file_lengths", "surface_longest_files", "check_file_lengths",
+    "check_file_length_warnings",
     "scan_inline_css_and_js", "check_inline_css_and_js", "run_meta_checks",
 ]
 
 
 if __name__ == "__main__":
+    import argparse
     import sys
-    root = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _, longest_report = surface_longest_files(root, top_n=10)
+
+    parser = argparse.ArgumentParser(description="Repository meta-quality and file-length enforcement.")
+    parser.add_argument("target_dir", nargs="?", default=None, help="Root directory to scan (default: repository root)")
+    parser.add_argument("--warn", type=int, default=DEFAULT_WARN_LINES, help="Yellow-flag warning threshold (default: 250)")
+    parser.add_argument("--max", type=int, default=DEFAULT_MAX_LINES, help="Red-flag error threshold (default: 500)")
+    parser.add_argument("--top", type=int, default=10, help="Number of longest files to surface (default: 10)")
+    parser.add_argument("--yellow-only", action="store_true", help="Display only yellow-flag files (250-500 lines)")
+    args = parser.parse_args()
+
+    root = args.target_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    if args.yellow_only:
+        yfs = check_file_length_warnings(root, warn_lines=args.warn, max_lines=args.max)
+        print(f"Yellow Flag Files ({len(yfs)} files between {args.warn} and {args.max} lines):")
+        print("-" * 72)
+        for yf in yfs:
+            print(f"  {yf.file.line_count:4d} lines | {yf.file.rel_path}")
+        print("-" * 72)
+        sys.exit(0)
+
+    _, longest_report = surface_longest_files(root, top_n=args.top, warn_lines=args.warn, max_lines=args.max)
     print(longest_report)
     print()
 
-    res = run_meta_checks(root)
+    res = run_meta_checks(root, max_lines=args.max, warn_lines=args.warn)
     print("Meta Checks Status:", "PASSED" if res["is_passed"] else "FAILED")
+    if res["yellow_flags"]:
+        print(f"\nYellow Flags ({len(res['yellow_flags'])} files in {args.warn}-{args.max} line range):")
+        for yf in res["yellow_flags"]:
+            print(f"  - [YELLOW FLAG] {yf['file']} ({yf['lines']} lines)")
     if res["length_violations"]:
-        print(f"File Length Violations ({len(res['length_violations'])}):")
+        print(f"\nFile Length Violations ({len(res['length_violations'])}):")
         for lv in res["length_violations"]:
-            print(f"  - {lv['message']}")
+            print(f"  - [RED FLAG] {lv['message']}")
     if res["inline_violations"]:
-        print(f"Inline CSS/JS Violations ({len(res['inline_violations'])}):")
+        print(f"\nInline CSS/JS Violations ({len(res['inline_violations'])}):")
         for iv in res["inline_violations"]:
             print(f"  - {iv['message']}")
     sys.exit(0 if res["is_passed"] else 1)

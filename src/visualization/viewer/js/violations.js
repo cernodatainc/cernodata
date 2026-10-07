@@ -166,25 +166,19 @@ function acceptCategoryOnPage(category, targetPage = null) {
             v.suppressed = "true";
             v.accepted = true;
             count++;
-        }
-    });
 
-    if (domData && domData.nodes) {
-        domData.nodes.forEach(node => {
-            const nPage = getNodePage(node);
-            if (page === null || nPage === page) {
-                if (node.violations) {
-                    node.violations.forEach(nv => {
-                        const nvCat = nv.type || (nv.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
-                        if (nvCat === category) {
-                            nv.suppressed = "true";
-                            nv.accepted = true;
-                        }
-                    });
+            if (domData && domData.nodes) {
+                const node = domData.nodes.find(n => n.node_id === v.node_id);
+                if (node && node.violations) {
+                    const nv = node.violations.find(item => item.violation_id === v.violation_id || item.rule_type === v.rule_type);
+                    if (nv) {
+                        nv.suppressed = "true";
+                        nv.accepted = true;
+                    }
                 }
             }
-        });
-    }
+        }
+    });
 
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();
@@ -224,25 +218,19 @@ function restoreCategoryOnPage(category, targetPage = null) {
             v.suppressed = "false";
             v.accepted = false;
             count++;
-        }
-    });
 
-    if (domData && domData.nodes) {
-        domData.nodes.forEach(node => {
-            const nPage = getNodePage(node);
-            if (page === null || nPage === page) {
-                if (node.violations) {
-                    node.violations.forEach(nv => {
-                        const nvCat = nv.type || (nv.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
-                        if (nvCat === category) {
-                            nv.suppressed = "false";
-                            nv.accepted = false;
-                        }
-                    });
+            if (domData && domData.nodes) {
+                const node = domData.nodes.find(n => n.node_id === v.node_id);
+                if (node && node.violations) {
+                    const nv = node.violations.find(item => item.violation_id === v.violation_id || item.rule_type === v.rule_type);
+                    if (nv) {
+                        nv.suppressed = "false";
+                        nv.accepted = false;
+                    }
                 }
             }
-        });
-    }
+        }
+    });
 
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();
