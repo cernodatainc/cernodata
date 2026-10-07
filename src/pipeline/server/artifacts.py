@@ -233,21 +233,27 @@ def build_viewer_dataset(
     Constructs canonical dataset required to hydrate interactive visual viewer.
     Stores raw result and diff to eliminate expensive redundant preset reruns.
     """
+    resolved_raw_dom = raw_dom if raw_dom is not None else dom
+    resolved_diff = diff if diff is not None else {}
+    resolved_output_dir = output_dir if output_dir else "output"
+
     det_langs = decision.get("detected_languages") if isinstance(decision, dict) else None
+    detected_languages = det_langs if isinstance(det_langs, dict) else {}
+
     dataset: Dict[str, Any] = {
         "dom": dom,
-        "raw_dom": raw_dom or dom,
-        "diff": diff or {},
+        "raw_dom": resolved_raw_dom,
+        "diff": resolved_diff,
         "violations": violations,
         "decision": decision,
-        "detectedLanguages": det_langs if isinstance(det_langs, dict) else {},
+        "detectedLanguages": detected_languages,
         "plan": plan,
         "pdfSourceFile": pdf_path,
         "activeLanguage": language,
         "pageImages": page_images,
         "pageDimensions": page_dimensions,
         "totalPages": total_pages,
-        "outputDir": output_dir or "output",
+        "outputDir": resolved_output_dir,
     }
     return dataset
 

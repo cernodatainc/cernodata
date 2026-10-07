@@ -46,8 +46,18 @@ class BaseApiRoutesMixin:
 
         Returns:
             Tuple of (resolved_document_path, language_code).
+
+        Raises:
+            ValueError: If no document path is provided in payload or session.
         """
-        raw_pdf = payload.get("pdf_path") or self.session.pdf_path or "src/e2e/Document 8.pdf"
+        raw_pdf = payload.get("pdf_path") or self.session.pdf_path
+        if not raw_pdf:
+            default_doc = getattr(self.server, "default_doc", None)
+            if default_doc:
+                raw_pdf = default_doc
+            else:
+                raise ValueError("No document path provided in request payload or active session.")
+
         pdf_path = resolve_pdf_path(raw_pdf)
         language = payload.get("language") or self.session.language or "en"
         return pdf_path, language

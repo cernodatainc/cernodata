@@ -72,29 +72,34 @@ class ViewerHydrationMixin:
             target_full = target_dir if os.path.isabs(target_dir) else os.path.join(self.repo_root, target_dir)
 
             artifacts = load_run_artifacts(target_full)
-            dom_data = artifacts["dom"] or {
-                "document_id": "doc_init",
-                "source_filename": self.pdf_path or "Document 8.pdf",
-                "total_pages": 1,
-                "nodes": [],
-            }
-            violations_data = artifacts["violations"]
-            decision_data = artifacts["decision"] or {
-                "chosen_preset": "docling_fast",
-                "overall_confidence": 1.0,
-                "status": "ACCEPT",
-                "attempts": list(self.preset_attempts),
-            }
-            plan_data = artifacts["plan"]
+            dom_data = artifacts.get("dom") or (self.current_result.get("dom") if self.current_result else None)
+            if not dom_data:
+                raise ValueError(
+                    f"DocumentDOM artifact is missing or empty in run directory '{target_full}'. "
+                    "Ensure pipeline has produced document_dom.json before hydrating viewer."
+                )
 
-            default_fallback_pdf = "src/e2e/Document 8.pdf"
-            candidate_paths = [
+            decision_data = artifacts.get("decision") or (self.current_result.get("decision") if self.current_result else None)
+            if not decision_data:
+                raise ValueError(
+                    f"Decision artifact is missing or empty in run directory '{target_full}'. "
+                    "Ensure pipeline has produced decision_tree.json or plan_execution_result.json."
+                )
+
+            plan_data = artifacts.get("plan") or (self.current_result.get("plan") if self.current_result else None)
+
+            raw_violations = artifacts.get("violations")
+            if raw_violations is None and self.current_result:
+                raw_violations = self.current_result.get("violations")
+            violations_data = normalize_violations(raw_violations if raw_violations is not None else [])
+
+            candidate_paths: List[Optional[str]] = [
                 self.pdf_path,
                 dom_data.get("source_filename"),
                 plan_data.get("document_path") if plan_data else None,
-                default_fallback_pdf,
+                artifacts.get("document_path"),
             ]
-            resolved_pdf = resolve_pdf_path(default_fallback_pdf)
+            resolved_pdf: Optional[str] = None
             for cand in candidate_paths:
                 if cand:
                     cand_resolved = resolve_pdf_path(str(cand))
@@ -102,8 +107,24 @@ class ViewerHydrationMixin:
                         resolved_pdf = cand_resolved
                         break
 
+            if not resolved_pdf:
+                first_cand = next((str(c) for c in candidate_paths if c), None)
+                if first_cand:
+                    resolved_pdf = resolve_pdf_path(first_cand)
+                else:
+                    raise FileNotFoundError(
+                        f"Cannot locate source PDF for run '{target_full}'. "
+                        "No document_path specified in session, DOM, or execution plan."
+                    )
+
             pdf_path = resolved_pdf
-            total_pages = dom_data.get("total_pages", 1) or 1
+
+            raw_pages = dom_data.get("total_pages")
+            if raw_pages is None:
+                raise ValueError(f"DocumentDOM is missing required 'total_pages' in '{target_full}'.")
+            total_pages = int(raw_pages)
+            if total_pages < 1:
+                raise ValueError(f"DocumentDOM has non-positive total_pages ({total_pages}) in '{target_full}'.")
 
             page_images, page_dimensions = load_or_render_page_images(
                 pdf_path=pdf_path,
@@ -115,8 +136,8 @@ class ViewerHydrationMixin:
                 decision_data["attempts"] = list(self.preset_attempts)
 
             viewer_language = self.language or decision_data.get("language", "en")
-            raw_dom = artifacts.get("raw_dom")
-            diff = artifacts.get("diff")
+            raw_dom = artifacts.get("raw_dom") or dom_data
+            diff = artifacts.get("diff") or {}
 
             self.viewer_data = build_viewer_dataset(
                 dom=dom_data,
@@ -144,10 +165,21 @@ class ViewerHydrationMixin:
             self.pdf_path = resolved_path
             self.language = language
 
-            dom_dict = result["dom"]
-            decision_dict = result["decision"]
+            dom_dict = result.get("dom")
+            if not dom_dict:
+                raise ValueError("Pipeline execution result must contain a non-empty 'dom' mapping.")
+
+            decision_dict = result.get("decision")
+            if not decision_dict:
+                raise ValueError("Pipeline execution result must contain a non-empty 'decision' mapping.")
+
             violations_list = normalize_violations(result.get("violations", []))
-            total_pages = dom_dict.get("total_pages", 1) or 1
+            raw_pages = dom_dict.get("total_pages")
+            if raw_pages is None:
+                raise ValueError("DocumentDOM in execution result is missing 'total_pages'.")
+            total_pages = int(raw_pages)
+            if total_pages < 1:
+                raise ValueError(f"Invalid non-positive total_pages ({total_pages}) in DocumentDOM.")
 
             target_output_dir = self.output_dir or "output"
             page_images, page_dimensions = load_or_render_page_images(

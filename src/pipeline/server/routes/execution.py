@@ -46,12 +46,17 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 )
                 self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
                 dec = cached.get("decision", {})
-                score = float(dec.get("overall_confidence", 1.0) or 1.0)
-                status = str(dec.get("status", "ACCEPT"))
+                raw_score = dec.get("overall_confidence")
+                score = float(raw_score) if raw_score is not None else 0.0
+
+                raw_status = dec.get("status")
+                status = str(raw_status) if raw_status is not None else "UNKNOWN"
+
+                viols = cached.get("violations", [])
                 self.session.set_completed(
                     status=status,
                     confidence=score,
-                    violations_count=len(cached.get("violations", [])),
+                    violations_count=len(viols),
                     log=f"[CACHE] Reused previous result for preset '{preset}' (Status: {status}, Confidence: {score:.4f}).",
                 )
                 send_json_response(self, 200, {  # type: ignore[arg-type]
@@ -106,16 +111,23 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             )
             session.update_result_state(res, pdf_path=pdf_path, language=language)
             dec = res.get("decision", {})
-            score = float(dec.get("overall_confidence", 1.0) or 1.0)
-            status = str(dec.get("status", "ACCEPT"))
+            raw_score = dec.get("overall_confidence")
+            score = float(raw_score) if raw_score is not None else 0.0
+
+            raw_status = dec.get("status")
+            status = str(raw_status) if raw_status is not None else "UNKNOWN"
+
+            viols = res.get("violations", [])
+            viols_count = len(viols)
+
             t_end = datetime.now().strftime("%H:%M:%S")
             session.set_completed(
                 status=status,
                 confidence=score,
-                violations_count=len(res.get("violations", [])),
+                violations_count=viols_count,
                 log=(
                     f"[{t_end}] [SUCCESS] Run complete: Status '{status}', "
-                    f"Confidence: {score:.4f}, Violations: {len(res.get('violations', []))}."
+                    f"Confidence: {score:.4f}, Violations: {viols_count}."
                 ),
             )
             return res
@@ -159,12 +171,17 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 )
                 self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
                 dec = cached.get("decision", {})
-                score = float(dec.get("overall_confidence", 1.0) or 1.0)
-                status = str(dec.get("status", "ACCEPT"))
+                raw_score = dec.get("overall_confidence")
+                score = float(raw_score) if raw_score is not None else 0.0
+
+                raw_status = dec.get("status")
+                status = str(raw_status) if raw_status is not None else "UNKNOWN"
+
+                viols = cached.get("violations", [])
                 self.session.set_completed(
                     status=status,
                     confidence=score,
-                    violations_count=len(cached.get("violations", [])),
+                    violations_count=len(viols),
                     log=f"[CACHE] Reused previous result for preset '{preset}' (Status: {status}, Confidence: {score:.4f}).",
                 )
                 send_json_response(self, 200, {  # type: ignore[arg-type]

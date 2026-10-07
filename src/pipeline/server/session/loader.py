@@ -93,15 +93,12 @@ class RunLoaderMixin:
             if not found_pdf and candidate_pdf_names:
                 self.pdf_path = resolve_pdf_path(candidate_pdf_names[0])
 
-            if not decision_dict and dom_dict:
-                decision_dict = {
-                    "chosen_preset": "docling_fast",
-                    "overall_confidence": 1.0,
-                    "status": "ACCEPT",
-                }
+            if not decision_dict:
+                decision_dict = {}
 
-            if decision_dict.get("language") and not self.language:
-                self.language = decision_dict["language"]
+            dec_language = decision_dict.get("language")
+            if dec_language and not self.language:
+                self.language = str(dec_language)
 
             attempts = decision_dict.get("attempts", [])
             if attempts:
@@ -129,9 +126,15 @@ class RunLoaderMixin:
             # Invalidate cached viewer_data so it rehydrates from the newly loaded run
             self.viewer_data = None
 
-            conf_val = float(decision_dict.get("overall_confidence", 1.0) or 1.0)
-            status_val = str(decision_dict.get("status", "ACCEPT"))
-            chosen_preset = str(decision_dict.get("chosen_preset", "docling_fast"))
+            raw_conf = decision_dict.get("overall_confidence")
+            conf_val = float(raw_conf) if raw_conf is not None else 0.0
+
+            raw_status = decision_dict.get("status")
+            status_val = str(raw_status) if raw_status is not None else "UNKNOWN"
+
+            raw_chosen = decision_dict.get("chosen_preset")
+            chosen_preset = str(raw_chosen) if raw_chosen is not None else "unknown"
+
             viol_count = len(viol_list)
 
             target_att = None

@@ -42,7 +42,9 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         """
         Returns runtime server configuration and preset options.
         """
-        default_doc = getattr(self.server, "default_doc", None) or self.session.pdf_path or "src/e2e/Document 8.pdf"
+        configured_doc = getattr(self.server, "default_doc", None)
+        session_doc = self.session.pdf_path
+        default_doc = configured_doc or session_doc or ""
         default_lang = getattr(self.server, "default_lang", None) or self.session.language or "en"
         default_thresh = getattr(self.server, "default_threshold", 0.85)
 
