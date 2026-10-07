@@ -1,5 +1,5 @@
 """
-src/pipeline/planner.py
+src/pipeline/planner/planner.py
 
 Data-Driven Preset Planner.
 Inquires about document characteristics and system constraints, computes preset suitability
@@ -9,35 +9,11 @@ rankings, allows user override, and produces an executable execution plan.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Callable, Any, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from src.pipeline.planner_models import DocumentPlan, PlannerCriteria, IngestionConfig
-from src.pipeline.planner_options import (
-    DEFAULT_PRESET_WEIGHTS,
-    TAXONOMY_OPTIONS,
-    TARGET_OPTIONS,
-    SECURITY_OPTIONS,
-    WizardDimension,
-    WIZARD_DIMENSIONS,
-)
-from src.pipeline.planner_wizard import resolve_choice, run_interactive_wizard
-from src.pipeline.planner_server import serve_data_shape_wizard
-
-__all__ = [
-    "DocumentPlan",
-    "PlannerCriteria",
-    "IngestionConfig",
-    "PresetPlanner",
-    "DEFAULT_PRESET_WEIGHTS",
-    "TAXONOMY_OPTIONS",
-    "TARGET_OPTIONS",
-    "SECURITY_OPTIONS",
-    "WizardDimension",
-    "WIZARD_DIMENSIONS",
-    "resolve_choice",
-    "run_interactive_wizard",
-    "serve_data_shape_wizard",
-]
+from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
+from src.pipeline.planner.options import DEFAULT_PRESET_WEIGHTS
+from src.pipeline.planner.wizard import resolve_choice, run_interactive_wizard
 
 
 class PresetPlanner:
@@ -53,7 +29,7 @@ class PresetPlanner:
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Dict[str, float]:
         """Calculates preset suitability scores based on strongly-typed PlannerCriteria or backward-compatible arguments."""
         if isinstance(criteria, PlannerCriteria):
@@ -73,7 +49,7 @@ class PresetPlanner:
             resolved_criteria = PlannerCriteria(
                 taxonomy=tax,
                 target=actual_target,
-                security=actual_security
+                security=actual_security,
             )
 
         scores: Dict[str, float] = {}
@@ -100,7 +76,7 @@ class PresetPlanner:
         override_order: Optional[List[str]] = None,
         override_primary: Optional[str] = None,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> DocumentPlan:
         """Constructs an executable DocumentPlan instance using strongly-typed PlannerCriteria."""
         if isinstance(criteria, PlannerCriteria):
@@ -112,7 +88,7 @@ class PresetPlanner:
             resolved_criteria = PlannerCriteria(
                 taxonomy=tax,
                 target=target,
-                security=security
+                security=security,
             )
 
         scores = self.calculate_scores(criteria=resolved_criteria)
@@ -129,8 +105,12 @@ class PresetPlanner:
             order = list(suggested)
 
         primary_preset = order[0]
-        fallback_queue = [{"preset": p, "score": scores.get(p, 0.50)} for p in order[1:]]
+        fallback_queue: List[Dict[str, Any]] = []
+        for p in order[1:]:
+            p_score = scores.get(p, 0.50)
+            fallback_queue.append({"preset": p, "score": p_score})
 
+        created_at_iso = datetime.now(timezone.utc).isoformat()
         return DocumentPlan(
             document_path=document_path,
             criteria=resolved_criteria,
@@ -142,7 +122,7 @@ class PresetPlanner:
             suggested_order=suggested,
             overridden=overridden,
             scores=scores,
-            created_at=datetime.now(timezone.utc).isoformat()
+            created_at=created_at_iso,
         )
 
     @staticmethod
@@ -154,14 +134,14 @@ class PresetPlanner:
         self,
         input_func: Callable[[str], str] = input,
         print_func: Callable[..., None] = print,
-        default_doc: Optional[str] = None
+        default_doc: Optional[str] = None,
     ) -> DocumentPlan:
         """Interactive questionnaire wizard delegating to run_interactive_wizard."""
         return run_interactive_wizard(
             planner=self,
             input_func=input_func,
             print_func=print_func,
-            default_doc=default_doc
+            default_doc=default_doc,
         )
 
     def browser_session(
@@ -171,9 +151,10 @@ class PresetPlanner:
         default_threshold: float = 0.82,
         output_dir: str = "output",
         port: int = 8000,
-        open_browser: bool = True
+        open_browser: bool = True,
     ) -> DocumentPlan:
         """Interactive in-browser data shape configuration wizard delegating to serve_data_shape_wizard."""
+        from src.pipeline.planner.server import serve_data_shape_wizard
         return serve_data_shape_wizard(
             planner=self,
             default_doc=default_doc,
@@ -181,5 +162,5 @@ class PresetPlanner:
             default_threshold=default_threshold,
             output_dir=output_dir,
             port=port,
-            open_browser=open_browser
+            open_browser=open_browser,
         )

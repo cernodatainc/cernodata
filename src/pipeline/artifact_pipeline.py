@@ -13,7 +13,7 @@ from src.pipeline.artifact_exporter import (
     render_visual_overlays,
 )
 from src.pipeline.execution_models import PipelineExecutionResult
-from src.pipeline.planner_models import DocumentPlan, IngestionConfig
+from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 
 
 class PipelineArtifactPipeline:

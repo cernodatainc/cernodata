@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional, Tuple, Type
 
-from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.planner.models import DocumentPlan
 from src.pipeline.server.session import ServerSessionContext
 
 logger = logging.getLogger("cernodata.server.core")

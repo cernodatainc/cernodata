@@ -63,10 +63,12 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
 
         self.session.viewer_data = None
         if self.session.current_result:
+            result_diff = diff_data or {}
+            result_violations = violations_data or []
             self.session.current_result.update({
                 "dom": dom_data,
-                "diff": diff_data or {},
-                "violations": violations_data or [],
+                "diff": result_diff,
+                "violations": result_violations,
             })
             if decision_data:
                 self.session.current_result["decision"] = decision_data
