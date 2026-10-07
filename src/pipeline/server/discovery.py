@@ -13,7 +13,7 @@ import os
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Dict, List, Optional, Set
 
-from src.pipeline.server.artifacts import load_run_artifacts
+from src.pipeline.server.artifacts import RunArtifacts, load_run_artifacts
 from src.pipeline.server.http_utils import REPO_ROOT
 
 logger = logging.getLogger("cernodata.server.discovery")
@@ -45,13 +45,13 @@ class RunMetadata:
         cls,
         norm_rel: str,
         match: str,
-        artifacts: Dict[str, Any],
+        artifacts: RunArtifacts,
     ) -> RunMetadata:
         """Constructs canonical RunMetadata directly from load_run_artifacts output."""
-        plan_data = artifacts.get("plan")
-        dom_data = artifacts.get("dom") or {}
-        violations = artifacts.get("violations") or []
-        decision_data = artifacts.get("decision") or {}
+        plan_data = artifacts.plan
+        dom_data = artifacts.dom
+        violations = artifacts.violations
+        decision_data = artifacts.decision
 
         active_violations = [
             v for v in violations
@@ -61,10 +61,10 @@ class RunMetadata:
         ]
         violations_count = len(active_violations)
 
-        overall_confidence = artifacts.get("overall_confidence")
-        status = artifacts.get("status", "ACCEPT")
+        overall_confidence = artifacts.overall_confidence
+        status = artifacts.status
 
-        diff_data = artifacts.get("diff") or {}
+        diff_data = artifacts.diff
         diff_scoring = diff_data.get("scoring") or {}
         if diff_scoring:
             if diff_scoring.get("current_overall_confidence") is not None:
@@ -73,8 +73,8 @@ class RunMetadata:
                 status = str(diff_scoring["status"])
 
         conf_val = float(overall_confidence) if overall_confidence is not None else 1.0
-        doc_name = str(artifacts.get("document_name") or "Unknown")
-        chosen_preset = str(artifacts.get("chosen_preset") or "docling_fast")
+        doc_name = artifacts.document_name or "Unknown"
+        chosen_preset = artifacts.chosen_preset or "docling_fast"
         score_str = f"{conf_val:.4f}"
         label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
 
@@ -88,11 +88,13 @@ class RunMetadata:
             p_num = str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
             per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
 
+        document_path = artifacts.document_path or ""
+
         return cls(
             id=norm_rel,
             dir_path=norm_rel,
             document_name=doc_name,
-            document_path=str(artifacts.get("document_path") or ""),
+            document_path=document_path,
             chosen_preset=chosen_preset,
             status=status,
             overall_confidence=conf_val,
@@ -172,7 +174,7 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             artifacts = load_run_artifacts(match)
             base_run = RunMetadata.from_run_artifacts(norm_rel, match, artifacts)
 
-            decision_data = artifacts.get("decision") or {}
+            decision_data = artifacts.decision
 
             attempts = decision_data.get("attempts", [])
             if attempts and len(attempts) > 1:

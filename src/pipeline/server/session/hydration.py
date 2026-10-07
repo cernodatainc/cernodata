@@ -74,23 +74,23 @@ class ViewerHydrationMixin:
             target_full = target_dir if os.path.isabs(target_dir) else os.path.join(self.repo_root, target_dir)
 
             artifacts = load_run_artifacts(target_full)
-            dom_data = artifacts.get("dom") or (self.current_result.get("dom") if self.current_result else None)
+            dom_data = artifacts.dom or (self.current_result.get("dom") if self.current_result else None)
             if not dom_data:
                 raise ValueError(
                     f"DocumentDOM artifact is missing or empty in run directory '{target_full}'. "
                     "Ensure pipeline has produced document_dom.json before hydrating viewer."
                 )
 
-            decision_data = artifacts.get("decision") or (self.current_result.get("decision") if self.current_result else None)
+            decision_data = artifacts.decision or (self.current_result.get("decision") if self.current_result else None)
             if not decision_data:
                 raise ValueError(
                     f"Decision artifact is missing or empty in run directory '{target_full}'. "
                     "Ensure pipeline has produced decision_tree.json or plan_execution_result.json."
                 )
 
-            plan_data = artifacts.get("plan") or (self.current_result.get("plan") if self.current_result else None)
+            plan_data = artifacts.plan or (self.current_result.get("plan") if self.current_result else None)
 
-            raw_violations = artifacts.get("violations")
+            raw_violations = artifacts.violations
             if raw_violations is None and self.current_result:
                 raw_violations = self.current_result.get("violations")
             violations_data = normalize_violations(raw_violations if raw_violations is not None else [])
@@ -99,7 +99,7 @@ class ViewerHydrationMixin:
                 self.pdf_path,
                 dom_data.get("source_filename"),
                 plan_data.get("document_path") if plan_data else None,
-                artifacts.get("document_path"),
+                artifacts.document_path,
             ]
             resolved_pdf: Optional[str] = None
             for cand in candidate_paths:
@@ -138,8 +138,8 @@ class ViewerHydrationMixin:
                 decision_data["attempts"] = list(self.preset_attempts)
 
             viewer_language = self.language or decision_data.get("language", "en")
-            raw_dom = artifacts.get("raw_dom") or dom_data
-            diff = artifacts.get("diff") or {}
+            raw_dom = artifacts.raw_dom or dom_data
+            diff = artifacts.diff or {}
 
             self.viewer_data = build_viewer_dataset(
                 dom=dom_data,

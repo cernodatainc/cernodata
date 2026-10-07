@@ -12,11 +12,55 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from src.pipeline.execution_models import AttemptRecord
 
 logger = logging.getLogger("cernodata.server.artifacts")
+
+
+@dataclass
+class RunArtifacts:
+    """Strongly-typed container for loaded pipeline execution artifacts."""
+    plan_execution_result: Dict[str, Any] = field(default_factory=dict)
+    plan: Optional[Dict[str, Any]] = None
+    decision: Dict[str, Any] = field(default_factory=dict)
+    dom: Dict[str, Any] = field(default_factory=dict)
+    raw_dom: Dict[str, Any] = field(default_factory=dict)
+    diff: Dict[str, Any] = field(default_factory=dict)
+    violations: List[Dict[str, Any]] = field(default_factory=list)
+    chosen_preset: str = "N/A"
+    status: str = "ACCEPT"
+    overall_confidence: Optional[float] = None
+    document_path: str = ""
+    document_name: str = "Unknown"
+
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializes artifacts to dictionary mapping."""
+        return {
+            "plan_execution_result": self.plan_execution_result,
+            "plan": self.plan,
+            "decision": self.decision,
+            "dom": self.dom,
+            "raw_dom": self.raw_dom,
+            "diff": self.diff,
+            "violations": self.violations,
+            "chosen_preset": self.chosen_preset,
+            "status": self.status,
+            "overall_confidence": self.overall_confidence,
+            "document_path": self.document_path,
+            "document_name": self.document_name,
+        }
 
 
 class ViewerDataset(TypedDict, total=False):
@@ -102,7 +146,7 @@ def extract_decision_from_html(html_path: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
+def load_run_artifacts(run_dir: str) -> RunArtifacts:
     """
     Loads and coalesces pipeline execution artifacts from an output directory.
 
@@ -113,7 +157,7 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
         run_dir: Path to directory containing output artifacts.
 
     Returns:
-        Dictionary mapping artifact identifiers to deserialized data.
+        RunArtifacts container holding deserialized pipeline data.
     """
     plan_res_path = os.path.join(run_dir, "plan_execution_result.json")
     plan_res_data: Dict[str, Any] = safe_load_json(plan_res_path, {})
@@ -178,20 +222,20 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
 
     doc_name = os.path.basename(doc_path) if doc_path else "Unknown"
 
-    return {
-        "plan_execution_result": plan_res_data,
-        "plan": plan_data,
-        "decision": decision_data,
-        "dom": dom_data,
-        "raw_dom": raw_dom_data,
-        "diff": diff_data,
-        "violations": violations,
-        "chosen_preset": chosen_preset,
-        "status": status,
-        "overall_confidence": overall_confidence,
-        "document_path": doc_path,
-        "document_name": doc_name,
-    }
+    return RunArtifacts(
+        plan_execution_result=plan_res_data,
+        plan=plan_data,
+        decision=decision_data,
+        dom=dom_data,
+        raw_dom=raw_dom_data,
+        diff=diff_data,
+        violations=violations,
+        chosen_preset=chosen_preset,
+        status=status,
+        overall_confidence=overall_confidence,
+        document_path=doc_path,
+        document_name=doc_name,
+    )
 
 
 def create_preset_attempt_record(

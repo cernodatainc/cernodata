@@ -131,12 +131,12 @@ class PresetCache:
                 if dir_path:
                     full_dir = dir_path if os.path.isabs(dir_path) else os.path.join(repo_root, dir_path)
                     artifacts = load_run_artifacts(full_dir)
-                    if artifacts.get("dom") and artifacts.get("decision"):
+                    if artifacts.dom and artifacts.decision:
                         res: Dict[str, Any] = {
-                            "dom": artifacts["dom"],
-                            "decision": artifacts["decision"],
-                            "violations": artifacts["violations"],
-                            "plan": artifacts.get("plan"),
+                            "dom": artifacts.dom,
+                            "decision": artifacts.decision,
+                            "violations": artifacts.violations,
+                            "plan": artifacts.plan,
                         }
                         with self._lock:
                             for k in target_keys:

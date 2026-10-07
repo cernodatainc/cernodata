@@ -16,6 +16,7 @@ from src.pipeline.server.artifacts import (
     load_run_artifacts,
     normalize_violations,
     safe_load_json,
+    RunArtifacts,
 )
 from src.pipeline.server.core import PipelineViewerServer
 from src.pipeline.server.discovery import (
@@ -66,6 +67,7 @@ __all__ = [
     "normalize_violations",
     "extract_decision_from_html",
     "load_run_artifacts",
+    "RunArtifacts",
     "load_or_render_page_images",
     "calculate_progress_step",
     "create_preset_attempt_record",

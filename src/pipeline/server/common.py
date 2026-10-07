@@ -21,6 +21,7 @@ from src.pipeline.server.artifacts import (
     load_run_artifacts,
     normalize_violations,
     safe_load_json,
+    RunArtifacts,
 )
 from src.pipeline.server.discovery import (
     build_runs_grid,
@@ -52,6 +53,7 @@ __all__ = [
     "find_previous_runs",
     "load_or_render_page_images",
     "load_run_artifacts",
+    "RunArtifacts",
     "normalize_violations",
     "read_html_template",
     "read_json_payload",

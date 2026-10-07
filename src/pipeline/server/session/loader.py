@@ -65,10 +65,10 @@ class RunLoaderMixin:
                 return {}
 
             artifacts = load_run_artifacts(full_dir)
-            plan_dict = artifacts["plan"]
-            decision_dict = artifacts["decision"]
-            dom_dict = artifacts["dom"]
-            viol_list = artifacts["violations"]
+            plan_dict = artifacts.plan
+            decision_dict = artifacts.decision
+            dom_dict = artifacts.dom
+            viol_list = artifacts.violations
 
             candidate_pdf_names: List[str] = []
             if plan_dict:
@@ -115,8 +115,8 @@ class RunLoaderMixin:
                     )
                 ]
 
-            raw_dom = artifacts.get("raw_dom") or dom_dict
-            diff = artifacts.get("diff") or {}
+            raw_dom = artifacts.raw_dom or dom_dict
+            diff = artifacts.diff or {}
             self.current_result = {
                 "decision": decision_dict,
                 "violations": viol_list,
