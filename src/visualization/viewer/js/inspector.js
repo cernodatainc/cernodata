@@ -184,6 +184,17 @@ function renderSelectedEditor() {
                 <h4>Selected: ${node.node_id} (${node.type})</h4>
                 <button style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="clearSelection()">Close</button>
             </div>
+            ${(node.is_merged || (node.merged_from && node.merged_from.length > 0)) ? `
+            <div style="background: rgba(37, 99, 235, 0.15); border: 1px solid #3B82F6; border-radius: 4px; padding: 6px 8px; margin-bottom: 8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:11px; font-weight:600; color:#93C5FD;">[MERGE] Merged Element (${(node.merged_from || []).length} elements combined)</span>
+                    <button class="action-btn" style="background:#DC2626; color:#FFF; font-size:10px; padding:2px 8px;" onclick="unmergeDOMNode('${node.node_id}')">[UNMERGE] Undo Merge</button>
+                </div>
+                <div style="font-size:10px; color:#BFDBFE; margin-top:2px;">
+                    Original: ${(node.merged_from || []).map(m => escapeHtml(m.node_id)).join(' + ')}
+                </div>
+            </div>
+            ` : ''}
             <div class="coord-grid">
                 <div class="coord-field"><label>X0</label><input type="number" step="0.5" id="inpX0" value="${bbox.x0}" onchange="onManualCoordChange()"></div>
                 <div class="coord-field"><label>Y0</label><input type="number" step="0.5" id="inpY0" value="${bbox.y0}" onchange="onManualCoordChange()"></div>
@@ -342,6 +353,7 @@ function renderDOMTree() {
                     <span class="badge-status" style="font-size:9px; background:${isOnCurrentPage ? '#2563EB' : '#374151'}; color:#FFF;">P${nodePage}</span>
                     <span class="node-type">${escapeHtml(node.type)}</span>
                     ${isFixed ? '<span class="node-corrected-badge">FIXED</span>' : ''}
+                    ${node.is_merged || (node.merged_from && node.merged_from.length > 0) ? '<span class="badge-status" style="font-size:9px; background:#1E40AF; color:#DBEAFE;">MERGED</span>' : ''}
                     ${!hasActiveViol && hasSuppressedViol ? '<span class="badge-status" style="font-size:9px; background:#065F46; color:#A7F3D0;">ACCEPTED</span>' : ''}
                     ${isIncorrect ? '<span class="node-incorrect-badge">INCORRECT TEXT</span>' : ''}
                 </div>

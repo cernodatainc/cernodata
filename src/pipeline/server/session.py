@@ -22,7 +22,7 @@ from src.pipeline.server.artifacts import (
     normalize_violations,
 )
 from src.pipeline.server.discovery import build_runs_grid, find_previous_runs
-from src.pipeline.server.http_utils import REPO_ROOT, SRC_DIR
+from src.pipeline.server.http_utils import REPO_ROOT, SRC_DIR, parse_run_dir_and_step
 from src.pipeline.server.preset_cache import PresetCache
 from src.pipeline.server.progress import ProgressTracker
 from src.utils import resolve_pdf_path
@@ -50,6 +50,7 @@ class ServerSessionContext:
         self.repo_root: str = repo_root or REPO_ROOT
         self.src_dir: str = src_dir or SRC_DIR
         self.output_dir: str = output_dir.replace("\\", "/")
+        self.active_step: Optional[int] = None
         self.viewer_data: Optional[Dict[str, Any]] = None
         self.current_result: Optional[Dict[str, Any]] = None
         self.preset_attempts: List[Dict[str, Any]] = []
@@ -60,7 +61,6 @@ class ServerSessionContext:
 
     @property
     def progress_state(self) -> Dict[str, Any]:
-        """Provides direct access to the progress tracker's current state."""
         return self._progress_tracker.progress_state
 
     @progress_state.setter
@@ -69,7 +69,6 @@ class ServerSessionContext:
 
     @property
     def preset_results(self) -> Dict[str, Dict[str, Any]]:
-        """Provides direct access to cached preset results dictionary."""
         return self._preset_cache.preset_results
 
     @preset_results.setter
@@ -77,21 +76,15 @@ class ServerSessionContext:
         self._preset_cache.preset_results = val
 
     def get_available_documents(self) -> List[str]:
-        """
-        Finds candidate PDF documents in repository workspace.
-
-        Returns:
-            List of repository-relative PDF file paths.
-        """
+        """Finds candidate PDF documents in repository workspace."""
         docs: List[str] = []
-        patterns = [
+        for pat in [
             os.path.join(self.repo_root, "src", "e2e", "*.pdf"),
             os.path.join(self.repo_root, "output", "*.pdf"),
             os.path.join(self.repo_root, "*.pdf"),
             os.path.join(self.src_dir, "e2e", "*.pdf"),
-        ]
-        for pattern in patterns:
-            for match in glob.glob(pattern):
+        ]:
+            for match in glob.glob(pat):
                 try:
                     rel = os.path.relpath(match, self.repo_root).replace("\\", "/")
                 except Exception:
@@ -104,12 +97,7 @@ class ServerSessionContext:
         return docs
 
     def get_previous_runs(self) -> List[Dict[str, Any]]:
-        """
-        Finds completed output runs available in repository.
-
-        Returns:
-            List of discovered run metadata dictionaries.
-        """
+        """Finds completed output runs available in repository."""
         return find_previous_runs(self.repo_root)
 
     def load_previous_run(self, output_dir: str) -> Dict[str, Any]:
@@ -123,8 +111,10 @@ class ServerSessionContext:
             Summary of loaded artifacts and run attributes.
         """
         with self._lock:
-            norm_rel = output_dir.replace("\\", "/").strip()
+            norm_rel, step_idx = parse_run_dir_and_step(output_dir)
             self.output_dir = norm_rel
+            self.active_step = step_idx
+            self.viewer_data = None
             full_dir = norm_rel if os.path.isabs(norm_rel) else os.path.join(self.repo_root, norm_rel)
             if not os.path.exists(full_dir):
                 logger.warning("Requested output directory does not exist: %s", full_dir)
@@ -195,9 +185,21 @@ class ServerSessionContext:
             # Invalidate cached viewer_data so it rehydrates from the newly loaded run
             self.viewer_data = None
 
-            conf_val = decision_dict.get("overall_confidence", 1.0)
-            status_val = decision_dict.get("status", "ACCEPT")
-            chosen_preset = decision_dict.get("chosen_preset", "docling_fast")
+            conf_val = float(decision_dict.get("overall_confidence", 1.0) or 1.0)
+            status_val = str(decision_dict.get("status", "ACCEPT"))
+            chosen_preset = str(decision_dict.get("chosen_preset", "docling_fast"))
+            viol_count = len(viol_list)
+
+            target_att = None
+            if step_idx is not None and self.preset_attempts:
+                target_att = next((a for a in self.preset_attempts if a.get("step") == step_idx), None)
+                if not target_att and 0 <= step_idx - 1 < len(self.preset_attempts):
+                    target_att = self.preset_attempts[step_idx - 1]
+            if target_att:
+                chosen_preset = str(target_att.get("preset", chosen_preset))
+                conf_val = float(target_att.get("overall_confidence", conf_val) or conf_val)
+                status_val = str(target_att.get("status", status_val))
+                viol_count = int(target_att.get("violations_count", viol_count))
 
             # Cache loaded preset result for instant reuse without redundant reruns
             if dom_dict:
@@ -216,7 +218,7 @@ class ServerSessionContext:
                 confidence=conf_val,
                 status=status_val,
                 nodes_count=len(dom_dict.get("nodes", [])),
-                violations_count=len(viol_list),
+                violations_count=viol_count,
             )
 
             return {
@@ -224,8 +226,12 @@ class ServerSessionContext:
                 "document_path": self.pdf_path,
                 "decision": decision_dict,
                 "plan": plan_dict,
-                "violations_count": len(viol_list),
+                "violations_count": viol_count,
                 "attempts": list(self.preset_attempts),
+                "active_step": self.active_step,
+                "chosen_preset": chosen_preset,
+                "overall_confidence": conf_val,
+                "status": status_val,
             }
 
     # -------------------------------------------------------------------------
@@ -310,8 +316,10 @@ class ServerSessionContext:
     def get_viewer_data(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe retrieval and hydration of viewer state."""
         with self._lock:
-            if output_dir and output_dir != self.output_dir:
-                self.load_previous_run(output_dir)
+            if output_dir:
+                norm_rel, step_idx = parse_run_dir_and_step(output_dir)
+                if norm_rel != self.output_dir or step_idx != self.active_step:
+                    self.load_previous_run(output_dir)
 
             if self.viewer_data is not None:
                 return self.viewer_data
@@ -335,21 +343,8 @@ class ServerSessionContext:
             }
             plan_data = artifacts["plan"]
 
-            candidates = [
-                self.pdf_path,
-                dom_data.get("source_filename"),
-                (plan_data.get("document_path") if plan_data else None),
-                "src/e2e/Document 8.pdf",
-            ]
-            pdf_path = ""
-            for cand in candidates:
-                if cand:
-                    res = resolve_pdf_path(str(cand))
-                    if os.path.exists(res):
-                        pdf_path = res
-                        break
-            if not pdf_path:
-                pdf_path = resolve_pdf_path(str(candidates[0] or "src/e2e/Document 8.pdf"))
+            candidates = [self.pdf_path, dom_data.get("source_filename"), plan_data.get("document_path") if plan_data else None, "src/e2e/Document 8.pdf"]
+            pdf_path = next((resolve_pdf_path(str(c)) for c in candidates if c and os.path.exists(resolve_pdf_path(str(c)))), resolve_pdf_path(str(candidates[0] or "src/e2e/Document 8.pdf")))
             total_pages = dom_data.get("total_pages", 1) or 1
 
             page_images, page_dimensions = load_or_render_page_images(
@@ -375,6 +370,8 @@ class ServerSessionContext:
                 raw_dom=artifacts.get("raw_dom"),
                 diff=artifacts.get("diff"),
             )
+            if self.active_step is not None:
+                self.viewer_data["activeStep"] = self.active_step
             return self.viewer_data
 
     def update_result_state(self, result: Mapping[str, Any], pdf_path: str, language: str) -> None:

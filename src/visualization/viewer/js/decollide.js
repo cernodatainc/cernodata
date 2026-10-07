@@ -263,12 +263,18 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
         quad: null
     };
 
+    const origUpper = JSON.parse(JSON.stringify(upper));
+    const origLower = JSON.parse(JSON.stringify(lower));
+
     const mergedContent = Object.assign({}, upper.content, lower.content, { raw_text: mergedText });
 
     upper.type = targetType;
     upper.bounding_box = mergedBbox;
     upper.content = mergedContent;
     upper.user_correction_note = mergedText;
+    upper.is_merged = true;
+    upper.merged_from = [origUpper, origLower];
+    upper.merged_at = new Date().toISOString();
 
     domData.nodes = domData.nodes.filter(n => n.node_id !== lower.node_id);
 
@@ -282,19 +288,88 @@ function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     selectedNodeIds = [upper.node_id];
     selectedNodeId = upper.node_id;
 
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
+
     renderDOMTree();
     renderViolationsList();
     renderSelectedEditor();
     renderSVGOverlays();
 
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
+    }
+
     const banner = document.getElementById('statusBanner');
     if (banner) {
         banner.style.display = 'block';
-        banner.textContent = `[OK] Merged '${upper.node_id}' and '${lower.node_id}' into '${upper.node_id}' (${targetType}). Click '[SAVE] Save Annotations' to persist.`;
+        banner.textContent = `[OK] Merged '${upper.node_id}' and '${lower.node_id}' into '${upper.node_id}' (${targetType}). Persisted.`;
         setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
 
     return upper;
+}
+
+function unmergeDOMNode(nodeId) {
+    if (!domData || !domData.nodes) return null;
+    const target = domData.nodes.find(n => n.node_id === nodeId);
+    if (!target || !target.merged_from || !Array.isArray(target.merged_from) || target.merged_from.length === 0) {
+        return null;
+    }
+
+    const restoredNodes = JSON.parse(JSON.stringify(target.merged_from));
+    const targetIdx = domData.nodes.findIndex(n => n.node_id === nodeId);
+    if (targetIdx === -1) return null;
+
+    domData.nodes.splice(targetIdx, 1, ...restoredNodes);
+
+    const viols = (typeof extractViolationsList === 'function')
+        ? extractViolationsList(violationsData)
+        : (Array.isArray(violationsData) ? violationsData : []);
+    restoredNodes.forEach(rn => {
+        if (rn.violations && Array.isArray(rn.violations)) {
+            rn.violations.forEach(rv => {
+                const found = viols.find(v => v.violation_id === rv.violation_id);
+                if (found) {
+                    found.node_id = rn.node_id;
+                }
+            });
+        }
+    });
+
+    selectedNodeIds = restoredNodes.map(n => n.node_id);
+    selectedNodeId = restoredNodes[0] ? restoredNodes[0].node_id : null;
+
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
+
+    renderDOMTree();
+    renderViolationsList();
+    renderSelectedEditor();
+    renderSVGOverlays();
+
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
+    }
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        const restoredNames = restoredNodes.map(n => `'${n.node_id}'`).join(' and ');
+        banner.textContent = `[OK] Undid merge. Restored original elements ${restoredNames}. Persisted.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+
+    return restoredNodes;
 }
 
 function decollideSelectedPair() {

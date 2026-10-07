@@ -77,12 +77,19 @@ function renderResultsTable(data) {
  *
  * @param {number|null} [pageNum=null] - Target page number to navigate to (1-indexed).
  */
-function reloadViewerIframe(pageNum = null) {
+function reloadViewerIframe(pageNum = null, targetRun = null) {
     const frame = document.getElementById('viewerFrame');
     if (!frame) return;
 
     const page = pageNum || (frame.contentWindow && frame.contentWindow.currentPage) || 1;
-    const runDir = (typeof activeRunOutputDir !== 'undefined' && activeRunOutputDir) ? activeRunOutputDir : 'output';
+    const runDir = targetRun || (typeof activeRunOutputDir !== 'undefined' && activeRunOutputDir) || 'output';
+    let stepQuery = '';
+    if (runDir.includes(':step_')) {
+        const parts = runDir.split(':step_');
+        if (parts[1]) {
+            stepQuery = `&step=${encodeURIComponent(parts[1])}`;
+        }
+    }
     const cached = window.runResultsCache && (window.runResultsCache[runDir] || window.runResultsCache[runDir.replace(/\\/g, '/')]);
 
     if (frame.contentWindow && typeof frame.contentWindow.hydrateViewer === 'function' && cached) {
@@ -97,5 +104,5 @@ function reloadViewerIframe(pageNum = null) {
         }
     }
 
-    frame.src = `/viewer?output_dir=${encodeURIComponent(runDir)}&page=${page}&t=${Date.now()}`;
+    frame.src = `/viewer?output_dir=${encodeURIComponent(runDir)}&page=${page}${stepQuery}&t=${Date.now()}`;
 }

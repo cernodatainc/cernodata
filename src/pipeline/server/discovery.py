@@ -80,7 +80,21 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             doc_name = artifacts["document_name"]
             doc_path = artifacts["document_path"]
             timestamp = plan_data.get("created_at", "") if plan_data else ""
-            violations_count = len(violations)
+            active_violations = [
+                v for v in violations
+                if str(v.get("suppressed", "false")).lower() not in ("true", "1")
+                and not v.get("accepted")
+                and not v.get("is_fixed")
+            ]
+            violations_count = len(active_violations)
+
+            diff_data = artifacts.get("diff", {})
+            diff_scoring = diff_data.get("scoring", {})
+            if diff_scoring:
+                if diff_scoring.get("current_overall_confidence") is not None:
+                    overall_confidence = float(diff_scoring["current_overall_confidence"])
+                if diff_scoring.get("status"):
+                    status = str(diff_scoring["status"])
 
             score_str = f"{overall_confidence:.4f}" if overall_confidence is not None else "1.0000"
             label = f"{doc_name} [{chosen_preset} | {status} {score_str} | {violations_count} viols] ({norm_rel})"
@@ -90,7 +104,7 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             per_page_conf = decision_data.get("per_page_confidence", {})
 
             per_page_viols: Dict[str, int] = {}
-            for v in violations:
+            for v in active_violations:
                 p_num = str(v.get("global_page_index") or v.get("page") or 1)
                 per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
 
@@ -103,12 +117,27 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             if attempts and len(attempts) > 1:
                 for att in attempts:
                     att_preset = att.get("preset", chosen_preset)
-                    att_conf = att.get("overall_confidence", overall_confidence)
-                    att_status = att.get("status", status)
-                    att_viols = att.get("violations_count", violations_count)
-                    att_page_conf = att.get("per_page_confidence", per_page_conf)
                     att_step = att.get("step", 1)
                     att_id = f"{norm_rel}:step_{att_step}"
+                    is_active = (att_preset == chosen_preset)
+
+                    att_conf = att.get("overall_confidence")
+                    if att_conf is None:
+                        att_conf = overall_confidence if is_active else 1.0
+
+                    att_status = att.get("status") or (status if is_active else "ACCEPT")
+
+                    att_viols = att.get("violations_count")
+                    if att_viols is None:
+                        att_viols = violations_count if is_active else 0
+
+                    att_page_conf = att.get("per_page_confidence")
+                    if not att_page_conf:
+                        att_page_conf = per_page_conf if is_active else {}
+
+                    att_page_viols = att.get("per_page_violations")
+                    if not att_page_viols:
+                        att_page_viols = per_page_viols if is_active else {}
                     conf_str = f"{float(att_conf):.4f}" if att_conf is not None else "1.0000"
                     att_label = (
                         f"{doc_name} [{att_preset} (Step {att_step}) | "
@@ -130,7 +159,7 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
                         "has_plan": plan_data is not None,
                         "total_pages": total_pages,
                         "per_page_confidence": att_page_conf,
-                        "per_page_violations": per_page_viols,
+                        "per_page_violations": att_page_viols,
                         "per_page_nodes": per_page_nodes,
                         "label": att_label,
                     })

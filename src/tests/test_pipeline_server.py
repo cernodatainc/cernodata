@@ -150,6 +150,8 @@ class TestPipelineServer(unittest.TestCase):
 
         # Verify global picker dropdown bar has been removed
         self.assertNotIn("run-selector-card", content)
+        self.assertNotIn("previous-runs-box", content)
+        self.assertNotIn("Quick Preset Actions", content)
 
     def test_viewer_html_endpoint_serves_untemplated_html(self) -> None:
         status, content, headers = self._get("/viewer")
@@ -179,6 +181,9 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("extractViolationsList", content_js)
         self.assertIn("executeMergeElements", content_js)
         self.assertIn("mergeDOMNodes", content_js)
+        self.assertIn("computeDomDiff", content_js)
+        self.assertIn("recalculateScoring", content_js)
+        self.assertIn("accepted_violations", content_js)
 
         # Test landing CSS and JS
         status_l_css, content_l_css, headers_l_css = self._get("/landing.css")
@@ -282,11 +287,37 @@ class TestPipelineServer(unittest.TestCase):
             ],
         }
         raw_dom_payload = dict(dom_payload)
-        diff_payload = {"added": [], "modified": ["node_1"], "removed": []}
+        diff_payload = {
+            "added": [],
+            "modified": ["node_1"],
+            "removed": [],
+            "accepted_violations": [
+                {
+                    "violation_id": "v1",
+                    "node_id": "node_1",
+                    "rule_type": "diacritic_conflict",
+                    "page": 1,
+                    "accepted": True,
+                    "suppressed": True,
+                }
+            ],
+            "scoring": {
+                "raw_overall_confidence": 0.85,
+                "current_overall_confidence": 0.95,
+                "score_delta": 0.10,
+                "status": "ACCEPT",
+            },
+        }
+        viols_payload = [
+            {"violation_id": "v1", "node_id": "node_1", "rule_type": "diacritic_conflict", "suppressed": "true"}
+        ]
+        decision_payload = {"chosen_preset": "docling_fast", "overall_confidence": 0.95, "status": "ACCEPT"}
         status, resp = self._post_json("/api/save_dom", {
             "dom": dom_payload,
             "raw_dom": raw_dom_payload,
             "diff": diff_payload,
+            "violations": viols_payload,
+            "decision": decision_payload,
             "output_dir": "test_output_save",
         })
         self.assertEqual(status, 200)
@@ -296,8 +327,12 @@ class TestPipelineServer(unittest.TestCase):
 
         raw_path = os.path.join("test_output_save", "raw_document_dom.json")
         diff_path = os.path.join("test_output_save", "run_diff.json")
+        viols_path = os.path.join("test_output_save", "quality_violations.json")
+        dec_path = os.path.join("test_output_save", "decision_tree.json")
         self.assertTrue(os.path.exists(raw_path))
         self.assertTrue(os.path.exists(diff_path))
+        self.assertTrue(os.path.exists(viols_path))
+        self.assertTrue(os.path.exists(dec_path))
 
         with open(diff_path, "r", encoding="utf-8") as f:
             saved_diff = json.load(f)
@@ -340,6 +375,13 @@ class TestPipelineServer(unittest.TestCase):
         self.assertEqual(resp.get("output_dir"), "output")
         self.assertIn("run", resp)
         self.assertIn("results", resp)
+
+        # Test POST /api/load_run with step suffix
+        s_step, resp_step = self._post_json("/api/load_run", {"output_dir": "src/output:step_2"})
+        self.assertEqual(s_step, 200)
+        self.assertTrue(resp_step.get("success"))
+        self.assertEqual(resp_step.get("output_dir"), "src/output")
+        self.assertEqual(resp_step["run"].get("active_step"), 2)
 
         # Test GET /api/load_run?output_dir=output
         status, content, _ = self._get("/api/load_run?output_dir=output")
@@ -417,6 +459,13 @@ class TestPipelineServer(unittest.TestCase):
             self.assertEqual(s2, 200)
             g2 = json.loads(c2)
             self.assertEqual(g2["selected_file"], doc_name)
+
+        # Check that runs for multi-step execution have distinct ids and scores
+        step_runs = {r["run_id"]: r for r in grid["runs"] if ":step_" in r.get("run_id", "")}
+        if "src/output:step_1" in step_runs and "src/output:step_2" in step_runs:
+            r1, r2 = step_runs["src/output:step_1"], step_runs["src/output:step_2"]
+            self.assertNotEqual(r1["preset"], r2["preset"])
+            self.assertNotEqual(r1["overall_confidence"], r2["overall_confidence"])
 
     def test_api_rerun_reuses_cached_preset_result(self) -> None:
         # Load run 'output' to populate session with Document 8 results (preset: docling_fast)

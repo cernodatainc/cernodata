@@ -6,6 +6,81 @@
  */
 
 let currentRunsGridDoc = '';
+window.liveRunOverrides = window.liveRunOverrides || {};
+window.currentGridData = null;
+
+function applyLiveOverridesToGrid(gridData) {
+    if (!gridData || !gridData.runs) return;
+    const overrides = window.liveRunOverrides || {};
+    gridData.runs.forEach(r => {
+        const matchKey = Object.keys(overrides).find(k => {
+            const ov = overrides[k];
+            if (!ov) return false;
+            if (ov.runId && ov.runId === r.run_id) return true;
+            if (ov.outputDir && ov.preset && r.dir_path === ov.outputDir && r.preset === ov.preset) return true;
+            return false;
+        });
+
+        if (matchKey) {
+            const ov = overrides[matchKey];
+            if (ov.overall_confidence !== undefined) {
+                r.overall_confidence = ov.overall_confidence;
+            }
+            if (ov.status) {
+                r.status = ov.status;
+            }
+            if (ov.violationsCount !== undefined) {
+                r.violations_count = ov.violationsCount;
+            }
+            if (ov.perPageConfidence) {
+                r.pages_data = r.pages_data || {};
+                Object.keys(ov.perPageConfidence).forEach(pStr => {
+                    const pNum = parseInt(pStr, 10);
+                    if (!r.pages_data[pStr]) {
+                        r.pages_data[pStr] = { page: pNum };
+                    }
+                    const conf = Number(ov.perPageConfidence[pStr]);
+                    r.pages_data[pStr].confidence = conf;
+                    r.pages_data[pStr].is_passed = (conf >= 0.85);
+                    if (ov.perPageViolations && ov.perPageViolations[pStr] !== undefined) {
+                        r.pages_data[pStr].violations_count = ov.perPageViolations[pStr];
+                    }
+                });
+            }
+        }
+    });
+}
+
+function updateRunsGridLiveEntry(updateMsg) {
+    if (!updateMsg) return;
+    window.liveRunOverrides = window.liveRunOverrides || {};
+    if (updateMsg.runId) window.liveRunOverrides[updateMsg.runId] = updateMsg;
+    if (updateMsg.outputDir && updateMsg.preset) {
+        window.liveRunOverrides[`${updateMsg.outputDir}:${updateMsg.preset}`] = updateMsg;
+    }
+
+    if (window.runResultsCache) {
+        const cacheEntry = window.runResultsCache[updateMsg.outputDir] || window.runResultsCache[updateMsg.runId];
+        if (cacheEntry && cacheEntry.decision) {
+            cacheEntry.decision.overall_confidence = updateMsg.overall_confidence;
+            cacheEntry.decision.status = updateMsg.status;
+            cacheEntry.decision.per_page_confidence = updateMsg.perPageConfidence;
+        }
+    }
+
+    if (window.currentGridData) {
+        applyLiveOverridesToGrid(window.currentGridData);
+        renderRunsGrid(window.currentGridData);
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('message', (evt) => {
+        if (evt && evt.data && evt.data.type === 'RUN_RESULT_UPDATED') {
+            updateRunsGridLiveEntry(evt.data);
+        }
+    });
+}
 
 /**
  * Fetches run comparison grid data from /api/runs_grid for target document.
@@ -19,6 +94,8 @@ async function loadRunsGrid(docName = null) {
         if (!resp.ok) return;
         const gridData = await resp.json();
         currentRunsGridDoc = gridData.selected_file || '';
+        window.currentGridData = gridData;
+        applyLiveOverridesToGrid(gridData);
         renderRunsGrid(gridData);
     } catch (e) {
         console.log('[WARN] Failed to load previous runs grid:', e);
@@ -47,7 +124,7 @@ async function chooseRunAndPage(runId, pageNo) {
     const targetPage = parseInt(pageNo, 10) || 1;
     await choosePreviousRun(runId, targetPage, false);
     switchNavTab('results');
-    reloadViewerIframe(targetPage);
+    reloadViewerIframe(targetPage, runId);
 }
 
 /**
@@ -116,7 +193,7 @@ function renderRunsGrid(gridData) {
                 : `<span class="cell-viols-zero">0 viols</span>`;
 
             return `
-                <td class="grid-page-cell" onclick="chooseRunAndPage('${escapeHtml(r.dir_path || r.run_id)}', ${p})" title="Load ${escapeHtml(r.run_id)} on Page ${p}">
+                <td class="grid-page-cell" onclick="chooseRunAndPage('${escapeHtml(r.run_id || r.dir_path)}', ${p})" title="Load ${escapeHtml(r.run_id)} on Page ${p}">
                     <div class="page-cell-score ${scoreCls}">${conf}</div>
                     <div class="page-cell-meta">${violBadge}</div>
                 </td>
@@ -135,7 +212,7 @@ function renderRunsGrid(gridData) {
                 <td class="${overallScoreClass}">${overallStr}</td>
                 <td>${r.violations_count || 0}</td>
                 <td><span class="badge ${statusBadgeClass}">${escapeHtml(r.status || 'ACCEPT')}</span></td>
-                <td><button class="btn btn-sm btn-primary" onclick="choosePreviousRun('${escapeHtml(r.dir_path || r.run_id)}')">[LOAD] Load Run</button></td>
+                <td><button class="btn btn-sm btn-primary" onclick="choosePreviousRun('${escapeHtml(r.run_id || r.dir_path)}')">[LOAD] Load Run</button></td>
             </tr>
         `;
     }).join('');

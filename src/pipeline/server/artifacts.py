@@ -102,21 +102,23 @@ def load_run_artifacts(run_dir: str) -> Dict[str, Any]:
     plan_res_path = os.path.join(run_dir, "plan_execution_result.json")
     plan_res_data: Dict[str, Any] = safe_load_json(plan_res_path, {})
     plan_data: Optional[Dict[str, Any]] = plan_res_data.get("plan") or safe_load_json(os.path.join(run_dir, "plan.json"))
-    decision_data: Dict[str, Any] = (
-        plan_res_data.get("decision")
-        or safe_load_json(os.path.join(run_dir, "decision_tree.json"), {})
+    dec_tree_path = os.path.join(run_dir, "decision_tree.json")
+    saved_dec = safe_load_json(dec_tree_path, {})
+    decision_data: Dict[str, Any] = saved_dec if saved_dec else (
+        plan_res_data.get("decision") or {}
     )
     dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "document_dom.json"), {})
     raw_dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "raw_document_dom.json"), {}) or dom_data
     diff_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "run_diff.json"), {})
-    raw_viols = plan_res_data.get("violations")
-    if raw_viols is None:
-        raw_viols = safe_load_json(os.path.join(run_dir, "quality_violations.json"), [])
+
+    q_viols_path = os.path.join(run_dir, "quality_violations.json")
+    saved_viols = safe_load_json(q_viols_path, None)
+    raw_viols = saved_viols if saved_viols is not None else plan_res_data.get("violations", [])
     violations = normalize_violations(raw_viols)
 
     html_path = os.path.join(run_dir, "interactive_viewer.html")
     html_decision = extract_decision_from_html(html_path)
-    if html_decision:
+    if html_decision and not saved_dec:
         plan_mtime = os.path.getmtime(plan_res_path) if os.path.exists(plan_res_path) else 0.0
         html_mtime = os.path.getmtime(html_path)
         dec_page_count = len(decision_data.get("per_page_confidence", {})) if decision_data else 0

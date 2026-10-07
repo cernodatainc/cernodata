@@ -66,6 +66,9 @@ function getNodePage(node) {
     if (node.temp_slice_index !== undefined && node.temp_slice_index !== null) {
         return Number(node.temp_slice_index);
     }
+    if (node.page !== undefined && node.page !== null) {
+        return Number(node.page);
+    }
     return 1;
 }
 
@@ -135,7 +138,13 @@ function syncDomAndViolations() {
                     }
                     const found = violationsData.find(v => (nv.violation_id && v.violation_id === nv.violation_id) || (v.node_id === node.node_id && v.rule_type === nv.rule_type));
                     if (found) {
-                        found.suppressed = nv.suppressed;
+                        if (found.suppressed !== undefined) {
+                            nv.suppressed = found.suppressed;
+                            nv.accepted = found.accepted;
+                        } else {
+                            found.suppressed = nv.suppressed;
+                            found.accepted = nv.accepted;
+                        }
                         found.type = nv.type;
                         if (nv.suggestion) found.suggestion = nv.suggestion;
                     }
@@ -195,12 +204,16 @@ function computeDomDiff() {
             );
             const typeChanged = raw.type !== curr.type;
             const noteChanged = (raw.user_correction_note || '') !== (curr.user_correction_note || '');
-            if (boxChanged || textChanged || typeChanged || noteChanged) {
+            const rawViols = (raw.violations || []).filter(v => isSuppressed(v)).map(v => v.violation_id || v.rule_type).sort();
+            const currViols = (curr.violations || []).filter(v => isSuppressed(v)).map(v => v.violation_id || v.rule_type).sort();
+            const violationsChanged = JSON.stringify(rawViols) !== JSON.stringify(currViols);
+
+            if (boxChanged || textChanged || typeChanged || noteChanged || violationsChanged) {
                 modified.push({
                     node_id: id,
                     raw: raw,
                     current: curr,
-                    changes: { boxChanged, textChanged, typeChanged, noteChanged }
+                    changes: { boxChanged, textChanged, typeChanged, noteChanged, violationsChanged }
                 });
             }
         }
@@ -212,14 +225,189 @@ function computeDomDiff() {
         }
     }
 
+    const rawViolsList = (typeof extractViolationsList === 'function')
+        ? extractViolationsList(rawViolationsData)
+        : (Array.isArray(rawViolationsData) ? rawViolationsData : []);
+    const currViolsList = (typeof extractViolationsList === 'function')
+        ? extractViolationsList(violationsData)
+        : (Array.isArray(violationsData) ? violationsData : []);
+
+    const rawSuppressedMap = new Map();
+    rawViolsList.forEach(v => {
+        const vid = v.violation_id || `${v.node_id}_${v.rule_type}`;
+        rawSuppressedMap.set(vid, isSuppressed(v));
+    });
+
+    const acceptedViolations = [];
+    currViolsList.forEach(v => {
+        const vid = v.violation_id || `${v.node_id}_${v.rule_type}`;
+        const wasSuppressedInRaw = rawSuppressedMap.get(vid) || false;
+        const isCurrentlySuppressed = isSuppressed(v);
+        if (isCurrentlySuppressed && !wasSuppressedInRaw) {
+            acceptedViolations.push({
+                violation_id: v.violation_id,
+                node_id: v.node_id,
+                rule_type: v.rule_type || v.type,
+                type: v.type,
+                page: getViolationPage(v),
+                detected_snippet: v.detected_snippet || '',
+                accepted: true,
+                suppressed: true
+            });
+        }
+    });
+
+    const rawOverall = (typeof rawDecisionData !== 'undefined' && rawDecisionData) ? rawDecisionData.overall_confidence : null;
+    const currOverall = (typeof decisionData !== 'undefined' && decisionData) ? decisionData.overall_confidence : null;
+    const scoreDelta = (rawOverall !== null && currOverall !== null)
+        ? Math.round((currOverall - rawOverall) * 10000) / 10000
+        : 0;
+
     return {
         added_count: added.length,
         modified_count: modified.length,
         removed_count: removed.length,
-        has_changes: (added.length > 0 || modified.length > 0 || removed.length > 0),
+        accepted_violations_count: acceptedViolations.length,
+        has_changes: (added.length > 0 || modified.length > 0 || removed.length > 0 || acceptedViolations.length > 0),
         added,
         modified,
-        removed
+        removed,
+        accepted_violations: acceptedViolations,
+        scoring: {
+            raw_overall_confidence: rawOverall,
+            current_overall_confidence: currOverall,
+            score_delta: scoreDelta,
+            status: (decisionData && decisionData.status) || 'ACCEPT'
+        }
+    };
+}
+
+function recalculateScoring() {
+    if (!decisionData) return null;
+
+    const viols = (typeof extractViolationsList === 'function')
+        ? extractViolationsList(violationsData)
+        : (Array.isArray(violationsData) ? violationsData : []);
+
+    const rawDecision = (typeof rawDecisionData !== 'undefined' && rawDecisionData) ? rawDecisionData : decisionData;
+    const rawPerPage = (rawDecision && rawDecision.per_page_confidence) || {};
+    const rawAttempts = (rawDecision && rawDecision.attempts) || [];
+    const rawAtt = rawAttempts[activePresetIndex] || rawAttempts[0] || {};
+    const rawAttPerPage = rawAtt.per_page_confidence || {};
+
+    const cleanMax = 1.0;
+    const newPerPage = {};
+    const numPages = totalPages || 1;
+
+    for (let p = 1; p <= numPages; p++) {
+        const pStr = String(p);
+        const pViols = viols.filter(v => getViolationPage(v) === p);
+        const totalPViols = pViols.length;
+        const activePViols = pViols.filter(v => !v.is_fixed && !isSuppressed(v)).length;
+        const resolvedPViols = totalPViols - activePViols;
+
+        let rawScore = rawAttPerPage[pStr] ?? rawAttPerPage[p] ?? rawPerPage[pStr] ?? rawPerPage[p];
+        if (rawScore === undefined || rawScore === null) {
+            rawScore = rawAtt.overall_confidence ?? rawDecision.overall_confidence ?? 0.85;
+        }
+        rawScore = Number(rawScore);
+
+        if (totalPViols === 0) {
+            newPerPage[pStr] = rawScore;
+        } else if (activePViols === 0) {
+            newPerPage[pStr] = Math.max(cleanMax, rawScore);
+        } else {
+            const penalty = Math.max(0, cleanMax - rawScore);
+            const recoveryRatio = resolvedPViols / totalPViols;
+            const computed = rawScore + (penalty * recoveryRatio);
+            newPerPage[pStr] = Math.min(cleanMax, Math.round(computed * 10000) / 10000);
+        }
+    }
+
+    const pageScores = Object.values(newPerPage);
+    const overallScore = Math.round((pageScores.reduce((a, b) => a + b, 0) / Math.max(1, pageScores.length)) * 10000) / 10000;
+
+    const threshold = decisionData.target_confidence_threshold || 0.82;
+    const isAccepted = overallScore >= threshold;
+    const newStatus = isAccepted ? 'ACCEPT' : 'TRIGGER_FALLBACK';
+
+    decisionData.per_page_confidence = newPerPage;
+    decisionData.overall_confidence = overallScore;
+    decisionData.is_accepted = isAccepted;
+    decisionData.status = newStatus;
+
+    const activePerPageViols = {};
+    for (let p = 1; p <= numPages; p++) {
+        const pViols = viols.filter(v => getViolationPage(v) === p && !v.is_fixed && !isSuppressed(v));
+        activePerPageViols[String(p)] = pViols.length;
+    }
+    const totalActiveViolations = Object.values(activePerPageViols).reduce((a, b) => a + b, 0);
+
+    if (decisionData.attempts && decisionData.attempts.length > 0) {
+        const targetAttempt = decisionData.attempts[activePresetIndex] || decisionData.attempts[decisionData.attempts.length - 1];
+        if (targetAttempt) {
+            targetAttempt.overall_confidence = overallScore;
+            targetAttempt.per_page_confidence = JSON.parse(JSON.stringify(newPerPage));
+            targetAttempt.violations_count = totalActiveViolations;
+            targetAttempt.per_page_violations = JSON.parse(JSON.stringify(activePerPageViols));
+            targetAttempt.is_accepted = isAccepted;
+            targetAttempt.status = newStatus;
+        }
+    }
+
+    if (typeof updatePageScoreBadge === 'function') {
+        updatePageScoreBadge();
+    }
+    if (typeof updatePresetUIState === 'function') {
+        updatePresetUIState();
+    }
+    if (typeof renderTimelineButtons === 'function') {
+        renderTimelineButtons();
+    }
+    if (typeof saveCurrentPresetToClientCache === 'function') {
+        saveCurrentPresetToClientCache();
+    }
+
+    const targetAttempt = (decisionData && decisionData.attempts && decisionData.attempts[activePresetIndex]) || null;
+    const currentPreset = (targetAttempt && targetAttempt.preset) || ((activePresetIndex === 1) ? 'docling_deep' : 'docling_fast');
+    const targetStep = (targetAttempt && targetAttempt.step) || (activePresetIndex + 1);
+    const outDir = (typeof outputDir !== 'undefined' && outputDir) ? outputDir : ((window.VIEWER_DATA && window.VIEWER_DATA.outputDir) || 'output');
+    const updateMsg = {
+        type: 'RUN_RESULT_UPDATED',
+        outputDir: outDir,
+        preset: currentPreset,
+        activePresetIndex: activePresetIndex,
+        runId: `${outDir}:step_${targetStep}`,
+        overall_confidence: overallScore,
+        status: newStatus,
+        violationsCount: totalActiveViolations,
+        perPageConfidence: newPerPage,
+        perPageViolations: activePerPageViols,
+        totalPages: numPages
+    };
+
+    if (typeof window !== 'undefined') {
+        if (window.parent && window.parent !== window) {
+            try {
+                if (typeof window.parent.updateRunsGridLiveEntry === 'function') {
+                    window.parent.updateRunsGridLiveEntry(updateMsg);
+                }
+                window.parent.postMessage(updateMsg, '*');
+            } catch (e) {
+                // Cross-origin fallback
+            }
+        }
+        if (typeof updateViewerRunsGridLiveEntry === 'function') {
+            updateViewerRunsGridLiveEntry(updateMsg);
+        }
+    }
+
+    return {
+        overall_confidence: overallScore,
+        per_page_confidence: newPerPage,
+        status: newStatus,
+        is_accepted: isAccepted,
+        active_violations_count: totalActiveViolations,
     };
 }
 
@@ -279,8 +467,28 @@ function hydrateViewer(data, pageNum = null) {
 
     const urlParams = new URLSearchParams(window.location.search);
     const targetPage = pageNum || parseInt(urlParams.get('page') || '1', 10) || 1;
+    const stepQuery = urlParams.get('step');
+
+    if (stepQuery !== null && stepQuery !== undefined) {
+        const parsedStep = parseInt(stepQuery, 10);
+        if (!isNaN(parsedStep) && parsedStep >= 1) {
+            activePresetIndex = parsedStep - 1;
+        }
+    } else if (data && data.activeStep) {
+        activePresetIndex = data.activeStep - 1;
+    } else if (decisionData.attempts && decisionData.attempts.length > 0 && decisionData.chosen_preset) {
+        const matchIdx = decisionData.attempts.findIndex(a => a.preset === decisionData.chosen_preset);
+        if (matchIdx >= 0) {
+            activePresetIndex = matchIdx;
+        } else {
+            activePresetIndex = decisionData.attempts.length - 1;
+        }
+    }
 
     renderTimelineButtons();
+    if (typeof updatePresetUIState === 'function') {
+        updatePresetUIState();
+    }
     initPageControls();
     switchPage(targetPage);
     renderDecisionLog();

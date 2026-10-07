@@ -75,12 +75,6 @@
                             <span class="file-chips-label">Discovered files:</span>
                             <button class="chip-btn" onclick="selectDocPath('src/e2e/Document 8.pdf')">src/e2e/Document 8.pdf</button>
                         </div>
-                        <div class="previous-runs-box">
-                            <div class="previous-runs-title">Choose completed output from a previous run:</div>
-                            <div class="file-chips" id="previousRunsChipsContainer">
-                                <span class="file-chips-label">Loading runs...</span>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="form-group">
@@ -275,17 +269,9 @@
                             <option value="">-- Choose Run to Inspect --</option>
                         </select>
                         <button class="btn btn-secondary" onclick="refreshResultsData()">[REFRESH] Refresh Data</button>
+                        <button class="btn btn-secondary" onclick="reloadViewerIframe()">Reload Viewer</button>
                         <a href="/viewer" target="_blank" class="btn btn-primary">[EXPAND] Open Full Viewer (/viewer)</a>
                     </div>
-                </div>
-
-                <div class="results-actions-bar">
-                    <span class="results-actions-title">Quick Preset Actions:</span>
-                    <button class="chip-btn" onclick="triggerRerunWithPreset('docling_fast')">Rerun docling_fast</button>
-                    <button class="chip-btn" onclick="triggerRerunWithPreset('docling_deep')">Rerun docling_deep (Deep Fallback)</button>
-                    <button class="chip-btn" onclick="triggerRerunWithPreset('pypdfium_rapidocr')">Rerun pypdfium_rapidocr</button>
-                    <span class="results-spacer"></span>
-                    <button class="btn btn-secondary btn-reload-viewer" onclick="reloadViewerIframe()">Reload Viewer</button>
                 </div>
 
                 <div id="resultsTableContainer">

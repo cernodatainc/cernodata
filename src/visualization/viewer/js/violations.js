@@ -164,6 +164,7 @@ function acceptCategoryOnPage(category, targetPage = null) {
         const vPage = getViolationPage(v);
         if (vCat === category && (page === null || vPage === page)) {
             v.suppressed = "true";
+            v.accepted = true;
             count++;
         }
     });
@@ -177,11 +178,22 @@ function acceptCategoryOnPage(category, targetPage = null) {
                         const nvCat = nv.type || (nv.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
                         if (nvCat === category) {
                             nv.suppressed = "true";
+                            nv.accepted = true;
                         }
                     });
                 }
             }
         });
+    }
+
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
     }
 
     renderDOMTree();
@@ -194,7 +206,8 @@ function acceptCategoryOnPage(category, targetPage = null) {
         banner.className = 'status-banner';
         banner.style.display = 'block';
         const pageDesc = page === null ? 'all pages' : `Page ${page}`;
-        banner.textContent = `[OK] Accepted ${count} '${category}' violation(s) on ${pageDesc} as legitimate false positives. Click '[SAVE] Save Annotations' to persist.`;
+        const scoreStr = (decisionData && decisionData.overall_confidence !== undefined) ? Number(decisionData.overall_confidence).toFixed(4) : '';
+        banner.textContent = `[OK] Accepted ${count} '${category}' violation(s) on ${pageDesc} as legitimate false positives. Updated score: ${scoreStr} (${(decisionData && decisionData.status) || 'ACCEPT'}).`;
         setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
 }
@@ -209,6 +222,7 @@ function restoreCategoryOnPage(category, targetPage = null) {
         const vPage = getViolationPage(v);
         if (vCat === category && (page === null || vPage === page)) {
             v.suppressed = "false";
+            v.accepted = false;
             count++;
         }
     });
@@ -222,11 +236,22 @@ function restoreCategoryOnPage(category, targetPage = null) {
                         const nvCat = nv.type || (nv.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
                         if (nvCat === category) {
                             nv.suppressed = "false";
+                            nv.accepted = false;
                         }
                     });
                 }
             }
         });
+    }
+
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
     }
 
     renderDOMTree();
@@ -239,7 +264,8 @@ function restoreCategoryOnPage(category, targetPage = null) {
         banner.className = 'status-banner';
         banner.style.display = 'block';
         const pageDesc = page === null ? 'all pages' : `Page ${page}`;
-        banner.textContent = `[OK] Restored ${count} '${category}' violation(s) on ${pageDesc} to active state.`;
+        const scoreStr = (decisionData && decisionData.overall_confidence !== undefined) ? Number(decisionData.overall_confidence).toFixed(4) : '';
+        banner.textContent = `[OK] Restored ${count} '${category}' violation(s) on ${pageDesc} to active state. Updated score: ${scoreStr} (${(decisionData && decisionData.status) || 'ACCEPT'}).`;
         setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
 }
@@ -254,6 +280,7 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
     if (!v) return;
 
     v.suppressed = shouldSuppress ? "true" : "false";
+    v.accepted = !!shouldSuppress;
 
     if (domData && domData.nodes) {
         const node = domData.nodes.find(n => n.node_id === v.node_id);
@@ -261,8 +288,19 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
             const nv = node.violations.find(item => item.violation_id === violationId || item.rule_type === v.rule_type);
             if (nv) {
                 nv.suppressed = shouldSuppress ? "true" : "false";
+                nv.accepted = !!shouldSuppress;
             }
         }
+    }
+
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
     }
 
     renderDOMTree();
@@ -274,9 +312,10 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
     if (banner) {
         banner.className = 'status-banner';
         banner.style.display = 'block';
+        const scoreStr = (decisionData && decisionData.overall_confidence !== undefined) ? Number(decisionData.overall_confidence).toFixed(4) : '';
         banner.textContent = shouldSuppress
-            ? `[OK] Accepted violation '${violationId}' as legitimate false positive.`
-            : `[OK] Re-flagged violation '${violationId}' as active.`;
+            ? `[OK] Accepted violation '${violationId}' as legitimate false positive. Updated score: ${scoreStr} (${(decisionData && decisionData.status) || 'ACCEPT'}).`
+            : `[OK] Re-flagged violation '${violationId}' as active. Updated score: ${scoreStr} (${(decisionData && decisionData.status) || 'ACCEPT'}).`;
         setTimeout(() => { banner.style.display = 'none'; }, 3000);
     }
 }
@@ -373,6 +412,16 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
         });
     }
 
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
+    }
+
     renderDOMTree();
     renderSelectedEditor();
     renderSVGOverlays();
@@ -382,7 +431,8 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     if (banner) {
         banner.className = 'status-banner';
         banner.style.display = 'block';
-        banner.textContent = `[OK] Applied violation fix for '${targetNodeId}': '${targetSnippet || ''}' -> '${targetFix || ''}'. Click '[SAVE] Save Annotations' to persist.`;
+        const scoreStr = (decisionData && decisionData.overall_confidence !== undefined) ? Number(decisionData.overall_confidence).toFixed(4) : '';
+        banner.textContent = `[OK] Applied violation fix for '${targetNodeId}': '${targetSnippet || ''}' -> '${targetFix || ''}'. Updated score: ${scoreStr} (${(decisionData && decisionData.status) || 'ACCEPT'}).`;
         setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
 }

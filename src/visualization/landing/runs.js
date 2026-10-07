@@ -198,7 +198,7 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
             loadRunsGrid(run.document_name);
         }
         if (shouldReloadViewer && typeof reloadViewerIframe === 'function') {
-            reloadViewerIframe(targetPage);
+            reloadViewerIframe(targetPage, outputDir);
         }
     } catch (e) {
         console.log('[ERROR] Failed to switch previous run:', e);

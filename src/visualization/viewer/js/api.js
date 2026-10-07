@@ -8,8 +8,8 @@
 window.presetCache = window.presetCache || {};
 
 function saveCurrentPresetToClientCache() {
-    if (typeof decisionData === 'undefined' || !decisionData) return;
-    const currentPreset = decisionData.chosen_preset || ((activePresetIndex === 1) ? 'docling_deep' : 'docling_fast');
+    const targetAttempt = (decisionData && decisionData.attempts && decisionData.attempts[activePresetIndex]) || null;
+    const currentPreset = (targetAttempt && targetAttempt.preset) || ((activePresetIndex === 1) ? 'docling_deep' : (decisionData.chosen_preset || 'docling_fast'));
     const targetLang = (typeof activeLanguage !== 'undefined' && activeLanguage) ? activeLanguage : 'en';
     const entry = {
         dom: (typeof domData !== 'undefined' && domData) ? JSON.parse(JSON.stringify(domData)) : { nodes: [] },
@@ -264,14 +264,18 @@ function updatePresetUIState() {
     renderSVGOverlays();
 }
 
-async function saveAnnotations() {
+async function saveAnnotations(quiet = false) {
     const banner = document.getElementById('statusBanner');
-    if (banner) {
+    if (!quiet && banner) {
         banner.style.display = 'block';
         banner.textContent = `[SAVING] Saving modified DocumentDOM annotations...`;
     }
 
     const diffPayload = (typeof computeDomDiff === 'function') ? computeDomDiff() : {};
+    const outDir = (typeof outputDir !== 'undefined' && outputDir)
+        ? outputDir
+        : ((window.VIEWER_DATA && window.VIEWER_DATA.outputDir) || 'output');
+    const cleanOutDir = outDir.split(':step_')[0];
     try {
         const res = await fetch('/api/save_dom', {
             method: 'POST',
@@ -280,32 +284,50 @@ async function saveAnnotations() {
                 dom: domData,
                 raw_dom: (typeof rawDomData !== 'undefined') ? rawDomData : domData,
                 diff: diffPayload,
-                output_dir: 'output'
+                violations: (typeof violationsData !== 'undefined') ? violationsData : [],
+                decision: (typeof decisionData !== 'undefined') ? decisionData : {},
+                output_dir: cleanOutDir
             })
         });
         if (res.ok) {
             const data = await res.json();
-            if (banner) {
+            if (typeof saveCurrentPresetToClientCache === 'function') {
+                saveCurrentPresetToClientCache();
+            }
+            if (window.parent && window.parent.runResultsCache) {
+                const parentCache = window.parent.runResultsCache[cleanOutDir] || window.parent.runResultsCache[outDir];
+                if (parentCache) {
+                    parentCache.dom = JSON.parse(JSON.stringify(domData));
+                    parentCache.violations = JSON.parse(JSON.stringify(violationsData));
+                    parentCache.decision = JSON.parse(JSON.stringify(decisionData));
+                    parentCache.diff = diffPayload;
+                }
+            }
+            if (!quiet && banner) {
                 banner.textContent = `[OK] Annotations saved successfully to '${data.path}'.`;
                 setTimeout(() => { banner.style.display = 'none'; }, 4000);
             }
             return;
         }
     } catch (e) {
-        console.log('[INFO] Server endpoint unreachable, initiating file download.', e);
+        if (!quiet) {
+            console.log('[INFO] Server endpoint unreachable, initiating file download.', e);
+        }
     }
 
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(domData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", "document_dom.json");
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    if (!quiet) {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(domData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", "document_dom.json");
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
 
-    if (banner) {
-        banner.textContent = `[OK] Downloaded updated document_dom.json.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+        if (banner) {
+            banner.textContent = `[OK] Downloaded updated document_dom.json.`;
+            setTimeout(() => { banner.style.display = 'none'; }, 4000);
+        }
     }
 }
 
@@ -342,6 +364,13 @@ function revertToRawResult() {
     appliedCorrections = false;
     const togCorr = document.getElementById('toggleCorrections');
     if (togCorr) togCorr.checked = false;
+
+    if (typeof syncDomAndViolations === 'function') {
+        syncDomAndViolations();
+    }
+    if (typeof recalculateScoring === 'function') {
+        recalculateScoring();
+    }
 
     if (typeof saveCurrentPresetToClientCache === 'function') {
         saveCurrentPresetToClientCache();

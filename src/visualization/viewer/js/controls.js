@@ -283,6 +283,13 @@ async function loadViewerRunsGrid() {
     renderViewerRunsGridFallback();
 }
 
+function updateViewerRunsGridLiveEntry(updateMsg) {
+    if (!updateMsg) return;
+    const cont = document.getElementById('viewerRunsGridContainer');
+    if (!cont) return;
+    renderViewerRunsGridFallback();
+}
+
 function renderViewerRunsGrid(gridData) {
     const cont = document.getElementById('viewerRunsGridContainer');
     if (!cont) return;

@@ -24,7 +24,7 @@ from src.pipeline.planner_options import (
     TAXONOMY_OPTIONS,
     WIZARD_DIMENSIONS,
 )
-from src.pipeline.server.http_utils import send_json_response
+from src.pipeline.server.http_utils import parse_run_dir_and_step, send_json_response
 from src.utils import mkdirs, resolve_pdf_path
 
 if TYPE_CHECKING:
@@ -401,7 +401,7 @@ class ApiRoutesMixin:
             payload: Dictionary containing dom structure and target output_dir.
         """
         dom_data = payload.get("dom")
-        output_dir = payload.get("output_dir", "output")
+        output_dir, _ = parse_run_dir_and_step(payload.get("output_dir", "output"))
 
         if not dom_data:
             send_json_response(self, 400, {"error": "Missing dom payload"})  # type: ignore[arg-type]
@@ -423,6 +423,26 @@ class ApiRoutesMixin:
             diff_file = os.path.join(output_dir, "run_diff.json")
             with open(diff_file, "w", encoding="utf-8") as f:
                 json.dump(diff_data, f, indent=2)
+
+        violations_data = payload.get("violations")
+        if violations_data is not None:
+            viol_file = os.path.join(output_dir, "quality_violations.json")
+            with open(viol_file, "w", encoding="utf-8") as f:
+                json.dump(violations_data, f, indent=2)
+
+        decision_data = payload.get("decision")
+        if decision_data is not None:
+            dec_file = os.path.join(output_dir, "decision_tree.json")
+            with open(dec_file, "w", encoding="utf-8") as f:
+                json.dump(decision_data, f, indent=2)
+
+        self.session.viewer_data = None
+        if self.session.current_result:
+            self.session.current_result.update({"dom": dom_data, "diff": diff_data or {}, "violations": violations_data or []})
+            if decision_data:
+                self.session.current_result["decision"] = decision_data
+        if isinstance(decision_data, dict) and "attempts" in decision_data:
+            self.session.preset_attempts = list(decision_data["attempts"])
 
         nodes_len = len(dom_data.get("nodes", [])) if isinstance(dom_data, dict) else 0
         print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({nodes_len} nodes).")

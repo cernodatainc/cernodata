@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from http.server import SimpleHTTPRequestHandler
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 logger = logging.getLogger("cernodata.server.http_utils")
 
@@ -222,3 +222,18 @@ def read_html_template(filename: str, fallback_title: str = "cernodata") -> str:
         except OSError as e:
             logger.warning("Could not read template %s: %s", src_path, e)
     return f"<html><body><h1>{fallback_title}</h1><p>Template missing.</p></body></html>"
+
+
+def parse_run_dir_and_step(output_dir: str) -> tuple[str, Optional[int]]:
+    """
+    Separates base directory path and optional attempt step index from run identifier.
+    Example: 'src/output:step_2' -> ('src/output', 2).
+    """
+    raw = output_dir.replace("\\", "/").strip()
+    if ":step_" in raw:
+        base, s_str = raw.split(":step_", 1)
+        try:
+            return base.strip(), int(s_str.strip())
+        except ValueError:
+            return base.strip(), None
+    return raw, None
