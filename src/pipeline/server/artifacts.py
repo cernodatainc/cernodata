@@ -12,9 +12,29 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
+
+from src.pipeline.execution_models import AttemptRecord
 
 logger = logging.getLogger("cernodata.server.artifacts")
+
+
+class ViewerDataset(TypedDict, total=False):
+    """Strongly-typed dataset schema required to hydrate interactive visual viewer."""
+    dom: Dict[str, Any]
+    raw_dom: Dict[str, Any]
+    diff: Dict[str, Any]
+    violations: List[Dict[str, Any]]
+    decision: Dict[str, Any]
+    detectedLanguages: Dict[str, Any]
+    plan: Optional[Dict[str, Any]]
+    pdfSourceFile: str
+    activeLanguage: str
+    pageImages: List[str]
+    pageDimensions: List[Dict[str, float]]
+    totalPages: int
+    outputDir: str
+    activeStep: Optional[int]
 
 
 def safe_load_json(file_path: str, default: Any = None) -> Any:
@@ -183,7 +203,7 @@ def create_preset_attempt_record(
     violations_count: int,
     step: int = 1,
     default_action: str = "ACCEPT_OUTPUT",
-) -> Dict[str, Any]:
+) -> AttemptRecord:
     """
     Constructs a standardized preset attempt record dictionary.
 
@@ -228,7 +248,7 @@ def build_viewer_dataset(
     output_dir: Optional[str] = None,
     raw_dom: Optional[Dict[str, Any]] = None,
     diff: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+) -> ViewerDataset:
     """
     Constructs canonical dataset required to hydrate interactive visual viewer.
     Stores raw result and diff to eliminate expensive redundant preset reruns.
@@ -240,7 +260,7 @@ def build_viewer_dataset(
     det_langs = decision.get("detected_languages") if isinstance(decision, dict) else None
     detected_languages = det_langs if isinstance(det_langs, dict) else {}
 
-    dataset: Dict[str, Any] = {
+    dataset: ViewerDataset = {
         "dom": dom,
         "raw_dom": resolved_raw_dom,
         "diff": resolved_diff,

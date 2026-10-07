@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -83,60 +83,26 @@ class IngestionConfig:
         )
 
 
+@dataclass
 class DocumentPlan:
     """Executable plan defining candidate preset hierarchy and quality thresholds."""
-    document_path: str
-    criteria: PlannerCriteria
-    language: Optional[str]
-    target_threshold: float
-    primary_preset: str
-    fallback_queue: List[Dict[str, Any]]
-    preset_order: List[str]
-    suggested_order: List[str]
-    overridden: bool
-    scores: Dict[str, float]
-    created_at: str
+    document_path: str = ""
+    criteria: PlannerCriteria = field(default_factory=PlannerCriteria)
+    language: Optional[str] = None
+    target_threshold: float = 0.82
+    primary_preset: str = "docling_fast"
+    fallback_queue: List[Dict[str, Any]] = field(default_factory=list)
+    preset_order: List[str] = field(default_factory=lambda: ["docling_fast"])
+    suggested_order: List[str] = field(default_factory=lambda: ["docling_fast"])
+    overridden: bool = False
+    scores: Dict[str, float] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    def __init__(
-        self,
-        document_path: str = "",
-        criteria: Optional[PlannerCriteria] = None,
-        language: Optional[str] = None,
-        target_threshold: float = 0.82,
-        primary_preset: str = "docling_fast",
-        fallback_queue: Optional[List[Dict[str, Any]]] = None,
-        preset_order: Optional[List[str]] = None,
-        suggested_order: Optional[List[str]] = None,
-        overridden: bool = False,
-        scores: Optional[Dict[str, float]] = None,
-        created_at: Optional[str] = None,
-        taxonomy: Optional[str] = None,
-        target: Optional[str] = None,
-        security: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        self.document_path = document_path
-        if criteria is not None:
-            self.criteria = criteria
-        else:
-            tax = taxonomy or "general_text"
-            tgt = target or "high_precision_structure"
-            sec = security or "air_gapped_local"
-            self.criteria = PlannerCriteria(
-                taxonomy=tax,
-                target=tgt,
-                security=sec,
-            )
-        self.language = language
-        self.target_threshold = target_threshold
-        self.primary_preset = primary_preset
-        self.fallback_queue = fallback_queue or []
-        self.preset_order = preset_order or [primary_preset]
-        self.suggested_order = suggested_order or [primary_preset]
-        self.overridden = overridden
-        self.scores = scores or {}
-        now_iso = datetime.now(timezone.utc).isoformat()
-        self.created_at = created_at or now_iso
+    def __post_init__(self) -> None:
+        if not self.preset_order and self.primary_preset:
+            self.preset_order = [self.primary_preset]
+        if not self.suggested_order and self.primary_preset:
+            self.suggested_order = [self.primary_preset]
 
     @property
     def taxonomy(self) -> str:
@@ -184,6 +150,10 @@ class DocumentPlan:
             visualize=visualize,
             output_dir=output_dir,
         )
+
+    def evolve(self, **changes: Any) -> DocumentPlan:
+        """Returns a copy of the plan with specified fields updated."""
+        return replace(self, **changes)
 
     def save(self, output_path: str = os.path.join("output", "plan.json")) -> str:
         dir_path = os.path.dirname(output_path)

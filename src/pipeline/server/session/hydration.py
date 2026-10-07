@@ -10,7 +10,9 @@ import os
 import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
 
+from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.server.artifacts import (
+    ViewerDataset,
     build_viewer_dataset,
     create_preset_attempt_record,
     load_or_render_page_images,
@@ -30,9 +32,9 @@ class ViewerHydrationMixin:
     _lock: threading.RLock
     output_dir: str
     active_step: Optional[int]
-    viewer_data: Optional[Dict[str, Any]]
+    viewer_data: Optional[ViewerDataset]
     current_result: Optional[Dict[str, Any]]
-    preset_attempts: List[Dict[str, Any]]
+    preset_attempts: List[AttemptRecord]
     repo_root: str
     pdf_path: str
     language: str
@@ -57,7 +59,7 @@ class ViewerHydrationMixin:
                 "output_dir": self.output_dir or "output",
             }
 
-    def get_viewer_data(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    def get_viewer_data(self, output_dir: Optional[str] = None) -> ViewerDataset:
         """Thread-safe retrieval and hydration of viewer state."""
         with self._lock:
             if output_dir:
@@ -192,20 +194,40 @@ class ViewerHydrationMixin:
             raw_dom = result.get("raw_dom") or dom_dict
             diff = result.get("diff") or {}
 
-            self.viewer_data = build_viewer_dataset(
-                dom=dom_dict,
-                violations=violations_list,
-                decision=decision_dict,
-                plan=plan,
-                pdf_path=resolved_path,
-                language=language,
-                page_images=page_images,
-                page_dimensions=page_dimensions,
-                total_pages=total_pages,
-                output_dir=target_output_dir,
-                raw_dom=raw_dom,
-                diff=diff,
-            )
+            # If existing viewer_data has the same document and pages, update only changed fields
+            existing = self.viewer_data
+            if (
+                existing is not None
+                and existing.get("pdfSourceFile") == resolved_path
+                and existing.get("totalPages") == total_pages
+                and existing.get("outputDir") == target_output_dir
+            ):
+                updated_dataset: ViewerDataset = dict(existing)  # type: ignore[assignment]
+                updated_dataset.update({
+                    "dom": dom_dict,
+                    "violations": violations_list,
+                    "decision": decision_dict,
+                    "plan": plan,
+                    "activeLanguage": language,
+                    "raw_dom": raw_dom,
+                    "diff": diff,
+                })
+                self.viewer_data = updated_dataset
+            else:
+                self.viewer_data = build_viewer_dataset(
+                    dom=dom_dict,
+                    violations=violations_list,
+                    decision=decision_dict,
+                    plan=plan,
+                    pdf_path=resolved_path,
+                    language=language,
+                    page_images=page_images,
+                    page_dimensions=page_dimensions,
+                    total_pages=total_pages,
+                    output_dir=target_output_dir,
+                    raw_dom=raw_dom,
+                    diff=diff,
+                )
 
             preset_name = decision_dict.get("chosen_preset") or "docling_fast"
 

@@ -10,7 +10,9 @@ import logging
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
+from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.planner_models import DocumentPlan
+from src.pipeline.server.artifacts import ViewerDataset
 from src.pipeline.server.http_utils import REPO_ROOT, SRC_DIR
 from src.pipeline.server.preset_cache import PresetCache
 from src.pipeline.server.progress import ProgressTracker
@@ -36,9 +38,9 @@ class BaseSessionState:
         self.src_dir: str = src_dir or SRC_DIR
         self.output_dir: str = output_dir.replace("\\", "/")
         self.active_step: Optional[int] = None
-        self.viewer_data: Optional[Dict[str, Any]] = None
+        self.viewer_data: Optional[ViewerDataset] = None
         self.current_result: Optional[Dict[str, Any]] = None
-        self.preset_attempts: List[Dict[str, Any]] = []
+        self.preset_attempts: List[AttemptRecord] = []
         self.submitted_plan: Optional[DocumentPlan] = None
 
         self._progress_tracker: ProgressTracker = ProgressTracker(lock=self._lock)

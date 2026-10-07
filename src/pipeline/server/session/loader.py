@@ -11,8 +11,10 @@ import os
 import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.planner_models import DocumentPlan
 from src.pipeline.server.artifacts import (
+    ViewerDataset,
     create_preset_attempt_record,
     load_run_artifacts,
 )
@@ -32,12 +34,12 @@ class RunLoaderMixin:
     _lock: threading.RLock
     output_dir: str
     active_step: Optional[int]
-    viewer_data: Optional[Dict[str, Any]]
+    viewer_data: Optional[ViewerDataset]
     repo_root: str
     submitted_plan: Optional[DocumentPlan]
     language: str
     pdf_path: str
-    preset_attempts: List[Dict[str, Any]]
+    preset_attempts: List[AttemptRecord]
     current_result: Optional[Dict[str, Any]]
     _preset_cache: PresetCache
     _progress_tracker: ProgressTracker

@@ -14,6 +14,8 @@ from http.server import SimpleHTTPRequestHandler
 from typing import Any, Dict, List, Mapping, Optional
 from urllib.parse import parse_qs, urlparse
 
+from src.pipeline.execution_models import AttemptRecord
+from src.pipeline.server.artifacts import ViewerDataset
 from src.pipeline.server.http_utils import (
     SRC_DIR,
     read_json_payload,
@@ -46,9 +48,9 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
 
     pdf_path: str = ""
     language: str = "en"
-    viewer_data: Optional[Dict[str, Any]] = None
+    viewer_data: Optional[ViewerDataset] = None
     current_result: Optional[Dict[str, Any]] = None
-    preset_attempts: List[Dict[str, Any]] = []
+    preset_attempts: List[AttemptRecord] = []
     progress_state: Dict[str, Any] = {
         "status": "idle",
         "progress": 0,
@@ -102,7 +104,7 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
         return res
 
     @classmethod
-    def get_viewer_data(cls) -> Dict[str, Any]:
+    def get_viewer_data(cls) -> ViewerDataset:
         """Returns structured data required to hydrate the interactive visual viewer."""
         return cls._default_session.get_viewer_data()
 
