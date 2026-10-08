@@ -55,14 +55,7 @@ function renderViolationsList() {
     }
 
     if (violationsToDisplay.length === 0) {
-        if (viols.length === 0) {
-            container.innerHTML = '<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600;">[OK] Zero quality violations detected for current language/preset.</div>';
-        } else {
-            container.innerHTML = `<div style="color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: 600; padding: 10px;">
-                [OK] Zero quality violations on Page ${currentPage}.<br>
-                <span style="font-size:10px; color: var(--text-muted); font-weight:400;">(Shift-click "Violations" tab to show all ${viols.length} violation(s) across all pages)</span>
-            </div>`;
-        }
+        container.innerHTML = renderViolationsEmptyComponent(currentPage, viols.length);
         return;
     }
 
@@ -90,33 +83,12 @@ function renderViolationsList() {
         bundleEl.className = 'viol-bundle';
 
         const pageLabel = showAllViolations ? 'All Pages' : `Page ${currentPage}`;
-        bundleEl.innerHTML = `
-            <div class="viol-bundle-header">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="viol-bundle-title">[Category: ${escapeHtml(cat.toUpperCase())}]</span>
-                    <span class="badge-status" style="font-size:10px; background:#374151; color:#E5E7EB;">
-                        ${catViols.length} total | ${catActiveCount} active | ${catSuppressedCount} accepted
-                    </span>
-                </div>
-                <div class="viol-bundle-actions">
-                    ${catActiveCount > 0 ? `
-                        <button class="btn-accept-bundle" onclick="acceptCategoryOnPage('${escapeHtml(cat)}')">
-                            [Accept All '${escapeHtml(cat)}' on ${pageLabel}]
-                        </button>
-                    ` : `
-                        <button class="btn-restore-bundle" onclick="restoreCategoryOnPage('${escapeHtml(cat)}')">
-                            [Restore '${escapeHtml(cat)}' on ${pageLabel}]
-                        </button>
-                    `}
-                    ${hasFixable ? `
-                        <button class="apply-fix-btn" style="margin-top:0;" onclick="applyAllFixesForCategory('${escapeHtml(cat)}')">
-                            [Fix All '${escapeHtml(cat)}']
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-            <div class="viol-bundle-items" id="bundle-items-${escapeHtml(cat)}"></div>
-        `;
+        bundleEl.innerHTML = renderViolationBundleComponent(
+            cat,
+            { totalCount: catViols.length, activeCount: catActiveCount, suppressedCount: catSuppressedCount },
+            pageLabel,
+            hasFixable
+        );
 
         const itemsContainer = bundleEl.querySelector(`#bundle-items-${cat}`);
         catViols.forEach(v => {
@@ -128,56 +100,13 @@ function renderViolationsList() {
             card.onclick = () => selectNode(v.node_id, vPage);
             const canFix = !!(v.suggested_correction || v.suggestion);
 
-            let statusHtml = '';
-            if (isFixed) {
-                statusHtml = '<span style="font-size: 10px; font-weight:700; color: #10B981;">[FIXED]</span>';
-            } else if (isSupp) {
-                statusHtml = '<span style="font-size: 10px; font-weight:700; color: #34D399;">[ACCEPTED (FALSE POSITIVE)]</span>';
-            } else {
-                statusHtml = `<span style="font-size: 10px; font-weight:700; color: #F87171;">${escapeHtml(v.severity || 'WARNING')}</span>`;
-            }
-
-            card.innerHTML = `
-                <div class="viol-header">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span class="viol-title">[!] ${escapeHtml(v.rule_type || v.type)}</span>
-                        <span class="badge-status" style="font-size:9px; background:#4B5563; color:#E5E7EB;">${escapeHtml(cat)}</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:4px;">
-                        <span class="badge-status lang" style="font-size:9px; padding:1px 5px;">P${vPage}</span>
-                        ${statusHtml}
-                    </div>
-                </div>
-                <div style="font-size: 11px; font-family: monospace; color:#FDE047;">
-                    Snippet: '${escapeHtml(v.detected_snippet || '')}'${v.suggested_correction ? ` -> '${escapeHtml(v.suggested_correction)}'` : ''}
-                </div>
-                ${v.suggestion && v.suggestion !== v.suggested_correction ? `
-                    <div style="font-size: 10px; font-family: monospace; color:#A7F3D0; margin-top:2px;">
-                        Rewrite: '${escapeHtml(v.suggestion)}'
-                    </div>
-                ` : ''}
-                <div class="viol-desc">${escapeHtml(v.description || '')}</div>
-                <div style="display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
-                    ${isSupp ? `
-                        <button class="btn-restore-bundle" onclick="toggleSuppressSingleViolation(event, '${v.violation_id}', false)">
-                            [Restore] Re-flag as Active
-                        </button>
-                    ` : `
-                        ${!isFixed ? `
-                            <button class="btn-accept-bundle" onclick="toggleSuppressSingleViolation(event, '${v.violation_id}', true)">
-                                [Accept] Accept as Legitimate
-                            </button>
-                        ` : ''}
-                    `}
-                    ${canFix ? `
-                        ${isFixed ? `
-                            <span class="badge-status" style="font-size:10px; background:#10B981; color:#000; padding:2px 8px; font-weight:700;">[OK] Fix Applied</span>
-                        ` : `
-                            <button class="apply-fix-btn" style="margin-top:0;" onclick="applySingleFix(event, '${v.violation_id || v.node_id}')">[Fix] Apply Suggested Fix</button>
-                        `}
-                    ` : ''}
-                </div>
-            `;
+            card.innerHTML = renderViolationCardComponent(v, {
+                cat,
+                vPage,
+                isFixed,
+                isSupp,
+                canFix
+            });
             itemsContainer.appendChild(card);
         });
 

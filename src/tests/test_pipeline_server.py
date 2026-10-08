@@ -176,6 +176,9 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("computeDomDiff", content_js)
         self.assertIn("recalculateScoring", content_js)
         self.assertIn("accepted_violations", content_js)
+        self.assertIn("renderViolationCardComponent", content_js)
+        self.assertIn("renderViolationBundleComponent", content_js)
+        self.assertIn("renderViolationsEmptyComponent", content_js)
 
         # Test landing CSS and JS
         status_l_css, content_l_css, headers_l_css = self._get("/landing.css")

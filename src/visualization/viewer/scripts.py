@@ -21,6 +21,7 @@ JS_MODULE_ORDER: List[str] = [
     "cutout.js",
     "decollide_components.js",
     "decollide.js",
+    "violations_components.js",
     "violations.js",
     "api.js",
     "app.js",
