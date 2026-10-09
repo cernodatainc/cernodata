@@ -12,6 +12,8 @@ dependencies = [
     "pypdfium2>=4.30.0",
     "Pillow>=10.0.0",
     "rapidocr-onnxruntime>=1.3.0",
+    # Workaround: rapidocr 3.10.0 removed PP_OCRV6_LANGS required by docling; remove once docling fixes it.
+    "rapidocr>=3.9.1,<3.10",
     "docling>=2.0.0",
     "torch>=2.0.0",
     "pydantic>=2.0.0",
