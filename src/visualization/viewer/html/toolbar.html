@@ -1,30 +1,43 @@
     <div class="toolbar">
         <div class="zoom-controls">
-            <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom Out">-</button>
+            <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom out">−</button>
             <span class="zoom-label" id="zoomDisplay">100%</span>
-            <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom In">+</button>
-            <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset Zoom">100%</button>
-            <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit Width">Fit</button>
+            <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom in">+</button>
+            <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset zoom">100%</button>
+            <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit width">Fit</button>
         </div>
-
+ 
         <div class="page-controls page-controls-group">
-            <span class="control-label">Page:</span>
-            <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous Page">&lt;</button>
+            <span class="control-label">Page</span>
+            <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous page">&lt;</button>
             <select class="type-filter page-select-dropdown" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))"></select>
-            <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next Page">&gt;</button>
+            <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next page">&gt;</button>
             <span class="control-label"><span id="currentPageNum" class="current-page-num">1</span> / <span id="totalPagesNum">{{ total_pages }}</span></span>
         </div>
-
-        <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding Boxes</label></div>
-        <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality Violations</label></div>
-        <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
-        <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score Badge</label></div>
+ 
+        <div class="toolbar-group page-controls-group">
+            <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding boxes</label></div>
+            <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality violations</label></div>
+            <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
+            <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score badge</label></div>
+            <div class="filter-controls-group">
+                <span class="control-label">Filter</span>
+                <select class="type-filter" id="typeFilter" onchange="updateLayers()">
+                    <option value="ALL">All types</option>
+                    <option value="heading">Headings</option>
+                    <option value="paragraph">Paragraphs</option>
+                    <option value="table_grid">Tables</option>
+                    <option value="figure">Figures</option>
+                </select>
+            </div>
+        </div>
+ 
         <div class="lang-controls-group">
-            <span class="control-label">Detected Lang:</span>
+            <span class="control-label">Detected language</span>
             <span class="badge-status lang" id="detectedLangBadge">P1: {{ primary_detected }}</span>
-            <span class="control-label">Override:</span>
+            <span class="control-label">Override</span>
             <select class="type-filter" id="selectLanguage" onchange="onLanguageChanged()">
-                <option value="auto">Auto-Detect</option>
+                <option value="auto">Auto-detect</option>
                 <option value="pl" {{ pl_selected }}>Polish (pl)</option>
                 <option value="en" {{ en_selected }}>English (en)</option>
                 <option value="de" {{ de_selected }}>German (de)</option>
@@ -32,18 +45,11 @@
                 <option value="es" {{ es_selected }}>Spanish (es)</option>
             </select>
         </div>
-        <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
-        <button class="action-btn secondary action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">[REVERT] Revert to Raw</button>
-        <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">[+ SECTION] Add Section</button>
-        <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
-        <div class="filter-controls-group">
-            <span class="control-label">Filter:</span>
-            <select class="type-filter" id="typeFilter" onchange="updateLayers()">
-                <option value="ALL">All Types</option>
-                <option value="heading">Headings</option>
-                <option value="paragraph">Paragraphs</option>
-                <option value="table_grid">Tables</option>
-                <option value="figure">Figures</option>
-            </select>
+ 
+        <div class="toolbar-actions">
+            <button class="action-btn action-btn-draw-section" id="btnDrawSection" hidden onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">Add section</button>
+            <button class="action-btn action-btn-decollide" id="btnDecollidePage" hidden onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">Decollide page</button>
+            <button class="action-btn action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">Revert to raw</button>
+            <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">Save annotations</button>
         </div>
     </div>

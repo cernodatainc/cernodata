@@ -1,164 +1,232 @@
 <!DOCTYPE html>
 <html lang="en">
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cernodata | Data Shape &amp; Pipeline Planner</title>
+    <title>Cernodata</title>
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg width="1000" height="1000" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1000" height="1000" rx="200" fill="white"/>
+<rect x="679.998" y="519.999" width="56.5685" height="276.814" transform="rotate(45 679.998 519.999)" fill="black"/>
+<rect x="468.874" y="251.124" width="56.5685" height="267.111" transform="rotate(45 468.874 251.124)" fill="black"/>
+<rect x="499.999" y="100" width="565.685" height="56.5686" transform="rotate(45 499.999 100)" fill="black"/>
+<rect x="474.376" y="125.623" width="56.5685" height="444.598" transform="rotate(45 474.376 125.623)" fill="black"/>
+<rect x="222.81" y="422.812" width="448.572" height="56.5686" transform="rotate(45 222.81 422.812)" fill="black"/>
+<rect x="140" y="460" width="565.685" height="56.5686" transform="rotate(45 140 460)" fill="black"/>
+<rect x="499.999" y="220" width="442.647" height="56.5686" transform="rotate(45 499.999 220)" fill="black"/>
+<rect x="799.998" y="519.999" width="56.5685" height="437.372" transform="rotate(45 799.998 519.999)" fill="black"/>
+<path d="M499.996 415.997C571.746 415.997 629.92 499.888 629.995 499.996C629.995 499.996 571.792 583.996 499.996 583.996C428.2 583.996 369.997 499.996 369.997 499.996C370.098 499.85 428.262 415.997 499.996 415.997ZM499.997 443.997C469.069 443.997 443.997 469.069 443.997 499.997C443.997 530.925 469.069 555.997 499.997 555.997C530.925 555.997 555.997 530.925 555.997 499.997C555.997 469.069 530.925 443.997 499.997 443.997Z" fill="black"/>
+</svg>
+'>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/data_shape_config.css">
 </head>
+ 
 <body>
-
+ 
     <header>
         <div class="brand">
-            <div class="brand-logo">C</div>
-            <div>
-                <div class="brand-title">cernodata Data Shape & Preset Planner</div>
-                <div class="brand-subtitle">Interactive browser setup to configure ingestion constraints and preset suitability ranking</div>
-            </div>
+            <svg class="brand-logo-img" viewBox="0 0 3952 1000" fill="none" xmlns="http://www.w3.org/2000/svg"
+                role="img" aria-label="cernodata">
+                <rect x="679.997" y="519.999" width="56.5685" height="269.039" transform="rotate(45 679.997 519.999)"
+                    fill="black" />
+                <rect x="472.843" y="247.155" width="56.5685" height="272.724" transform="rotate(45 472.843 247.155)"
+                    fill="black" />
+                <rect x="499.998" y="100" width="565.685" height="56.5686" transform="rotate(45 499.998 100)"
+                    fill="black" />
+                <rect x="472.157" y="127.841" width="56.5685" height="441.46" transform="rotate(45 472.157 127.841)"
+                    fill="black" />
+                <rect x="226.454" y="426.457" width="443.417" height="56.5686" transform="rotate(45 226.454 426.457)"
+                    fill="black" />
+                <rect x="140" y="460" width="565.685" height="56.5686" transform="rotate(45 140 460)" fill="black" />
+                <rect x="499.998" y="220" width="431.18" height="56.5686" transform="rotate(45 499.998 220)"
+                    fill="black" />
+                <rect x="799.997" y="520" width="56.5685" height="436.077" transform="rotate(45 799.997 520)"
+                    fill="black" />
+                <path
+                    d="M499.996 415.997C571.792 415.997 629.995 499.997 629.995 499.997C629.941 500.076 571.759 583.996 499.996 583.996C428.253 583.996 370.083 500.122 369.997 499.997C369.997 499.997 428.2 415.997 499.996 415.997ZM499.997 443.997C469.069 443.997 443.997 469.069 443.997 499.997C443.997 530.925 469.069 555.997 499.997 555.997C530.925 555.997 555.997 530.925 555.997 499.997C555.997 469.069 530.925 443.997 499.997 443.997Z"
+                    fill="black" />
+                <path
+                    d="M1278 402H1180C1128.64 402 1087 445.876 1087 500C1087 554.124 1128.64 598 1180 598H1330L1278 650H1180C1097.16 650 1030 582.843 1030 500C1030 417.157 1097.16 350 1180 350H1330L1278 402Z"
+                    fill="black" />
+                <path
+                    d="M1568 402H1470C1427.18 402 1391.12 432.495 1380.31 474H1600L1548 526H1380.31C1391.12 567.505 1427.18 598 1470 598H1620L1568 650H1470C1387.16 650 1320 582.843 1320 500C1320 417.157 1387.16 350 1470 350H1620L1568 402Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M2895 350C2977.84 350 3045 417.157 3045 500C3045 582.843 2977.84 650 2895 650H2745V350H2895ZM2802 598H2895C2946.36 598 2988 554.124 2988 500C2988 445.876 2946.36 402 2895 402H2802V598Z"
+                    fill="black" />
+                <path d="M3590 350L3538 402H3468V650H3412V402H3290L3342 350H3590Z" fill="black" />
+                <path
+                    d="M2239.47 560.943L2239 561.12L2258 604V582.792L2258 582.793V350H2315V650H2249.44L2070.96 439.565L2051.57 396.7V446.7L2052 446.542V650H1995V350H2060.56L2239.47 560.943Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M1867 350C1915.6 350 1955 389.399 1955 438C1955 486.601 1915.6 526 1867 526H1849.83L1955 650H1884.19L1779.02 526H1712V650H1655V350H1867ZM1712 474H1867C1884.12 474 1898 457.882 1898 438C1898 418.118 1884.12 402 1867 402H1712V474Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M2550 350C2632.84 350 2700 417.157 2700 500C2700 582.843 2632.84 650 2550 650H2510C2427.16 650 2360 582.843 2360 500C2360 417.157 2427.16 350 2510 350H2550ZM2510 402C2458.64 402 2417 445.876 2417 500C2417 554.124 2458.64 598 2510 598H2550C2601.36 598 2643 554.124 2643 500C2643 445.876 2601.36 402 2550 402H2510Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M3297.84 552H3371.39L3323.39 600H3323.39L3350 650H3288.83L3262.22 600H3107.78L3081.17 650H3020L3185 340L3297.84 552ZM3133.33 552H3236.67L3185 454.93L3133.33 552Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M3777.84 552H3851.39L3803.39 600H3803.39L3830 650H3768.83L3742.22 600H3587.78L3561.17 650H3500L3665 340L3777.84 552ZM3613.33 552H3716.67L3665 454.93L3613.33 552Z"
+                    fill="black" />
+            </svg>
         </div>
-        <div class="header-badge">[SETUP WIZARD]</div>
+        <div class="header-links">
+            <a href="/" class="header-link-btn">Dashboard</a>
+            <a href="/planner" class="header-link-btn active">Planner Wizard</a>
+            <a href="/viewer" class="header-link-btn">Visual Flow Viewer</a>
+        </div>
     </header>
-
+ 
     <div class="main-container">
         <!-- Form Section -->
         <div>
             <div class="status-banner" id="statusBanner"></div>
-
+ 
             <!-- 0. Browse Previous Results & Completed Outputs -->
-            <div class="form-section section-browse">
+            <div class="form-section">
                 <div class="section-header">
-                    <div class="section-num section-browse-num">0</div>
-                    <div class="section-title">Browse Previous Results &amp; Outputs</div>
-                    <div class="section-desc">Select existing run to inspect or reuse parameters</div>
+                    <div class="section-num">0</div>
+                    <div class="section-title">Previous results</div>
+                    <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
                 </div>
-
+ 
                 <div class="input-group">
-                    <label class="input-label" for="prevRunSelect">Choose Completed Run Output</label>
+                    <label class="input-label" for="prevRunSelect">Completed run output</label>
                     <div class="prev-run-row">
-                        <select id="prevRunSelect" class="override-select prev-run-select" onchange="onPreviousRunSelected(this.value)">
-                            <option value="">-- Choose output of a previous run --</option>
+                        <select id="prevRunSelect" class="override-select prev-run-select"
+                            onchange="onPreviousRunSelected(this.value)">
+                            <option value="">Choose a previous run</option>
                         </select>
-                        <button type="button" class="btn btn-load-params" onclick="loadSelectedPreviousRunIntoWizard()">
-                            [LOAD] Load Run Parameters
+                        <button type="button" class="btn btn-secondary btn-load-params"
+                            onclick="loadSelectedPreviousRunIntoWizard()">
+                            Load parameters
                         </button>
-                        <a id="btnInspectViewer" href="/viewer" target="_blank" class="btn btn-view-params">
-                            [VIEW] Open in Viewer
+                        <a id="btnInspectViewer" href="/viewer" target="_blank" class="btn btn-secondary btn-view-params">
+                            Open in viewer
                         </a>
                     </div>
                     <div id="prevRunSummary" class="prev-run-summary">
                     </div>
                 </div>
             </div>
-
+ 
             <!-- 1. Document & Ingestion Parameters -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">1</div>
-                    <div class="section-title">Document &amp; Quality Targets</div>
-                    <div class="section-desc">File source, language hint, and confidence goal</div>
+                    <div class="section-title">Quality targets</div>
+                    <div class="section-desc">File source, language hint and confidence goal</div>
                 </div>
-
+ 
                 <div class="input-group">
-                    <label class="input-label" for="docPath">Document File Path</label>
+                    <label class="input-label" for="docPath">Document file path</label>
                     <input type="text" id="docPath" class="input-text" placeholder="e.g. src/e2e/Dokument 5.pdf" />
                 </div>
-
+ 
                 <div class="inline-inputs">
                     <div class="input-group">
                         <div class="lang-hint-header">
-                            <label class="input-label lang-hint-title" for="langCode">Language Hint</label>
+                            <label class="input-label lang-hint-title" for="langCode">Language hint</label>
                             <label class="lang-hint-checkbox-label">
-                                <input type="checkbox" id="enableLangHint" class="lang-hint-checkbox" onchange="toggleLanguageHint()" />
+                                <input type="checkbox" id="enableLangHint" class="lang-hint-checkbox"
+                                    onchange="toggleLanguageHint()" />
                                 Provide hint
                             </label>
                         </div>
-                        <select id="langCode" class="override-select lang-select-disabled" onchange="recalculate()" disabled>
-                            <option value="en">en - English</option>
-                            <option value="pl">pl - Polish</option>
-                            <option value="de">de - German</option>
-                            <option value="fr">fr - French</option>
-                            <option value="es">es - Spanish</option>
+                        <select id="langCode" class="override-select lang-select-disabled" onchange="recalculate()"
+                            disabled>
+                            <option value="en">English (en)</option>
+                            <option value="pl">Polish (pl)</option>
+                            <option value="de">German (de)</option>
+                            <option value="fr">French (fr)</option>
+                            <option value="es">Spanish (es)</option>
                         </select>
                     </div>
-
+ 
                     <div class="input-group">
-                        <label class="input-label" for="thresholdSlider">Target Confidence Threshold</label>
+                        <label class="input-label" for="thresholdSlider">Target confidence threshold</label>
                         <div class="slider-wrapper">
-                            <input type="range" id="thresholdSlider" min="0.50" max="0.99" step="0.01" value="0.82" oninput="updateThreshold(this.value)" />
+                            <input type="range" id="thresholdSlider" min="0.50" max="0.99" step="0.01" value="0.82"
+                                oninput="updateThreshold(this.value)" />
                             <span class="slider-value" id="thresholdDisplay">0.82</span>
                         </div>
                     </div>
                 </div>
             </div>
-
+ 
             <!-- 2. Document Taxonomy -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">2</div>
-                    <div class="section-title">Document Taxonomy</div>
-                    <div class="section-desc">Select the primary structural layout shape</div>
+                    <div class="section-title">Document taxonomy</div>
+                    <div class="section-desc">Primary structural layout shape</div>
                 </div>
                 <div class="options-grid" id="taxonomyGrid">
                     <!-- Populated by JS -->
                 </div>
             </div>
-
+ 
             <!-- 3. Quality vs Speed Target -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">3</div>
-                    <div class="section-title">Quality vs. Speed Target</div>
-                    <div class="section-desc">Throughput priority versus bounding box layout fidelity</div>
+                    <div class="section-title">Processing priority</div>
+                    <div class="section-desc">Throughput priority versus layout fidelity</div>
                 </div>
                 <div class="options-grid" id="targetGrid">
                     <!-- Populated by JS -->
                 </div>
             </div>
-
+ 
             <!-- 4. Security Constraints -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">4</div>
-                    <div class="section-title">Security &amp; Network Constraints</div>
-                    <div class="section-desc">External cloud API allowance vs. air-gapped local model</div>
+                    <div class="section-title">Security</div>
+                    <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
                 </div>
                 <div class="options-grid" id="securityGrid">
                     <!-- Populated by JS -->
                 </div>
             </div>
         </div>
-
+ 
         <!-- Sidebar / Ranking Preview -->
         <div class="sidebar">
             <div class="ranking-card">
-                <div class="ranking-header">Suitability Ranking</div>
-                <div class="ranking-sub">Dynamic confidence scores based on answers</div>
-
+                <div class="ranking-header">Suitability ranking</div>
+                <div class="ranking-sub">Confidence scores update as you answer</div>
+ 
                 <div id="presetsList">
                     <!-- Populated by JS -->
                 </div>
-
+ 
                 <div class="override-box">
-                    <div class="override-title">Primary Preset Override</div>
+                    <label class="override-title" for="overrideSelect">Primary preset override</label>
                     <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
-                        <option value="auto">[AUTO] Use Recommended Ranking</option>
+                        <option value="auto">Auto (recommended ranking)</option>
                         <option value="pypdfium_rapidocr">pypdfium_rapidocr</option>
                         <option value="docling_fast">docling_fast</option>
                         <option value="docling_deep">docling_deep</option>
                         <option value="vision_llm_direct">vision_llm_direct</option>
                     </select>
                 </div>
-
-                <button class="submit-btn" id="submitBtn" onclick="submitPlan()" data-submit-endpoint="/api/submit_plan">
-                    [SUBMIT PLAN] Start Pipeline Execution
+ 
+                <button class="submit-btn" id="submitBtn" onclick="submitPlan()"
+                    data-submit-endpoint="/api/submit_plan">
+                    Start pipeline
                 </button>
             </div>
         </div>
     </div>
-
+ 
     <script src="/data_shape_config.js" data-submit-endpoint="/api/submit_plan"></script>
 </body>
+ 
 </html>

@@ -543,7 +543,7 @@ function hydrateViewer(data, pageNum = null) {
 
     const detBadge = document.getElementById('detectedLangBadge');
     if (detBadge) {
-        detBadge.textContent = `P${currentPage}: ${decisionData.primary_detected_language || 'pl'} (Active: ${activeLanguage})`;
+        detBadge.textContent = `P${currentPage}: ${decisionData.primary_detected_language || 'pl'} (active: ${activeLanguage})`;
     }
 
     const selLang = document.getElementById('selectLanguage');

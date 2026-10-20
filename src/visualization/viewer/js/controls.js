@@ -139,7 +139,7 @@ function switchPage(pageNum) {
     updateNavButtonsState();
 
     const actTitle = document.getElementById('pageActionTitle');
-    if (actTitle) actTitle.textContent = `Page ${currentPage} Controls:`;
+    if (actTitle) actTitle.textContent = `Page ${currentPage} controls:`;
 
     updatePageScoreBadge();
 
@@ -170,14 +170,14 @@ function updatePageScoreBadge() {
 
     const titleEl = document.getElementById('scoreTitle');
     if (titleEl) {
-        titleEl.textContent = `Page ${currentPage} Confidence Score: ${pageScore !== undefined && pageScore !== null ? Number(pageScore).toFixed(4) : '1.0000'}`;
+        titleEl.textContent = `Page ${currentPage} confidence score: ${pageScore !== undefined && pageScore !== null ? Number(pageScore).toFixed(4) : '1.0000'}`;
     }
 
     const detBadge = document.getElementById('detectedLangBadge');
     if (detBadge) {
         const detMap = decisionData.detected_languages || detectedLanguagesMap || {};
         const det = detMap[String(currentPage)] || detMap[currentPage] || decisionData.primary_detected_language || 'pl';
-        detBadge.textContent = `P${currentPage}: ${det} (Active: ${activeLanguage})`;
+        detBadge.textContent = `P${currentPage}: ${det} (active: ${activeLanguage})`;
     }
 }
 
@@ -351,14 +351,14 @@ function renderViewerRunsGrid(gridData) {
         return `
             <tr>
                 <td title="Run: ${escapeHtml(r.run_id)}">
-                    <div style="font-family:monospace;font-weight:600;color:#60A5FA;">${escapeHtml(r.run_id)}</div>
-                    <span class="preset-badge" style="font-size:10px;">${escapeHtml(r.preset)}</span>
+                    <div style="font-family:monospace;font-weight:600;color:#1E4B8A;">${escapeHtml(r.run_id)}</div>
+                    <span class="preset-badge" style="font-size:11px;">${escapeHtml(r.preset)}</span>
                 </td>
                 ${pageCells}
                 <td class="${overallCls}">${overall}</td>
-                <td><span class="badge-status ${isAccept ? 'pass' : 'fail'}" style="font-size:10px;">${escapeHtml(r.status)}</span></td>
+                <td><span class="badge-status ${isAccept ? 'pass' : 'fail'}" style="font-size:11px;">${escapeHtml(r.status)}</span></td>
                 <td>
-                    <button class="action-btn" style="padding:2px 8px; font-size:10px; margin:0; white-space:nowrap;" onclick="forceRerunFromViewerGrid('${escapeHtml(r.preset)}', '${escapeHtml(selFile || '')}')">[RERUN] Force Rerun</button>
+                    <button class="action-btn action-btn-decollide-sm" style="margin:0;" onclick="forceRerunFromViewerGrid('${escapeHtml(r.preset)}', '${escapeHtml(selFile || '')}')">Force Rerun</button>
                 </td>
             </tr>
         `;
@@ -424,14 +424,14 @@ function renderViewerRunsGridFallback() {
         return `
             <tr>
                 <td>
-                    <div style="font-family:monospace;font-weight:600;color:#60A5FA;">Attempt ${idx + 1}</div>
-                    <span class="preset-badge" style="font-size:10px;">${escapeHtml(att.preset || 'docling_fast')}</span>
+                    <div style="font-family:monospace;font-weight:600;color:#1E4B8A;">Attempt ${idx + 1}</div>
+                    <span class="preset-badge" style="font-size:11px;">${escapeHtml(att.preset || 'docling_fast')}</span>
                 </td>
                 ${pageCells}
                 <td class="${overallCls}">${overall}</td>
-                <td><span class="badge-status ${isAccept ? 'pass' : 'fail'}" style="font-size:10px;">${escapeHtml(att.status || 'ACCEPT')}</span></td>
+                <td><span class="badge-status ${isAccept ? 'pass' : 'fail'}" style="font-size:11px;">${escapeHtml(att.status || 'ACCEPT')}</span></td>
                 <td>
-                    <button class="action-btn" style="padding:2px 8px; font-size:10px; margin:0; white-space:nowrap;" onclick="forceRerunFromViewerGrid('${escapeHtml(att.preset || 'docling_fast')}')">[RERUN] Force Rerun</button>
+                    <button class="action-btn action-btn-decollide-sm" style="margin:0;" onclick="forceRerunFromViewerGrid('${escapeHtml(att.preset || 'docling_fast')}')">Force Rerun</button>
                 </td>
             </tr>
         `;
