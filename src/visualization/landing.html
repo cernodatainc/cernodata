@@ -1,23 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cernodata | Document Ingestion &amp; Pipeline Hub</title>
+    <title>Cernodata</title>
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg width="1000" height="1000" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1000" height="1000" rx="200" fill="white"/>
+<rect x="679.998" y="519.999" width="56.5685" height="276.814" transform="rotate(45 679.998 519.999)" fill="black"/>
+<rect x="468.874" y="251.124" width="56.5685" height="267.111" transform="rotate(45 468.874 251.124)" fill="black"/>
+<rect x="499.999" y="100" width="565.685" height="56.5686" transform="rotate(45 499.999 100)" fill="black"/>
+<rect x="474.376" y="125.623" width="56.5685" height="444.598" transform="rotate(45 474.376 125.623)" fill="black"/>
+<rect x="222.81" y="422.812" width="448.572" height="56.5686" transform="rotate(45 222.81 422.812)" fill="black"/>
+<rect x="140" y="460" width="565.685" height="56.5686" transform="rotate(45 140 460)" fill="black"/>
+<rect x="499.999" y="220" width="442.647" height="56.5686" transform="rotate(45 499.999 220)" fill="black"/>
+<rect x="799.998" y="519.999" width="56.5685" height="437.372" transform="rotate(45 799.998 519.999)" fill="black"/>
+<path d="M499.996 415.997C571.746 415.997 629.92 499.888 629.995 499.996C629.995 499.996 571.792 583.996 499.996 583.996C428.2 583.996 369.997 499.996 369.997 499.996C370.098 499.85 428.262 415.997 499.996 415.997ZM499.997 443.997C469.069 443.997 443.997 469.069 443.997 499.997C443.997 530.925 469.069 555.997 499.997 555.997C530.925 555.997 555.997 530.925 555.997 499.997C555.997 469.069 530.925 443.997 499.997 443.997Z" fill="black"/>
+</svg>
+'>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/landing.css">
 </head>
+
 <body>
 
     <header>
         <div class="brand">
-            <div class="brand-logo">C</div>
-            <div>
-                <div class="brand-title">cernodata Ingestion Hub</div>
-                <div class="brand-sub">Document Ingestion, Preset Planning, Live Execution &amp; Preset Results</div>
-            </div>
+            <svg class="brand-logo-img" viewBox="0 0 3952 1000" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="cernodata">
+                <rect x="679.997" y="519.999" width="56.5685" height="269.039" transform="rotate(45 679.997 519.999)" fill="black"/>
+                <rect x="472.843" y="247.155" width="56.5685" height="272.724" transform="rotate(45 472.843 247.155)" fill="black"/>
+                <rect x="499.998" y="100" width="565.685" height="56.5686" transform="rotate(45 499.998 100)" fill="black"/>
+                <rect x="472.157" y="127.841" width="56.5685" height="441.46" transform="rotate(45 472.157 127.841)" fill="black"/>
+                <rect x="226.454" y="426.457" width="443.417" height="56.5686" transform="rotate(45 226.454 426.457)" fill="black"/>
+                <rect x="140" y="460" width="565.685" height="56.5686" transform="rotate(45 140 460)" fill="black"/>
+                <rect x="499.998" y="220" width="431.18" height="56.5686" transform="rotate(45 499.998 220)" fill="black"/>
+                <rect x="799.997" y="520" width="56.5685" height="436.077" transform="rotate(45 799.997 520)" fill="black"/>
+                <path d="M499.996 415.997C571.792 415.997 629.995 499.997 629.995 499.997C629.941 500.076 571.759 583.996 499.996 583.996C428.253 583.996 370.083 500.122 369.997 499.997C369.997 499.997 428.2 415.997 499.996 415.997ZM499.997 443.997C469.069 443.997 443.997 469.069 443.997 499.997C443.997 530.925 469.069 555.997 499.997 555.997C530.925 555.997 555.997 530.925 555.997 499.997C555.997 469.069 530.925 443.997 499.997 443.997Z" fill="black"/>
+                <path d="M1278 402H1180C1128.64 402 1087 445.876 1087 500C1087 554.124 1128.64 598 1180 598H1330L1278 650H1180C1097.16 650 1030 582.843 1030 500C1030 417.157 1097.16 350 1180 350H1330L1278 402Z" fill="black"/>
+                <path d="M1568 402H1470C1427.18 402 1391.12 432.495 1380.31 474H1600L1548 526H1380.31C1391.12 567.505 1427.18 598 1470 598H1620L1568 650H1470C1387.16 650 1320 582.843 1320 500C1320 417.157 1387.16 350 1470 350H1620L1568 402Z" fill="black"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M2895 350C2977.84 350 3045 417.157 3045 500C3045 582.843 2977.84 650 2895 650H2745V350H2895ZM2802 598H2895C2946.36 598 2988 554.124 2988 500C2988 445.876 2946.36 402 2895 402H2802V598Z" fill="black"/>
+                <path d="M3590 350L3538 402H3468V650H3412V402H3290L3342 350H3590Z" fill="black"/>
+                <path d="M2239.47 560.943L2239 561.12L2258 604V582.792L2258 582.793V350H2315V650H2249.44L2070.96 439.565L2051.57 396.7V446.7L2052 446.542V650H1995V350H2060.56L2239.47 560.943Z" fill="black"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M1867 350C1915.6 350 1955 389.399 1955 438C1955 486.601 1915.6 526 1867 526H1849.83L1955 650H1884.19L1779.02 526H1712V650H1655V350H1867ZM1712 474H1867C1884.12 474 1898 457.882 1898 438C1898 418.118 1884.12 402 1867 402H1712V474Z" fill="black"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M2550 350C2632.84 350 2700 417.157 2700 500C2700 582.843 2632.84 650 2550 650H2510C2427.16 650 2360 582.843 2360 500C2360 417.157 2427.16 350 2510 350H2550ZM2510 402C2458.64 402 2417 445.876 2417 500C2417 554.124 2458.64 598 2510 598H2550C2601.36 598 2643 554.124 2643 500C2643 445.876 2601.36 402 2550 402H2510Z" fill="black"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M3297.84 552H3371.39L3323.39 600H3323.39L3350 650H3288.83L3262.22 600H3107.78L3081.17 650H3020L3185 340L3297.84 552ZM3133.33 552H3236.67L3185 454.93L3133.33 552Z" fill="black"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M3777.84 552H3851.39L3803.39 600H3803.39L3830 650H3768.83L3742.22 600H3587.78L3561.17 650H3500L3665 340L3777.84 552ZM3613.33 552H3716.67L3665 454.93L3613.33 552Z" fill="black"/>
+            </svg>
         </div>
         <div class="header-links">
             <a href="/" class="header-link-btn active">Dashboard</a>
@@ -28,23 +59,23 @@
 
     <nav class="hub-nav-bar">
         <button class="hub-tab-btn active" id="tabBtnInput" onclick="switchNavTab('input')">
-            <span>[1] Input Selection</span>
+            <span>Input selection</span>
             <span class="hub-tab-badge">PDF &amp; OCR</span>
         </button>
         <button class="hub-tab-btn" id="tabBtnPlan" onclick="switchNavTab('plan')">
-            <span>[2] Planning</span>
+            <span>Planning</span>
             <span class="hub-tab-badge">Preset Wizard</span>
         </button>
         <button class="hub-tab-btn" id="tabBtnProgress" onclick="switchNavTab('progress')">
-            <span>[3] Parsing Progress</span>
+            <span>Parsing progress</span>
             <span class="hub-tab-badge" id="navBadgeProgress">Idle</span>
         </button>
         <button class="hub-tab-btn" id="tabBtnResults" onclick="switchNavTab('results')">
-            <span>[4] Preset Results</span>
+            <span>Preset results</span>
             <span class="hub-tab-badge" id="navBadgeResults">Scores</span>
         </button>
         <button class="hub-tab-btn" id="tabBtnRuns" onclick="switchNavTab('runs')">
-            <span>[5] Previous Runs</span>
+            <span>Previous runs</span>
             <span class="hub-tab-badge" id="navBadgeRuns">Matrix Grid</span>
         </button>
     </nav>
@@ -53,299 +84,345 @@
 
         <!-- 1. Input Selection Section -->
         <section class="tab-section active" id="secInput">
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">1. Document Input &amp; Ingestion Parameters</div>
-                        <div class="card-subtitle">Select the PDF file, OCR language hint, or browse completed previous outputs.</div>
-                    </div>
-                    <span class="badge badge-idle" id="inputStatusBadge">Ready</span>
-                </div>
+            <div class="card card-flush">
 
-                <div class="form-grid">
-                    <div class="form-group form-group-full">
-                        <label class="form-label" for="inpPdfPath">Select or Enter Input PDF Document</label>
+                <div class="card-section">
+                    <div class="form-group">
+                        <label class="form-label" for="docSelectDropdown">Document</label>
                         <div class="doc-input-row">
-                            <select class="form-select doc-select-dropdown" id="docSelectDropdown" onchange="if(this.value) selectDocPath(this.value);">
+                            <select class="form-select doc-select-dropdown" id="docSelectDropdown"
+                                onchange="if(this.value) selectDocPath(this.value);">
                                 <option value="">-- Choose Discovered Document --</option>
                             </select>
-                            <input type="text" class="form-input doc-path-input" id="inpPdfPath" value="src/e2e/Document 8.pdf" placeholder="e.g. src/e2e/Document 8.pdf">
+                            <input type="text" class="form-input doc-path-input" id="inpPdfPath"
+                                value="src/e2e/Document 8.pdf" placeholder="Enter a file path">
                         </div>
                         <div class="file-chips" id="docChipsContainer">
                             <span class="file-chips-label">Discovered files:</span>
                             <button class="chip-btn" onclick="selectDocPath('src/e2e/Document 8.pdf')">src/e2e/Document 8.pdf</button>
                         </div>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label class="form-label" for="inpLanguage">Language Hint (OCR &amp; Verification)</label>
-                        <select class="form-select" id="inpLanguage">
-                            <option value="auto">Auto-Detect Document Language</option>
-                            <option value="pl" selected>Polish (pl)</option>
-                            <option value="en">English (en)</option>
-                            <option value="de">German (de)</option>
-                            <option value="fr">French (fr)</option>
-                            <option value="es">Spanish (es)</option>
-                        </select>
+                <div class="card-section">
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="form-label" for="inpLanguage">Language hint</label>
+                            <select class="form-select" id="inpLanguage">
+                                <option value="auto">Auto-Detect Document Language</option>
+                                <option value="pl" selected>Polish (pl)</option>
+                                <option value="en">English (en)</option>
+                                <option value="de">German (de)</option>
+                                <option value="fr">French (fr)</option>
+                                <option value="es">Spanish (es)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="inpPreset">Ingestion preset</label>
+                            <select class="form-select" id="inpPreset">
+                                <option value="docling_fast" selected>docling_fast (Hybrid Parser)</option>
+                                <option value="docling_deep">docling_deep (Deep Visual OCR &amp; Tables)</option>
+                                <option value="pypdfium_rapidocr">pypdfium_rapidocr (RapidOCR Standalone)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label form-label-split" for="inpThreshold">
+                                Confidence threshold <span id="thresholdDisplay" class="threshold-display">0.85</span>
+                            </label>
+                            <input type="range" id="inpThreshold" class="threshold-slider" min="0.50" max="0.98"
+                                step="0.01" value="0.85"
+                                oninput="document.getElementById('thresholdDisplay').textContent = Number(this.value).toFixed(2);">
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label" for="inpPreset">Primary Ingestion Preset</label>
-                        <select class="form-select" id="inpPreset">
-                            <option value="docling_fast" selected>docling_fast (Hybrid Parser)</option>
-                            <option value="docling_deep">docling_deep (Deep Visual OCR &amp; Tables)</option>
-                            <option value="pypdfium_rapidocr">pypdfium_rapidocr (RapidOCR Standalone)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">
-                            Target Confidence Threshold: <span id="thresholdDisplay" class="threshold-display">0.85</span>
-                        </label>
-                        <input type="range" id="inpThreshold" class="threshold-slider" min="0.50" max="0.98" step="0.01" value="0.85" oninput="document.getElementById('thresholdDisplay').textContent = Number(this.value).toFixed(2);">
-                    </div>
-
-                    <div class="form-group form-group-center">
+                    <div class="checkbox-row">
                         <label class="checkbox-label">
-                            <input type="checkbox" id="inpAlignSkew" checked> Auto-align Text Skew Angles
+                            <input type="checkbox" id="inpAlignSkew" checked> Auto-align text skew
                         </label>
-                        <label class="checkbox-label checkbox-label-spaced">
-                            <input type="checkbox" id="inpVisualize" checked> Generate Visual Overlays
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="inpVisualize" checked> Generate visual overlays
                         </label>
-                        <label class="checkbox-label checkbox-label-spaced">
-                            <input type="checkbox" id="inpForceRerun"> Force Rerun (Bypass Previous Results)
+                        <label class="checkbox-label" title="Bypass previous results">
+                            <input type="checkbox" id="inpForceRerun"> Force rerun
                         </label>
                     </div>
                 </div>
 
-                <div class="action-row">
-                    <button class="btn btn-secondary" onclick="switchNavTab('plan')">Configure Plan in Wizard -&gt;</button>
-                    <button class="btn btn-primary" id="btnRunDirect" onclick="triggerRunPipeline(false)">[RUN] Run Pipeline Directly</button>
+                <div class="card-footer">
+                    <span class="badge badge-idle" id="inputStatusBadge">Ready</span>
+                    <div class="card-footer-actions">
+                        <button class="btn btn-secondary" onclick="switchNavTab('plan')">Configure plan</button>
+                        <button class="btn btn-primary" id="btnRunDirect" onclick="triggerRunPipeline(false)">Run pipeline</button>
+                    </div>
                 </div>
+
             </div>
         </section>
 
         <!-- 2. Planning Section -->
         <section class="tab-section" id="secPlan">
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">2. Execution Plan &amp; Preset Strategy Planning</div>
-                        <div class="card-subtitle">Configure heuristic weighting to optimize latency, cost, and layout precision before execution.</div>
-                    </div>
-                    <div class="header-actions-group">
-                        <select class="form-select plan-run-select" id="planPreviousRunSelect" onchange="if(this.value) choosePreviousRun(this.value)">
-                            <option value="">-- Load Plan from Previous Run --</option>
+            <div class="card card-flush">
+
+                <div class="card-section">
+                    <div class="form-group">
+                        <label class="form-label" for="planPreviousRunSelect">Start from previous run</label>
+                        <select class="form-select plan-run-select" id="planPreviousRunSelect"
+                            onchange="if(this.value) choosePreviousRun(this.value)">
+                            <option value="">Choose a previous run</option>
                         </select>
-                        <a href="/planner" target="_blank" class="btn btn-secondary btn-plan-popup">[POPUP] Open Full Plan Wizard</a>
+                    </div>
+                    <div id="planLoadedNotice" class="plan-loaded-notice"></div>
+                </div>
+
+                <div class="card-section">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="planTaxonomy">Document taxonomy</label>
+                            <select class="form-select" id="planTaxonomy" onchange="updateSuggestedPlan()">
+                                <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
+                                <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
+                                <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
+                                <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="planTarget">Target use case</label>
+                            <select class="form-select" id="planTarget" onchange="updateSuggestedPlan()">
+                                <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
+                                <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
+                                <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="planLatency">Latency vs quality</label>
+                            <select class="form-select" id="planLatency" onchange="updateSuggestedPlan()">
+                                <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
+                                <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
+                                <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="planHardware">Hardware</label>
+                            <select class="form-select" id="planHardware" onchange="updateSuggestedPlan()">
+                                <option value="cpu" selected>Local CPU (Standard host)</option>
+                                <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
+                                <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div id="planLoadedNotice" class="plan-loaded-notice"></div>
-
-                <div class="form-grid">
+                <div class="card-section">
                     <div class="form-group">
-                        <label class="form-label" for="planTaxonomy">Document Taxonomy</label>
-                        <select class="form-select" id="planTaxonomy" onchange="updateSuggestedPlan()">
-                            <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
-                            <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
-                            <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
-                            <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="planTarget">Target Use-Case</label>
-                        <select class="form-select" id="planTarget" onchange="updateSuggestedPlan()">
-                            <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
-                            <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
-                            <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="planLatency">Latency vs Quality Trade-off</label>
-                        <select class="form-select" id="planLatency" onchange="updateSuggestedPlan()">
-                            <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
-                            <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
-                            <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="planHardware">Hardware Environment</label>
-                        <select class="form-select" id="planHardware" onchange="updateSuggestedPlan()">
-                            <option value="cpu" selected>Local CPU (Standard host)</option>
-                            <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
-                            <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
-                        </select>
+                        <span class="form-label">Suggested presets</span>
+                        <div id="planPresetOrderList" class="plan-hierarchy-list">
+                            <div class="plan-primary-desc">Primary: <span class="preset-badge"
+                                    id="planPrimaryBadge">docling_fast</span> Initial execution pass</div>
+                            <div class="plan-fallback-desc">Fallback: <span class="preset-badge"
+                                    id="planFallbackBadge">docling_deep</span> Automated confidence fallback</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="plan-hierarchy-card">
-                    <div class="plan-hierarchy-title">Suggested Preset Hierarchy</div>
-                    <div id="planPresetOrderList" class="plan-hierarchy-list">
-                        <div class="plan-primary-desc">1. Primary Candidate: <span class="preset-badge" id="planPrimaryBadge">docling_fast</span> (Initial execution pass)</div>
-                        <div class="plan-fallback-desc">2. Fallback Queue: <span class="preset-badge" id="planFallbackBadge">docling_deep</span> (Automated confidence fallback)</div>
+                <div class="card-footer">
+                    <div class="card-footer-actions">
+                        <button class="btn btn-secondary" onclick="switchNavTab('input')">Back</button>
+                        <button class="btn btn-primary" onclick="triggerRunPipeline(true)">Start parsing</button>
                     </div>
                 </div>
 
-                <div class="action-row">
-                    <button class="btn btn-secondary" onclick="switchNavTab('input')">&lt;- Back to Input</button>
-                    <button class="btn btn-success" onclick="triggerRunPipeline(true)">[EXECUTE] Start Parsing with Configured Plan</button>
-                </div>
             </div>
         </section>
 
         <!-- 3. Parsing Progress Section -->
         <section class="tab-section" id="secProgress">
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">3. Live Ingestion &amp; Parsing Progress</div>
-                        <div class="card-subtitle">Real-time status tracking across ingestion, text skew orientation, and quality verification gates.</div>
-                    </div>
-                    <span class="badge badge-idle" id="progressStatusBadge">IDLE</span>
-                </div>
+            <div class="card card-flush">
 
-                <div class="progress-header-row">
+                <div class="card-section">
+                    <div class="progress-header-row">
+                        <span class="badge badge-idle" id="progressStatusBadge">Idle</span>
+                        <span id="progressPercentText" class="progress-pct-text">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressFillBar"></div>
+                    </div>
                     <span id="progressCurrentStepText" class="progress-step-text">Waiting to start...</span>
-                    <span id="progressPercentText" class="progress-pct-text">0%</span>
                 </div>
 
-                <div class="progress-track">
-                    <div class="progress-fill" id="progressFillBar"></div>
+                <div class="card-section">
+                    <div class="form-group">
+                        <span class="form-label">Pipeline steps</span>
+                        <div class="pipeline-steps">
+                            <div class="step-card" id="stepCard1">
+                                <div class="step-card-num">Step 1</div>
+                                <div class="step-card-title">Document validation &amp; slicing</div>
+                            </div>
+                            <div class="step-card" id="stepCard2">
+                                <div class="step-card-num">Step 2</div>
+                                <div class="step-card-title">Layout &amp; OCR parsing</div>
+                            </div>
+                            <div class="step-card" id="stepCard3">
+                                <div class="step-card-num">Step 3</div>
+                                <div class="step-card-title">Text skew alignment</div>
+                            </div>
+                            <div class="step-card" id="stepCard4">
+                                <div class="step-card-num">Step 4</div>
+                                <div class="step-card-title">Quality checks</div>
+                            </div>
+                            <div class="step-card" id="stepCard5">
+                                <div class="step-card-num">Step 5</div>
+                                <div class="step-card-title">Decision tree &amp; fallback</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="pipeline-steps">
-                    <div class="step-card" id="stepCard1">
-                        <div class="step-card-num">STEP 1</div>
-                        <div class="step-card-title">Document Validation &amp; Slicing</div>
-                    </div>
-                    <div class="step-card" id="stepCard2">
-                        <div class="step-card-num">STEP 2</div>
-                        <div class="step-card-title">Preset Layout &amp; OCR Parsing</div>
-                    </div>
-                    <div class="step-card" id="stepCard3">
-                        <div class="step-card-num">STEP 3</div>
-                        <div class="step-card-title">Text Skew Alignment</div>
-                    </div>
-                    <div class="step-card" id="stepCard4">
-                        <div class="step-card-num">STEP 4</div>
-                        <div class="step-card-title">Quality Checks &amp; Violations</div>
-                    </div>
-                    <div class="step-card" id="stepCard5">
-                        <div class="step-card-num">STEP 5</div>
-                        <div class="step-card-title">Decision Tree &amp; Fallback</div>
+                <div class="card-section">
+                    <div class="form-group">
+                        <span class="form-label">Log</span>
+                        <div class="terminal-box" id="progressLogConsole">---Ready to execute pipeline ---</div>
                     </div>
                 </div>
-
-                <div class="terminal-box" id="progressLogConsole">--- [CONSOLE READY] Ready to execute pipeline ---
-</div>
 
                 <div id="progressCompletionBanner" class="progress-completion-banner">
                     <div>
-                        <div class="progress-completion-title">[SUCCESS] Pipeline Run Completed Successfully!</div>
+                        <div class="progress-completion-title">Pipeline run completed</div>
                         <div class="progress-completion-summary" id="progressSummaryText">Result: ACCEPT | Score: 1.0000 | Preset: docling_fast</div>
                     </div>
                     <div class="progress-completion-actions">
-                        <button class="btn btn-primary" onclick="switchNavTab('results')">Inspect Preset Results -&gt;</button>
-                        <a href="/viewer" class="btn btn-secondary">Open Visual Flow Viewer</a>
+                        <a href="/viewer" class="btn btn-secondary">Open viewer</a>
+                        <button class="btn btn-primary" onclick="switchNavTab('results')">View results</button>
                     </div>
                 </div>
+
             </div>
         </section>
 
         <!-- 4. Preset Results Section -->
         <section class="tab-section" id="secResults">
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">4. Multi-Preset Evaluation &amp; Comparison Results</div>
-                        <div class="card-subtitle">Review confidence scores, quality violations, and fallback decisions across candidate presets.</div>
+            <div class="card card-flush">
+
+                <div class="card-section">
+                    <div class="section-toolbar">
+                        <span class="form-label">Preset comparison</span>
+                        <button class="btn btn-secondary" onclick="refreshResultsData()">Refresh data</button>
                     </div>
-                    <div class="header-actions-group">
-                        <button class="btn btn-secondary" onclick="refreshResultsData()">[REFRESH] Refresh Data</button>
-                        <button class="btn btn-secondary" onclick="reloadViewerIframe()">Reload Viewer</button>
-                        <a href="/viewer" target="_blank" class="btn btn-primary">[EXPAND] Open Full Viewer (/viewer)</a>
+                    <div id="resultsTableContainer">
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>Step</th>
+                                    <th>Preset</th>
+                                    <th>Confidence</th>
+                                    <th>Per-page score</th>
+                                    <th>Violations</th>
+                                    <th>Status</th>
+                                    <th>Decision</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                <tr>
+                                    <td colspan="7" class="table-empty-message">No runs yet. Run a document from Input selection or Planning to see results.</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <div id="resultsTableContainer">
-                    <table class="comparison-table">
-                        <thead>
-                            <tr>
-                                <th>Step / Attempt</th>
-                                <th>Preset</th>
-                                <th>Confidence</th>
-                                <th>Per-Page Score</th>
-                                <th>Violations</th>
-                                <th>Status</th>
-                                <th>Decision Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsTableBody">
-                            <tr>
-                                <td colspan="7" class="table-empty-message">No pipeline run executed yet. Run a document from Input Selection or Planning to see multi-preset results.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="card-section">
+                    <div class="section-toolbar">
+                        <span class="form-label">Visual flow</span>
+                        <div class="card-footer-actions">
+                            <button class="btn btn-secondary" onclick="reloadViewerIframe()">Reload view</button>
+                            <a href="/viewer" target="_blank" class="btn btn-primary">Open full view</a>
+                        </div>
+                    </div>
+                    <div class="viewer-frame-container">
+                        <iframe class="viewer-frame" id="viewerFrame" src="/viewer"
+                            title="cernodata Interactive Visual Flow Viewer"></iframe>
+                    </div>
                 </div>
 
-                <div class="viewer-heading-row">
-                    <div class="viewer-heading-title">Embedded Interactive Visual Flow &amp; DOM Viewer:</div>
-                    <div class="viewer-heading-sub">Hydrated dynamically from backend <span class="viewer-sub-code">/api/viewer_data</span></div>
-                </div>
-
-                <div class="viewer-frame-container">
-                    <iframe class="viewer-frame" id="viewerFrame" src="/viewer" title="cernodata Interactive Visual Flow Viewer"></iframe>
-                </div>
             </div>
         </section>
 
         <!-- 5. Previous Runs Grid Section -->
         <section class="tab-section" id="secRuns">
-            <div class="card runs-grid-card">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">5. Previous Runs by Page Grid</div>
-                        <div class="card-subtitle">Table grid comparison of previous parsing runs across document pages. Click any page cell to immediately bring up that page in the viewer.</div>
-                    </div>
+            <div class="card card-flush">
+
+                <div class="card-section">
                     <div class="runs-grid-controls">
-                        <label class="control-label" for="runsGridDocSelect">Document:</label>
-                        <select class="form-select runs-grid-doc-select" id="runsGridDocSelect" onchange="onRunsGridDocChanged(this.value)">
-                            <option value="">-- Choose Document --</option>
-                        </select>
-                        <button class="btn btn-secondary btn-sm" onclick="loadRunsGrid()">[REFRESH] Refresh Grid</button>
-                        <span class="active-run-label">Active Run:</span>
-                        <span class="preset-badge active-run-badge" id="activeRunBadge">output</span>
+                        <div class="form-group">
+                            <label class="form-label" for="runsGridDocSelect">Document</label>
+                            <select class="form-select runs-grid-doc-select" id="runsGridDocSelect"
+                                onchange="onRunsGridDocChanged(this.value)">
+                                <option value="">Choose a document</option>
+                            </select>
+                        </div>
+                        <div class="runs-grid-meta">
+                            <span class="active-run-label">Active run</span>
+                            <span class="preset-badge active-run-badge" id="activeRunBadge">output</span>
+                            <button class="btn btn-secondary" onclick="loadRunsGrid()">Refresh</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="runs-grid-table-container">
-                    <table class="comparison-table runs-grid-table" id="runsGridTable">
-                        <thead id="runsGridTableHead">
-                            <tr>
-                                <th>Parsing Run Identifier</th>
-                                <th>Page 1</th>
-                                <th>Overall Score</th>
-                                <th>Violations</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="runsGridTableBody">
-                            <tr>
-                                <td colspan="6" class="table-empty-message">Loading previous runs grid...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="card-section">
+                    <div class="section-toolbar">
+                        <span class="form-label">Runs by page</span>
+                        <span class="section-hint">Click a page cell to open it in the viewer</span>
+                    </div>
+                    <div class="runs-grid-table-container">
+                        <table class="comparison-table runs-grid-table" id="runsGridTable">
+                            <thead id="runsGridTableHead">
+                                <tr>
+                                    <th>Run</th>
+                                    <th>Page 1</th>
+                                    <th>Overall score</th>
+                                    <th>Violations</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="runsGridTableBody">
+                                <tr>
+                                    <td colspan="6" class="table-empty-message">Loading runs...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
             </div>
         </section>
 
     </main>
 
     <script src="/landing.js"></script>
+<script>
+        (function () {
+            var frame = document.getElementById('viewerFrame');
+
+            function hideViewerHeader() {
+                try {
+                    var doc = frame.contentDocument;
+                    if (!doc || !doc.head || doc.getElementById('embedOverrides')) return;
+                    var style = doc.createElement('style');
+                    style.id = 'embedOverrides';
+                    style.textContent = 'body > header { display: none !important; }';
+                    doc.head.appendChild(style);
+                } catch (e) {}
+            }
+
+            frame.addEventListener('load', hideViewerHeader);
+            hideViewerHeader();
+        })();
+    </script>
 </body>
+
 </html>

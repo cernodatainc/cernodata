@@ -88,7 +88,7 @@ function renderPresetsList() {
         const item = document.createElement("div");
         item.className = "preset-item " + (isPrimary ? "primary" : "fallback");
 
-        const tagText = isPrimary ? "[Primary Candidate]" : `[Fallback ${idx}]`;
+        const tagText = isPrimary ? "Primary Candidate" : `Fallback ${idx}`;
         const tagClass = isPrimary ? "primary-tag" : "fallback-tag";
 
         item.innerHTML = `
