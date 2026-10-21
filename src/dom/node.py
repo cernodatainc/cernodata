@@ -18,6 +18,8 @@ class DOMNode:
     bounding_box: BoundingBox
     content: Dict[str, Any] = field(default_factory=dict)
     template_hint_applied: Optional[str] = None
+    # TODO(TASK-903): Populate `template_hint_applied` and `content["template_zone_id"]` when spatial
+    # zones from a DocumentTemplateHint match this node's bounding box.
     violations: List[Dict[str, Any]] = field(default_factory=list)
     is_merged: bool = False
     merged_from: Optional[List[Dict[str, Any]]] = None
@@ -86,4 +88,13 @@ class DOMNode:
             ocr_confidence=data.get("ocr_confidence"),
             is_custom=data.get("is_custom"),
         )
+
+    def split_at_offset(
+        self, char_offset: int, vertical_ratio: float = 0.5
+    ) -> List["DOMNode"]:
+        """No-op hook returning this node until interactive node splitting is implemented."""
+        # TODO(stride): Split `self.content["raw_text"]` at `char_offset` and `self.bounding_box`
+        # vertically by `vertical_ratio` into two DOMNode instances (supports TASK-702).
+        _ = (char_offset, vertical_ratio)
+        return [self]
 

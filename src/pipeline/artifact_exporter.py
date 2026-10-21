@@ -41,6 +41,47 @@ def export_interactive_html_viewer(
     return generate_interactive_html(pdf_path, dom, decision, violations, output_path=html_path, plan=plan)
 
 
+def export_rag_chunks_artifact(dom: DocumentDOM, output_dir: str) -> Optional[str]:
+    """No-op hook for exporting hierarchical RAG JSONL chunks."""
+    # TODO(TASK-302): Export hierarchical RAG chunks JSONL (`export_rag_jsonl`) with parent header breadcrumbs.
+    _ = (dom, output_dir)
+    return None
+
+
+def export_markdown_and_sft_artifacts(dom: DocumentDOM, output_dir: str) -> Optional[str]:
+    """No-op hook for exporting conversational Markdown and SFT pretraining JSONL."""
+    # TODO(TASK-303): Export clean conversational Markdown and high-hygiene SFT pretraining JSONL (`min_confidence >= 0.85`).
+    _ = (dom, output_dir)
+    return None
+
+
+def deliver_artifacts_to_sink(
+    dom: DocumentDOM, target_uri: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """No-op hook for delivering formatted output payloads to an HTTP webhook or local URI sink."""
+    # TODO(TASK-304): Deliver formatted payload to `pipe_target_uri` (`http://`, `https://`, or `file://`) when configured.
+    _ = (dom, target_uri)
+    return None
+
+
+def build_downstream_recommendation(
+    dom: DocumentDOM, plan: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """No-op hook for generating downstream chunking and tool recommendations by use case."""
+    # TODO(TASK-305): Attach `recommend_downstream_setup(dom, use_case)` advisor summary to `execution_report`.
+    _ = (dom, plan)
+    return {}
+
+
+def export_standalone_runner_script(
+    output_dir: str, plan: Optional[Dict[str, Any]] = None
+) -> Optional[str]:
+    """No-op hook for emitting an audit-friendly standalone Python runner script."""
+    # TODO(TASK-1001): Optionally emit a standalone, audit-friendly Python runner script (`generate_standalone_script`).
+    _ = (output_dir, plan)
+    return None
+
+
 def export_pipeline_artifacts(
     dom: DocumentDOM,
     decision: Dict[str, Any],
@@ -51,6 +92,11 @@ def export_pipeline_artifacts(
 ) -> Tuple[str, str, Optional[str]]:
     """Exports DocumentDOM JSON, standalone quality_violations.json, and plan_execution_result.json reports."""
     mkdirs(output_dir)
+    export_rag_chunks_artifact(dom, output_dir)
+    export_markdown_and_sft_artifacts(dom, output_dir)
+    deliver_artifacts_to_sink(dom)
+    build_downstream_recommendation(dom, plan)
+    export_standalone_runner_script(output_dir, plan)
 
     dom_output_path = os.path.join(output_dir, "document_dom.json")
     with open(dom_output_path, "w", encoding="utf-8") as f:

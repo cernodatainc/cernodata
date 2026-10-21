@@ -53,6 +53,8 @@ class IngestionConfig:
     ocr_scale: Optional[float] = None
     force_full_page_ocr: bool = False
     do_table_structure: bool = True
+    # TODO(stride): Extend `IngestionConfig` with optional paths/flags for `test_suite_path` (TASK-107),
+    # `custom_presets_path` (TASK-204), `postprocess_steps` (TASK-506), and `template_hint_path` (TASK-903).
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

@@ -19,6 +19,20 @@ from src.utils import mkdirs
 class PlanningRoutesMixin(BaseApiRoutesMixin):
     """Mixin handling data shape criteria scoring and document plan configuration."""
 
+    def _evaluate_corpus_topic_balance(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """No-op hook for evaluating multi-document topic skew for the Browser Wizard UI."""
+        # TODO(TASK-603): Compute TopicSkewReport (TASK-602) when a multi-document folder is selected
+        # and return data for the interactive 'Dataset Topic Balance' questionnaire card in the Wizard UI.
+        _ = payload
+        return {}
+
+    def _build_downstream_setup_advice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """No-op hook returning visual downstream format and tool setup recommendations."""
+        # TODO(TASK-305): Return DownstreamAdvisor chunking, export format, and external app setup
+        # recommendations tailored to the user's selected Target Use-Case in the Web UI.
+        _ = payload
+        return {}
+
     def _handle_post_calculate_scores(self, payload: Dict[str, Any]) -> None:
         """
         Calculates preset scores based on data shape questionnaire criteria.
@@ -36,6 +50,8 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
             "success": True,
             "scores": scores,
             "suggested_order": suggested,
+            "corpus_balance": self._evaluate_corpus_topic_balance(payload),
+            "downstream_advice": self._build_downstream_setup_advice(payload),
         })
 
     def _handle_post_submit_plan(self, payload: Dict[str, Any]) -> None:

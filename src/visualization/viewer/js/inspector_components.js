@@ -183,6 +183,7 @@ function renderSingleNodeEditorComponent(node, options) {
     return `
         <div class="editor-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <!-- TODO(TASK-701): Replace static (${escapeHtml(node.type)}) label with an interactive <select> dropdown to switch single-node semantic type. -->
                 <h4>Selected: ${escapeHtml(node.node_id)} (${escapeHtml(node.type)})</h4>
                 <button style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="clearSelection()">Close</button>
             </div>
@@ -208,10 +209,12 @@ function renderSingleNodeEditorComponent(node, options) {
                 ${isIncorrect ? '[X] Flagged: Incorrect Parsed Text (Click to Unmark)' : '[!] Mark as Incorrect Parsed Text'}
             </button>
             <div style="margin-top:6px;">
+                <!-- TODO(TASK-705): When node.type === 'table_grid', mount an interactive HTML table cell/row/column editor (table_editor.js). -->
                 <label style="font-size:10px; color:var(--text-muted); font-weight:600;">Parsed Text / Correction Note (Defaulted to Content):</label>
                 <textarea class="note-area" placeholder="Parsed text / manual correction note..." oninput="updateCorrectionNote('${node.node_id}', this.value)">${escapeHtml(noteVal)}</textarea>
             </div>
             <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                <!-- TODO(TASK-702): Add a "Split at Cursor" button to split merged headings/paragraphs into two vertically stacked DOMNodes. -->
                 <button class="action-btn" style="background:#DC2626; color:#FFF; font-size:10px; padding:3px 10px;" onclick="deleteDOMNode('${node.node_id}')">[DELETE] Delete Element</button>
             </div>
             <div style="margin-top:8px; font-size:10px; color:var(--text-muted); border-top:1px solid #334155; padding-top:6px;">

@@ -96,6 +96,29 @@ def _check_diacritic_violations(
     return violations
 
 
+def _check_structural_assertion_violations(dom: DocumentDOM) -> List[Dict[str, Any]]:
+    """No-op hook for Level 3 single-document structural and semantic assertions."""
+    # TODO(TASK-102): Hook Level 3 structural & semantic spot-checks (`AssertionEvaluator`) here when a
+    # `DocumentAssertionSuite` is provided (expected headers, regex patterns, forbidden boilerplate).
+    _ = dom
+    return []
+
+
+def _check_template_misapplication_violations(dom: DocumentDOM) -> List[Dict[str, Any]]:
+    """No-op hook for detecting misapplied spatial document templates."""
+    # TODO(TASK-902): Hook `validate_template_application` to emit `TEMPLATE_MISAPPLICATION` violations when
+    # a user-supplied spatial template yields excessive empty or colliding zones.
+    _ = dom
+    return []
+
+
+def _check_dataset_retrieval_violations(dom: DocumentDOM) -> List[Dict[str, Any]]:
+    """No-op hook for Level 5 downstream RAG retrieval recall evaluation."""
+    # TODO(TASK-106): Hook Level 5 downstream retrieval evaluation (`evaluate_retrieval_suite`) for batch runs.
+    _ = dom
+    return []
+
+
 def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations and anomalies.
@@ -146,4 +169,7 @@ def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") 
         node.violations = node_viols
         violations.extend(node_viols)
 
+    violations.extend(_check_structural_assertion_violations(dom))
+    violations.extend(_check_template_misapplication_violations(dom))
+    violations.extend(_check_dataset_retrieval_violations(dom))
     return violations

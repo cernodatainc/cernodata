@@ -19,6 +19,8 @@ class DocumentDOM:
     source_filename: str
     total_pages: int
     nodes: List[DOMNode] = field(default_factory=list)
+    # TODO(stride): Add `metadata: Dict[str, Any] = field(default_factory=dict)` to DocumentDOM (and include it in
+    # to_dict/from_dict) to store document-level postprocessing audit trails, topic tags, and Ollama summaries.
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -144,3 +146,14 @@ class DocumentDOM:
                 new_nodes.append(n)
         self.nodes = new_nodes
         return merged_node
+
+    def merge_sliced_dom(
+        self,
+        sliced_dom: "DocumentDOM",
+        slice_to_global_map: Optional[Dict[int, int]] = None,
+    ) -> "DocumentDOM":
+        """No-op hook for splicing re-parsed page slices back into this DocumentDOM."""
+        # TODO(TASK-802): Splice re-parsed failing pages from `sliced_dom` into `self.nodes`
+        # while remapping `temp_slice_index` -> `global_page_index` via `slice_to_global_map`.
+        _ = (sliced_dom, slice_to_global_map)
+        return self

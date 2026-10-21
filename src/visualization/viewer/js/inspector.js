@@ -62,6 +62,7 @@ function handleNodeClick(evt, nodeId) {
  * @param {number|null} [pageIndex=null] - Target 1-indexed page index.
  */
 function selectNode(nodeId, pageIndex = null) {
+    // TODO(TASK-706): Add keyboard shortcuts (`]` / `[` for next/prev violation, `v` to mark node verified) in `review_navigation.js`.
     if (pageIndex && pageIndex !== currentPage) {
         switchPage(pageIndex);
     }
@@ -211,6 +212,7 @@ function updateCorrectionNote(nodeId, text) {
  * @param {string} nodeId - Target DOM node identifier.
  */
 async function deleteDOMNode(nodeId) {
+    // TODO(TASK-703): Push a snapshot to the Undo/Redo history stack (`history.js`) before mutating `domData.nodes`.
     if (!domData || !domData.nodes) return;
     const idx = domData.nodes.findIndex(n => n.node_id === nodeId);
     if (idx === -1) return;
@@ -234,6 +236,7 @@ async function deleteDOMNode(nodeId) {
  * Renders the hierarchical DOM element tree cards for the active page.
  */
 function renderDOMTree() {
+    // TODO(TASK-704): Add reading-order Move Up / Move Down controls and sequence badges to fix multi-column ordering.
     const container = document.getElementById('domListContainer');
     if (!container) return;
     container.innerHTML = '';

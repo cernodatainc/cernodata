@@ -19,6 +19,26 @@ def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> Do
     return dom
 
 
+def run_postprocessing_steps(
+    dom: DocumentDOM, config: Optional[IngestionConfig] = None
+) -> DocumentDOM:
+    """No-op hook for running declarative DOM postprocessing steps."""
+    # TODO(TASK-501): Execute `PostprocessorChain` (letterhead stripping TASK-502, hyphenation defragmentation
+    # TASK-503, watermark filter TASK-504, and regex/PII scrubbing TASK-505) and record audit trail on `dom`.
+    _ = config
+    return dom
+
+
+def run_ollama_ocr_repair_step(
+    dom: DocumentDOM, violations: List[Dict[str, Any]]
+) -> DocumentDOM:
+    """No-op hook for repairing OCR-corrupted nodes with a local Ollama SLM."""
+    # TODO(TASK-403): Selectively repair nodes flagged with OCR quality violations using `OllamaClient`
+    # while enforcing the <=25% length-drift anti-hallucination check.
+    _ = violations
+    return dom
+
+
 def evaluate_quality_and_decision_tree(
     dom: DocumentDOM,
     target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,

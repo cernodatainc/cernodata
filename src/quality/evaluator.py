@@ -84,6 +84,8 @@ def evaluate_page_confidence(
         combined_text_score = char_score * lang_score
 
         if node.type == "table_grid":
+            # TODO(TASK-103): Replace static `cell_alignment_score` fallback with real Level 4 Markdown table
+            # grid validation (column count consistency across rows, numeric alignment, and empty header checks).
             cell_alignment = node.content.get("cell_alignment_score", 0.95)
             score = 0.5 * combined_text_score + 0.5 * cell_alignment
         else:

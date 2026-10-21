@@ -6,6 +6,7 @@ Configuration and run retrieval API endpoints for cernodata HTTP server.
 
 from __future__ import annotations
 
+from typing import Any, Dict, List
 from src.pipeline.planner.options import (
     DEFAULT_PRESET_WEIGHTS,
     SECURITY_OPTIONS,
@@ -38,6 +39,24 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             "results": self.session.get_results(),
         })
 
+    def _get_custom_presets_catalog(self) -> List[Dict[str, Any]]:
+        """No-op hook returning custom OCR presets and community recipes for the Web Hub UI."""
+        # TODO(TASK-207): Return user-saved CustomPresetConfig entries and community OCR recipes (TASK-208)
+        # to populate the guided 'Add / Connect Custom OCR Preset' modal in the Web Hub.
+        return []
+
+    def _get_ollama_models_status(self) -> Dict[str, Any]:
+        """No-op hook returning local Ollama availability and installed models for the Web UI."""
+        # TODO(TASK-406): Check local Ollama availability via OllamaClient (TASK-401) and return installed
+        # model names so the Web Hub and Viewer can populate the Local AI Assistant dropdown.
+        return {"available": False, "models": []}
+
+    def _get_template_hints_catalog(self) -> List[Dict[str, Any]]:
+        """No-op hook returning available spatial document layout templates for the Web Hub UI."""
+        # TODO(TASK-903): Return starter (TASK-905) and user-saved (TASK-904) DocumentTemplateHint options
+        # for the 'Document Layout Template' dropdown in the Web Hub.
+        return []
+
     def _handle_api_config(self) -> None:
         """
         Returns runtime server configuration and preset options.
@@ -59,4 +78,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             "security_options": SECURITY_OPTIONS,
             "previous_runs": self.session.get_previous_runs(),
             "active_run": self.session.output_dir,
+            "custom_presets": self._get_custom_presets_catalog(),
+            "ollama_status": self._get_ollama_models_status(),
+            "template_hints": self._get_template_hints_catalog(),
         })

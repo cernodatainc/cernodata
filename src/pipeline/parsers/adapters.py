@@ -91,6 +91,8 @@ class DoclingPresetAdapter:
     """Adapter executing Docling layout and OCR parser presets."""
 
     def can_handle(self, preset: str) -> bool:
+        # TODO(TASK-204): Restrict `can_handle` to explicit Docling preset IDs (`docling_fast`, `docling_deep`)
+        # instead of returning `True` unconditionally, which currently swallows `vision_llm_direct` and custom presets.
         # Default fallback adapter handling all docling presets
         return True
 

@@ -40,6 +40,34 @@ class FallbackLoopHandler:
 
         return next_candidate, part_of_plan, curr_score, next_score
 
+    def _resolve_wiggle_parameters(self, config: IngestionConfig) -> Tuple[float, bool]:
+        """Resolves OCR parameter wiggling bounds for Path B retries."""
+        # TODO(TASK-206): Read custom parameter wiggling bounds (`ParameterWiggleSpec`) from `CustomPresetConfig`
+        # instead of only wiggling `ocr_scale` and `force_full_page_ocr`.
+        wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
+        return wiggled_scale, True
+
+    def _slice_failing_pages_if_needed(
+        self, pdf_path: str, dom: DocumentDOM, violations: List[Dict[str, Any]]
+    ) -> str:
+        """No-op hook returning full PDF path until targeted page slicing is wired into fallback retries."""
+        # TODO(TASK-803): When only a subset of pages failed quality checks, slice just those pages via
+        # `slice_pdf_pages` (TASK-801), run the fallback preset on the slice, and splice back via `merge_sliced_dom` (TASK-802).
+        _ = (dom, violations)
+        return pdf_path
+
+    def _execute_isolated_attempt(
+        self,
+        pdf_path: str,
+        config: IngestionConfig,
+        curr_score: float = 0.90,
+        next_score: float = 0.72,
+    ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
+        """Executes a fallback attempt, serving as the hook for subprocess isolation."""
+        # TODO(TASK-1003): Support running heavy fallback presets inside an isolated subprocess (`IsolatedParserRunner`)
+        # with timeout/OOM protection so a model crash cannot terminate the host server.
+        return self.attempt_runner.execute_attempt(pdf_path, config, curr_score, next_score)
+
     def handle_fallback(
         self,
         pdf_path: str,
@@ -77,15 +105,15 @@ class FallbackLoopHandler:
             if notifier is not None:
                 notifier.notify_parameter_wiggling(config.preset)
 
-            wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
-            wiggled_force_ocr = True
+            wiggled_scale, wiggled_force_ocr = self._resolve_wiggle_parameters(config)
+            target_pdf = self._slice_failing_pages_if_needed(pdf_path, dom, violations)
             wiggled_config = replace(
                 config,
                 ocr_scale=wiggled_scale,
                 force_full_page_ocr=wiggled_force_ocr,
             )
-            w_dom, w_decision, w_violations = self.attempt_runner.execute_attempt(
-                pdf_path, wiggled_config, curr_score, next_score
+            w_dom, w_decision, w_violations = self._execute_isolated_attempt(
+                target_pdf, wiggled_config, curr_score, next_score
             )
             attempts.append(dict(self.attempt_runner.make_attempt_record(
                 len(attempts) + 1, config.preset, w_decision, w_violations,

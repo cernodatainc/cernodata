@@ -14,6 +14,8 @@ async function refreshResultsData() {
         if (!resp.ok) return;
         const data = await resp.json();
         renderResultsTable(data);
+        renderDownstreamRecommendationAndConnectorCard(data);
+        renderOutputTestSuiteResultsCard(data);
     } catch (e) {
         console.log('[INFO] Failed to fetch results:', e);
     }
@@ -105,4 +107,26 @@ function reloadViewerIframe(pageNum = null, targetRun = null) {
     }
 
     frame.src = `/viewer?output_dir=${encodeURIComponent(runDir)}&page=${page}${stepQuery}&t=${Date.now()}`;
+}
+
+/**
+ * No-op UI hook for rendering the visual Downstream Setup Advisor & Watched-Folder Connector card.
+ *
+ * @param {Object} data - Results payload returned by /api/results.
+ */
+function renderDownstreamRecommendationAndConnectorCard(data) {
+    // TODO(TASK-306): Render the 'Recommended Downstream Setup & Connect Output' card in the Preset Results tab
+    // with one-click export buttons and watched-folder / webhook auto-forwarding controls (TASK-301).
+    void data;
+}
+
+/**
+ * No-op UI hook for rendering visual Pass/Fail badges from the Output Test Case & Q&A Sandbox UI.
+ *
+ * @param {Object} data - Results payload returned by /api/results.
+ */
+function renderOutputTestSuiteResultsCard(data) {
+    // TODO(TASK-107): Render visual Pass/Fail badges for user-defined expected section headers,
+    // table structure rules, and plain-English retrieval Q&A checks configured in the Web Hub.
+    void data;
 }

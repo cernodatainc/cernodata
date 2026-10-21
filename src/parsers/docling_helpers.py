@@ -147,5 +147,7 @@ def build_node_content(
             content_dict["markdown_table"] = item.export_to_markdown()
         except Exception:
             pass
+        # TODO(TASK-103): Compute `cell_alignment_score` from actual parsed Markdown table row/column raggedness
+        # instead of hardcoding 0.98 / 0.96 by preset name.
         content_dict["cell_alignment_score"] = 0.98 if preset == "docling_deep" else 0.96
     return content_dict

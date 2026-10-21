@@ -30,6 +30,12 @@ class ParserPresetRegistry:
         else:
             self._adapters.append(adapter)
 
+    def load_custom_presets(self, config_path: Optional[str] = None) -> None:
+        """No-op hook for loading user-defined custom preset manifests into this registry."""
+        # TODO(TASK-204): Load `CustomPresetConfig` entries from JSON and register CLI (`TASK-202`)
+        # and HTTP (`TASK-203`) OCR adapters ahead of `DoclingPresetAdapter`.
+        _ = config_path
+
     def resolve(self, preset: str) -> Optional[ParserPresetAdapter]:
         """Finds the first registered adapter that can handle the given preset."""
         for adapter in self._adapters:
@@ -47,6 +53,7 @@ class ParserPresetRegistry:
     @classmethod
     def create_default(cls) -> ParserPresetRegistry:
         """Creates a registry pre-configured with default standard adapters."""
+        # TODO(TASK-402): Register `VisionLlmPresetAdapter` for `vision_llm_direct` via local Ollama VLM.
         return cls([
             PyPdfiumPresetAdapter(),
             DoclingPresetAdapter(),

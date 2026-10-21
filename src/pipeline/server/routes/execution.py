@@ -7,7 +7,7 @@ Pipeline execution and rerun API route handlers for cernodata HTTP server.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.http_utils import send_json_response
@@ -19,6 +19,20 @@ if TYPE_CHECKING:
 
 class ExecutionRoutesMixin(BaseApiRoutesMixin):
     """Mixin handling live document pipeline execution and rerun endpoints."""
+
+    def _run_visual_test_suite_check(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """No-op hook for evaluating expectations and Q&A questions configured in the Web Hub UI."""
+        # TODO(TASK-107): Evaluate expected section headers, table checks, and plain-English retrieval
+        # questions submitted from the Web Hub 'Define Output Expectations & Test Questions' UI card.
+        _ = payload
+        return []
+
+    def _run_fast_layout_preview(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """No-op hook for instant bounding-box layout preview in the Web Hub and Viewer UI."""
+        # TODO(TASK-1002): Execute fast structure-only bounding-box extraction when the user clicks
+        # 'Instant Layout Preview (Skip OCR)' in the Web Hub or Viewer toolbar.
+        _ = payload
+        return None
 
     def _handle_post_run(self, payload: Dict[str, Any]) -> None:
         """

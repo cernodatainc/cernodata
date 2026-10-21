@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from src.pipeline.server.http_utils import parse_run_dir_and_step, send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
@@ -17,6 +17,20 @@ from src.utils import mkdirs
 
 class PersistenceRoutesMixin(BaseApiRoutesMixin):
     """Mixin handling DocumentDOM, diff, and decision tree disk persistence."""
+
+    def _handle_visual_downstream_connector(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """No-op hook for the Web Hub 'Connect Output to Pre-Existing Setup' visual wizard."""
+        # TODO(TASK-301): Persist and test the user's watched local folder or local app webhook URL
+        # configured in the Web Hub UI, and auto-forward formatted outputs via deliver_to_sink (TASK-304).
+        _ = payload
+        return {"connected": False}
+
+    def _handle_export_reproducible_package(self, output_dir: str) -> Optional[str]:
+        """No-op hook for the Web Hub 'Download Reproducible Pipeline' one-click export button."""
+        # TODO(TASK-1001): Generate and return a self-contained, audit-friendly Python pipeline script
+        # with all active UI settings baked in when the user clicks 'Download Reproducible Pipeline'.
+        _ = output_dir
+        return None
 
     def _handle_post_save_dom(self, payload: Dict[str, Any]) -> None:
         """
