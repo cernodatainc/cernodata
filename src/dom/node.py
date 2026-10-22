@@ -5,14 +5,15 @@ DOMNode element primitive for cernodata IR.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from src.dom.bounding_box import BoundingBox
+from src.dom.enums import DOMNodeType
 
 
 @dataclass
 class DOMNode:
     node_id: str
-    type: str  # heading, paragraph, table_grid, figure, header_footer, multi_column_group
+    type: Union[DOMNodeType, str]  # heading, paragraph, table_grid, figure, header_footer, multi_column_group
     global_page_index: int
     temp_slice_index: int
     bounding_box: BoundingBox
@@ -30,9 +31,10 @@ class DOMNode:
     is_custom: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        node_type = self.type.value if isinstance(self.type, DOMNodeType) else str(self.type)
         res: Dict[str, Any] = {
             "node_id": self.node_id,
-            "type": self.type,
+            "type": node_type,
             "global_page_index": self.global_page_index,
             "temp_slice_index": self.temp_slice_index,
             "bounding_box": self.bounding_box.to_dict(),

@@ -5,8 +5,11 @@ Shared pypdfium2 context manager utilities for safe PDF lifecycle management.
 """
 
 import os
+import logging
 from contextlib import contextmanager
 from typing import Iterator, Optional, Any, List, Dict
+
+logger = logging.getLogger("cernodata.pdf_utils")
 
 HAS_PYPDFIUM = False
 try:
@@ -22,13 +25,19 @@ def open_pdf(pdf_path: str) -> Iterator[Optional[Any]]:
     Context manager that safely opens a PDF document with pypdfium2,
     yielding the PdfDocument or None on failure, and ensuring closure on exit.
     """
-    if not HAS_PYPDFIUM or not os.path.exists(pdf_path):
+    if not HAS_PYPDFIUM:
+        logger.warning("pypdfium2 is not available to open %s", pdf_path)
+        yield None
+        return
+    if not os.path.exists(pdf_path):
+        logger.warning("PDF path does not exist: %s", pdf_path)
         yield None
         return
 
     try:
         pdf = pypdfium2.PdfDocument(pdf_path)
-    except Exception:
+    except Exception as ex:
+        logger.error("Failed opening PDF document '%s': %s", pdf_path, ex)
         yield None
         return
 

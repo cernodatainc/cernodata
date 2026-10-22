@@ -75,31 +75,42 @@ class DoclingParser:
         def _instantiate_ocr_options(cls: Any, **extra_kwargs: Any) -> Any:
             try:
                 return cls(mode=ocr_mode, scale=self.ocr_scale, **extra_kwargs)
-            except Exception:
+            except TypeError as te:
+                logger.debug("Failed initializing %s with mode; retrying with scale only: %s", cls.__name__, te)
                 try:
                     return cls(scale=self.ocr_scale, **extra_kwargs)
-                except Exception:
+                except Exception as ex:
+                    logger.warning("Failed initializing OCR options for %s: %s", cls.__name__, ex)
                     return None
+            except Exception as ex:
+                logger.warning("Unexpected error creating %s: %s", cls.__name__, ex)
+                return None
 
         ocr_opts = None
         if engine == "rapidocr":
             try:
                 from docling.datamodel.pipeline_options import RapidOcrOptions
                 ocr_opts = _instantiate_ocr_options(RapidOcrOptions, backend="torch")
-            except Exception:
-                pass
+            except ImportError as ie:
+                logger.debug("RapidOcrOptions not available in docling datamodel: %s", ie)
+            except Exception as ex:
+                logger.warning("RapidOCR engine option configuration failed: %s", ex)
         elif engine in ("tesseract", "tesseract_cli"):
             try:
                 from docling.datamodel.pipeline_options import TesseractOcrOptions
                 ocr_opts = _instantiate_ocr_options(TesseractOcrOptions)
-            except Exception:
-                pass
+            except ImportError as ie:
+                logger.debug("TesseractOcrOptions not available in docling datamodel: %s", ie)
+            except Exception as ex:
+                logger.warning("Tesseract engine option configuration failed: %s", ex)
         elif engine == "easyocr":
             try:
                 from docling.datamodel.pipeline_options import EasyOcrOptions
                 ocr_opts = _instantiate_ocr_options(EasyOcrOptions)
-            except Exception:
-                pass
+            except ImportError as ie:
+                logger.debug("EasyOcrOptions not available in docling datamodel: %s", ie)
+            except Exception as ex:
+                logger.warning("EasyOCR engine option configuration failed: %s", ex)
 
         if ocr_opts is not None:
             pipeline_options.ocr_options = ocr_opts

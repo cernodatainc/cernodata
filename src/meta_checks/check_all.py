@@ -20,6 +20,10 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
+_repo_root = Path(__file__).resolve().parents[2]
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 from src.meta_checks.check_ast import run_checks as check_ast
 from src.meta_checks.check_emojis import check_files as check_emojis
 from src.meta_checks.file_hygiene import run_meta_checks

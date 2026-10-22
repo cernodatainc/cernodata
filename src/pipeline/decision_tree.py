@@ -6,11 +6,12 @@ Evaluates parsing confidence scores against target threshold and routes dual-pat
 """
 from typing import Dict, Any, Optional
 from src.dom import DocumentDOM
+from src.dom.enums import PresetKind, PipelineAction
 from src.quality import evaluate_document_confidence
 
 DEFAULT_TARGET_CONFIDENCE_THRESHOLD = 0.82
-PRESET_ID = "docling_fast"
-NEXT_PRESET_ID = "docling_deep"
+PRESET_ID = PresetKind.DOCLING_FAST.value
+NEXT_PRESET_ID = PresetKind.DOCLING_DEEP.value
 NEXT_PRESET_SCORE = 0.72
 
 
@@ -58,7 +59,7 @@ class DecisionTreeEngine:
         if is_accepted:
             result["status"] = "ACCEPT"
             result["decision_tree"] = {
-                "action": "ACCEPT_OUTPUT",
+                "action": PipelineAction.ACCEPT_OUTPUT.value,
                 "reason": f"Overall confidence ({overall_conf}) >= target threshold ({self.target_threshold}){lang_label}"
             }
         else:
@@ -70,10 +71,10 @@ class DecisionTreeEngine:
                 "contrast_enhancement": 1.2
             }
             if delta >= 0.20:
-                action = "PATH_B_WIGGLE_PARAMETERS"
+                action = PipelineAction.PATH_B_WIGGLE_PARAMETERS.value
                 reason = f"Delta ({delta}) >= 0.20. Language/quality heuristics below threshold ({overall_conf} < {self.target_threshold}). Wiggling OCR language hint and DPI."
             else:
-                action = "PATH_A_SWITCH_PRESET"
+                action = PipelineAction.PATH_A_SWITCH_PRESET.value
                 hint_str = f" with explicit '{self.language}' language hint." if self.language else "."
                 reason = f"Delta ({delta}) < 0.20. Switching to next preset candidate ('{NEXT_PRESET_ID}'){hint_str}"
 

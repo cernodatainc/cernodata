@@ -6,6 +6,7 @@ Helper functions for Docling item normalization, bounding box translation, and c
 
 import re
 from typing import Dict, Any, Tuple
+from src.dom.enums import DOMNodeType
 from src.quality.language_config import get_language_config
 
 LANG_CODE_MAP = {
@@ -23,12 +24,12 @@ LANG_CODE_MAP = {
 # are resolved first: a substring check would route "section_header" to header_footer (it
 # contains "header") before the heading check could run.
 _EXACT_LABEL_TYPES: Dict[str, str] = {
-    "title": "heading",
-    "section_header": "heading",
-    "page_header": "header_footer",
-    "page_footer": "header_footer",
-    "table": "table_grid",
-    "picture": "figure",
+    "title": DOMNodeType.HEADING.value,
+    "section_header": DOMNodeType.HEADING.value,
+    "page_header": DOMNodeType.HEADER_FOOTER.value,
+    "page_footer": DOMNodeType.HEADER_FOOTER.value,
+    "table": DOMNodeType.TABLE_GRID.value,
+    "picture": DOMNodeType.FIGURE.value,
 }
 
 
@@ -82,14 +83,14 @@ def resolve_node_type(item: Any) -> str:
     if exact:
         return exact
     if "title" in label or "heading" in label or "section" in label:
-        return "heading"
+        return DOMNodeType.HEADING.value
     if "header" in label or "footer" in label:
-        return "header_footer"
+        return DOMNodeType.HEADER_FOOTER.value
     if "table" in label:
-        return "table_grid"
+        return DOMNodeType.TABLE_GRID.value
     if "picture" in label or "figure" in label:
-        return "figure"
-    return "paragraph"
+        return DOMNodeType.FIGURE.value
+    return DOMNodeType.PARAGRAPH.value
 
 
 def figure_caption(item: Any, doc: Any) -> str:
