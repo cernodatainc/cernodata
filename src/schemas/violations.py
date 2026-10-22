@@ -7,7 +7,7 @@ Pydantic contract schemas for quality violations (quality_violations.json).
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.schemas.dom import BoundingBoxSchema
 
@@ -25,20 +25,22 @@ class QualityViolationSchema(BaseModel):
     severity: str = "MEDIUM"
     detected_snippet: Optional[str] = ""
     suggestion: Optional[str] = None
-    suppressed: Union[str, bool] = False
+    suppressed: bool = False
     is_fixed: Optional[bool] = False
     accepted: Optional[bool] = False
     description: str = ""
     bounding_box: Optional[Union[BoundingBoxSchema, Dict[str, float], List[float]]] = None
 
+    @field_validator("suppressed", mode="before")
+    @classmethod
+    def _coerce_suppressed(cls, v: Any) -> bool:
+        if isinstance(v, str):
+            return v.lower() in ("true", "1")
+        return bool(v)
+
     def is_active(self) -> bool:
         """Determines if the violation is currently active (unsuppressed, unaccepted, unfixed)."""
-        if isinstance(self.suppressed, str):
-            if self.suppressed.lower() in ("true", "1"):
-                return False
-        elif bool(self.suppressed):
-            return False
-        if bool(self.accepted) or bool(self.is_fixed):
+        if self.suppressed or bool(self.accepted) or bool(self.is_fixed):
             return False
         return True
 

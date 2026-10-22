@@ -42,7 +42,7 @@ def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> Lis
         "severity": "HIGH",
         "detected_snippet": raw_text[:60],
         "suggestion": None,
-        "suppressed": "false",
+        "suppressed": False,
         "description": f"High ratio of OCR noise or corrupt characters ({round(gb_ratio, 3)}){desc_detail}",
         "bounding_box": node.bounding_box.to_dict()
     }]
@@ -70,7 +70,7 @@ def _check_diacritic_violations(
             "detected_snippet": match_snippet,
             "suggested_correction": suggested,
             "suggestion": rewrite,
-            "suppressed": "false",
+            "suppressed": False,
             "description": f"OCR '{anom_char}' character substitution anomaly detected ('{match_snippet}' -> '{suggested}')",
             "bounding_box": node.bounding_box.to_dict()
         })
@@ -88,7 +88,7 @@ def _check_diacritic_violations(
             "detected_snippet": match_snippet,
             "suggested_correction": suggested,
             "suggestion": rewrite,
-            "suppressed": "false",
+            "suppressed": False,
             "description": f"Diacritic conflict detected: '{conf_char}' is not valid in {config.name} ('{match_snippet}' -> '{suggested}')",
             "bounding_box": node.bounding_box.to_dict()
         })
@@ -140,14 +140,15 @@ def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") 
     counter = 1
 
     for node in dom.nodes:
-        existing_suppressed: Dict[str, str] = {}
+        existing_suppressed: Dict[str, bool] = {}
         for ev in getattr(node, "violations", []):
             if isinstance(ev, dict):
-                supp_val = str(ev.get("suppressed", "false"))
+                supp_val = ev.get("suppressed", False)
+                is_supp = (supp_val is True) or (str(supp_val).lower() in ("true", "1"))
                 if ev.get("violation_id"):
-                    existing_suppressed[ev["violation_id"]] = supp_val
+                    existing_suppressed[ev["violation_id"]] = is_supp
                 if ev.get("rule_type"):
-                    existing_suppressed[ev["rule_type"]] = supp_val
+                    existing_suppressed[ev["rule_type"]] = is_supp
 
         raw_text = node.content.get("raw_text", "")
         gb_viols = _check_garbage_violations(node, raw_text, counter)

@@ -51,12 +51,12 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(v["rule_type"], "ocr_character_substitution")
         self.assertEqual(v["type"], "diacritic")
         self.assertEqual(v["suggestion"], "Infolinia czynna w piątku.")
-        self.assertEqual(v["suppressed"], "false")
+        self.assertFalse(v["suppressed"])
 
         # Verify violations are populated directly on the DOMNode
         self.assertEqual(len(node.violations), 1)
         self.assertEqual(node.violations[0]["type"], "diacritic")
-        self.assertEqual(node.violations[0]["suppressed"], "false")
+        self.assertFalse(node.violations[0]["suppressed"])
 
     def test_suppressed_violations_affect_confidence(self):
         node = DOMNode(

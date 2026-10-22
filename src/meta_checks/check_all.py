@@ -3,23 +3,27 @@ src/meta_checks/check_all.py
 
 Consolidated meta checker executing all repository quality gates:
 1. Strict Emoji Ban compliance
-2. Type annotation completeness check across non-test sources
-3. Ruff linting
-4. Mypy static type checking
-5. Pytest unit and integration test suite
+2. File hygiene & length thresholds (< 500 lines) and inline CSS/JS rules
+3. Type annotation completeness check across non-test sources
+4. AST code hygiene (UTF-8 BOM, unused imports, bare excepts, mutable defaults)
+5. Architectural silo invariant validation (Planner strictly decoupled)
+6. Ruff linting
+7. Mypy static type checking
+8. Pytest unit and integration test suite
 """
 
 from __future__ import annotations
 
 import ast
-import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import List, Tuple
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from check_emojis import check_files as check_emojis  # type: ignore[import-not-found]
+from src.meta_checks.check_ast import run_checks as check_ast
+from src.meta_checks.check_emojis import check_files as check_emojis
+from src.meta_checks.file_hygiene import run_meta_checks
+from src.meta_checks.visualize_dependencies import build_dependency_graph, verify_planner_silo
 
 
 def check_type_annotations(root_dir: Path) -> int:
@@ -75,6 +79,33 @@ def check_type_annotations(root_dir: Path) -> int:
     return 0
 
 
+def check_hygiene(root_dir: Path) -> int:
+    """Verifies file length limits (< 500 lines) and flags unmuted inline CSS/JS."""
+    res = run_meta_checks(str(root_dir))
+    if not res["is_passed"]:
+        print("[FAIL] File hygiene checks failed:")
+        for lv in res["length_violations"]:
+            print(f"  - [RED FLAG] {lv['message']}")
+        for iv in res["inline_violations"]:
+            print(f"  - [INLINE] {iv['message']}")
+        return 1
+    print("[PASS] File hygiene verified (scanned files compliant with line thresholds and asset policies).")
+    return 0
+
+
+def check_architectural_silos(root_dir: Path) -> int:
+    """Verifies architectural silo invariants (planner is strictly siloed)."""
+    graph = build_dependency_graph(root_dir)
+    violations = verify_planner_silo(graph)
+    if violations:
+        print(f"[FAIL] Architectural silo violations detected ({len(violations)}):")
+        for v in violations:
+            print(f"  - {v}")
+        return 1
+    print("[PASS] Architectural silo invariants satisfied (planner strictly decoupled).")
+    return 0
+
+
 def run_command(cmd: List[str], desc: str, cwd: Path) -> int:
     """Executes a command line tool and prints status."""
     print(f"\n--- Running: {desc} ({' '.join(cmd)}) ---")
@@ -98,21 +129,37 @@ def main() -> int:
     if check_emojis(repo_root) != 0:
         return 1
 
-    # 2. Type annotation completeness
-    print("\n--- Gate 2: Type Annotation Completeness ---")
+    # 2. File hygiene & inline CSS/JS
+    print("\n--- Gate 2: File Hygiene & Asset Policies ---")
+    if check_hygiene(repo_root) != 0:
+        return 1
+
+    # 3. Type annotation completeness
+    print("\n--- Gate 3: Type Annotation Completeness ---")
     if check_type_annotations(repo_root) != 0:
         return 1
 
-    # 3. Ruff linting
-    if run_command(["ruff", "check", "src/"], "Ruff Linter", repo_root) != 0:
+    # 4. AST integrity and code hygiene
+    print("\n--- Gate 4: AST Integrity and Code Hygiene ---")
+    if check_ast(str(repo_root / "src")) != 0:
         return 1
 
-    # 4. Mypy static type checking
-    if run_command(["mypy"], "Mypy Type Checker", repo_root) != 0:
+    # 5. Architectural silos
+    print("\n--- Gate 5: Architectural Silo Invariants ---")
+    if check_architectural_silos(repo_root) != 0:
         return 1
 
-    # 5. Pytest
-    if run_command(["pytest", "-q"], "Pytest Test Suite", repo_root) != 0:
+    # 6. Ruff linting
+    if run_command([sys.executable, "-m", "ruff", "check", "src/"], "Ruff Linter", repo_root) != 0:
+        return 1
+
+    # 7. Mypy static type checking
+    if run_command([sys.executable, "-m", "mypy"], "Mypy Type Checker", repo_root) != 0:
+        return 1
+
+    # 8. Pytest test suite
+    test_cmd = [sys.executable, "-m", "pytest", "-q"]
+    if run_command(test_cmd, "Pytest Test Suite", repo_root) != 0:
         return 1
 
     print("\n====================================================================")

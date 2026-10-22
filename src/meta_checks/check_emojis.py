@@ -7,8 +7,6 @@ Markdown, and HTML files.
 
 from __future__ import annotations
 
-import glob
-import os
 import re
 import sys
 from pathlib import Path
