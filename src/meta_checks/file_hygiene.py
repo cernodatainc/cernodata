@@ -1,7 +1,7 @@
 """
-src/meta_checks.py
+src/meta_checks/file_hygiene.py
 
-Repository meta-quality enforcement checks.
+Repository file-hygiene and meta-quality enforcement checks.
 Surfaces the longest source files and flags anything exceeding 500 lines.
 Flags inline CSS and inline JS unless explicitly muted with substantive justification.
 """
@@ -416,7 +416,7 @@ def run_meta_checks(
     include_event_handlers: bool = False,
 ) -> Dict[str, Any]:
     """Executes all meta quality checks against target directory."""
-    base_dir = target_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = target_dir or os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     mutes = muted_cases if muted_cases is not None else DEFAULT_MUTED_CASES
     longest_files, length_viols = check_file_lengths(base_dir, max_lines, muted_cases=mutes)
     inline_viols = check_inline_css_and_js(base_dir, muted_cases=mutes, include_event_handlers=include_event_handlers)
@@ -450,48 +450,3 @@ __all__ = [
     "check_file_length_warnings",
     "scan_inline_css_and_js", "check_inline_css_and_js", "run_meta_checks",
 ]
-
-
-if __name__ == "__main__":
-    import argparse
-    import sys
-
-    parser = argparse.ArgumentParser(description="Repository meta-quality and file-length enforcement.")
-    parser.add_argument("target_dir", nargs="?", default=None, help="Root directory to scan (default: repository root)")
-    parser.add_argument("--warn", type=int, default=DEFAULT_WARN_LINES, help="Yellow-flag warning threshold (default: 250)")
-    parser.add_argument("--max", type=int, default=DEFAULT_MAX_LINES, help="Red-flag error threshold (default: 500)")
-    parser.add_argument("--top", type=int, default=10, help="Number of longest files to surface (default: 10)")
-    parser.add_argument("--yellow-only", action="store_true", help="Display only yellow-flag files (250-500 lines)")
-    args = parser.parse_args()
-
-    root = args.target_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    if args.yellow_only:
-        yfs = check_file_length_warnings(root, warn_lines=args.warn, max_lines=args.max)
-        print(f"Yellow Flag Files ({len(yfs)} files between {args.warn} and {args.max} lines):")
-        print("-" * 72)
-        for yf in yfs:
-            print(f"  {yf.file.line_count:4d} lines | {yf.file.rel_path}")
-        print("-" * 72)
-        sys.exit(0)
-
-    _, longest_report = surface_longest_files(root, top_n=args.top, warn_lines=args.warn, max_lines=args.max)
-    print(longest_report)
-    print()
-
-    res = run_meta_checks(root, max_lines=args.max, warn_lines=args.warn)
-    print("Meta Checks Status:", "PASSED" if res["is_passed"] else "FAILED")
-    if res["yellow_flags"]:
-        print(f"\nYellow Flags ({len(res['yellow_flags'])} files in {args.warn}-{args.max} line range):")
-        for yf in res["yellow_flags"]:
-            print(f"  - [YELLOW FLAG] {yf['file']} ({yf['lines']} lines)")
-    if res["length_violations"]:
-        print(f"\nFile Length Violations ({len(res['length_violations'])}):")
-        for lv in res["length_violations"]:
-            print(f"  - [RED FLAG] {lv['message']}")
-    if res["inline_violations"]:
-        print(f"\nInline CSS/JS Violations ({len(res['inline_violations'])}):")
-        for iv in res["inline_violations"]:
-            print(f"  - {iv['message']}")
-    sys.exit(0 if res["is_passed"] else 1)
-
