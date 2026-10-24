@@ -54,7 +54,6 @@ def evaluate_quality_and_decision_tree(
         language = config.language
         preset = config.preset
 
-    violations = detect_quality_violations(dom, language=language)
     engine = DecisionTreeEngine(
         target_threshold=target_threshold,
         current_preset_score=current_preset_score,
@@ -63,4 +62,6 @@ def evaluate_quality_and_decision_tree(
     )
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset
+    detected_langs = decision.get("detected_languages")
+    violations = detect_quality_violations(dom, language=language, page_languages=detected_langs)
     return decision, violations

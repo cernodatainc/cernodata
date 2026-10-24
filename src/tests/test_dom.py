@@ -27,6 +27,22 @@ class TestDOMPrimitives(unittest.TestCase):
         self.assertEqual(b_dict["y1"], 200.01)
         self.assertEqual(b_dict["angle"], 45.0)
 
+    def test_bounding_box_normalization_and_properties(self):
+        # Inverted coordinates should auto-normalize
+        bbox = BoundingBox(100.0, 200.0, 10.0, 20.0)
+        self.assertEqual(bbox.x0, 10.0)
+        self.assertEqual(bbox.y0, 20.0)
+        self.assertEqual(bbox.x1, 100.0)
+        self.assertEqual(bbox.y1, 200.0)
+        self.assertEqual(bbox.width, 90.0)
+        self.assertEqual(bbox.height, 180.0)
+        self.assertEqual(bbox.area, 16200.0)
+        self.assertFalse(bbox.is_empty)
+
+        # Zero-area box
+        empty_box = BoundingBox(10.0, 10.0, 10.0, 20.0)
+        self.assertTrue(empty_box.is_empty)
+
     def test_bounding_box_rotation_polygon(self):
         # 0 degree rotation unrotated corners
         bbox0 = BoundingBox(0.0, 0.0, 10.0, 20.0, angle=0.0)

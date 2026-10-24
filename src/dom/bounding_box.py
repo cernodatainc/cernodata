@@ -18,6 +18,32 @@ class BoundingBox:
     angle: float = 0.0  # Rotation angle in degrees (text alignment orientation)
     quad: Optional[List[List[float]]] = None  # 4 corner vertices: [[x0, y0], [x1, y1], [x2, y2], [x3, y3]]
 
+    def __post_init__(self) -> None:
+        if self.x0 > self.x1:
+            self.x0, self.x1 = self.x1, self.x0
+        if self.y0 > self.y1:
+            self.y0, self.y1 = self.y1, self.y0
+
+    @property
+    def width(self) -> float:
+        """Returns the width of the bounding box."""
+        return max(0.0, self.x1 - self.x0)
+
+    @property
+    def height(self) -> float:
+        """Returns the height of the bounding box."""
+        return max(0.0, self.y1 - self.y0)
+
+    @property
+    def area(self) -> float:
+        """Returns the area of the bounding box."""
+        return self.width * self.height
+
+    @property
+    def is_empty(self) -> bool:
+        """Indicates whether bounding box has non-positive area."""
+        return self.width <= 0.0 or self.height <= 0.0
+
     def to_dict(self) -> Dict[str, Any]:
         res: Dict[str, Any] = {
             "x0": round(self.x0, 2),

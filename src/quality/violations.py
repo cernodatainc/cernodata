@@ -122,7 +122,11 @@ def _check_dataset_retrieval_violations(dom: DocumentDOM) -> List[Dict[str, Any]
     return []
 
 
-def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") -> List[Dict[str, Any]]:
+def detect_quality_violations(
+    dom: DocumentDOM,
+    language: Optional[str] = "en",
+    page_languages: Optional[Dict[int, str]] = None,
+) -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations and anomalies.
     Composes single-rule check functions with language configuration rules.
@@ -134,8 +138,11 @@ def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") 
 
     page_configs: Dict[int, Optional[LanguageConfig]] = {}
     if is_auto:
-        from src.quality.language import detect_document_languages
-        page_langs = detect_document_languages(dom)
+        if page_languages is not None:
+            page_langs = page_languages
+        else:
+            from src.quality.language import detect_document_languages
+            page_langs = detect_document_languages(dom)
         page_configs = {p: get_language_config(lang_code) for p, lang_code in page_langs.items()}
     else:
         fixed_config = get_language_config(lang)

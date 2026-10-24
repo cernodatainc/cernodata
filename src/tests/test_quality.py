@@ -94,6 +94,16 @@ class TestQualityMetrics(unittest.TestCase):
         # Verify get_language_config handles None safely
         self.assertIsNone(get_language_config(None))
 
+    def test_detect_quality_violations_with_page_languages(self):
+        node = DOMNode(
+            node_id="n_lang_map", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Firma dostarczy nowe Möbel do biura."}
+        )
+        dom = DocumentDOM(document_id="doc_map", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        violations = detect_quality_violations(dom, language="auto", page_languages={1: "pl"})
+        self.assertTrue(any(v.get("rule_type") == "diacritic_conflict" for v in violations))
+
     def test_detect_node_text_skew(self):
         # Test on blank/empty array returns 0.0
         blank_crop = np.ones((50, 200, 3), dtype=np.uint8) * 255

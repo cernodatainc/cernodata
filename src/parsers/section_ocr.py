@@ -8,11 +8,14 @@ PDF crops, and extensible custom OCR engine backends.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from PIL import Image
+
+logger = logging.getLogger("cernodata.parsers.section_ocr")
 
 from src.dom.bounding_box import BoundingBox
 from src.parsers.ocr_imaging import crop_pdf_region, normalize_to_pil
@@ -76,7 +79,7 @@ class SectionOCRParser:
                 }
             )
         except Exception as ex:
-            print(f"[WARN] RapidOCR torch engine initialization failed: {ex}")
+            logger.warning("RapidOCR torch engine initialization failed: %s", ex)
             try:
                 return RapidOCR()
             except Exception:
