@@ -203,6 +203,12 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("application/javascript", headers_ds_js.get("Content-Type", ""))
         self.assertIn("PRESET_WEIGHTS", content_ds_js)
 
+        # Test favicon SVG asset
+        status_fav, content_fav, headers_fav = self._get("/favicon.svg")
+        self.assertEqual(status_fav, 200)
+        self.assertIn("image/svg+xml", headers_fav.get("Content-Type", ""))
+        self.assertIn("<svg", content_fav)
+
     def test_api_viewer_data_hydration(self) -> None:
         status, content, headers = self._get("/api/viewer_data")
         self.assertEqual(status, 200)
