@@ -162,6 +162,10 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             send_text_response(self, get_data_shape_config_js(), content_type="application/javascript; charset=utf-8")
         elif raw_path in ("/data_shape_config.html", "/data_shape", "/planner"):
             self._serve_planner_page()
+        elif raw_path in ("/favicon.svg", "/favicon.ico"):
+            fav_path = os.path.join(SRC_DIR, "visualization", "favicon.svg")
+            if not send_file_response(self, fav_path, "image/svg+xml"):
+                self.send_error(404, "Favicon not found")
         elif raw_path == "/api/config":
             self._handle_api_config()
         elif raw_path in ("/api/previous_runs", "/api/runs"):

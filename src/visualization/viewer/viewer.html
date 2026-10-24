@@ -3,56 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cernodata | Interactive Visual Flow &amp; Preset Simulator</title>
+    <title>Cernodata</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/viewer.css">
 </head>
 <body>
-
-    <div class="status-banner" id="statusBanner">[RUNNING] Running live backend Python pipeline...</div>
-
+ 
+    <div class="status-banner" id="statusBanner">Running backend pipeline…</div>
+ 
     <header>
         <div class="brand">
-            <div class="brand-logo">C</div>
-            <div>
-                <div class="brand-title">cernodata Visual Flow &amp; Preset Simulator</div>
-                <div class="brand-doc-meta">
-                    Document: <span id="domSourceFilename">sample.pdf</span> | ID: <span id="domDocId">doc_init</span><span id="planHeaderSub"></span>
-                </div>
-            </div>
-            <a href="/" class="action-btn header-back-btn">&lt;- Back to Hub</a>
+            <svg class="brand-logo-img" viewBox="0 0 3952 1000" fill="none" xmlns="http://www.w3.org/2000/svg"
+                role="img" aria-label="cernodata">
+                <rect x="679.997" y="519.999" width="56.5685" height="269.039" transform="rotate(45 679.997 519.999)"
+                    fill="black" />
+                <rect x="472.843" y="247.155" width="56.5685" height="272.724" transform="rotate(45 472.843 247.155)"
+                    fill="black" />
+                <rect x="499.998" y="100" width="565.685" height="56.5686" transform="rotate(45 499.998 100)"
+                    fill="black" />
+                <rect x="472.157" y="127.841" width="56.5685" height="441.46" transform="rotate(45 472.157 127.841)"
+                    fill="black" />
+                <rect x="226.454" y="426.457" width="443.417" height="56.5686" transform="rotate(45 226.454 426.457)"
+                    fill="black" />
+                <rect x="140" y="460" width="565.685" height="56.5686" transform="rotate(45 140 460)" fill="black" />
+                <rect x="499.998" y="220" width="431.18" height="56.5686" transform="rotate(45 499.998 220)"
+                    fill="black" />
+                <rect x="799.997" y="520" width="56.5685" height="436.077" transform="rotate(45 799.997 520)"
+                    fill="black" />
+                <path
+                    d="M499.996 415.997C571.792 415.997 629.995 499.997 629.995 499.997C629.941 500.076 571.759 583.996 499.996 583.996C428.253 583.996 370.083 500.122 369.997 499.997C369.997 499.997 428.2 415.997 499.996 415.997ZM499.997 443.997C469.069 443.997 443.997 469.069 443.997 499.997C443.997 530.925 469.069 555.997 499.997 555.997C530.925 555.997 555.997 530.925 555.997 499.997C555.997 469.069 530.925 443.997 499.997 443.997Z"
+                    fill="black" />
+                <path
+                    d="M1278 402H1180C1128.64 402 1087 445.876 1087 500C1087 554.124 1128.64 598 1180 598H1330L1278 650H1180C1097.16 650 1030 582.843 1030 500C1030 417.157 1097.16 350 1180 350H1330L1278 402Z"
+                    fill="black" />
+                <path
+                    d="M1568 402H1470C1427.18 402 1391.12 432.495 1380.31 474H1600L1548 526H1380.31C1391.12 567.505 1427.18 598 1470 598H1620L1568 650H1470C1387.16 650 1320 582.843 1320 500C1320 417.157 1387.16 350 1470 350H1620L1568 402Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M2895 350C2977.84 350 3045 417.157 3045 500C3045 582.843 2977.84 650 2895 650H2745V350H2895ZM2802 598H2895C2946.36 598 2988 554.124 2988 500C2988 445.876 2946.36 402 2895 402H2802V598Z"
+                    fill="black" />
+                <path d="M3590 350L3538 402H3468V650H3412V402H3290L3342 350H3590Z" fill="black" />
+                <path
+                    d="M2239.47 560.943L2239 561.12L2258 604V582.792L2258 582.793V350H2315V650H2249.44L2070.96 439.565L2051.57 396.7V446.7L2052 446.542V650H1995V350H2060.56L2239.47 560.943Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M1867 350C1915.6 350 1955 389.399 1955 438C1955 486.601 1915.6 526 1867 526H1849.83L1955 650H1884.19L1779.02 526H1712V650H1655V350H1867ZM1712 474H1867C1884.12 474 1898 457.882 1898 438C1898 418.118 1884.12 402 1867 402H1712V474Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M2550 350C2632.84 350 2700 417.157 2700 500C2700 582.843 2632.84 650 2550 650H2510C2427.16 650 2360 582.843 2360 500C2360 417.157 2427.16 350 2510 350H2550ZM2510 402C2458.64 402 2417 445.876 2417 500C2417 554.124 2458.64 598 2510 598H2550C2601.36 598 2643 554.124 2643 500C2643 445.876 2601.36 402 2550 402H2510Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M3297.84 552H3371.39L3323.39 600H3323.39L3350 650H3288.83L3262.22 600H3107.78L3081.17 650H3020L3185 340L3297.84 552ZM3133.33 552H3236.67L3185 454.93L3133.33 552Z"
+                    fill="black" />
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M3777.84 552H3851.39L3803.39 600H3803.39L3830 650H3768.83L3742.22 600H3587.78L3561.17 650H3500L3665 340L3777.84 552ZM3613.33 552H3716.67L3665 454.93L3613.33 552Z"
+                    fill="black" />
+            </svg>
+        </div>
+        <div class="header-links">
+            <a href="/" class="header-link-btn">Dashboard</a>
+            <a href="/planner" class="header-link-btn">Planner Wizard</a>
+            <a href="/viewer" class="header-link-btn active">Visual Flow Viewer</a>
         </div>
     </header>
-
+ 
     <div class="toolbar">
         <div class="zoom-controls">
-            <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom Out">-</button>
+            <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom out">−</button>
             <span class="zoom-label" id="zoomDisplay">100%</span>
-            <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom In">+</button>
-            <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset Zoom">100%</button>
-            <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit Width">Fit</button>
+            <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom in">+</button>
+            <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset zoom">100%</button>
+            <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit width">Fit</button>
         </div>
-
+ 
         <div class="page-controls page-controls-group">
-            <span class="control-label">Page:</span>
-            <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous Page">&lt;</button>
+            <span class="control-label">Page</span>
+            <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous page">&lt;</button>
             <select class="type-filter page-select-dropdown" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))"></select>
-            <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next Page">&gt;</button>
+            <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next page">&gt;</button>
             <span class="control-label"><span id="currentPageNum" class="current-page-num">1</span> / <span id="totalPagesNum">1</span></span>
         </div>
-
-        <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding Boxes</label></div>
-        <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality Violations</label></div>
-        <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
-        <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score Badge</label></div>
+ 
+        <div class="toolbar-group page-controls-group">
+            <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding boxes</label></div>
+            <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality violations</label></div>
+            <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
+            <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score badge</label></div>
+            <div class="filter-controls-group">
+                <span class="control-label">Filter</span>
+                <select class="type-filter" id="typeFilter" onchange="updateLayers()">
+                    <option value="ALL">All types</option>
+                    <option value="heading">Headings</option>
+                    <option value="paragraph">Paragraphs</option>
+                    <option value="table_grid">Tables</option>
+                    <option value="figure">Figures</option>
+                </select>
+            </div>
+        </div>
+ 
         <div class="lang-controls-group">
-            <span class="control-label">Detected Lang:</span>
+            <span class="control-label">Detected language</span>
             <span class="badge-status lang" id="detectedLangBadge">P1: en</span>
-            <span class="control-label">Override:</span>
+            <span class="control-label">Override</span>
             <select class="type-filter" id="selectLanguage" onchange="onLanguageChanged()">
-                <option value="auto">Auto-Detect</option>
+                <option value="auto">Auto-detect</option>
                 <option value="pl">Polish (pl)</option>
                 <option value="en" selected>English (en)</option>
                 <option value="de">German (de)</option>
@@ -60,28 +118,21 @@
                 <option value="es">Spanish (es)</option>
             </select>
         </div>
-        <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">[SAVE] Save Annotations</button>
-        <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">[+ SECTION] Add Section</button>
-        <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">[AUTO-DECOLLIDE] Decollide Page</button>
-        <div class="filter-controls-group">
-            <span class="control-label">Filter:</span>
-            <select class="type-filter" id="typeFilter" onchange="updateLayers()">
-                <option value="ALL">All Types</option>
-                <option value="heading">Headings</option>
-                <option value="paragraph">Paragraphs</option>
-                <option value="table_grid">Tables</option>
-                <option value="figure">Figures</option>
-            </select>
+ 
+        <div class="toolbar-actions">
+            <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">Add section</button>
+            <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">Decollide page</button>
+            <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">Save annotations</button>
         </div>
     </div>
-
+ 
     <div class="workspace">
         <div class="visual-pane" id="visualPane">
             <div class="canvas-container" id="canvasContainer">
                 <img src="" id="pageImg" alt="Page Canvas" />
                 <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
             </div>
-
+ 
             <div class="score-badge-box" id="scoreBadge">
                 <div class="score-title" id="scoreTitle">Page 1 Confidence Score: 1.0000</div>
                 <div class="score-sub" id="scoreSub">
@@ -89,20 +140,20 @@
                 </div>
             </div>
         </div>
-
+ 
         <div class="inspector-pane">
             <div class="tab-bar">
                 <button class="tab-btn active" id="tabBtnDom" data-name="dom page" onclick="showTab(event, 'domTab')" title="Click: Show selected page | Shift+Click: Show all pages"><span id="domTabLabel">DOM Page</span> (<span id="domCount">0</span>)</button>
                 <button class="tab-btn" id="tabBtnViol" data-name="violations" onclick="showTab(event, 'violTab')" title="Click: Show selected page | Shift+Click: Show all pages"><span id="violTabLabel">Violations</span> (<span id="violCount">0</span>)</button>
-                <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision Log</button>
+                <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision log</button>
                 <button class="tab-btn" id="tabBtnPlan" onclick="showTab(event, 'planTab')">Plan</button>
-                <button class="tab-btn" id="tabBtnRuns" onclick="showTab(event, 'runsTab')">Runs Grid</button>
+                <button class="tab-btn" id="tabBtnRuns" onclick="showTab(event, 'runsTab')">Runs</button>
             </div>
-
+ 
             <div class="tab-content active" id="domTab">
                 <div class="page-action-bar">
                     <span class="page-action-title" id="pageActionTitle">Page 1 Controls:</span>
-                    <button class="action-btn action-btn-decollide-sm" onclick="decollideCurrentPage()">[AUTO-DECOLLIDE] Decollide Page Boxes</button>
+                    <button class="action-btn action-btn-decollide-sm" onclick="decollideCurrentPage()">Decollide boxes</button>
                 </div>
                 <div id="selectedEditorContainer"></div>
                 <div id="domListContainer"></div>
@@ -112,14 +163,14 @@
             <div class="tab-content" id="planTab"><div class="log-box log-box-plan"><pre id="planContent"></pre></div></div>
             <div class="tab-content" id="runsTab">
                 <div class="page-action-bar">
-                    <span class="page-action-title">Previous Runs by Page Grid:</span>
-                    <button class="action-btn" onclick="loadViewerRunsGrid()">[REFRESH] Refresh Grid</button>
+                    <span class="page-action-title">Runs by page</span>
+                    <button class="action-btn action-btn-decollide-sm" onclick="loadViewerRunsGrid()">Refresh</button>
                 </div>
                 <div id="viewerRunsGridContainer" class="viewer-runs-grid-box"></div>
             </div>
         </div>
     </div>
-
+ 
     <script src="/viewer.js"></script>
 </body>
 </html>

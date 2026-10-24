@@ -4,11 +4,26 @@
  * SVG canvas overlays, bounding box visualization, interactive dragging and resizing handles,
  * and custom section drawing tools.
  */
-
+ 
 let isDrawSectionMode = false;
 let drawStartPt = null;
 let drawRectEl = null;
-
+ 
+/**
+ * Overlay colours drawn on top of the page image. Based on the UI palette
+ * (landing.css / data_shape_config.css), using solid fills with a white outline
+ * so labels stay readable on top of scanned text and photos.
+ */
+const OVERLAY_COLORS = {
+    labelText: '#FFFFFF',
+    labelOutline: '#FFFFFF',
+    violation: '#B42318',
+    fixed: '#2E6E52',
+    incorrect: '#A15C07',
+    drawStroke: '#1E4B8A',
+    drawFill: 'rgba(30, 75, 138, 0.15)'
+};
+ 
 /**
  * Creates an SVG DOM element with namespace and applies attribute key-value pairs.
  *
@@ -21,7 +36,7 @@ function createSvgElem(tag, attrs) {
     for (const k in attrs) el.setAttribute(k, attrs[k]);
     return el;
 }
-
+ 
 /**
  * Transforms screen mouse coordinates to SVG canvas internal coordinate system.
  *
@@ -35,7 +50,7 @@ function getSvgCoordinates(evt) {
     pt.y = evt.clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
-
+ 
 /**
  * Calculates 4 corner coordinates for a bounding box, applying angle rotation if present.
  *
@@ -66,7 +81,7 @@ function getBoxCorners(bbox) {
         };
     });
 }
-
+ 
 /**
  * Recalculates bounding box envelope coordinates and optional quad polygon from corner array.
  *
@@ -80,7 +95,7 @@ function updateBboxFromCorners(node, corners) {
     node.bounding_box.x1 = roundCoord(Math.max(...corners.map(p => p.x)));
     node.bounding_box.y1 = roundCoord(Math.max(...corners.map(p => p.y)));
 }
-
+ 
 /**
  * Toggles interactive rectangle drawing mode for creating new user-defined sections.
  */
@@ -97,7 +112,7 @@ function toggleDrawSectionMode() {
         if (banner) {
             banner.className = 'status-banner';
             banner.style.display = 'block';
-            banner.textContent = '[MODE] Click and drag on page to draw and select a new section.';
+            banner.textContent = 'Click and drag on the page to draw a new section.';
         }
     } else {
         if (btn) btn.classList.remove('active');
@@ -111,7 +126,7 @@ function toggleDrawSectionMode() {
         drawStartPt = null;
     }
 }
-
+ 
 /**
  * Renders all SVG bounding box polygons, selection resize handles, and violation callout badges.
  */
@@ -134,8 +149,8 @@ function renderSVGOverlays() {
                 y: drawStartPt.y,
                 width: 0,
                 height: 0,
-                fill: 'rgba(16, 185, 129, 0.2)',
-                stroke: '#10B981',
+                fill: OVERLAY_COLORS.drawFill,
+                stroke: OVERLAY_COLORS.drawStroke,
                 'stroke-width': '2',
                 'stroke-dasharray': '4 2',
                 id: 'drawSectionPreview'
@@ -146,7 +161,7 @@ function renderSVGOverlays() {
     const showBbox = document.getElementById('toggleBbox') ? document.getElementById('toggleBbox').checked : true;
     const showViol = document.getElementById('toggleViolations') ? document.getElementById('toggleViolations').checked : true;
     const filterType = document.getElementById('typeFilter') ? document.getElementById('typeFilter').value : 'ALL';
-
+ 
     domData.nodes.forEach(node => {
         const nodePage = node.global_page_index || 1;
         if (nodePage !== currentPage) return;
@@ -159,13 +174,13 @@ function renderSVGOverlays() {
         const hasViol = hasUnfixedViol && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
-
+ 
         if (showBbox) {
             let classNames = ['node-bbox'];
             if (isSelected) classNames.push('highlighted');
             if (hasViol) classNames.push('violation');
             if (isIncorrect) classNames.push('incorrect-text');
-
+ 
             const pointsStr = corners.map(p => `${roundCoord(p.x)},${roundCoord(p.y)}`).join(' ');
             const poly = createSvgElem('polygon', {
                 points: pointsStr,
@@ -182,48 +197,49 @@ function renderSVGOverlays() {
                 handleNodeClick(e, node.node_id);
             };
             svg.appendChild(poly);
-
+ 
             if (isSelected) {
                 renderQuadResizeHandles(svg, node, corners);
             }
-
+ 
             if (isIncorrect) {
-                const tagW = 120, tagH = 16;
+                const tagW = 84, tagH = 16;
                 const tagBg = createSvgElem('rect', {
                     x: bbox.x0, y: Math.max(0, bbox.y0 - tagH - 2),
                     width: tagW, height: tagH,
-                    fill: '#D97706', stroke: '#FDE68A', 'stroke-width': '1',
+                    fill: OVERLAY_COLORS.incorrect, stroke: OVERLAY_COLORS.labelOutline, 'stroke-width': '1',
                     rx: '3'
                 });
                 const tagTxt = createSvgElem('text', {
                     x: bbox.x0 + 4, y: Math.max(11, bbox.y0 - 4),
-                    fill: '#FFF', 'font-size': '9px', 'font-weight': '700',
+                    fill: OVERLAY_COLORS.labelText, 'font-size': '10px', 'font-weight': '600',
                     'pointer-events': 'none'
                 });
-                tagTxt.textContent = '[!] INCORRECT TEXT';
+                tagTxt.textContent = 'Incorrect text';
                 svg.appendChild(tagBg);
                 svg.appendChild(tagTxt);
             }
         }
-
+ 
         if ((showViol || isSelected) && nodeViols.length > 0) {
             nodeViols.forEach((viol, vIdx) => {
                 const g = createSvgElem('g', {});
                 const isFixed = !!viol.is_fixed || !!node.is_fixed || activePresetIndex === 1;
                 const labelText = isFixed
-                    ? `[FIXED] '${viol.detected_snippet}' -> '${viol.suggested_correction || ''}'`
-                    : `[!] VIOLATION: '${viol.detected_snippet}' -> '${viol.suggested_correction || ''}'`;
-
+                    ? `Fixed: '${viol.detected_snippet}' → '${viol.suggested_correction || ''}'`
+                    : `Violation: '${viol.detected_snippet}' → '${viol.suggested_correction || ''}'`;
+ 
                 const yOffset = vIdx * 20;
                 const badgeBg = createSvgElem('rect', {
                     x: bbox.x0, y: Math.max(0, bbox.y0 - 18 - yOffset),
                     width: Math.min(360, labelText.length * 6.8), height: 18,
+                    rx: '3',
                     class: 'viol-callout',
-                    style: isFixed ? 'fill: #00E676; stroke: #00B0FF;' : ''
+                    style: `fill: ${isFixed ? OVERLAY_COLORS.fixed : OVERLAY_COLORS.violation}; stroke: ${OVERLAY_COLORS.labelOutline}; stroke-width: 1px;`
                 });
                 const badgeTxt = createSvgElem('text', {
                     x: bbox.x0 + 4, y: Math.max(12, bbox.y0 - 4 - yOffset), class: 'viol-text',
-                    style: isFixed ? 'fill: #000;' : ''
+                    style: `fill: ${OVERLAY_COLORS.labelText};`
                 });
                 badgeTxt.textContent = labelText;
                 g.appendChild(badgeBg);
@@ -233,7 +249,7 @@ function renderSVGOverlays() {
         }
     });
 }
-
+ 
 /**
  * Convenience alias for rendering quadrilateral resizing handles on selected node.
  *
@@ -244,7 +260,7 @@ function renderSVGOverlays() {
 function renderResizeHandles(svg, node, corners) {
     return renderQuadResizeHandles(svg, node, corners || getBoxCorners(node.bounding_box));
 }
-
+ 
 /**
  * Renders corner handles (crosshair) and edge midpoint handles (ew/ns-resize) on bounding box.
  *
@@ -254,14 +270,14 @@ function renderResizeHandles(svg, node, corners) {
  */
 function renderQuadResizeHandles(svg, node, corners) {
     const hs = 9;
-
+ 
     const cornerDefs = [
         { cornerIndex: 0, pt: corners[0], cursor: 'crosshair', title: 'Top-Left Corner' },
         { cornerIndex: 1, pt: corners[1], cursor: 'crosshair', title: 'Top-Right Corner' },
         { cornerIndex: 2, pt: corners[2], cursor: 'crosshair', title: 'Bottom-Right Corner' },
         { cornerIndex: 3, pt: corners[3], cursor: 'crosshair', title: 'Bottom-Left Corner' }
     ];
-
+ 
     cornerDefs.forEach(cd => {
         const hRect = createSvgElem('rect', {
             x: cd.pt.x - hs / 2, y: cd.pt.y - hs / 2, width: hs, height: hs,
@@ -271,14 +287,14 @@ function renderQuadResizeHandles(svg, node, corners) {
         hRect.onmousedown = (e) => onCornerHandleMouseDown(e, cd.cornerIndex, node.node_id);
         svg.appendChild(hRect);
     });
-
+ 
     const edgeDefs = [
         { edge: 0, p1: corners[0], p2: corners[1], cursor: 'ns-resize' },
         { edge: 1, p1: corners[1], p2: corners[2], cursor: 'ew-resize' },
         { edge: 2, p1: corners[2], p2: corners[3], cursor: 'ns-resize' },
         { edge: 3, p1: corners[3], p2: corners[0], cursor: 'ew-resize' }
     ];
-
+ 
     edgeDefs.forEach(ed => {
         const mx = (ed.p1.x + ed.p2.x) / 2;
         const my = (ed.p1.y + ed.p2.y) / 2;
@@ -291,7 +307,7 @@ function renderQuadResizeHandles(svg, node, corners) {
         svg.appendChild(hRect);
     });
 }
-
+ 
 /**
  * Initiates dragging interaction on a specific corner handle.
  *
@@ -304,7 +320,7 @@ function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
     evt.preventDefault();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
-
+ 
     const svgPt = getSvgCoordinates(evt);
     const corners = getBoxCorners(node.bounding_box);
     activeDrag = {
@@ -316,7 +332,7 @@ function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
         initialCorners: corners.map(p => ({ ...p }))
     };
 }
-
+ 
 /**
  * Initiates dragging interaction on a specific edge midpoint handle.
  *
@@ -329,7 +345,7 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
     evt.preventDefault();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
-
+ 
     const svgPt = getSvgCoordinates(evt);
     const corners = getBoxCorners(node.bounding_box);
     activeDrag = {
@@ -341,7 +357,7 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
         initialCorners: corners.map(p => ({ ...p }))
     };
 }
-
+ 
 /**
  * Initiates dragging interaction to translate/move an entire bounding box.
  *
@@ -354,7 +370,7 @@ function onPolygonMouseDown(evt, nodeId) {
     evt.stopPropagation();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
-
+ 
     const svgPt = getSvgCoordinates(evt);
     const corners = getBoxCorners(node.bounding_box);
     activeDrag = {

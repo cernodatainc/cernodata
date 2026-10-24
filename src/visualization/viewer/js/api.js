@@ -278,7 +278,7 @@ function updatePresetUIState() {
     if (subEl) {
         const violCount = getViolationsList().length;
         subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violCount}`;
-        subEl.style.color = isAccepted ? 'var(--accent-green)' : 'var(--accent-red)';
+        subEl.style.color = isAccepted ? '#2E6E52' : '#B42318';
     }
     const badgeEl = document.getElementById('scoreBadge');
     if (badgeEl) {

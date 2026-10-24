@@ -226,8 +226,8 @@ function renderRunsGrid(gridData) {
                 <td><span class="badge ${statusBadgeClass}">${escapeHtml(r.status || 'ACCEPT')}</span></td>
                 <td>
                     <div style="display:flex; gap:6px; align-items:center;">
-                        <button class="btn btn-sm btn-primary" onclick="choosePreviousRun('${escapeHtml(r.run_id || r.dir_path)}')">[LOAD] Load Run</button>
-                        <button class="btn btn-sm btn-secondary" onclick="forceRerunGridRun('${escapeHtml(r.run_id || r.dir_path)}', '${escapeHtml(r.preset || 'docling_fast')}', '${escapeHtml(selectedFile)}')">[RERUN] Force Rerun</button>
+                        <button class="btn btn-sm btn-primary" onclick="choosePreviousRun('${escapeHtml(r.run_id || r.dir_path)}')">Load run</button>
+                        <button class="btn btn-sm btn-secondary" onclick="forceRerunGridRun('${escapeHtml(r.run_id || r.dir_path)}', '${escapeHtml(r.preset || 'docling_fast')}', '${escapeHtml(selectedFile)}')">Force rerun</button>
                     </div>
                 </td>
             </tr>
