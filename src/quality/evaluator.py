@@ -6,6 +6,7 @@ Page-level (S_i) and document-level (S) confidence score evaluators.
 
 import functools
 import json
+import logging
 import os
 from typing import List, Dict, Any, Optional, TypedDict
 from collections import Counter
@@ -13,6 +14,8 @@ from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_ratio
 from src.quality.language import compute_language_score, detect_page_language
 from src.quality.language_config import get_language_config
+
+logger = logging.getLogger("cernodata.quality.evaluator")
 
 
 class DocumentConfidenceMetrics(TypedDict, total=False):
@@ -34,8 +37,10 @@ def load_quality_config() -> Dict[str, Any]:
             try:
                 with open(fpath, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except json.JSONDecodeError as jde:
+                logger.warning("Corrupt JSON in quality config file %s: %s", fpath, jde)
+            except Exception as ex:
+                logger.warning("Failed loading quality config from %s: %s", fpath, ex)
     return {
         "diacritic_hit": 0.20,
         "max_diacritic_penalty": 0.60,
@@ -70,7 +75,7 @@ def evaluate_page_confidence(
         suppressed_types = {
             str(v.get("type", "")): True
             for v in getattr(node, "violations", [])
-            if str(v.get("suppressed", "false")).lower() in ("true", "1")
+            if (v.get("suppressed") is True) or (str(v.get("suppressed", "false")).lower() in ("true", "1"))
         }
 
         if suppressed_types.get("symbols"):
@@ -84,6 +89,8 @@ def evaluate_page_confidence(
         combined_text_score = char_score * lang_score
 
         if node.type == "table_grid":
+            # TODO(TASK-103): Replace static `cell_alignment_score` fallback with real Level 4 Markdown table
+            # grid validation (column count consistency across rows, numeric alignment, and empty header checks).
             cell_alignment = node.content.get("cell_alignment_score", 0.95)
             score = 0.5 * combined_text_score + 0.5 * cell_alignment
         else:

@@ -53,19 +53,22 @@ def normalize_to_pil(
     if isinstance(image_input, (str, os.PathLike)):
         str_val = os.fspath(image_input).strip()
         if os.path.isfile(str_val):
-            return Image.open(str_val).convert("RGB")
+            with Image.open(str_val) as img:
+                return img.convert("RGB")
 
         b64_str = str_val
         if "," in b64_str and ";base64" in b64_str:
             b64_str = b64_str.split(",", 1)[1]
         try:
             raw_bytes = base64.b64decode(b64_str)
-            return Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+            with Image.open(io.BytesIO(raw_bytes)) as img:
+                return img.convert("RGB")
         except Exception as ex:
             raise ValueError(f"Unable to parse image from string/path: {ex}") from ex
 
     if isinstance(image_input, (bytes, bytearray)):
-        return Image.open(io.BytesIO(image_input)).convert("RGB")
+        with Image.open(io.BytesIO(image_input)) as img:
+            return img.convert("RGB")
 
     raise TypeError(f"Unsupported image input type: {type(image_input)}")
 

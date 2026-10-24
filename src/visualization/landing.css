@@ -21,7 +21,10 @@
     padding: 0;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
     font-family: inherit;
 }
 
@@ -91,6 +94,7 @@ header {
     outline: 2px solid #1F1D1A;
     outline-offset: 2px;
 }
+
 /* Navigation Bar */
 
 .hub-nav-bar {
@@ -213,7 +217,7 @@ header {
     padding: 18px 20px;
 }
 
-.card-section + .card-section {
+.card-section+.card-section {
     border-top: 1px solid var(--border-color);
 }
 
@@ -311,7 +315,8 @@ header {
     color: var(--text-primary);
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
     height: 36px;
     background: #FFFFFF;
     border: 1px solid var(--border-color);
@@ -327,7 +332,8 @@ header {
     color: var(--text-muted);
 }
 
-.form-input:focus, .form-select:focus {
+.form-input:focus,
+.form-select:focus {
     border-color: var(--accent-blue);
 }
 
@@ -417,7 +423,7 @@ header {
 }
 
 .btn-success {
-    background:#059669;
+    background: #059669;
     color: #FFF;
 }
 
@@ -540,18 +546,27 @@ header {
     background: var(--text-muted);
 }
 
-.badge-running::before { background: var(--accent-blue); }
-.badge-success::before { background: var(--accent-green); }
-.badge-error::before { background: var(--accent-red); }
+.badge-running::before {
+    background: var(--accent-blue);
+}
+
+.badge-success::before {
+    background: var(--accent-green);
+}
+
+.badge-error::before {
+    background: var(--accent-red);
+}
 
 /* Comparison Table */
 .comparison-table {
-     width: 100%;
+    width: 100%;
     border-collapse: collapse;
     font-size: 13px;
 }
 
-.comparison-table th, .comparison-table td {
+.comparison-table th,
+.comparison-table td {
     padding: 10px 12px;
     border-bottom: 1px solid var(--border-color);
     text-align: left;
@@ -772,6 +787,39 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.progress-step-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(96, 165, 250, 0.3);
+    border-top-color: #60A5FA;
+    border-radius: 50%;
+    animation: spin-progress 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.progress-spinner.hidden {
+    display: none;
+}
+
+@keyframes spin-progress {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .progress-step-text {

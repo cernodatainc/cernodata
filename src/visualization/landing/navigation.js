@@ -73,3 +73,19 @@ function updateSuggestedPlan() {
     if (primaryBadge) primaryBadge.textContent = primary;
     if (fallbackBadge) fallbackBadge.textContent = fallback;
 }
+
+/**
+ * No-op UI hook for initializing the guided Custom OCR Preset Builder modal in the Web Hub.
+ */
+function initCustomPresetBuilderModal() {
+    // TODO(TASK-207): Render the 'Add / Connect Custom OCR Preset' modal with the community OCR recipe
+    // selector (TASK-208), local app / web service inputs, and 'Test Connection' button.
+}
+
+/**
+ * No-op UI hook for initializing the interactive Document Cleanup & Postprocessing checklist card.
+ */
+function initPostprocessingChecklistCard() {
+    // TODO(TASK-506): Bind visual checkboxes in the Web Hub for stripping company letterheads (TASK-502),
+    // rejoining hyphenated line breaks (TASK-503), removing watermarks (TASK-504), and redacting PII (TASK-505).
+}

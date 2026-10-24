@@ -4,7 +4,7 @@
  * Reusable UI presentation components and HTML templates for the inspector pane,
  * DOM element tree cards, and single-node property editors.
  */
- 
+
 /**
  * Colour palette shared with the rest of the UI (landing.css / data_shape_config.css).
  * Tints (*Bg / *Border) are light variants of the accent colours used for badges and notices.
@@ -31,7 +31,7 @@ const INSPECTOR_PALETTE = {
     redBorder: '#E8C3BE',
     purple: '#6B4E9B'
 };
- 
+
 /**
  * Returns inline style string for a small status badge in the given colour variant.
  *
@@ -52,7 +52,7 @@ function inspectorBadgeStyle(variant) {
     };
     return base + (variants[variant] || variants.neutral);
 }
- 
+
 /**
  * Renders HTML markup for the unselected inspector placeholder state.
  *
@@ -70,7 +70,7 @@ function renderEmptySelectionComponent() {
         </div>
     `;
 }
- 
+
 /**
  * Renders HTML markup for quality violations attached to a selected node.
  *
@@ -89,18 +89,18 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
                 <span class="badge-status" style="${inspectorBadgeStyle('muted')}">Violation inspector</span>
             </div>
             ${nodeViols.map((v, vIdx) => {
-                const isFixed = !!v.is_fixed || !!node.is_fixed || activePresetIndex === 1;
-                const isSupp = isSuppressed(v);
-                const canFix = !!(v.suggested_correction || v.suggestion);
-                const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
-                let statusHtml = `<span style="font-size:11px; font-weight:500; color:${p.red};">${escapeHtml(v.severity || 'WARNING')}</span>`;
-                if (isFixed) {
-                    statusHtml = `<span class="badge-status" style="${inspectorBadgeStyle('green')}">Fixed</span>`;
-                } else if (isSupp) {
-                    statusHtml = `<span class="badge-status" style="${inspectorBadgeStyle('green')}">Accepted (false positive)</span>`;
-                }
- 
-                return `
+        const isFixed = !!v.is_fixed || !!node.is_fixed || activePresetIndex === 1;
+        const isSupp = isSuppressed(v);
+        const canFix = !!(v.suggested_correction || v.suggestion);
+        const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
+        let statusHtml = `<span style="font-size:11px; font-weight:500; color:${p.red};">${escapeHtml(v.severity || 'WARNING')}</span>`;
+        if (isFixed) {
+            statusHtml = `<span class="badge-status" style="${inspectorBadgeStyle('green')}">Fixed</span>`;
+        } else if (isSupp) {
+            statusHtml = `<span class="badge-status" style="${inspectorBadgeStyle('green')}">Accepted (false positive)</span>`;
+        }
+
+        return `
                     <div class="selected-viol-item" style="border-top: ${vIdx > 0 ? `1px solid ${p.border}` : 'none'}; padding-top: ${vIdx > 0 ? '8px' : '0'}; margin-top: ${vIdx > 0 ? '8px' : '0'};">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -146,11 +146,11 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
                         </div>
                     </div>
                 `;
-            }).join('')}
+    }).join('')}
         </div>
     `;
 }
- 
+
 /**
  * Renders HTML markup for the merged element audit banner if the node is merged.
  *
@@ -175,7 +175,7 @@ function renderMergedNodeBadgeComponent(node) {
         </div>
     `;
 }
- 
+
 /**
  * Renders HTML markup for the image cutout preview card and OCR action triggers.
  *
@@ -215,7 +215,7 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
         </div>
     `;
 }
- 
+
 /**
  * Renders complete HTML markup for the single-node inspector editor pane.
  *
@@ -229,10 +229,11 @@ function renderSingleNodeEditorComponent(node, options) {
     const mergedBadgeHtml = renderMergedNodeBadgeComponent(node);
     const cutoutCardHtml = renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, isCutoutUnskewed);
     const angleVal = (bbox.angle !== undefined && bbox.angle !== 0) ? bbox.angle : effectiveAngle;
- 
+
     return `
         <div class="editor-box">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+                <!-- TODO(TASK-701): Replace static (${escapeHtml(node.type)}) label with an interactive <select> dropdown to switch single-node semantic type. -->
                 <h4 style="margin-bottom:0;">Selected: <span style="font-family:monospace; font-weight:500;">${escapeHtml(node.node_id)}</span> <span style="color:${p.textMuted}; font-weight:400;">(${escapeHtml(node.type)})</span></h4>
                 <button style="background:transparent; border:none; color:${p.textMuted}; cursor:pointer; font-size:12px; padding:2px 4px;" onclick="clearSelection()">Close</button>
             </div>
@@ -258,10 +259,12 @@ function renderSingleNodeEditorComponent(node, options) {
                 ${isIncorrect ? 'Flagged as incorrect text (click to unmark)' : 'Mark as incorrect parsed text'}
             </button>
             <div style="margin-top:10px;">
+                <!-- TODO(TASK-705): When node.type === 'table_grid', mount an interactive HTML table cell/row/column editor (table_editor.js). -->
                 <label style="display:block; font-size:12px; color:${p.textPrimary}; font-weight:500; margin-bottom:2px;">Parsed text / correction note</label>
                 <textarea class="note-area" placeholder="Parsed text or manual correction note…" oninput="updateCorrectionNote('${node.node_id}', this.value)">${escapeHtml(noteVal)}</textarea>
             </div>
             <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                <!-- TODO(TASK-702): Add a "Split at Cursor" button to split merged headings/paragraphs into two vertically stacked DOMNodes. -->
                 <button class="action-btn action-btn-decollide-sm" style="color:${p.red}; border-color:${p.redBorder};" onclick="deleteDOMNode('${node.node_id}')">Delete element</button>
             </div>
             <div style="margin-top:10px; font-size:11px; color:${p.textMuted}; border-top:1px solid ${p.border}; padding-top:8px; line-height:1.45;">
@@ -270,7 +273,7 @@ function renderSingleNodeEditorComponent(node, options) {
         </div>
     `;
 }
- 
+
 /**
  * Renders HTML markup for an individual node card in the DOM list tree.
  *
@@ -282,7 +285,7 @@ function renderDOMTreeNodeCardComponent(node, options) {
     const { nodePage, isOnCurrentPage, isFixed, isIncorrect, hasActiveViol, hasSuppressedViol, displayText } = options;
     const pageBadgeVariant = isOnCurrentPage ? 'blueSolid' : 'muted';
     const isMerged = node.is_merged || (node.merged_from && node.merged_from.length > 0);
- 
+
     return `
         <div class="node-header">
             <span class="node-id">${escapeHtml(node.node_id)}</span>
@@ -298,7 +301,7 @@ function renderDOMTreeNodeCardComponent(node, options) {
         <div class="node-text">${escapeHtml(displayText)}</div>
     `;
 }
- 
+
 /**
  * Renders HTML markup for an empty DOM tree view.
  *

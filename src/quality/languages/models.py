@@ -60,6 +60,12 @@ def load_all_known_diacritics(config_path: Optional[str] = None) -> Set[str]:
 ALL_KNOWN_DIACRITICS: Set[str] = load_all_known_diacritics()
 
 
+@functools.lru_cache(maxsize=128)
+def _compile_anom_pattern(char: str) -> re.Pattern[str]:
+    """Compiles and caches word-boundary regex for anomalous character detection."""
+    return re.compile(rf"\b\w*{re.escape(char)}\w*\b", re.IGNORECASE)
+
+
 @dataclass
 class LanguageConfig:
     """
@@ -122,7 +128,8 @@ class LanguageConfig:
                 continue
             handled_chars.add(base_char)
 
-            matches = re.findall(rf"\b\w*{re.escape(base_char)}\w*\b", text, re.IGNORECASE)
+            pattern = _compile_anom_pattern(base_char)
+            matches = pattern.findall(text)
             for match in matches:
                 clean_match = match.strip(".,;:!?()[]\"'*")
                 if clean_match.lower() not in self.allowed_anomalous_tokens:

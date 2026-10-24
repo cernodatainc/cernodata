@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from http.server import SimpleHTTPRequestHandler
 from typing import Any, Dict, Optional, Sequence, Union
 
@@ -193,10 +194,7 @@ def copy_file_if_exists(src_path: str, dst_path: str) -> bool:
     if not os.path.exists(src_path):
         return False
     try:
-        with open(src_path, "rb") as f_in:
-            data = f_in.read()
-        with open(dst_path, "wb") as f_out:
-            f_out.write(data)
+        shutil.copy2(src_path, dst_path)
         return True
     except OSError as e:
         logger.warning("Could not copy asset from %s to %s: %s", src_path, dst_path, e)

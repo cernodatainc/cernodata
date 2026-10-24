@@ -20,7 +20,13 @@ class PresetPlanner:
     """Calculates preset confidence scores and generates pipeline execution plans."""
 
     def __init__(self, weights: Optional[Dict[str, Dict[str, float]]] = None) -> None:
+        # TODO(TASK-205): Merge user-defined `CustomPresetConfig` suitability weights into `self.weights`.
         self.weights = weights or DEFAULT_PRESET_WEIGHTS
+
+    def _apply_hardware_calibration(self, scores: Dict[str, float]) -> Dict[str, float]:
+        """No-op hook for adjusting preset scores using empirical hardware benchmark logs."""
+        # TODO(TASK-1004): Calibrate preset speed/suitability weights using empirical hardware timing logs.
+        return scores
 
     def calculate_scores(
         self,
@@ -48,7 +54,7 @@ class PresetPlanner:
             score = sum(matched_weights) / len(matched_weights)
             scores[preset_id] = round(score, 3)
 
-        return scores
+        return self._apply_hardware_calibration(scores)
 
     def suggest_preset_order(self, scores: Dict[str, float]) -> List[str]:
         """Sorts presets in descending order of calculated score."""

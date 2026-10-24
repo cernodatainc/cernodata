@@ -19,6 +19,8 @@ class DocumentDOM:
     source_filename: str
     total_pages: int
     nodes: List[DOMNode] = field(default_factory=list)
+    # TODO(stride): Add `metadata: Dict[str, Any] = field(default_factory=dict)` to DocumentDOM (and include it in
+    # to_dict/from_dict) to store document-level postprocessing audit trails, topic tags, and Ollama summaries.
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -86,6 +88,9 @@ class DocumentDOM:
         Merges two DOM nodes within this document.
         Combines bounding boxes, unifies content/text, and replaces both nodes with a single merged node.
         """
+        if node_id_1 == node_id_2:
+            raise ValueError(f"Cannot merge node '{node_id_1}' with itself.")
+
         idx1 = next((i for i, n in enumerate(self.nodes) if n.node_id == node_id_1), -1)
         idx2 = next((i for i, n in enumerate(self.nodes) if n.node_id == node_id_2), -1)
         if idx1 == -1 or idx2 == -1:
@@ -93,6 +98,12 @@ class DocumentDOM:
 
         n1 = self.nodes[idx1]
         n2 = self.nodes[idx2]
+
+        if n1.global_page_index != n2.global_page_index:
+            raise ValueError(
+                f"Cannot merge nodes across different pages: "
+                f"page {n1.global_page_index} vs page {n2.global_page_index}."
+            )
 
         upper, lower = (n1, n2) if (n1.bounding_box.y0 <= n2.bounding_box.y0) else (n2, n1)
         res_type = target_type if target_type is not None else upper.type
@@ -105,7 +116,9 @@ class DocumentDOM:
         )
 
         merged_content = dict(upper.content)
-        merged_content.update(lower.content)
+        for k, v in lower.content.items():
+            if k not in merged_content:
+                merged_content[k] = v
 
         if merged_text is not None:
             merged_content["raw_text"] = merged_text
@@ -144,3 +157,14 @@ class DocumentDOM:
                 new_nodes.append(n)
         self.nodes = new_nodes
         return merged_node
+
+    def merge_sliced_dom(
+        self,
+        sliced_dom: "DocumentDOM",
+        slice_to_global_map: Optional[Dict[int, int]] = None,
+    ) -> "DocumentDOM":
+        """No-op hook for splicing re-parsed page slices back into this DocumentDOM."""
+        # TODO(TASK-802): Splice re-parsed failing pages from `sliced_dom` into `self.nodes`
+        # while remapping `temp_slice_index` -> `global_page_index` via `slice_to_global_map`.
+        _ = (sliced_dom, slice_to_global_map)
+        return self

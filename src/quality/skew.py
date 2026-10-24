@@ -7,9 +7,12 @@ Uses OpenCV minimum-area oriented bounding box analysis (cv2.minAreaRect) to det
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Dict, List
 import numpy as np
+
+logger = logging.getLogger("cernodata.quality.skew")
 
 HAS_CV2 = False
 try:
@@ -58,7 +61,7 @@ def _render_page_images(pdf_path: str, scale: float) -> Dict[int, tuple]:
     page_images: Dict[int, tuple] = {}
     with open_pdf(pdf_path) as pdf:
         if pdf is None:
-            print(f"[WARN] Failed to open PDF for skew alignment ({pdf_path}).")
+            logger.warning("Failed to open PDF for skew alignment (%s).", pdf_path)
             return page_images
 
         for page_idx in range(len(pdf)):
@@ -71,7 +74,7 @@ def _render_page_images(pdf_path: str, scale: float) -> Dict[int, tuple]:
                 sy = img_np.shape[0] / page_h if page_h > 0 else scale
                 page_images[page_no] = (img_np, sx, sy)
             except Exception as e:
-                print(f"[WARN] Page {page_no} render error in skew alignment: {e}")
+                logger.warning("Page %s render error in skew alignment: %s", page_no, e)
     return page_images
 
 

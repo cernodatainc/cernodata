@@ -40,12 +40,22 @@ def resolve_pdf_path(path: str) -> str:
 
 
 def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
-    """Finds an available TCP port starting from start_port."""
+    """
+    Finds an available TCP port starting from start_port by testing bind availability.
+    Falls back to an OS-assigned ephemeral port if the scanned range is exhausted.
+    """
     for port in range(start_port, start_port + max_attempts):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("127.0.0.1", port))
                 return port
-    return start_port
+            except OSError:
+                continue
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
 
 
 def mkdirs(

@@ -29,6 +29,12 @@ class TestVisualization(unittest.TestCase):
         if os.path.exists(out_paths[0]):
             os.remove(out_paths[0])
 
+    def test_visualizer_streaming_backgrounds_nonexistent(self):
+        visualizer = PageVisualizer(dpi=72)
+        backgrounds = list(visualizer._iter_pdf_page_backgrounds("non_existent.pdf"))
+        self.assertEqual(len(backgrounds), 0)
+        self.assertIsNone(visualizer._render_pdf_page_backgrounds("non_existent.pdf"))
+
 
 if __name__ == "__main__":
     unittest.main()

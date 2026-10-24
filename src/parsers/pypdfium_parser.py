@@ -13,6 +13,7 @@ from typing import List, Any, Optional, Tuple
 
 from src.utils import resolve_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
+from src.dom.enums import DOMNodeType
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
 from src.parsers.pdf_utils import open_pdf
 
@@ -52,13 +53,13 @@ def _classify_digital_node_type(text: str, is_first_on_page: bool) -> str:
     """Classifies extracted digital text as heading or paragraph."""
     is_short = len(text.split()) < 8
     is_title_case = text.isupper() or text.istitle()
-    return "heading" if (is_first_on_page and is_short and is_title_case) else "paragraph"
+    return DOMNodeType.HEADING.value if (is_first_on_page and is_short and is_title_case) else DOMNodeType.PARAGRAPH.value
 
 
 def _classify_ocr_node_type(text: str, is_first_line: bool) -> str:
     """Classifies OCR line text as heading or paragraph."""
     is_short = len(text.split()) < 8
-    return "heading" if (is_first_line and is_short) else "paragraph"
+    return DOMNodeType.HEADING.value if (is_first_line and is_short) else DOMNodeType.PARAGRAPH.value
 
 
 class PyPdfiumParser:

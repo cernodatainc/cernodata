@@ -139,6 +139,7 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("Parsing Progress", content)
         self.assertIn("Preset Results", content)
         self.assertIn("Previous Runs", content)
+        self.assertIn("id=\"progressSpinner\"", content)
 
         # Verify global picker dropdown bar has been removed
         self.assertNotIn("run-selector-card", content)

@@ -8,11 +8,14 @@ PDF crops, and extensible custom OCR engine backends.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from PIL import Image
+
+logger = logging.getLogger("cernodata.parsers.section_ocr")
 
 from src.dom.bounding_box import BoundingBox
 from src.parsers.ocr_imaging import crop_pdf_region, normalize_to_pil
@@ -76,11 +79,21 @@ class SectionOCRParser:
                 }
             )
         except Exception as ex:
-            print(f"[WARN] RapidOCR torch engine initialization failed: {ex}")
+            logger.warning("RapidOCR torch engine initialization failed: %s", ex)
             try:
                 return RapidOCR()
             except Exception:
                 return None
+
+    def _create_cli_subprocess_engine(self) -> Optional[Any]:
+        """No-op hook for creating a CLI subprocess custom OCR engine."""
+        # TODO(TASK-202): Allow `SectionOCRParser` to wrap a user-defined CLI subprocess OCR preset (`CustomPresetConfig`).
+        return None
+
+    def _create_http_endpoint_engine(self) -> Optional[Any]:
+        """No-op hook for creating a remote HTTP microservice custom OCR engine."""
+        # TODO(TASK-203): Allow `SectionOCRParser` to wrap a remote HTTP microservice OCR endpoint (`HttpPresetAdapter`).
+        return None
 
     def _create_engine(self) -> Optional[Any]:
         """Creates engine using registered engine_factory or fallback default."""
@@ -90,6 +103,9 @@ class SectionOCRParser:
             except Exception as ex:
                 print(f"[WARN] Custom OCR engine factory failed: {ex}")
                 return None
+        custom_engine = self._create_cli_subprocess_engine() or self._create_http_endpoint_engine()
+        if custom_engine is not None:
+            return custom_engine
         return self._create_default_engine()
 
     def _get_engine(self) -> Optional[Any]:

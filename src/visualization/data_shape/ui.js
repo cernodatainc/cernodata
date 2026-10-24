@@ -127,3 +127,14 @@ function showBanner(text, type) {
 function escapeHtml(str) {
     return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+/**
+ * No-op UI hook for rendering the interactive Dataset Topic Balance questionnaire card in the Wizard.
+ *
+ * @param {Object|null} skewReport - Topic distribution skew summary from /api/calculate_scores.
+ */
+function renderCorpusBalanceQuestionnaireCard(skewReport) {
+    // TODO(TASK-606): Render the visual topic proportion bars (e.g. Topic A vs. Topic B) and 3-option
+    // plain-English intent selector (Keep as-is vs. Balance equally vs. Auto-deduplicate & cap) in the Wizard UI.
+    void skewReport;
+}

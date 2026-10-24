@@ -16,6 +16,8 @@ class DOMNodeType(str, Enum):
     HEADER_FOOTER = "header_footer"
     MULTI_COLUMN_GROUP = "multi_column_group"
     TEXT = "text"
+    # TODO(stride): Add LIST_ITEM = "list_item", PAGE_HEADER = "page_header", and FOOTER = "footer"
+    # so CompanyHeaderFooterStripper (TASK-502) and Markdown exporters (TASK-303) can distinguish them cleanly.
 
     def __str__(self) -> str:
         return str(self.value)

@@ -17,6 +17,20 @@ from src.pipeline.orchestrator import run_pipeline
 from src.pipeline.planner import PresetPlanner, DocumentPlan
 
 
+class CliProgressReporter:
+    """Terminal progress spinner and milestone reporter for CLI pipeline execution."""
+
+    def __init__(self) -> None:
+        self.spinner_chars: list[str] = ["|", "/", "-", "\\"]
+        self.spinner_idx: int = 0
+
+    def __call__(self, pct: int, step_desc: str, log_msg: str) -> None:
+        char = self.spinner_chars[self.spinner_idx % len(self.spinner_chars)]
+        self.spinner_idx += 1
+        sys.stdout.write(f"\r[{char}] [{pct:3d}%] {step_desc}\n")
+        sys.stdout.flush()
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
@@ -88,6 +102,7 @@ def main() -> None:
         print(f"[ERROR] Specified input file '{doc_input}' does not exist.")
         sys.exit(1)
 
+    progress_reporter = CliProgressReporter()
     result = run_pipeline(
         pdf_path=doc_input,
         target_threshold=args.target_threshold,
@@ -96,7 +111,8 @@ def main() -> None:
         align_skew=not args.no_align_skew,
         visualize=not args.no_visuals,
         output_dir=args.output_dir,
-        plan=active_plan
+        plan=active_plan,
+        progress_callback=progress_reporter,
     )
 
     print_summary(result)
