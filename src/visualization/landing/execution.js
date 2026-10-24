@@ -97,6 +97,8 @@ async function triggerRunPipeline(withPlan = false) {
  * Resets the progress bar, step cards, and milestone badges to initial state.
  */
 function resetProgressUI() {
+    const spinner = document.getElementById('progressSpinner');
+    if (spinner) spinner.classList.remove('hidden');
     document.getElementById('progressFillBar').style.width = '10%';
     document.getElementById('progressPercentText').textContent = '10%';
     document.getElementById('progressCurrentStepText').textContent = 'Starting ingestion...';
@@ -124,6 +126,13 @@ function startProgressPolling() {
             if (resp.ok) {
                 const data = await resp.json();
                 if (data) {
+                    const spinner = document.getElementById('progressSpinner');
+                    if (data.status === 'running') {
+                        if (spinner) spinner.classList.remove('hidden');
+                    } else if (data.status === 'completed' || data.status === 'error') {
+                        if (spinner) spinner.classList.add('hidden');
+                    }
+
                     if (data.progress !== undefined) {
                         document.getElementById('progressFillBar').style.width = data.progress + '%';
                         document.getElementById('progressPercentText').textContent = data.progress + '%';
@@ -171,6 +180,8 @@ function stopProgressPolling() {
  */
 function onPipelineCompleted(result) {
     stopProgressPolling();
+    const spinner = document.getElementById('progressSpinner');
+    if (spinner) spinner.classList.add('hidden');
     document.getElementById('progressFillBar').style.width = '100%';
     document.getElementById('progressPercentText').textContent = '100%';
     document.getElementById('progressCurrentStepText').textContent = 'Ingestion and verification finished.';
@@ -206,6 +217,10 @@ function onPipelineCompleted(result) {
  * @param {string} message - Descriptive status message.
  */
 function updateProgressStatus(status, message) {
+    const spinner = document.getElementById('progressSpinner');
+    if (spinner && (status === 'ERROR' || status === 'COMPLETED')) {
+        spinner.classList.add('hidden');
+    }
     const badge = document.getElementById('progressStatusBadge');
     if (badge) {
         badge.textContent = status;

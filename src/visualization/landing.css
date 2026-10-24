@@ -651,8 +651,35 @@ header {
 .progress-header-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     font-size: 12px;
     margin-bottom: 6px;
+}
+
+.progress-step-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(96, 165, 250, 0.3);
+    border-top-color: #60A5FA;
+    border-radius: 50%;
+    animation: spin-progress 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.progress-spinner.hidden {
+    display: none;
+}
+
+@keyframes spin-progress {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .progress-step-text {

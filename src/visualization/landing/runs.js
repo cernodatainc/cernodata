@@ -176,6 +176,8 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
         }
 
         // 3. Update Progress Tab
+        const spinner = document.getElementById('progressSpinner');
+        if (spinner) spinner.classList.add('hidden');
         const consoleEl = document.getElementById('progressLogConsole');
         if (consoleEl) {
             const conf = decision.overall_confidence !== undefined ? Number(decision.overall_confidence).toFixed(4) : '1.0000';

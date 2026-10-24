@@ -83,6 +83,46 @@ class TestPipelineEngine(unittest.TestCase):
             self.assertEqual(attempts[1]["status"], "ACCEPT")
             self.assertIn("detail", attempts[1])
 
+    def test_orchestrator_progress_callback_during_fallback(self):
+        from unittest.mock import patch
+
+        node_bad = DOMNode(
+            node_id="n1", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "piqtku w piqtku"}
+        )
+        dom_bad = DocumentDOM(document_id="doc_bad", source_filename="test.pdf", total_pages=1, nodes=[node_bad])
+
+        node_good = DOMNode(
+            node_id="n1", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "piątku w piątku"}
+        )
+        dom_good = DocumentDOM(document_id="doc_good", source_filename="test.pdf", total_pages=1, nodes=[node_good])
+
+        events = []
+        def progress_cb(pct: int, step_desc: str, log_msg: str) -> None:
+            events.append((pct, step_desc, log_msg))
+
+        with patch("src.pipeline.attempt_runner.parse_document", side_effect=[dom_bad, dom_good]), \
+             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
+
+            _ = run_pipeline(
+                pdf_path="test.pdf",
+                language="pl",
+                preset="docling_fast",
+                target_threshold=0.85,
+                progress_callback=progress_cb,
+            )
+
+        step_descriptions = [e[1] for e in events]
+        self.assertIn("running docling_fast", step_descriptions)
+        fallback_msgs = [desc for desc in step_descriptions if "confidence too low" in desc]
+        self.assertTrue(len(fallback_msgs) > 0)
+        self.assertIn("starting docling_deep", fallback_msgs[0])
+        self.assertIn("running docling_deep", step_descriptions)
+
 
 if __name__ == "__main__":
     unittest.main()

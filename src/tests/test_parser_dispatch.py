@@ -86,13 +86,27 @@ class TestModularParserDispatch(unittest.TestCase):
 
         notifier = PipelineProgressNotifier(callback)
         notifier.notify_initiation("doc.pdf", "docling_fast", "en")
+        notifier.notify_preset_execution("docling_fast")
         notifier.notify_verification()
+        notifier.notify_preset_switching(
+            target_preset="docling_deep",
+            current_preset="docling_fast",
+            confidence=0.54,
+            threshold=0.85,
+        )
+        notifier.notify_preset_execution("docling_deep", pct=80)
         notifier.notify_complete("ACCEPT", 0.95, 0)
 
-        self.assertEqual(len(events), 3)
+        self.assertEqual(len(events), 6)
         self.assertEqual(events[0][0], 20)
-        self.assertEqual(events[1][0], 65)
-        self.assertEqual(events[2][0], 100)
+        self.assertEqual(events[1][0], 40)
+        self.assertEqual(events[1][1], "running docling_fast")
+        self.assertEqual(events[2][0], 65)
+        self.assertEqual(events[3][0], 75)
+        self.assertEqual(events[3][1], "docling_fast confidence too low (0.54 < 0.85), starting docling_deep")
+        self.assertEqual(events[4][0], 80)
+        self.assertEqual(events[4][1], "running docling_deep")
+        self.assertEqual(events[5][0], 100)
 
     def test_progress_notifier_swallows_callback_exceptions(self):
         def bad_callback(pct: int, step: str, msg: str) -> None:
@@ -112,6 +126,25 @@ class TestModularParserDispatch(unittest.TestCase):
         self.assertEqual(cfg.preset, "docling_deep")
         self.assertEqual(cfg.target_threshold, 0.88)
         self.assertIsNone(plan)
+
+    def test_cli_progress_reporter(self):
+        import io
+        from unittest.mock import patch
+        from src.main import CliProgressReporter
+
+        reporter = CliProgressReporter()
+        buf = io.StringIO()
+        with patch("sys.stdout.write", side_effect=buf.write):
+            reporter(40, "running docling_fast", "Running extraction with preset 'docling_fast'...")
+            reporter(75, "docling_fast confidence too low (0.54 < 0.85), starting docling_deep", "switch")
+            reporter(80, "running docling_deep", "Running extraction with preset 'docling_deep'...")
+
+        out = buf.getvalue()
+        self.assertIn("running docling_fast", out)
+        self.assertIn("docling_fast confidence too low (0.54 < 0.85), starting docling_deep", out)
+        self.assertIn("running docling_deep", out)
+        self.assertIn("[|]", out)
+        self.assertIn("[/]", out)
 
 
 if __name__ == "__main__":

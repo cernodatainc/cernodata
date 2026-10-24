@@ -100,10 +100,16 @@ class FallbackLoopHandler:
 
         action = decision.get("decision_tree", {}).get("action")
 
+        score_val = float(decision.get("overall_confidence", 0.0) or 0.0)
+        thresh_val = float(config.target_threshold)
+        curr_preset = config.preset
+
         # Path B: Parameter Wiggling on current preset if delta is large
         if action == "PATH_B_WIGGLE_PARAMETERS":
+            w_msg = f"{curr_preset} confidence too low ({score_val:.2f} < {thresh_val:.2f}), wiggling parameters"
             if notifier is not None:
-                notifier.notify_parameter_wiggling(config.preset)
+                notifier.notify_parameter_wiggling(curr_preset, reason=w_msg)
+                notifier.notify(72, f"running {curr_preset} (wiggled parameters)", f"Running attempt with wiggled parameters for '{curr_preset}'...")
 
             wiggled_scale, wiggled_force_ocr = self._resolve_wiggle_parameters(config)
             target_pdf = self._slice_failing_pages_if_needed(pdf_path, dom, violations)
@@ -132,8 +138,11 @@ class FallbackLoopHandler:
             elif next_candidate:
                 # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
                 plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
+                w_conf = float(w_decision.get("overall_confidence", 0.0) or 0.0)
+                switch_msg = f"{curr_preset} confidence too low after wiggling ({w_conf:.2f} < {thresh_val:.2f}), starting {next_candidate}"
                 if notifier is not None:
-                    notifier.notify_preset_switching(next_candidate, reason="Wiggling exhausted.")
+                    notifier.notify_preset_switching(next_candidate, reason=switch_msg)
+                    notifier.notify_preset_execution(next_candidate, pct=80)
 
                 fallback_config = replace(config, preset=next_candidate)
                 fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
@@ -161,11 +170,13 @@ class FallbackLoopHandler:
             else:
                 plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
 
+            switch_msg = f"{curr_preset} confidence too low ({score_val:.2f} < {thresh_val:.2f}), starting {next_candidate}"
             if notifier is not None:
                 notifier.notify_preset_switching(
                     next_candidate,
-                    reason=f"Target threshold not met ({decision.get('overall_confidence')} < {config.target_threshold})."
+                    reason=switch_msg,
                 )
+                notifier.notify_preset_execution(next_candidate, pct=80)
 
             fallback_config = replace(config, preset=next_candidate)
             fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
