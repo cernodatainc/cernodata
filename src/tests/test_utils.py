@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.utils import mkdirs
+from src.utils import mkdirs, find_available_port
 
 
 class TestUtils(unittest.TestCase):
@@ -55,3 +55,12 @@ class TestUtils(unittest.TestCase):
         self.assertFalse(target_path.exists())
         mkdirs(target_path)
         self.assertTrue(target_path.is_dir())
+
+    def test_find_available_port(self) -> None:
+        port = find_available_port(start_port=8200, max_attempts=20)
+        self.assertGreaterEqual(port, 8200)
+
+    def test_find_available_port_fallback(self) -> None:
+        # With 0 attempts, loop will not run and should fallback to port 0 ephemeral allocation
+        port = find_available_port(start_port=8200, max_attempts=0)
+        self.assertGreater(port, 0)
