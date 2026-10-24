@@ -52,7 +52,7 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
     close_parens = text.count(')')
     open_brackets = text.count('[')
     close_brackets = text.count(']')
-    unmatched_parens = max(0, close_parens - open_parens) + max(0, close_brackets - open_brackets)
+    unmatched_parens = abs(close_parens - open_parens) + abs(close_brackets - open_brackets)
 
     soup_chars = unmatched_parens * 2
     noise_tokens: List[str] = []

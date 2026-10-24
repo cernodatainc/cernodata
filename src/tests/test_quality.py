@@ -220,6 +220,25 @@ class TestQualityMetrics(unittest.TestCase):
         page_conf = evaluate_page_confidence([node], language="pl")
         self.assertLess(page_conf, 1.0)
 
+    def test_unclosed_opening_delimiters_contribute_to_garbage_noise(self):
+        from src.quality.garbage_helpers import evaluate_punctuation_soup_and_noise
+        soup_chars, noise_tokens = evaluate_punctuation_soup_and_noise("((( unclosed text", ["(((", "unclosed", "text"])
+        self.assertGreater(soup_chars, 0)
+
+    def test_diacritic_violation_single_replacement(self):
+        node = DOMNode(
+            node_id="n_repeat", type="paragraph", global_page_index=1, temp_slice_index=1,
+            bounding_box=BoundingBox(10, 10, 100, 50),
+            content={"raw_text": "Infolinia czynna w piqtku. Pytanie qqq."}
+        )
+        dom = DocumentDOM(document_id="doc_repeat", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        violations = detect_quality_violations(dom, language="pl")
+        sub_viols = [v for v in violations if v.get("rule_type") == "ocr_character_substitution"]
+        self.assertGreater(len(sub_viols), 0)
+        # Should replace only the first occurrence 'piqtku' -> 'piątku' without altering trailing 'qqq'
+        self.assertIn("piątku", sub_viols[0]["suggestion"])
+        self.assertIn("qqq", sub_viols[0]["suggestion"])
+
     def test_quality_config_json_loading(self):
         from src.quality.evaluator import load_quality_config
         cfg = load_quality_config()

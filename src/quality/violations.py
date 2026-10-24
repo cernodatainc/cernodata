@@ -13,9 +13,12 @@ from src.quality.garbage import compute_garbage_details
 from src.quality.language_config import LanguageConfig, get_language_config
 from src.quality.evaluator import load_quality_config
 
-def _check_garbage_violations(node: DOMNode, raw_text: str, counter: int) -> List[Dict[str, Any]]:
+def _check_garbage_violations(
+    node: DOMNode, raw_text: str, counter: int, threshold: Optional[float] = None
+) -> List[Dict[str, Any]]:
     """Checks node raw text for OCR damage, punctuation soup, or corrupt characters."""
-    threshold = load_quality_config().get("garbage_threshold", 0.05)
+    if threshold is None:
+        threshold = float(load_quality_config().get("garbage_threshold", 0.05))
 
     details = compute_garbage_details(raw_text)
     gb_ratio = details["ratio"]
@@ -59,7 +62,7 @@ def _check_diacritic_violations(
 
     # 1. OCR character substitution anomalies (e.g. 'q' -> 'ą' in Polish)
     for anom_char, match_snippet, suggested in config.find_anomalous_substitutions(raw_text):
-        rewrite = raw_text.replace(match_snippet, suggested) if match_snippet else raw_text
+        rewrite = raw_text.replace(match_snippet, suggested, 1) if match_snippet else raw_text
         violations.append({
             "violation_id": f"viol_p{node.global_page_index}_v{counter + len(violations)}",
             "global_page_index": node.global_page_index,
@@ -77,7 +80,7 @@ def _check_diacritic_violations(
 
     # 2. Conflicting foreign diacritics (e.g. 'ö' umlaut in Polish hinted context)
     for conf_char, match_snippet, suggested in config.find_diacritic_conflicts(raw_text):
-        rewrite = raw_text.replace(match_snippet, suggested) if match_snippet else raw_text
+        rewrite = raw_text.replace(match_snippet, suggested, 1) if match_snippet else raw_text
         violations.append({
             "violation_id": f"viol_p{node.global_page_index}_v{counter + len(violations)}",
             "global_page_index": node.global_page_index,
@@ -137,6 +140,7 @@ def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") 
     else:
         fixed_config = get_language_config(lang)
 
+    garbage_threshold = float(load_quality_config().get("garbage_threshold", 0.05))
     counter = 1
 
     for node in dom.nodes:
@@ -151,7 +155,7 @@ def detect_quality_violations(dom: DocumentDOM, language: Optional[str] = "en") 
                     existing_suppressed[ev["rule_type"]] = is_supp
 
         raw_text = node.content.get("raw_text", "")
-        gb_viols = _check_garbage_violations(node, raw_text, counter)
+        gb_viols = _check_garbage_violations(node, raw_text, counter, threshold=garbage_threshold)
         counter += len(gb_viols)
 
         cfg = page_configs.get(node.global_page_index) if is_auto else fixed_config
