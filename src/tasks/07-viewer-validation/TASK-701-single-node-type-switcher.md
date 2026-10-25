@@ -1,5 +1,7 @@
 # TASK-701: Single-node type switcher in the viewer inspector
 
+Status: Done
+
 In `src/visualization/viewer/js/inspector_components.js:187` (`renderSingleNodeEditorComponent`), a selected node's type (`heading`, `paragraph`, `table_grid`, `figure`, `header_footer`) is rendered as plain text:
 ```html
 <h4>Selected: ${escapeHtml(node.node_id)} (${escapeHtml(node.type)})</h4>
