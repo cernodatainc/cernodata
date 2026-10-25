@@ -423,25 +423,6 @@
     </main>
 
     <script src="/landing.js"></script>
-    <script>
-        (function () {
-            var frame = document.getElementById('viewerFrame');
-
-            function hideViewerHeader() {
-                try {
-                    var doc = frame.contentDocument;
-                    if (!doc || !doc.head || doc.getElementById('embedOverrides')) return;
-                    var style = doc.createElement('style');
-                    style.id = 'embedOverrides';
-                    style.textContent = 'body > header { display: none !important; }';
-                    doc.head.appendChild(style);
-                } catch (e) { }
-            }
-
-            frame.addEventListener('load', hideViewerHeader);
-            hideViewerHeader();
-        })();
-    </script>
 </body>
 
 </html>

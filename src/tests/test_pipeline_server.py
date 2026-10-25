@@ -58,11 +58,8 @@ class TestPipelineServer(unittest.TestCase):
             json.dump({"document_path": "src/e2e/Document 8.pdf", "primary_preset": "docling_fast", "target_threshold": 0.82}, f)
             with open(os.path.join(out_dir, "plan_execution_result.json"), "w", encoding="utf-8") as f:
                 json.dump({
-                    "document_path": "src/e2e/Document 8.pdf",
-                    "chosen_preset": "docling_fast",
-                    "status": "ACCEPT",
-                    "overall_confidence": 0.95,
-                    "per_page_confidence": {"1": 0.95},
+                    "document_path": "src/e2e/Document 8.pdf", "chosen_preset": "docling_fast",
+                    "status": "ACCEPT", "overall_confidence": 0.95, "per_page_confidence": {"1": 0.95},
                     "decision": {"chosen_preset": "docling_fast", "status": "ACCEPT", "overall_confidence": 0.95, "per_page_confidence": {"1": 0.95}},
                     "violations": []
                 }, f)
@@ -485,18 +482,15 @@ class TestPipelineServer(unittest.TestCase):
         # POST /api/rerun requesting the same preset should hit cache without re-executing pipeline
         preset = resp["run"]["decision"].get("chosen_preset", "docling_fast")
         pdf_path = resp["run"].get("document_path", "src/e2e/Document 8.pdf")
-        rerun_status, rerun_data = self._post_json("/api/rerun", {
-            "preset": preset,
-            "pdf_path": pdf_path,
-            "force": False,
-        })
+        rerun_status, rerun_data = self._post_json(
+            "/api/rerun", {"preset": preset, "pdf_path": pdf_path, "force": False}
+        )
         self.assertEqual(rerun_status, 200)
         self.assertTrue(rerun_data.get("success"))
         self.assertTrue(rerun_data.get("cached"))
         self.assertEqual(rerun_data.get("preset"), preset)
-        self.assertIn("dom", rerun_data)
-        self.assertIn("violations", rerun_data)
-        self.assertIn("decision", rerun_data)
+        for key in ("dom", "violations", "decision"):
+            self.assertIn(key, rerun_data)
 
     def test_viewer_html_endpoint_with_page_param(self) -> None:
         status, content, headers = self._get("/viewer?output_dir=output&page=2")

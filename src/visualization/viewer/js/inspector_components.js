@@ -230,11 +230,24 @@ function renderSingleNodeEditorComponent(node, options) {
     const cutoutCardHtml = renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, isCutoutUnskewed);
     const angleVal = (bbox.angle !== undefined && bbox.angle !== 0) ? bbox.angle : effectiveAngle;
 
+    const domNodeTypes = ['paragraph', 'heading', 'table_grid', 'figure', 'header_footer', 'multi_column_group'];
+    if (node.type && !domNodeTypes.includes(node.type)) {
+        domNodeTypes.push(node.type);
+    }
+    const typeOptionsHtml = domNodeTypes.map(t => {
+        const sel = (t === node.type) ? ' selected' : '';
+        return `<option value="${escapeHtml(t)}"${sel}>${escapeHtml(t)}</option>`;
+    }).join('');
+
     return `
         <div class="editor-box">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
-                <!-- TODO(TASK-701): Replace static (${escapeHtml(node.type)}) label with an interactive <select> dropdown to switch single-node semantic type. -->
-                <h4 style="margin-bottom:0;">Selected: <span style="font-family:monospace; font-weight:500;">${escapeHtml(node.node_id)}</span> <span style="color:${p.textMuted}; font-weight:400;">(${escapeHtml(node.type)})</span></h4>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <h4 style="margin-bottom:0;">Selected: <span style="font-family:monospace; font-weight:500;">${escapeHtml(node.node_id)}</span></h4>
+                    <select id="selectNodeType_${escapeHtml(node.node_id)}" class="type-filter" style="font-size:12px; padding:2px 6px;" onchange="onNodeTypeChange('${node.node_id}', this.value)" title="Change node semantic type">
+                        ${typeOptionsHtml}
+                    </select>
+                </div>
                 <button style="background:transparent; border:none; color:${p.textMuted}; cursor:pointer; font-size:12px; padding:2px 4px;" onclick="clearSelection()">Close</button>
             </div>
             ${mergedBadgeHtml}
@@ -291,7 +304,7 @@ function renderDOMTreeNodeCardComponent(node, options) {
             <span class="node-id">${escapeHtml(node.node_id)}</span>
             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
                 <span class="badge-status" style="${inspectorBadgeStyle(pageBadgeVariant)}">P${nodePage}</span>
-                <span class="node-type">${escapeHtml(node.type)}</span>
+                <span class="node-type type-${escapeHtml(node.type)}">${escapeHtml(node.type)}</span>
                 ${isFixed ? '<span class="node-corrected-badge">Fixed</span>' : ''}
                 ${isMerged ? `<span class="badge-status" style="${inspectorBadgeStyle('blue')}">Merged</span>` : ''}
                 ${!hasActiveViol && hasSuppressedViol ? `<span class="badge-status" style="${inspectorBadgeStyle('green')}">Accepted</span>` : ''}

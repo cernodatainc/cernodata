@@ -112,6 +112,18 @@ header {
 .brand-doc-meta {
     font-size: 12px;
     color: var(--ui-text-muted);
+    border-left: 1px solid var(--ui-border);
+    padding-left: 12px;
+}
+
+#domSourceFilename {
+    color: var(--ui-text);
+    font-weight: 500;
+}
+
+#domDocId {
+    color: var(--ui-text);
+    font-family: var(--font-mono);
 }
  
 .header-back-btn {
@@ -529,6 +541,51 @@ select.type-filter option:checked {
     cursor: pointer;
     transition: fill 0.15s ease, stroke 0.15s ease;
 }
+
+.node-bbox.type-heading {
+    stroke: #6D28D9;
+    fill: rgba(109, 40, 217, 0.08);
+}
+
+.node-bbox.type-heading:hover {
+    fill: rgba(109, 40, 217, 0.22);
+}
+
+.node-bbox.type-table_grid {
+    stroke: #0D9488;
+    fill: rgba(13, 148, 136, 0.08);
+}
+
+.node-bbox.type-table_grid:hover {
+    fill: rgba(13, 148, 136, 0.22);
+}
+
+.node-bbox.type-figure {
+    stroke: #D97706;
+    fill: rgba(217, 119, 6, 0.08);
+}
+
+.node-bbox.type-figure:hover {
+    fill: rgba(217, 119, 6, 0.22);
+}
+
+.node-bbox.type-header_footer {
+    stroke: #64748B;
+    fill: rgba(100, 116, 139, 0.08);
+}
+
+.node-bbox.type-header_footer:hover {
+    fill: rgba(100, 116, 139, 0.22);
+}
+
+.node-bbox.type-multi_column_group {
+    stroke: #4F46E5;
+    fill: rgba(79, 70, 229, 0.08);
+}
+
+.node-bbox.type-multi_column_group:hover {
+    fill: rgba(79, 70, 229, 0.22);
+}
  
 .node-bbox:hover {
     fill: rgba(25, 118, 210, 0.22);
@@ -789,6 +846,36 @@ select.type-filter option:checked {
     background: #F7F6F3;
     border: 1px solid var(--ui-border);
     color: var(--ui-text-muted);
+}
+
+.node-type.type-heading {
+    color: #6D28D9;
+    border-color: #DDD6FE;
+    background: #F5F3FF;
+}
+
+.node-type.type-table_grid {
+    color: #0D9488;
+    border-color: #99F6E4;
+    background: #F0FDFA;
+}
+
+.node-type.type-figure {
+    color: #D97706;
+    border-color: #FDE68A;
+    background: #FFFBEB;
+}
+
+.node-type.type-header_footer {
+    color: #64748B;
+    border-color: #CBD5E1;
+    background: #F8FAFC;
+}
+
+.node-type.type-multi_column_group {
+    color: #4F46E5;
+    border-color: #C7D2FE;
+    background: #EEF2FF;
 }
  
 .node-text {

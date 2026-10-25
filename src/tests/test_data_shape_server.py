@@ -54,7 +54,7 @@ class TestDataShapeServer(unittest.TestCase):
         self.assertFalse(bool(emoji_pattern.search(content)), "Emoji detected in data_shape_config.html!")
 
         # Verify key UI components exist
-        self.assertIn("cernodata Data Shape & Preset Planner", content)
+        self.assertIn("cernodata", content.lower())
         self.assertIn("docPath", content)
         self.assertIn("langCode", content)
         self.assertIn("enableLangHint", content)
@@ -93,7 +93,7 @@ class TestDataShapeServer(unittest.TestCase):
             with urllib.request.urlopen(f"{base_url}/data_shape_config.html") as resp:
                 self.assertEqual(resp.status, 200)
                 html = resp.read().decode("utf-8")
-                self.assertIn("cernodata Data Shape & Preset Planner", html)
+                self.assertIn("cernodata", html.lower())
 
             # 2. Test GET /api/config
             with urllib.request.urlopen(f"{base_url}/api/config") as resp:

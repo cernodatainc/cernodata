@@ -176,7 +176,7 @@ function renderSVGOverlays() {
         const isIncorrect = !!node.is_incorrect_text;
  
         if (showBbox) {
-            let classNames = ['node-bbox'];
+            let classNames = ['node-bbox', `type-${node.type || 'paragraph'}`];
             if (isSelected) classNames.push('highlighted');
             if (hasViol) classNames.push('violation');
             if (isIncorrect) classNames.push('incorrect-text');
@@ -185,7 +185,8 @@ function renderSVGOverlays() {
             const poly = createSvgElem('polygon', {
                 points: pointsStr,
                 class: classNames.join(' '),
-                id: `svg-${node.node_id}`
+                id: `svg-${node.node_id}`,
+                'data-node-type': node.type || 'paragraph'
             });
             poly.onmousedown = (e) => {
                 if (isDrawSectionMode) return;

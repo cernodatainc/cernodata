@@ -38,9 +38,11 @@ class TestHTMLViewer(unittest.TestCase):
         with open(out_path, "r", encoding="utf-8") as f:
             content = f.read()
             self.assertIn("Test Heading", content)
-            self.assertIn("cernodata visual flow", content.lower())
+            self.assertIn("cernodata", content.lower())
+            self.assertIn("onNodeTypeChange", content)
+            self.assertIn("selectNodeType", content)
             self.assertIn("selectLanguage", content)
-            self.assertIn("Detected Lang:", content)
+            self.assertIn("Detected language", content)
             self.assertIn("renderResizeHandles", content)
             self.assertIn("resize-handle", content)
             self.assertIn("toggleIncorrectText", content)

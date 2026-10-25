@@ -189,6 +189,36 @@ function toggleIncorrectText(nodeId) {
 }
 
 /**
+ * Updates a DOM node's semantic type, re-renders tree card and overlays,
+ * and persists changes.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {string} newType - New DOMNodeType value.
+ */
+async function onNodeTypeChange(nodeId, newType) {
+    if (!domData || !domData.nodes) return;
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node || node.type === newType) return;
+
+    node.type = newType;
+    renderDOMTree();
+    renderSVGOverlays();
+    renderSelectedEditor();
+
+    if (typeof saveAnnotations === 'function') {
+        await saveAnnotations(true);
+    }
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = `[OK] Changed element '${nodeId}' type to '${newType}'. Persisted.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    }
+}
+
+/**
  * Updates manual user correction note text for a node.
  *
  * @param {string} nodeId - Target DOM node identifier.
