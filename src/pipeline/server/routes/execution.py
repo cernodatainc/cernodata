@@ -135,6 +135,21 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             viols_count = len(viols)
 
             t_end = datetime.now().strftime("%H:%M:%S")
+            from src.pipeline.server.run_mappings import record_run_mapping
+
+            record_run_mapping(
+                document_path=pdf_path,
+                run_id=session.output_dir or "output",
+                output_dir=session.output_dir or "output",
+                preset=preset,
+                status=status,
+                confidence=score,
+                violations_count=viols_count,
+                total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
+                timestamp=t_end,
+                repo_root=session.repo_root,
+            )
+
             session.set_completed(
                 status=status,
                 confidence=score,

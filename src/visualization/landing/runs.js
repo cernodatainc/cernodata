@@ -197,6 +197,11 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
         if (typeof loadRunsGrid === 'function') {
             loadRunsGrid(run.document_name);
         }
+        if (typeof renderExplorerUI === 'function') {
+            currentExplorerRun = activeRunOutputDir;
+            if (run.document_path) currentExplorerDoc = run.document_path;
+            renderExplorerUI();
+        }
         if (shouldReloadViewer && typeof reloadViewerIframe === 'function') {
             reloadViewerIframe(targetPage, outputDir);
         }

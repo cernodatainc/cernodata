@@ -183,6 +183,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             self._handle_load_run(query_params.get("output_dir", [""])[0])
         elif raw_path == "/api/documents":
             send_json_response(self, 200, {"documents": self.session.get_available_documents()})
+        elif raw_path == "/api/file_run_mappings":
+            send_json_response(self, 200, self.session.get_file_run_mappings())
         elif raw_path == "/api/progress":
             send_json_response(self, 200, self.session.get_progress())
         elif raw_path == "/api/results":

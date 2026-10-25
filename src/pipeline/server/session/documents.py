@@ -12,6 +12,7 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from src.pipeline.server.discovery import build_runs_grid, find_previous_runs
+from src.pipeline.server.run_mappings import get_file_run_mappings
 
 
 class DocumentsMixin:
@@ -55,3 +56,9 @@ class DocumentsMixin:
             if not target and self.pdf_path:
                 target = os.path.basename(self.pdf_path)
             return build_runs_grid(runs, target_file=target)
+
+    def get_file_run_mappings(self) -> Dict[str, Any]:
+        """Thread-safe retrieval of input files and historical parsing run mappings."""
+        with self._lock:
+            docs = self.get_available_documents()
+            return get_file_run_mappings(self.repo_root, available_docs=docs)

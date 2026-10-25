@@ -9,6 +9,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof updateSuggestedPlan === 'function') updateSuggestedPlan();
     if (typeof loadAvailableDocuments === 'function') loadAvailableDocuments();
     if (typeof loadPreviousRunsList === 'function') loadPreviousRunsList();
+    if (typeof loadFileRunMappings === 'function') loadFileRunMappings();
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof loadRunsGrid === 'function') loadRunsGrid();
 

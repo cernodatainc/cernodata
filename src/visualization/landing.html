@@ -100,21 +100,76 @@
         <section class="tab-section active" id="secInput">
             <div class="card card-flush">
 
-                <div class="card-section">
-                    <div class="form-group">
-                        <label class="form-label" for="docSelectDropdown">Document</label>
-                        <div class="doc-input-row">
-                            <select class="form-select doc-select-dropdown" id="docSelectDropdown"
-                                onchange="if(this.value) selectDocPath(this.value);">
-                                <option value="">-- Choose Discovered Document --</option>
-                            </select>
-                            <input type="text" class="form-input doc-path-input" id="inpPdfPath"
-                                value="src/e2e/Document 8.pdf" placeholder="Enter a file path">
+                <div class="card-section explorer-section">
+                    <div class="explorer-card">
+                        <div class="explorer-header">
+                            <div class="explorer-title-group">
+                                <span class="form-label explorer-title">Workspace documents &amp; parsing runs</span>
+                                <span class="explorer-subtitle">File explorer and run history mapping</span>
+                            </div>
+                            <div class="explorer-toolbar">
+                                <input type="text" class="form-input explorer-search-input" id="explorerSearchInput"
+                                    placeholder="Filter files, file sets, or runs..." oninput="onExplorerSearchChanged(this.value)">
+                                <button class="btn btn-secondary btn-sm" onclick="refreshExplorerData()" title="Rescan files and runs">Rescan</button>
+                            </div>
                         </div>
-                        <div class="file-chips" id="docChipsContainer">
-                            <span class="file-chips-label">Discovered files:</span>
-                            <button class="chip-btn" onclick="selectDocPath('src/e2e/Document 8.pdf')">src/e2e/Document
-                                8.pdf</button>
+
+                        <div class="explorer-active-bar">
+                            <div class="explorer-breadcrumb">
+                                <span class="breadcrumb-label">Active Document:</span>
+                                <span class="breadcrumb-doc" id="explorerActiveDocText">src/e2e/Document 8.pdf</span>
+                                <span class="breadcrumb-sep">&gt;</span>
+                                <span class="breadcrumb-label">Active Run:</span>
+                                <span class="breadcrumb-run" id="explorerActiveRunText">output</span>
+                            </div>
+                            <!-- Hidden inputs for compatibility with execution workflows -->
+                            <input type="hidden" id="inpPdfPath" value="src/e2e/Document 8.pdf">
+                            <select id="docSelectDropdown" class="hidden-compat"></select>
+                            <div id="docChipsContainer" class="hidden-compat"></div>
+                        </div>
+
+                        <div class="explorer-layout">
+                            <!-- Left Pane: Quasi File Explorer Tree -->
+                            <div class="explorer-tree-pane">
+                                <div class="explorer-pane-header">
+                                    <span>Explorer</span>
+                                    <span class="explorer-badge" id="explorerDocCount">Loading...</span>
+                                </div>
+                                <div class="explorer-tree-content" id="explorerTreeContainer">
+                                    <div class="explorer-empty-msg">Loading workspace documents...</div>
+                                </div>
+                            </div>
+
+                            <!-- Right Pane: Coherent Run Mappings Table -->
+                            <div class="explorer-table-pane">
+                                <div class="explorer-pane-header">
+                                    <span id="explorerTableTitle">Parsing runs for active document</span>
+                                    <div class="explorer-view-actions">
+                                        <button class="btn-text-toggle active" id="btnFilterActiveDoc" onclick="toggleExplorerTableScope(true)">Selected Document</button>
+                                        <button class="btn-text-toggle" id="btnFilterAllDocs" onclick="toggleExplorerTableScope(false)">All Documents</button>
+                                    </div>
+                                </div>
+                                <div class="explorer-table-container">
+                                    <table class="comparison-table explorer-runs-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Document / Set</th>
+                                                <th>Run ID</th>
+                                                <th>Preset</th>
+                                                <th>Score</th>
+                                                <th>Viols</th>
+                                                <th>Status</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="explorerTableBody">
+                                            <tr>
+                                                <td colspan="7" class="table-empty-message">Loading run mappings...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

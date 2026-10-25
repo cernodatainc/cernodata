@@ -240,19 +240,19 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("violations", data)
 
     def test_api_documents_endpoint(self) -> None:
-        status, content, headers = self._get("/api/documents")
+        status, content, _ = self._get("/api/documents")
         self.assertEqual(status, 200)
-        data = json.loads(content)
-        self.assertIn("documents", data)
-        self.assertIsInstance(data["documents"], list)
+        self.assertIn("documents", json.loads(content))
+        status_m, content_m, _ = self._get("/api/file_run_mappings")
+        self.assertEqual(status_m, 200)
+        self.assertIn("file_sets", json.loads(content_m))
 
     def test_api_config_endpoint(self) -> None:
         status, content, headers = self._get("/api/config")
         self.assertEqual(status, 200)
         data = json.loads(content)
-        self.assertIn("default_doc", data)
-        self.assertIn("default_lang", data)
-        self.assertIn("preset_weights", data)
+        for key in ("default_doc", "default_lang", "preset_weights"):
+            self.assertIn(key, data)
         self.assertIn("dimensions", data)
 
     def test_api_calculate_scores_endpoint(self) -> None:

@@ -204,6 +204,7 @@ function onPipelineCompleted(result) {
 
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof reloadViewerIframe === 'function') reloadViewerIframe();
+    if (typeof loadFileRunMappings === 'function') loadFileRunMappings();
 
     setTimeout(() => {
         switchNavTab('results');
