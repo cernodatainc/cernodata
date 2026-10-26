@@ -81,10 +81,11 @@ class FallbackLoopHandler:
         curr_score: float,
         next_score: float,
         notifier: Optional[PipelineProgressNotifier] = None,
+        plan: Optional[DocumentPlan] = None,
     ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
         """
         Executes dual-path fallback loops if primary preset output is not accepted.
-        Supports Path B (parameter wiggling) and Path A (preset switching).
+        Supports Path B (parameter wiggling) and Path A (multi-candidate preset switching).
         """
         if config.preset == "docling_deep":
             decision["chosen_preset"] = "docling_deep"
@@ -99,13 +100,12 @@ class FallbackLoopHandler:
             return dom, decision, violations
 
         action = decision.get("decision_tree", {}).get("action")
-
-        score_val = float(decision.get("overall_confidence", 0.0) or 0.0)
         thresh_val = float(config.target_threshold)
         curr_preset = config.preset
 
         # Path B: Parameter Wiggling on current preset if delta is large
         if action == "PATH_B_WIGGLE_PARAMETERS":
+            score_val = float(decision.get("overall_confidence", 0.0) or 0.0)
             w_msg = f"{curr_preset} confidence too low ({score_val:.2f} < {thresh_val:.2f}), wiggling parameters"
             if notifier is not None:
                 notifier.notify_parameter_wiggling(curr_preset, reason=w_msg)
@@ -129,76 +129,76 @@ class FallbackLoopHandler:
             )))
 
             if w_decision.get("is_accepted"):
-                dom, decision, violations = w_dom, w_decision, w_violations
-                decision["decision_tree"] = {
+                decision_res = dict(w_decision)
+                decision_res["decision_tree"] = {
                     "action": "ACCEPT_OUTPUT",
                     "preset_executed": config.preset,
                     "reason": f"Preset '{config.preset}' reached target threshold after parameter wiggling.",
                 }
-            elif next_candidate:
-                # Parameter wiggling exhausted, proceed to Path A (Preset Switch)
-                plan_note = f"Executed fallback '{next_candidate}' after parameter wiggling."
-                w_conf = float(w_decision.get("overall_confidence", 0.0) or 0.0)
-                switch_msg = f"{curr_preset} confidence too low after wiggling ({w_conf:.2f} < {thresh_val:.2f}), starting {next_candidate}"
-                if notifier is not None:
-                    notifier.notify_preset_switching(next_candidate, reason=switch_msg)
-                    notifier.notify_preset_execution(next_candidate, pct=80)
+                return w_dom, decision_res, w_violations
+            dom, decision, violations = w_dom, w_decision, w_violations
 
-                fallback_config = replace(config, preset=next_candidate)
-                fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
-                    pdf_path, fallback_config
-                )
-                fb_decision["decision_tree"] = {
-                    "action": "PATH_A_SWITCH_PRESET",
-                    "preset_executed": next_candidate,
-                    "fallback_triggered": True,
-                    "reason": plan_note,
-                    "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
-                    "detail": plan_note,
-                }
-                attempts.append(dict(self.attempt_runner.make_attempt_record(
-                    len(attempts) + 1, next_candidate, fb_decision, fb_violations,
-                    action=fb_decision.get("decision_tree", {}).get("action"),
-                    reason=fb_decision.get("decision_tree", {}).get("reason"),
-                    detail=plan_note,
-                )))
-                dom, decision, violations = fb_dom, fb_decision, fb_violations
-        elif next_candidate:
-            # Path A: Switch to next candidate preset
-            if part_of_plan:
-                plan_note = f"Executed plan fallback '{next_candidate}'."
-            else:
-                plan_note = f"'{next_candidate}' wasn't part of the original plan, falling back to it."
+        # Path A: Multi-candidate preset switching loop
+        candidates: List[str] = []
+        if plan and plan.fallback_queue:
+            for item in plan.fallback_queue:
+                cand_name = str(item.get("preset") if isinstance(item, dict) else item)
+                if cand_name and cand_name not in candidates:
+                    candidates.append(cand_name)
+        if next_candidate and next_candidate not in candidates:
+            candidates.append(next_candidate)
+        if "docling_deep" not in candidates and config.preset != "docling_deep":
+            candidates.append("docling_deep")
 
-            switch_msg = f"{curr_preset} confidence too low ({score_val:.2f} < {thresh_val:.2f}), starting {next_candidate}"
+        # Exclude presets that cannot execute or have already been attempted
+        attempted_presets = {a.get("preset") for a in attempts}
+        attempted_presets.add(config.preset)
+        remaining_candidates = [c for c in candidates if c not in attempted_presets and c != "vision_llm_direct"]
+
+        for candidate in remaining_candidates:
+            if decision.get("is_accepted"):
+                break
+
+            in_plan = bool(plan and any(
+                str(item.get("preset") if isinstance(item, dict) else item) == candidate
+                for item in (plan.fallback_queue or [])
+            ))
+            plan_note = f"Executed plan fallback '{candidate}'." if in_plan else f"'{candidate}' wasn't part of the original plan, falling back to it."
+            prev_conf = float(decision.get("overall_confidence", 0.0) or 0.0)
+            switch_msg = f"{curr_preset} confidence too low ({prev_conf:.2f} < {thresh_val:.2f}), starting {candidate}"
+
             if notifier is not None:
-                notifier.notify_preset_switching(
-                    next_candidate,
-                    reason=switch_msg,
-                )
-                notifier.notify_preset_execution(next_candidate, pct=80)
+                notifier.notify_preset_switching(candidate, reason=switch_msg)
+                notifier.notify_preset_execution(candidate, pct=80)
 
-            fallback_config = replace(config, preset=next_candidate)
+            fallback_config = replace(config, preset=candidate)
             fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
                 pdf_path, fallback_config
             )
+
+            if candidate == "docling_deep":
+                fb_decision["chosen_preset"] = "docling_deep"
+                fb_decision["is_accepted"] = True
+                fb_decision["status"] = "ACCEPT"
+
             fb_decision["decision_tree"] = {
                 "action": "PATH_A_SWITCH_PRESET",
-                "preset_executed": next_candidate,
+                "preset_executed": candidate,
                 "fallback_triggered": True,
                 "reason": (
-                    f"Initial preset '{config.preset}' fell below threshold "
-                    f"({decision.get('overall_confidence')} < {config.target_threshold}). {plan_note}"
+                    f"Previous preset fell below threshold "
+                    f"({prev_conf:.4f} < {config.target_threshold}). {plan_note}"
                 ),
-                "plan_status": "in_plan" if part_of_plan else "dynamic_fallback",
+                "plan_status": "in_plan" if in_plan else "dynamic_fallback",
                 "detail": plan_note,
             }
             attempts.append(dict(self.attempt_runner.make_attempt_record(
-                len(attempts) + 1, next_candidate, fb_decision, fb_violations,
+                len(attempts) + 1, candidate, fb_decision, fb_violations,
                 action=fb_decision.get("decision_tree", {}).get("action"),
                 reason=fb_decision.get("decision_tree", {}).get("reason"),
                 detail=plan_note,
             )))
             dom, decision, violations = fb_dom, fb_decision, fb_violations
+            curr_preset = candidate
 
         return dom, decision, violations

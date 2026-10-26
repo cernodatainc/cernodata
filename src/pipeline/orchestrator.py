@@ -77,6 +77,7 @@ class PipelineOrchestrator:
             curr_score=curr_score,
             next_score=next_score,
             notifier=notifier,
+            plan=plan,
         )
 
         decision["attempts"] = attempts

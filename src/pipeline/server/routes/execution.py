@@ -97,17 +97,51 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         plan_obj: Optional[DocumentPlan] = None
         if with_plan and plan_config:
             planner = PresetPlanner()
+            raw_tax = str(plan_config.get("taxonomy", "standard"))
+            tax_map = {
+                "standard": "general_text",
+                "scanned_archive": "scanned_form",
+                "form_heavy": "financial_report",
+                "multi_column_dense": "multicolumn_article",
+            }
+            resolved_tax = tax_map.get(raw_tax, raw_tax)
+
+            raw_target = str(plan_config.get("target_use_case", "rag_vector_search"))
+            lat = str(plan_config.get("latency", "balanced"))
+            if lat == "maximum_accuracy" or raw_target in ("audit_compliance", "slm_fine_tuning"):
+                resolved_target = "high_precision_structure"
+            else:
+                resolved_target = "rapid_approximate"
+
             criteria = PlannerCriteria(
-                taxonomy=plan_config.get("taxonomy", "standard"),
-                target=plan_config.get("target_use_case", "rag_vector_search"),
+                taxonomy=resolved_tax,
+                target=resolved_target,
                 security=plan_config.get("security", "air_gapped_local"),
             )
+
+            primary_override = plan_config.get("primary_preset")
+            fallback_override = plan_config.get("fallback_preset")
+            override_order: Optional[List[str]] = None
+            if primary_override and fallback_override:
+                all_known = ["docling_fast", "docling_deep", "pypdfium_rapidocr", "vision_llm_direct"]
+                rest = [p for p in all_known if p not in (primary_override, fallback_override)]
+                override_order = [str(primary_override), str(fallback_override)] + rest
+            elif primary_override:
+                override_order = [str(primary_override)]
+
             plan_obj = planner.create_plan(
                 document_path=pdf_path,
                 criteria=criteria,
                 language=language,
                 target_threshold=threshold,
+                override_order=override_order,
             )
+            if plan_obj and plan_obj.primary_preset:
+                preset = plan_obj.primary_preset
+        elif not with_plan and self.session.submitted_plan:
+            plan_obj = self.session.submitted_plan
+            if plan_obj and plan_obj.primary_preset:
+                preset = plan_obj.primary_preset
 
         session = self.session
         on_progress = session.make_progress_callback()
@@ -257,3 +291,26 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             logger.info("Client disconnected before rerun result could be returned.")
         except Exception as e:
             send_json_response(self, 500, {"success": False, "error": str(e)})  # type: ignore[arg-type]
+
+    def _handle_post_remove_run(self, payload: Dict[str, Any]) -> None:
+        """
+        Removes a recorded pipeline parsing run from disk and persistent mappings.
+
+        Args:
+            payload: JSON request body containing run_id and optional output_dir / document_path.
+        """
+        run_id = str(payload.get("run_id", "")).strip()
+        output_dir = payload.get("output_dir")
+        document_path = payload.get("document_path")
+        if not run_id and not output_dir:
+            send_json_response(self, 400, {"success": False, "error": "Missing run_id or output_dir"})  # type: ignore[arg-type]
+            return
+
+        from src.pipeline.server.run_mappings import remove_run_mapping
+        success = remove_run_mapping(
+            run_id=run_id,
+            output_dir=output_dir,
+            document_path=document_path,
+            repo_root=self.session.repo_root,
+        )
+        send_json_response(self, 200, {"success": success, "run_id": run_id})  # type: ignore[arg-type]

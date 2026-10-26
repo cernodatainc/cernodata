@@ -4,7 +4,7 @@
  * Quasi file explorer and run mapping repository interface.
  * Displays discovered document files, file sets, and associated historical parsing runs
  * in a hierarchical tree and coherent mappings comparison table.
- * Includes interactive per-page confidence scores and violations inspection with direct jump-to-page navigation.
+ * Includes interactive per-page confidence scores, run removal, and navigation to planning.
  */
 
 window.explorerData = null;
@@ -24,9 +24,32 @@ async function loadFileRunMappings() {
         if (!resp.ok) return;
         const data = await resp.json();
         window.explorerData = data;
+        const allMappings = data.all_mappings || [];
 
-        if (!currentExplorerDoc && data.active_file) currentExplorerDoc = data.active_file;
-        if (!currentExplorerRun && data.active_run) currentExplorerRun = data.active_run;
+        if (currentExplorerDoc) {
+            const docExists = allMappings.some(m => m.file_path === currentExplorerDoc);
+            if (!docExists) {
+                currentExplorerDoc = data.active_file || '';
+            }
+        } else if (data.active_file) {
+            currentExplorerDoc = data.active_file;
+        }
+
+        const activeDocEntry = allMappings.find(m => m.file_path === currentExplorerDoc);
+        if (activeDocEntry) {
+            if (activeDocEntry.runs && activeDocEntry.runs.length > 0) {
+                const hasRun = activeDocEntry.runs.some(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
+                if (!hasRun) {
+                    currentExplorerRun = activeDocEntry.latest_run
+                        ? (activeDocEntry.latest_run.output_dir || activeDocEntry.latest_run.run_id)
+                        : (activeDocEntry.runs[0].output_dir || activeDocEntry.runs[0].run_id);
+                }
+            } else {
+                currentExplorerRun = '';
+            }
+        } else {
+            currentExplorerRun = data.active_run || '';
+        }
 
         if (expandedFolders.size === 0 && data.file_sets) {
             data.file_sets.forEach(fs => expandedFolders.add(fs.file_set));
@@ -45,6 +68,13 @@ async function loadFileRunMappings() {
 function getSelectedRunObject() {
     if (!window.explorerData || !currentExplorerRun) return null;
     const allMappings = window.explorerData.all_mappings || [];
+    if (currentExplorerDoc) {
+        const activeDoc = allMappings.find(m => m.file_path === currentExplorerDoc);
+        if (activeDoc && activeDoc.runs) {
+            const found = activeDoc.runs.find(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
+            if (found) return { doc: activeDoc, run: found };
+        }
+    }
     for (const doc of allMappings) {
         if (doc.runs) {
             const found = doc.runs.find(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
@@ -68,7 +98,7 @@ function renderExplorerUI() {
     const docCountBadge = document.getElementById('explorerDocCount');
 
     if (docBreadcrumb) docBreadcrumb.textContent = currentExplorerDoc || 'None selected';
-    if (runBreadcrumb) runBreadcrumb.textContent = currentExplorerRun || 'output';
+    if (runBreadcrumb) runBreadcrumb.textContent = currentExplorerRun || 'None selected';
     if (hiddenDocInput && currentExplorerDoc) hiddenDocInput.value = currentExplorerDoc;
     if (docCountBadge) docCountBadge.textContent = `${data.total_documents} files · ${data.total_runs} runs`;
 
@@ -107,12 +137,10 @@ function renderExplorerTree() {
         html += `
             <div class="tree-node tree-folder-node">
                 <div class="tree-row folder-row" onclick="toggleExplorerFolder('${escapeHtml(fs.file_set)}')">
-                    <span class="tree-toggle-arrow">${folderArrow}</span>
-                    <span class="tree-icon folder-icon">[DIR]</span>
+                    <span class="tree-toggle-arrow">${folderArrow}</span><span class="tree-icon folder-icon">[DIR]</span>
                     <span class="tree-label folder-label">${escapeHtml(fs.file_set)}</span>
                     <span class="tree-node-badge">${matchingDocs.length}</span>
-                </div>
-        `;
+                </div>`;
 
         if (isExpanded) {
             html += '<div class="tree-children">';
@@ -127,8 +155,7 @@ function renderExplorerTree() {
                             <span class="tree-icon file-icon">[PDF]</span>
                             <span class="tree-label file-label" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span>
                             <span class="tree-runs-count-badge" title="${runCount} past runs">${runCount} runs</span>
-                        </div>
-                `;
+                        </div>`;
 
                 if (doc.runs && doc.runs.length > 0) {
                     html += '<div class="tree-runs-list">';
@@ -148,10 +175,8 @@ function renderExplorerTree() {
                                 <span class="run-preset-tag">${escapeHtml(r.preset)}</span>
                                 <span class="run-score-badge ${statusClass}">${scoreDisplay}</span>
                                 <span class="run-name-label" title="${escapeHtml(r.run_id)}">${escapeHtml(r.run_id)}</span>
-                            </div>
-                        `;
+                            </div>`;
 
-                        // Per-page nodes are hidden by default and unfolded only when toggled
                         if (hasPages && isRunExpanded) {
                             html += '<div class="tree-pages-list">';
                             for (let p = 1; p <= r.total_pages; p++) {
@@ -167,13 +192,18 @@ function renderExplorerTree() {
                                         <span class="tree-icon page-icon">[P${p}]</span>
                                         <span class="run-score-badge ${pStatus}">${Number(conf).toFixed(2)}</span>
                                         <span class="page-viols-badge">${viols}v</span>
-                                    </div>
-                                `;
+                                    </div>`;
                             }
                             html += '</div>';
                         }
                     });
                     html += '</div>';
+                } else {
+                    html += `
+                        <div class="tree-empty-runs-prompt" onclick="event.stopPropagation(); selectDocAndOpenPlanning('${escapeHtml(doc.file_path)}')">
+                            <span class="tree-prompt-plus">+</span>
+                            <span class="tree-prompt-label">Parsing planning</span>
+                        </div>`;
                 }
                 html += '</div>';
             });
@@ -245,16 +275,10 @@ function renderRunMappingsTable() {
         if (!run) {
             rowsHtml += `
                 <tr class="${rowClass}">
-                    <td>
-                        <span class="file-name-cell">${escapeHtml(doc.file_name)}</span>
-                        <span class="file-set-tag">${escapeHtml(doc.file_set)}</span>
-                    </td>
+                    <td><span class="file-name-cell">${escapeHtml(doc.file_name)}</span> <span class="file-set-tag">${escapeHtml(doc.file_set)}</span></td>
                     <td colspan="5" class="table-muted-cell">Not parsed yet</td>
-                    <td>
-                        <button class="btn btn-secondary btn-xs" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">Select</button>
-                    </td>
-                </tr>
-            `;
+                    <td><button class="btn btn-secondary btn-xs" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">Select</button></td>
+                </tr>`;
             return;
         }
 
@@ -263,14 +287,8 @@ function renderRunMappingsTable() {
 
         rowsHtml += `
             <tr class="${rowClass}" onclick="selectExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')">
-                <td>
-                    <span class="file-name-cell" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span>
-                    <span class="file-set-tag">${escapeHtml(doc.file_set)}</span>
-                </td>
-                <td>
-                    <span class="run-id-cell">${escapeHtml(run.run_id)}</span>
-                    ${run.timestamp ? `<span class="run-time-sub">${escapeHtml(run.timestamp)}</span>` : ''}
-                </td>
+                <td><span class="file-name-cell" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span> <span class="file-set-tag">${escapeHtml(doc.file_set)}</span></td>
+                <td><span class="run-id-cell">${escapeHtml(run.run_id)}</span>${run.timestamp ? `<span class="run-time-sub">${escapeHtml(run.timestamp)}</span>` : ''}</td>
                 <td><span class="preset-badge">${escapeHtml(run.preset)}</span></td>
                 <td><span class="score-num">${scoreFormatted}</span></td>
                 <td><span class="viol-count">${run.violations_count || 0}</span></td>
@@ -278,9 +296,9 @@ function renderRunMappingsTable() {
                 <td class="action-cell">
                     <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); selectExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')">Load run</button>
                     <button class="btn btn-subtle btn-xs" onclick="event.stopPropagation(); selectExplorerDoc('${escapeHtml(doc.file_path)}')">Select</button>
+                    <button class="btn btn-subtle btn-xs btn-remove-run" onclick="event.stopPropagation(); removeExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')" title="Remove run to force replay">Remove</button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
     });
 
     tbody.innerHTML = rowsHtml;
@@ -296,11 +314,7 @@ function renderPageBreakdownSection() {
 
     const selected = getSelectedRunObject();
     if (!selected || !selected.run) {
-        container.innerHTML = `
-            <div class="page-breakdown-empty">
-                <span class="page-breakdown-empty-text">Select a run from the table or explorer tree to inspect page-by-page confidence scores and violations.</span>
-            </div>
-        `;
+        container.innerHTML = '<div class="page-breakdown-empty"><span class="page-breakdown-empty-text">Select a run from the table or explorer tree to inspect page-by-page confidence scores and violations.</span></div>';
         return;
     }
 
@@ -321,34 +335,17 @@ function renderPageBreakdownSection() {
 
         cardsHtml += `
             <div class="page-breakdown-card" onclick="chooseRunAndPage('${escapeHtml(run.run_id)}', ${p})" title="Open page ${p} in viewer">
-                <div class="page-card-header">
-                    <span class="page-card-title">Page ${p}</span>
-                    <span class="page-card-score ${scoreCls}">${Number(pConf).toFixed(4)}</span>
-                </div>
-                <div class="page-card-body">
-                    <span class="page-card-viols ${violCls}">${pViols} viols</span>
-                    <button class="btn btn-xs btn-secondary page-card-btn">View page</button>
-                </div>
-            </div>
-        `;
+                <div class="page-card-header"><span class="page-card-title">Page ${p}</span><span class="page-card-score ${scoreCls}">${Number(pConf).toFixed(4)}</span></div>
+                <div class="page-card-body"><span class="page-card-viols ${violCls}">${pViols} viols</span><button class="btn btn-xs btn-secondary page-card-btn">View page</button></div>
+            </div>`;
     }
 
     container.innerHTML = `
         <div class="page-breakdown-header">
-            <div class="page-breakdown-title">
-                Page breakdown: <span class="breakdown-run-id">${escapeHtml(run.run_id)}</span>
-                <span class="breakdown-doc-sub">(${escapeHtml(doc.file_name)} · ${escapeHtml(run.preset)})</span>
-            </div>
-            <div class="page-breakdown-meta">
-                <span class="score-num breakdown-score-text">Score: ${scoreFormatted}</span>
-                <span class="badge ${statusClass}">${escapeHtml(run.status)}</span>
-                <span class="breakdown-viols-sub">${run.violations_count || 0} total viols</span>
-            </div>
+            <div class="page-breakdown-title">Page breakdown: <span class="breakdown-run-id">${escapeHtml(run.run_id)}</span> <span class="breakdown-doc-sub">(${escapeHtml(doc.file_name)} · ${escapeHtml(run.preset)})</span></div>
+            <div class="page-breakdown-meta"><span class="score-num breakdown-score-text">Score: ${scoreFormatted}</span> <span class="badge ${statusClass}">${escapeHtml(run.status)}</span> <span class="breakdown-viols-sub">${run.violations_count || 0} total viols</span></div>
         </div>
-        <div class="page-cards-grid">
-            ${cardsHtml}
-        </div>
-    `;
+        <div class="page-cards-grid">${cardsHtml}</div>`;
 }
 
 /**
@@ -360,15 +357,9 @@ function renderPageBreakdownSection() {
  */
 async function chooseRunAndPage(runId, pageNo) {
     const targetPage = parseInt(pageNo, 10) || 1;
-    if (typeof choosePreviousRun === 'function') {
-        await choosePreviousRun(runId, targetPage, false);
-    }
-    if (typeof switchNavTab === 'function') {
-        switchNavTab('results');
-    }
-    if (typeof reloadViewerIframe === 'function') {
-        reloadViewerIframe(targetPage, runId);
-    }
+    if (typeof choosePreviousRun === 'function') await choosePreviousRun(runId, targetPage, false);
+    if (typeof switchNavTab === 'function') switchNavTab('results');
+    if (typeof reloadViewerIframe === 'function') reloadViewerIframe(targetPage, runId);
 }
 
 /**
@@ -381,7 +372,31 @@ function selectExplorerDoc(docPath) {
     const inp = document.getElementById('inpPdfPath');
     if (inp) inp.value = docPath;
     if (typeof selectDocPath === 'function') selectDocPath(docPath);
+
+    const allMappings = (window.explorerData && window.explorerData.all_mappings) || [];
+    const docEntry = allMappings.find(m => m.file_path === docPath);
+    if (docEntry && docEntry.runs && docEntry.runs.length > 0) {
+        const hasCurrentRun = docEntry.runs.some(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
+        if (!hasCurrentRun) {
+            currentExplorerRun = docEntry.latest_run
+                ? (docEntry.latest_run.output_dir || docEntry.latest_run.run_id)
+                : (docEntry.runs[0].output_dir || docEntry.runs[0].run_id);
+        }
+    } else {
+        currentExplorerRun = '';
+    }
+
     renderExplorerUI();
+}
+
+/**
+ * Selects an input document and switches directly to the Planning tab.
+ *
+ * @param {string} docPath - Normalized document filesystem path.
+ */
+function selectDocAndOpenPlanning(docPath) {
+    selectExplorerDoc(docPath);
+    if (typeof switchNavTab === 'function') switchNavTab('plan');
 }
 
 /**
@@ -399,8 +414,27 @@ async function selectExplorerRun(runId, outputDir, docPath) {
         if (inp) inp.value = docPath;
     }
     renderExplorerUI();
-    if (typeof choosePreviousRun === 'function') {
-        await choosePreviousRun(outputDir || runId);
+    if (typeof choosePreviousRun === 'function') await choosePreviousRun(outputDir || runId);
+}
+
+/**
+ * Removes a specific parsing run from the repository and refreshes explorer data.
+ *
+ * @param {string} runId - Run identifier.
+ * @param {string} outputDir - Output directory path.
+ * @param {string} docPath - Associated document path.
+ */
+async function removeExplorerRun(runId, outputDir, docPath) {
+    try {
+        await fetch('/api/remove_run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ run_id: runId, output_dir: outputDir, document_path: docPath }),
+        });
+        if (currentExplorerRun === runId || currentExplorerRun === outputDir) currentExplorerRun = '';
+        await loadFileRunMappings();
+    } catch (e) {
+        console.log('[WARN] Failed to remove run:', e);
     }
 }
 
@@ -410,11 +444,8 @@ async function selectExplorerRun(runId, outputDir, docPath) {
  * @param {string} folder - Folder name.
  */
 function toggleExplorerFolder(folder) {
-    if (expandedFolders.has(folder)) {
-        expandedFolders.delete(folder);
-    } else {
-        expandedFolders.add(folder);
-    }
+    if (expandedFolders.has(folder)) expandedFolders.delete(folder);
+    else expandedFolders.add(folder);
     renderExplorerTree();
 }
 
@@ -424,11 +455,8 @@ function toggleExplorerFolder(folder) {
  * @param {string} runId - Run identifier.
  */
 function toggleExplorerRunPages(runId) {
-    if (expandedRuns.has(runId)) {
-        expandedRuns.delete(runId);
-    } else {
-        expandedRuns.add(runId);
-    }
+    if (expandedRuns.has(runId)) expandedRuns.delete(runId);
+    else expandedRuns.add(runId);
     renderExplorerTree();
 }
 
@@ -441,10 +469,8 @@ function toggleExplorerTableScope(showSelectedOnly) {
     filterTableBySelectedDoc = showSelectedOnly;
     const btnActive = document.getElementById('btnFilterActiveDoc');
     const btnAll = document.getElementById('btnFilterAllDocs');
-
     if (btnActive) btnActive.className = showSelectedOnly ? 'btn-text-toggle active' : 'btn-text-toggle';
     if (btnAll) btnAll.className = showSelectedOnly ? 'btn-text-toggle' : 'btn-text-toggle active';
-
     renderRunMappingsTable();
 }
 

@@ -183,12 +183,19 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
             const conf = decision.overall_confidence !== undefined ? Number(decision.overall_confidence).toFixed(4) : '1.0000';
             consoleEl.textContent = `--- [LOADED PREVIOUS RUN OUTPUT] ---\nDirectory: ${outputDir}\nDocument: ${run.document_path || 'N/A'}\nChosen Preset: ${decision.chosen_preset || 'N/A'}\nStatus: ${decision.status || 'ACCEPT'}\nConfidence: ${conf}\nQuality Violations: ${run.violations_count || 0}`;
         }
-        document.getElementById('progressFillBar').style.width = '100%';
-        document.getElementById('progressPercentText').textContent = '100%';
-        document.getElementById('progressCurrentStepText').textContent = `Loaded previous run: ${outputDir}`;
-        document.getElementById('progressStatusBadge').textContent = 'LOADED';
-        document.getElementById('progressStatusBadge').className = 'badge badge-success';
-        document.getElementById('navBadgeProgress').textContent = 'Loaded';
+        const fillBar = document.getElementById('progressFillBar');
+        if (fillBar) fillBar.style.width = '100%';
+        const pctText = document.getElementById('progressPercentText');
+        if (pctText) pctText.textContent = '100%';
+        const stepText = document.getElementById('progressCurrentStepText');
+        if (stepText) stepText.textContent = `Loaded previous run: ${outputDir}`;
+        const statusBadge = document.getElementById('progressStatusBadge');
+        if (statusBadge) {
+            statusBadge.textContent = 'LOADED';
+            statusBadge.className = 'badge badge-success';
+        }
+        const navBadge = document.getElementById('navBadgeProgress');
+        if (navBadge) navBadge.textContent = 'Loaded';
 
         // 4. Update Preset Results Tab
         if (typeof renderResultsTable === 'function') {

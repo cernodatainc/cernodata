@@ -147,6 +147,61 @@ class TestDoclingOCRPresets(unittest.TestCase):
             attempts = res["decision"]["attempts"]
             self.assertGreaterEqual(len(attempts), 1)
 
+    def test_pipeline_fallback_multi_step_continuation(self):
+        """Verifies pipeline continues down fallback queue when both primary and first fallback fail."""
+        from unittest.mock import patch
+        mock_dom = DocumentDOM(document_id="d1", source_filename="test_multi.pdf", total_pages=1, nodes=[
+            DOMNode(node_id="n1", type="text", global_page_index=1, temp_slice_index=1,
+                    bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Sample text"})
+        ])
+        planner = PresetPlanner()
+        plan = planner.create_plan(
+            document_path="test_multi.pdf",
+            taxonomy="general_text",
+            target="high_precision_structure",
+            security="air_gapped_local",
+            language="en",
+            target_threshold=0.85,
+            override_order=["docling_fast", "pypdfium_rapidocr", "docling_deep"],
+        )
+
+        def mock_eval_fn(*args, **kwargs):
+            config = kwargs.get("config") or (args[1] if len(args) > 1 else None)
+            preset = getattr(config, "preset", "docling_fast")
+            if preset in ("docling_fast", "pypdfium_rapidocr"):
+                return {
+                    "is_accepted": False,
+                    "overall_confidence": 0.35,
+                    "status": "TRIGGER_FALLBACK",
+                    "chosen_preset": preset,
+                    "decision_tree": {"action": "PATH_A_SWITCH_PRESET"},
+                }, []
+            return {
+                "is_accepted": True,
+                "overall_confidence": 0.95,
+                "status": "ACCEPT",
+                "chosen_preset": "docling_deep",
+                "decision_tree": {"action": "ACCEPT_OUTPUT"},
+            }, []
+
+        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
+             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
+             patch("src.pipeline.attempt_runner.evaluate_quality_and_decision_tree", side_effect=mock_eval_fn), \
+             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
+             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
+            res = run_pipeline(
+                pdf_path="test_multi.pdf",
+                plan=plan,
+                output_dir="test_output",
+                visualize=False,
+            )
+            attempts = res["decision"].get("attempts", [])
+            # Must have executed fallback chain to docling_deep
+            executed_presets = [a.get("preset") for a in attempts]
+            self.assertIn("docling_deep", executed_presets)
+            self.assertEqual(res["decision"].get("chosen_preset"), "docling_deep")
+
 
 if __name__ == "__main__":
     unittest.main()

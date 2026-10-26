@@ -59,11 +59,15 @@ async function triggerRunPipeline(withPlan = false) {
     };
 
     if (withPlan) {
+        const primBadge = document.getElementById('planPrimaryBadge');
+        const fbBadge = document.getElementById('planFallbackBadge');
         payload.plan_config = {
             taxonomy: document.getElementById('planTaxonomy').value,
             target_use_case: document.getElementById('planTarget').value,
             latency: document.getElementById('planLatency').value,
-            hardware: document.getElementById('planHardware').value
+            hardware: document.getElementById('planHardware').value,
+            primary_preset: primBadge ? primBadge.textContent.trim() : null,
+            fallback_preset: fbBadge ? fbBadge.textContent.trim() : null
         };
     }
 
@@ -99,13 +103,21 @@ async function triggerRunPipeline(withPlan = false) {
 function resetProgressUI() {
     const spinner = document.getElementById('progressSpinner');
     if (spinner) spinner.classList.remove('hidden');
-    document.getElementById('progressFillBar').style.width = '10%';
-    document.getElementById('progressPercentText').textContent = '10%';
-    document.getElementById('progressCurrentStepText').textContent = 'Starting ingestion...';
-    document.getElementById('progressStatusBadge').textContent = 'PARSING';
-    document.getElementById('progressStatusBadge').className = 'badge badge-running';
-    document.getElementById('navBadgeProgress').textContent = 'Running';
-    document.getElementById('progressCompletionBanner').style.display = 'none';
+    const fillBar = document.getElementById('progressFillBar');
+    if (fillBar) fillBar.style.width = '10%';
+    const pctText = document.getElementById('progressPercentText');
+    if (pctText) pctText.textContent = '10%';
+    const stepText = document.getElementById('progressCurrentStepText');
+    if (stepText) stepText.textContent = 'Starting ingestion...';
+    const statusBadge = document.getElementById('progressStatusBadge');
+    if (statusBadge) {
+        statusBadge.textContent = 'PARSING';
+        statusBadge.className = 'badge badge-running';
+    }
+    const navBadge = document.getElementById('navBadgeProgress');
+    if (navBadge) navBadge.textContent = 'Running';
+    const banner = document.getElementById('progressCompletionBanner');
+    if (banner) banner.style.display = 'none';
 
     for (let i = 1; i <= 5; i++) {
         const card = document.getElementById('stepCard' + i);
@@ -134,11 +146,14 @@ function startProgressPolling() {
                     }
 
                     if (data.progress !== undefined) {
-                        document.getElementById('progressFillBar').style.width = data.progress + '%';
-                        document.getElementById('progressPercentText').textContent = data.progress + '%';
+                        const fillBar = document.getElementById('progressFillBar');
+                        if (fillBar) fillBar.style.width = data.progress + '%';
+                        const pctText = document.getElementById('progressPercentText');
+                        if (pctText) pctText.textContent = data.progress + '%';
                     }
                     if (data.current_step) {
-                        document.getElementById('progressCurrentStepText').textContent = data.current_step;
+                        const stepText = document.getElementById('progressCurrentStepText');
+                        if (stepText) stepText.textContent = data.current_step;
                     }
                     if (data.logs && Array.isArray(data.logs)) {
                         const consoleEl = document.getElementById('progressLogConsole');
@@ -182,12 +197,19 @@ function onPipelineCompleted(result) {
     stopProgressPolling();
     const spinner = document.getElementById('progressSpinner');
     if (spinner) spinner.classList.add('hidden');
-    document.getElementById('progressFillBar').style.width = '100%';
-    document.getElementById('progressPercentText').textContent = '100%';
-    document.getElementById('progressCurrentStepText').textContent = 'Ingestion and verification finished.';
-    document.getElementById('progressStatusBadge').textContent = 'COMPLETED';
-    document.getElementById('progressStatusBadge').className = 'badge badge-success';
-    document.getElementById('navBadgeProgress').textContent = 'Done';
+    const fillBar = document.getElementById('progressFillBar');
+    if (fillBar) fillBar.style.width = '100%';
+    const pctText = document.getElementById('progressPercentText');
+    if (pctText) pctText.textContent = '100%';
+    const stepText = document.getElementById('progressCurrentStepText');
+    if (stepText) stepText.textContent = 'Ingestion and verification finished.';
+    const statusBadge = document.getElementById('progressStatusBadge');
+    if (statusBadge) {
+        statusBadge.textContent = 'COMPLETED';
+        statusBadge.className = 'badge badge-success';
+    }
+    const navBadge = document.getElementById('navBadgeProgress');
+    if (navBadge) navBadge.textContent = 'Done';
 
     for (let i = 1; i <= 5; i++) {
         const card = document.getElementById('stepCard' + i);
@@ -197,8 +219,10 @@ function onPipelineCompleted(result) {
     const dec = result.decision || {};
     const viols = result.violations || [];
     const summaryStr = `Status: ${dec.status || 'ACCEPT'} | Confidence: ${Number(dec.overall_confidence || 1.0).toFixed(4)} | Preset: ${dec.chosen_preset || 'docling_fast'} | Violations: ${viols.length}`;
-    document.getElementById('progressSummaryText').textContent = summaryStr;
-    document.getElementById('progressCompletionBanner').style.display = 'flex';
+    const summaryText = document.getElementById('progressSummaryText');
+    if (summaryText) summaryText.textContent = summaryStr;
+    const banner = document.getElementById('progressCompletionBanner');
+    if (banner) banner.style.display = 'flex';
 
     appendLog(`[COMPLETE] ${summaryStr}`);
 

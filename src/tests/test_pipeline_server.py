@@ -131,15 +131,13 @@ class TestPipelineServer(unittest.TestCase):
         # Verify section titles, subtabs, and contents
         for item in ("Input selection", "Planning", "Parsing progress", "Preset results", 'id="progressSpinner"'):
             self.assertIn(item, content)
-        self.assertNotIn(">Planner Wizard</a>", content)
-        self.assertNotIn("resultsTableContainer", content)
+        for old_btn in (">Planner Wizard</a>", ">Visual Flow Viewer</a>", ">Dashboard</a>", "resultsTableContainer"):
+            self.assertNotIn(old_btn, content)
         for expected in ("subtabBtnPlanSimple", "subtabBtnPlanComplex", "plannerFrame", "btnToggleViewerFull"):
             self.assertIn(expected, content)
 
-        # Verify global picker dropdown bar has been removed
-        self.assertNotIn("run-selector-card", content)
-        self.assertNotIn("previous-runs-box", content)
-        self.assertNotIn("Quick Preset Actions", content)
+        for removed in ("run-selector-card", "previous-runs-box", "Quick Preset Actions"):
+            self.assertNotIn(removed, content)
 
     def test_viewer_html_endpoint_serves_untemplated_html(self) -> None:
         status, content, headers = self._get("/viewer.html")
@@ -371,10 +369,10 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("results", resp)
 
         # Test POST /api/load_run with step suffix
-        s_step, resp_step = self._post_json("/api/load_run", {"output_dir": "src/output:step_2"})
+        s_step, resp_step = self._post_json("/api/load_run", {"output_dir": "output:step_2"})
         self.assertEqual(s_step, 200)
         self.assertTrue(resp_step.get("success"))
-        self.assertEqual(resp_step.get("output_dir"), "src/output")
+        self.assertEqual(resp_step.get("output_dir"), "output")
         self.assertEqual(resp_step["run"].get("active_step"), 2)
 
         # Test GET /api/load_run?output_dir=output
@@ -491,3 +489,8 @@ class TestPipelineServer(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("text/html", headers.get("Content-Type", ""))
         self.assertIn("/viewer.js", content)
+
+    def test_api_remove_run_endpoint(self) -> None:
+        status, data = self._post_json("/api/remove_run", {"run_id": "test_del", "output_dir": "test_output"})
+        self.assertEqual(status, 200)
+        self.assertTrue(data.get("success"))

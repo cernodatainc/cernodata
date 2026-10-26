@@ -224,6 +224,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
         if raw_path == "/api/load_run":
             target_dir = payload.get("output_dir") or payload.get("run_id") or "output"
             self._handle_load_run(target_dir)
+        elif raw_path == "/api/remove_run":
+            self._handle_post_remove_run(payload)
         elif raw_path == "/api/run":
             self._handle_post_run(payload)
         elif raw_path == "/api/rerun":

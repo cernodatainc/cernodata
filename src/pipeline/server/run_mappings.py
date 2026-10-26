@@ -128,6 +128,115 @@ def record_run_mapping(
         save_persistent_mappings(mappings, repo_root)
 
 
+def remove_run_mapping(
+    run_id: str,
+    output_dir: Optional[str] = None,
+    document_path: Optional[str] = None,
+    repo_root: Optional[str] = None,
+) -> bool:
+    """
+    Removes a historical run from persistent mappings and deletes associated output artifacts.
+    """
+    root = repo_root or REPO_ROOT
+    with _LOCK:
+        mappings = load_persistent_mappings(root)
+        removed_list = mappings.get("_removed_runs", [])
+        if not isinstance(removed_list, list):
+            removed_list = []
+        removed_set = set(removed_list)
+
+        norm_run = normalize_path(run_id) if run_id else None
+        norm_out = normalize_path(output_dir) if output_dir else None
+        norm_doc = normalize_path(document_path) if document_path else None
+        doc_base = os.path.basename(norm_doc) if norm_doc else None
+
+        # Record specific removal keys without suppressing the shared "output" folder
+        for item in (norm_run, norm_out):
+            if item and item != "output":
+                removed_set.add(item)
+            elif item == "output" and norm_doc:
+                removed_set.add(f"{norm_doc}::{item}")
+                if doc_base:
+                    removed_set.add(f"{doc_base}::{item}")
+        mappings["_removed_runs"] = sorted(removed_set)
+
+        for k, doc_entry in list(mappings.items()):
+            if k.startswith("_") or not isinstance(doc_entry, dict):
+                continue
+            if norm_doc:
+                entry_path = normalize_path(k)
+                entry_file = normalize_path(str(doc_entry.get("file_path") or ""))
+                entry_name = os.path.basename(entry_path)
+                if norm_doc not in (entry_path, entry_file) and doc_base != entry_name:
+                    continue
+
+            runs = doc_entry.get("runs", [])
+            filtered = []
+            removed_one = False
+            for r in runs:
+                r_id = normalize_path(str(r.get("run_id") or ""))
+                r_dir = normalize_path(str(r.get("output_dir") or ""))
+                is_match = (norm_run and r_id == norm_run) or (norm_out and r_dir == norm_out)
+                if is_match and not removed_one:
+                    removed_one = True
+                    continue
+                filtered.append(r)
+            doc_entry["runs"] = filtered
+
+        save_persistent_mappings(mappings, root)
+
+        target_dir_name = output_dir or run_id
+        if target_dir_name and target_dir_name != "output":
+            norm_target = normalize_path(target_dir_name)
+            candidates = [
+                os.path.join(root, norm_target),
+                os.path.join(root, "output", norm_target),
+            ]
+            for c_dir in candidates:
+                if os.path.isdir(c_dir):
+                    rel = normalize_path(os.path.relpath(c_dir, root))
+                    if rel != "output":
+                        import shutil
+                        shutil.rmtree(c_dir, ignore_errors=True)
+        elif target_dir_name == "output" and norm_doc:
+            out_dir = os.path.join(root, "output")
+            plan_path = os.path.join(out_dir, "plan.json")
+            res_path = os.path.join(out_dir, "plan_execution_result.json")
+            dom_path = os.path.join(out_dir, "document_dom.json")
+            should_clean = False
+            for fpath in (plan_path, res_path, dom_path):
+                if os.path.isfile(fpath):
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            content = f.read()
+                            if (doc_base and doc_base in content) or norm_doc in content:
+                                should_clean = True
+                                break
+                    except OSError:
+                        pass
+            if should_clean:
+                for art in (
+                    "plan_execution_result.json",
+                    "document_dom.json",
+                    "plan.json",
+                    "interactive_viewer.html",
+                    "quality_violations.json",
+                ):
+                    f_path = os.path.join(out_dir, art)
+                    if os.path.isfile(f_path):
+                        try:
+                            os.remove(f_path)
+                        except OSError:
+                            pass
+                for png in glob.glob(os.path.join(out_dir, "overlay_page_*.png")):
+                    try:
+                        os.remove(png)
+                    except OSError:
+                        pass
+
+        return True
+
+
 def get_file_run_mappings(
     repo_root: Optional[str] = None,
     available_docs: Optional[List[str]] = None,
@@ -139,7 +248,26 @@ def get_file_run_mappings(
     root = repo_root or REPO_ROOT
     with _LOCK:
         persistent_data = load_persistent_mappings(root)
-        discovered_runs = find_previous_runs(root)
+        raw_removed = persistent_data.get("_removed_runs", [])
+        if not isinstance(raw_removed, list):
+            raw_removed = []
+        removed_runs: Set[str] = {normalize_path(str(x)) for x in raw_removed if x}
+        def _is_run_removed(r: Dict[str, Any]) -> bool:
+            r_id = normalize_path(str(r.get("id") or ""))
+            r_dir = normalize_path(str(r.get("dir_path") or "output"))
+            r_doc = normalize_path(str(r.get("document_path") or ""))
+            r_doc_name = os.path.basename(r_doc) if r_doc else str(r.get("document_name") or "")
+            if r_id != "output" and r_id in removed_runs:
+                return True
+            if r_dir != "output" and r_dir in removed_runs:
+                return True
+            if r_doc and (f"{r_doc}::{r_id}" in removed_runs or f"{r_doc}::{r_dir}" in removed_runs):
+                return True
+            if r_doc_name and (f"{r_doc_name}::{r_id}" in removed_runs or f"{r_doc_name}::{r_dir}" in removed_runs):
+                return True
+            return False
+
+        discovered_runs = [r for r in find_previous_runs(root) if not _is_run_removed(r)]
 
         # 1. Discover all candidate PDF files
         doc_paths: Set[str] = set()
@@ -159,7 +287,9 @@ def get_file_run_mappings(
                     doc_paths.add(normalize_path(match))
 
         # Also include any documents previously recorded or found in runs
-        for p_key in persistent_data.keys():
+        for p_key, p_val in persistent_data.items():
+            if p_key.startswith("_") or not isinstance(p_val, dict):
+                continue
             norm_p = normalize_path(p_key)
             p_base = os.path.basename(norm_p)
             if not any(os.path.basename(p) == p_base for p in doc_paths):
@@ -167,7 +297,7 @@ def get_file_run_mappings(
 
         for r in discovered_runs:
             d_path = r.get("document_path")
-            if d_path:
+            if d_path and not d_path.startswith("_"):
                 norm_d = normalize_path(d_path)
                 d_base = os.path.basename(norm_d)
                 if not any(os.path.basename(p) == d_base for p in doc_paths):
@@ -235,27 +365,36 @@ def get_file_run_mappings(
 
             if not matched_key:
                 # Document wasn't pre-discovered on disk, create entry for it
-                matched_key = r_doc_path or r_doc_name
-                doc_mappings[matched_key] = {
-                    "file_path": matched_key,
-                    "file_name": r_doc_name,
-                    "file_set": derive_file_set(matched_key),
-                    "runs": [],
-                    "runs_count": 0,
-                    "latest_run": None,
-                }
+                candidate_key = r_doc_path or r_doc_name
+                if candidate_key and not candidate_key.startswith("_"):
+                    matched_key = candidate_key
+                    doc_mappings[matched_key] = {
+                        "file_path": matched_key,
+                        "file_name": r_doc_name,
+                        "file_set": derive_file_set(matched_key),
+                        "runs": [],
+                        "runs_count": 0,
+                        "latest_run": None,
+                    }
 
-            doc_entry = doc_mappings[matched_key]
-            if not any(x["run_id"] == run_id for x in doc_entry["runs"]):
-                doc_entry["runs"].append(run_entry)
+            if matched_key:
+                doc_entry = doc_mappings[matched_key]
+                if not any(x["run_id"] == run_id for x in doc_entry["runs"]):
+                    doc_entry["runs"].append(run_entry)
 
         # 4. Integrate persistent records (if run folder was moved or archived)
         for p_path, p_val in persistent_data.items():
+            if p_path.startswith("_") or not isinstance(p_val, dict):
+                continue
             norm_p = normalize_path(p_path)
             if norm_p in doc_mappings:
                 target_runs = doc_mappings[norm_p]["runs"]
                 for p_run in p_val.get("runs", []):
-                    if not any(x["run_id"] == p_run.get("run_id") for x in target_runs):
+                    r_id = p_run.get("run_id")
+                    r_out = p_run.get("output_dir")
+                    if r_id in removed_runs or r_out in removed_runs:
+                        continue
+                    if not any(x["run_id"] == r_id for x in target_runs):
                         target_runs.append(p_run)
 
         # 5. Finalize summaries and group into file sets
@@ -284,10 +423,18 @@ def get_file_run_mappings(
 
         file_sets_list = sorted(file_sets_map.values(), key=lambda s: str(s["file_set"]))
 
-        active_doc = all_mappings_list[0]["file_path"] if all_mappings_list else ""
-        active_run = "output"
-        if discovered_runs:
-            active_run = str(discovered_runs[0].get("dir_path") or "output")
+        active_doc = ""
+        active_run = ""
+        for entry in all_mappings_list:
+            if entry.get("runs"):
+                active_doc = str(entry["file_path"])
+                latest = entry.get("latest_run") or entry["runs"][0]
+                active_run = str(latest.get("output_dir") or latest.get("run_id") or "")
+                break
+
+        if not active_doc and all_mappings_list:
+            active_doc = str(all_mappings_list[0]["file_path"])
+            active_run = ""
 
         return {
             "file_sets": file_sets_list,

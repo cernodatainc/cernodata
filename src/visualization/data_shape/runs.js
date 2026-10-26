@@ -31,7 +31,7 @@ function onPreviousRunSelected(dirPath) {
     const btnViewer = document.getElementById("btnInspectViewer");
 
     if (btnViewer) {
-        btnViewer.href = dirPath ? `/viewer?output_dir=${encodeURIComponent(dirPath)}` : '/viewer';
+        btnViewer.href = dirPath ? `/viewer.html?output_dir=${encodeURIComponent(dirPath)}` : '/viewer.html';
     }
 
     if (!run) {

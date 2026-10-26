@@ -1781,3 +1781,48 @@ body.viewer-open-fullscreen {
     height: 100%;
     border: none;
 }
+
+/* Run Removal & Prompt for Empty Runs */
+.btn-remove-run {
+    color: var(--text-muted);
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.btn-remove-run:hover {
+    color: var(--accent-red);
+    background: #FDF2F2;
+    border-color: #F8D7DA;
+}
+
+.tree-empty-runs-prompt {
+    margin-left: 24px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: background 0.15s ease, color 0.15s ease;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.tree-empty-runs-prompt:hover {
+    background: #EBF3FB;
+    color: var(--accent-blue);
+}
+
+.tree-prompt-plus {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent-blue);
+}
+
+.tree-prompt-label {
+    font-size: 11px;
+    font-weight: 500;
+}
