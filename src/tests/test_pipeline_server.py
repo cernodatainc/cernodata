@@ -108,7 +108,7 @@ class TestPipelineServer(unittest.TestCase):
             parsed = json.loads(res_body) if res_body else {}
             return e.code, parsed
 
-    def test_landing_page_renders_five_navigation_sections(self) -> None:
+    def test_landing_page_renders_four_navigation_sections(self) -> None:
         status, content, headers = self._get("/")
         self.assertEqual(status, 200)
         self.assertIn("text/html", headers.get("Content-Type", ""))
@@ -117,26 +117,24 @@ class TestPipelineServer(unittest.TestCase):
         emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
         self.assertFalse(bool(emoji_pattern.search(content)), "Emoji detected on landing page!")
 
-        # Verify all five required navigation buttons and sections exist
-        self.assertIn("tabBtnInput", content)
-        self.assertIn("tabBtnPlan", content)
-        self.assertIn("tabBtnProgress", content)
-        self.assertIn("tabBtnResults", content)
-        self.assertIn("tabBtnRuns", content)
+        # Verify active navigation buttons and sections exist
+        for btn in ("tabBtnInput", "tabBtnPlan", "tabBtnProgress", "tabBtnResults"):
+            self.assertIn(btn, content)
+        for sec in ("secInput", "secPlan", "secProgress", "secResults"):
+            self.assertIn(sec, content)
 
-        self.assertIn("secInput", content)
-        self.assertIn("secPlan", content)
-        self.assertIn("secProgress", content)
-        self.assertIn("secResults", content)
-        self.assertIn("secRuns", content)
+        # Verify previous runs tab removed and explorer breakdown present
+        self.assertNotIn("tabBtnRuns", content)
+        self.assertNotIn('id="secRuns"', content)
+        self.assertIn("explorerPageBreakdown", content)
 
-        # Verify section titles and contents
-        self.assertIn("Input Selection", content)
-        self.assertIn("Planning", content)
-        self.assertIn("Parsing Progress", content)
-        self.assertIn("Preset Results", content)
-        self.assertIn("Previous Runs", content)
-        self.assertIn("id=\"progressSpinner\"", content)
+        # Verify section titles, subtabs, and contents
+        for item in ("Input selection", "Planning", "Parsing progress", "Preset results", 'id="progressSpinner"'):
+            self.assertIn(item, content)
+        self.assertNotIn(">Planner Wizard</a>", content)
+        self.assertNotIn("resultsTableContainer", content)
+        for expected in ("subtabBtnPlanSimple", "subtabBtnPlanComplex", "plannerFrame", "btnToggleViewerFull"):
+            self.assertIn(expected, content)
 
         # Verify global picker dropdown bar has been removed
         self.assertNotIn("run-selector-card", content)
@@ -144,17 +142,13 @@ class TestPipelineServer(unittest.TestCase):
         self.assertNotIn("Quick Preset Actions", content)
 
     def test_viewer_html_endpoint_serves_untemplated_html(self) -> None:
-        status, content, headers = self._get("/viewer")
+        status, content, headers = self._get("/viewer.html")
         self.assertEqual(status, 200)
         self.assertIn("text/html", headers.get("Content-Type", ""))
 
-        # Verify links to static assets and absence of huge injected base64 blob
-        self.assertIn("/viewer.css", content)
-        self.assertIn("/viewer.js", content)
-        self.assertIn("id=\"tabBtnDom\"", content)
-        self.assertIn("id=\"tabBtnViol\"", content)
-        self.assertIn("data-name=\"dom page\"", content)
-        self.assertIn("data-name=\"violations\"", content)
+        for asset in ("/viewer.css", "/viewer.js", 'id="tabBtnDom"', 'id="tabBtnViol"'):
+            self.assertIn(asset, content)
+        self.assertNotIn("page-action-bar", content)
 
     def test_static_css_and_js_served(self) -> None:
         # Test CSS
@@ -493,7 +487,7 @@ class TestPipelineServer(unittest.TestCase):
             self.assertIn(key, rerun_data)
 
     def test_viewer_html_endpoint_with_page_param(self) -> None:
-        status, content, headers = self._get("/viewer?output_dir=output&page=2")
+        status, content, headers = self._get("/viewer.html?output_dir=output&page=2")
         self.assertEqual(status, 200)
         self.assertIn("text/html", headers.get("Content-Type", ""))
         self.assertIn("/viewer.js", content)

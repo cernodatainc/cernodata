@@ -1,0 +1,15 @@
+{
+  "sourceFile": "inspector.html",
+  "updatedAt": "2026-10-26T02:33:32.930Z",
+  "metrics": {
+    "totalFunctions": 0,
+    "totalCyclomaticComplexity": 0,
+    "averageComplexity": 0,
+    "maxComplexity": 0,
+    "maxComplexitySymbol": "",
+    "maxComplexityLine": 1,
+    "totalLines": 45,
+    "fileRisk": "low"
+  },
+  "symbols": []
+}

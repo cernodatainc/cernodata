@@ -596,11 +596,56 @@ header {
 
 /* Embedded Viewer Frame */
 .viewer-frame-container {
+    position: relative;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow: hidden;
     height: 680px;
     background: var(--bg-card);
+}
+
+.viewer-frame-container.viewer-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 99999;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: #FFFFFF;
+}
+
+body.viewer-open-fullscreen {
+    overflow: hidden;
+}
+
+.viewer-full-exit-btn {
+    display: none;
+}
+
+.viewer-frame-container.viewer-fullscreen .viewer-full-exit-btn {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 12px;
+    right: 18px;
+    z-index: 100000;
+    background: rgba(30, 30, 30, 0.85);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: background 0.15s ease;
+}
+
+.viewer-frame-container.viewer-fullscreen .viewer-full-exit-btn:hover {
+    background: rgba(0, 0, 0, 0.95);
 }
 
 .viewer-frame {
@@ -1444,4 +1489,295 @@ header {
 .cell-score-none {
     color: var(--text-muted);
     font-family: monospace;
+}
+
+/* Explorer Page Breakdown and Quality Pills */
+.page-pills-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.page-pill {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    padding: 1px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.page-pill.status-pass {
+    background: #E6EFEA;
+    color: #2E6E52;
+    border-color: #BFD6CA;
+}
+
+.page-pill.status-warn {
+    background: #FBEEDC;
+    color: #A15C07;
+    border-color: #EBCB9F;
+}
+
+.page-pill:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}
+
+.explorer-subrow-pages td {
+    background: #FAFAF8;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.explorer-pages-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.explorer-pages-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.explorer-page-breakdown {
+    border-top: 1px solid var(--border-color);
+    background: #FAFAF8;
+    padding: 14px 16px;
+}
+
+.page-breakdown-empty {
+    padding: 12px 4px;
+}
+
+.page-breakdown-empty-text {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.page-breakdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.page-breakdown-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.breakdown-run-id {
+    font-family: var(--font-mono);
+    color: var(--accent-blue);
+}
+
+.breakdown-doc-sub {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 11px;
+    margin-left: 4px;
+}
+
+.page-breakdown-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.breakdown-score-text {
+    font-size: 11px;
+}
+
+.breakdown-viols-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.page-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.page-breakdown-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.page-breakdown-card:hover {
+    border-color: var(--accent-blue);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.page-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.page-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.page-card-score {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.page-card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.page-card-viols {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.page-card-viols.has-viols {
+    color: var(--accent-red);
+    font-weight: 600;
+}
+
+.page-card-btn {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+.tree-pages-list {
+    margin-left: 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+
+.tree-page-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.tree-page-row:hover {
+    background: #F0EEE9;
+}
+
+.page-icon {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.page-viols-badge {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.tree-arrow-spacer {
+    display: inline-block;
+    width: 12px;
+}
+
+.run-pages-toggle {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s ease;
+}
+
+.run-pages-toggle:hover {
+    color: var(--accent-blue);
+}
+
+/* Planning Tab Simple vs Complex Subtabs */
+.planning-subtabs-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.subtab-pills {
+    display: inline-flex;
+    background: #EBE8E1;
+    padding: 3px;
+    border-radius: 6px;
+    gap: 2px;
+}
+
+.subtab-pill {
+    background: transparent;
+    border: none;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.subtab-pill.active {
+    background: #FFFFFF;
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.subtab-pill:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+.planning-subtab-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.planning-subview {
+    display: none;
+}
+
+.planning-subview.active {
+    display: block;
+}
+
+.planner-frame-container {
+    width: 100%;
+    height: 720px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 10px;
+    background: #FFFFFF;
+}
+
+.planner-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
 }

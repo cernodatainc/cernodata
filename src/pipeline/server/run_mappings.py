@@ -79,6 +79,8 @@ def record_run_mapping(
     confidence: float,
     violations_count: int,
     total_pages: int = 1,
+    per_page_confidence: Optional[Dict[str, float]] = None,
+    per_page_violations: Optional[Dict[str, int]] = None,
     timestamp: str = "",
     repo_root: Optional[str] = None,
 ) -> None:
@@ -109,6 +111,8 @@ def record_run_mapping(
             "overall_confidence": round(confidence, 4),
             "violations_count": violations_count,
             "total_pages": total_pages,
+            "per_page_confidence": per_page_confidence or {},
+            "per_page_violations": per_page_violations or {},
             "timestamp": timestamp,
         }
 
@@ -217,6 +221,8 @@ def get_file_run_mappings(
                 "overall_confidence": round(conf, 4),
                 "violations_count": viols,
                 "total_pages": pages,
+                "per_page_confidence": r.get("per_page_confidence", {}),
+                "per_page_violations": r.get("per_page_violations", {}),
                 "timestamp": t_stamp,
                 "has_viewer": r.get("has_viewer", False),
                 "has_dom": r.get("has_dom", False),

@@ -1,0 +1,33 @@
+{
+  "sourceFile": "viewer.html",
+  "engine": "oxlint",
+  "updatedAt": "2026-10-26T02:27:06.236Z",
+  "health": {
+    "score": 100,
+    "status": "healthy",
+    "totalIssues": 0,
+    "checks": {
+      "correctness": {
+        "passed": true,
+        "issues": 0
+      },
+      "suspicious": {
+        "passed": true,
+        "issues": 0
+      },
+      "perf": {
+        "passed": true,
+        "issues": 0
+      },
+      "pedantic": {
+        "passed": true,
+        "issues": 0
+      },
+      "style": {
+        "passed": true,
+        "issues": 0
+      }
+    },
+    "issues": []
+  }
+}

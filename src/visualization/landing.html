@@ -66,7 +66,6 @@
         </div>
         <div class="header-links">
             <a href="/" class="header-link-btn active">Dashboard</a>
-            <a href="/planner" class="header-link-btn">Planner Wizard</a>
             <a href="/viewer" class="header-link-btn">Visual Flow Viewer</a>
         </div>
     </header>
@@ -87,10 +86,6 @@
         <button class="hub-tab-btn" id="tabBtnResults" onclick="switchNavTab('results')">
             <span>Preset results</span>
             <span class="hub-tab-badge" id="navBadgeResults">Scores</span>
-        </button>
-        <button class="hub-tab-btn" id="tabBtnRuns" onclick="switchNavTab('runs')">
-            <span>Previous runs</span>
-            <span class="hub-tab-badge" id="navBadgeRuns">Matrix Grid</span>
         </button>
     </nav>
 
@@ -169,6 +164,7 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <div class="explorer-page-breakdown" id="explorerPageBreakdown"></div>
                             </div>
                         </div>
                     </div>
@@ -234,80 +230,110 @@
 
         <!-- 2. Planning Section -->
         <section class="tab-section" id="secPlan">
-            <div class="card card-flush">
-
-                <div class="card-section">
-                    <div class="form-group">
-                        <label class="form-label" for="planPreviousRunSelect">Start from previous run</label>
-                        <select class="form-select plan-run-select" id="planPreviousRunSelect"
-                            onchange="if(this.value) choosePreviousRun(this.value)">
-                            <option value="">Choose a previous run</option>
-                        </select>
-                    </div>
-                    <div id="planLoadedNotice" class="plan-loaded-notice"></div>
+            <div class="planning-subtabs-bar">
+                <div class="subtab-pills">
+                    <button class="subtab-pill active" id="subtabBtnPlanSimple" onclick="switchPlanningSubtab('simple')">Simple</button>
+                    <button class="subtab-pill" id="subtabBtnPlanComplex" onclick="switchPlanningSubtab('complex')">Complex</button>
                 </div>
+                <span class="planning-subtab-desc" id="planSubtabDesc">Fast preset recommendation questionnaire</span>
+            </div>
 
-                <div class="card-section">
-                    <div class="form-grid-2">
+            <!-- 2a. Simple Planning View -->
+            <div class="planning-subview active" id="planSubviewSimple">
+                <div class="card card-flush">
+
+                    <div class="card-section">
                         <div class="form-group">
-                            <label class="form-label" for="planTaxonomy">Document taxonomy</label>
-                            <select class="form-select" id="planTaxonomy" onchange="updateSuggestedPlan()">
-                                <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
-                                <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
-                                <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
-                                <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
+                            <label class="form-label" for="planPreviousRunSelect">Start from previous run</label>
+                            <select class="form-select plan-run-select" id="planPreviousRunSelect"
+                                onchange="if(this.value) choosePreviousRun(this.value)">
+                                <option value="">Choose a previous run</option>
                             </select>
                         </div>
+                        <div id="planLoadedNotice" class="plan-loaded-notice"></div>
+                    </div>
 
-                        <div class="form-group">
-                            <label class="form-label" for="planTarget">Target use case</label>
-                            <select class="form-select" id="planTarget" onchange="updateSuggestedPlan()">
-                                <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
-                                <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
-                                <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)
-                                </option>
-                            </select>
+                    <div class="card-section">
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label" for="planTaxonomy">Document taxonomy</label>
+                                <select class="form-select" id="planTaxonomy" onchange="updateSuggestedPlan()">
+                                    <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
+                                    <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
+                                    <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
+                                    <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="planTarget">Target use case</label>
+                                <select class="form-select" id="planTarget" onchange="updateSuggestedPlan()">
+                                    <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
+                                    <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
+                                    <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="planLatency">Latency vs quality</label>
+                                <select class="form-select" id="planLatency" onchange="updateSuggestedPlan()">
+                                    <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
+                                    <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
+                                    <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="planHardware">Hardware</label>
+                                <select class="form-select" id="planHardware" onchange="updateSuggestedPlan()">
+                                    <option value="cpu" selected>Local CPU (Standard host)</option>
+                                    <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
+                                    <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
+                                </select>
+                            </div>
                         </div>
+                    </div>
 
+                    <div class="card-section">
                         <div class="form-group">
-                            <label class="form-label" for="planLatency">Latency vs quality</label>
-                            <select class="form-select" id="planLatency" onchange="updateSuggestedPlan()">
-                                <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
-                                <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
-                                <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
-                            </select>
+                            <span class="form-label">Suggested presets</span>
+                            <div id="planPresetOrderList" class="plan-hierarchy-list">
+                                <div class="plan-primary-desc">Primary: <span class="preset-badge"
+                                        id="planPrimaryBadge">docling_fast</span> Initial execution pass</div>
+                                <div class="plan-fallback-desc">Fallback: <span class="preset-badge"
+                                        id="planFallbackBadge">docling_deep</span> Automated confidence fallback</div>
+                            </div>
                         </div>
+                    </div>
 
-                        <div class="form-group">
-                            <label class="form-label" for="planHardware">Hardware</label>
-                            <select class="form-select" id="planHardware" onchange="updateSuggestedPlan()">
-                                <option value="cpu" selected>Local CPU (Standard host)</option>
-                                <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
-                                <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
-                            </select>
+                    <div class="card-footer">
+                        <div class="card-footer-actions">
+                            <button class="btn btn-secondary" onclick="switchNavTab('input')">Back</button>
+                            <button class="btn btn-primary" onclick="triggerRunPipeline(true)">Start parsing</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 2b. Complex Planning View (Planner Wizard) -->
+            <div class="planning-subview" id="planSubviewComplex">
+                <div class="card card-flush">
+                    <div class="card-section">
+                        <div class="section-toolbar">
+                            <span class="form-label">Planner Wizard</span>
+                            <div class="card-footer-actions">
+                                <button class="btn btn-secondary btn-xs" onclick="reloadPlannerIframe()">Reload wizard</button>
+                                <a href="/planner" target="_blank" class="btn btn-secondary btn-xs">Open in new tab</a>
+                            </div>
+                        </div>
+                        <div class="planner-frame-container">
+                            <iframe class="planner-frame" id="plannerFrame" src="/planner"
+                                title="cernodata Interactive Planner Wizard"></iframe>
                         </div>
                     </div>
                 </div>
-
-                <div class="card-section">
-                    <div class="form-group">
-                        <span class="form-label">Suggested presets</span>
-                        <div id="planPresetOrderList" class="plan-hierarchy-list">
-                            <div class="plan-primary-desc">Primary: <span class="preset-badge"
-                                    id="planPrimaryBadge">docling_fast</span> Initial execution pass</div>
-                            <div class="plan-fallback-desc">Fallback: <span class="preset-badge"
-                                    id="planFallbackBadge">docling_deep</span> Automated confidence fallback</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-footer">
-                    <div class="card-footer-actions">
-                        <button class="btn btn-secondary" onclick="switchNavTab('input')">Back</button>
-                        <button class="btn btn-primary" onclick="triggerRunPipeline(true)">Start parsing</button>
-                    </div>
-                </div>
-
             </div>
         </section>
 
@@ -368,7 +394,6 @@
                             | Preset: docling_fast</div>
                     </div>
                     <div class="progress-completion-actions">
-                        <a href="/viewer" class="btn btn-secondary">Open viewer</a>
                         <button class="btn btn-primary" onclick="switchNavTab('results')">View results</button>
                     </div>
                 </div>
@@ -382,93 +407,16 @@
 
                 <div class="card-section">
                     <div class="section-toolbar">
-                        <span class="form-label">Preset comparison</span>
-                        <button class="btn btn-secondary" onclick="refreshResultsData()">Refresh data</button>
-                    </div>
-                    <div id="resultsTableContainer">
-                        <table class="comparison-table">
-                            <thead>
-                                <tr>
-                                    <th>Step</th>
-                                    <th>Preset</th>
-                                    <th>Confidence</th>
-                                    <th>Per-page score</th>
-                                    <th>Violations</th>
-                                    <th>Status</th>
-                                    <th>Decision</th>
-                                </tr>
-                            </thead>
-                            <tbody id="resultsTableBody">
-                                <tr>
-                                    <td colspan="7" class="table-empty-message">No runs yet. Run a document from Input
-                                        selection or Planning to see results.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card-section">
-                    <div class="section-toolbar">
                         <span class="form-label">Visual flow</span>
                         <div class="card-footer-actions">
                             <button class="btn btn-secondary" onclick="reloadViewerIframe()">Reload view</button>
-                            <a href="/viewer" target="_blank" class="btn btn-primary">Open full view</a>
+                            <button class="btn btn-primary" id="btnToggleViewerFull" onclick="toggleViewerFullscreen()">Open full view</button>
                         </div>
                     </div>
-                    <div class="viewer-frame-container">
-                        <iframe class="viewer-frame" id="viewerFrame" src="/viewer"
+                    <div class="viewer-frame-container" id="viewerFrameContainer">
+                        <button class="viewer-full-exit-btn" id="btnExitViewerFull" onclick="toggleViewerFullscreen()" title="Exit full view">Exit full view</button>
+                        <iframe class="viewer-frame" id="viewerFrame" src="/viewer.html"
                             title="cernodata Interactive Visual Flow Viewer"></iframe>
-                    </div>
-                </div>
-
-            </div>
-        </section>
-
-        <!-- 5. Previous Runs Grid Section -->
-        <section class="tab-section" id="secRuns">
-            <div class="card card-flush">
-
-                <div class="card-section">
-                    <div class="runs-grid-controls">
-                        <div class="form-group">
-                            <label class="form-label" for="runsGridDocSelect">Document</label>
-                            <select class="form-select runs-grid-doc-select" id="runsGridDocSelect"
-                                onchange="onRunsGridDocChanged(this.value)">
-                                <option value="">Choose a document</option>
-                            </select>
-                        </div>
-                        <div class="runs-grid-meta">
-                            <span class="active-run-label">Active run</span>
-                            <span class="preset-badge active-run-badge" id="activeRunBadge">output</span>
-                            <button class="btn btn-secondary" onclick="loadRunsGrid()">Refresh</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-section">
-                    <div class="section-toolbar">
-                        <span class="form-label">Runs by page</span>
-                        <span class="section-hint">Click a page cell to open it in the viewer</span>
-                    </div>
-                    <div class="runs-grid-table-container">
-                        <table class="comparison-table runs-grid-table" id="runsGridTable">
-                            <thead id="runsGridTableHead">
-                                <tr>
-                                    <th>Run</th>
-                                    <th>Page 1</th>
-                                    <th>Overall score</th>
-                                    <th>Violations</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="runsGridTableBody">
-                                <tr>
-                                    <td colspan="6" class="table-empty-message">Loading runs...</td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
 

@@ -138,9 +138,6 @@ function switchPage(pageNum) {
     if (currNum) currNum.textContent = String(currentPage);
     updateNavButtonsState();
 
-    const actTitle = document.getElementById('pageActionTitle');
-    if (actTitle) actTitle.textContent = `Page ${currentPage} controls:`;
-
     updatePageScoreBadge();
 
     renderSVGOverlays();

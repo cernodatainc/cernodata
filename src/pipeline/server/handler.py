@@ -135,7 +135,7 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
 
         if raw_path in ("", "/", "/index.html", "/landing", "/hub"):
             self._serve_landing_page()
-        elif raw_path in ("/viewer", "/viewer.html"):
+        elif raw_path == "/viewer.html":
             self._serve_viewer_html()
         elif raw_path == "/interactive_viewer.html":
             self._serve_interactive_viewer_compat()

@@ -1,0 +1,15 @@
+{
+  "sourceFile": "viewer.html",
+  "updatedAt": "2026-10-26T02:27:06.234Z",
+  "metrics": {
+    "totalFunctions": 0,
+    "totalCyclomaticComplexity": 0,
+    "averageComplexity": 0,
+    "maxComplexity": 0,
+    "maxComplexitySymbol": "",
+    "maxComplexityLine": 1,
+    "totalLines": 203,
+    "fileRisk": "low"
+  },
+  "symbols": []
+}

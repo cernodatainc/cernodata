@@ -106,7 +106,7 @@ function reloadViewerIframe(pageNum = null, targetRun = null) {
         }
     }
 
-    frame.src = `/viewer?output_dir=${encodeURIComponent(runDir)}&page=${page}${stepQuery}&t=${Date.now()}`;
+    frame.src = `/viewer.html?output_dir=${encodeURIComponent(runDir)}&page=${page}${stepQuery}&t=${Date.now()}`;
 }
 
 /**

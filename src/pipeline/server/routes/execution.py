@@ -146,6 +146,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 confidence=score,
                 violations_count=viols_count,
                 total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
+                per_page_confidence=dec.get("per_page_confidence", {}),
                 timestamp=t_end,
                 repo_root=session.repo_root,
             )

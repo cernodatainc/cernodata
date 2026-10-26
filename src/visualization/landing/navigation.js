@@ -6,6 +6,7 @@
  */
 
 let currentTab = 'input';
+let currentPlanningSubtab = 'simple';
 
 /**
  * Switches the active tab and view section in the dashboard hub.
@@ -24,16 +25,84 @@ function switchNavTab(tabName) {
     if (btn) btn.classList.add('active');
     if (sec) sec.classList.add('active');
 
-    if (tabName === 'results') {
+    if (tabName === 'plan') {
+        if (currentPlanningSubtab === 'complex') {
+            const frame = document.getElementById('plannerFrame');
+            if (frame && (!frame.src || frame.src === 'about:blank' || frame.src.endsWith('/'))) {
+                frame.src = '/planner';
+            }
+        }
+    } else if (tabName === 'results') {
         if (typeof refreshResultsData === 'function') refreshResultsData();
         const frame = document.getElementById('viewerFrame');
         if (frame && (!frame.src || frame.src === 'about:blank' || frame.src.endsWith('/'))) {
             if (typeof reloadViewerIframe === 'function') reloadViewerIframe();
         }
-    } else if (tabName === 'runs') {
-        if (typeof loadRunsGrid === 'function') loadRunsGrid();
     }
 }
+
+/**
+ * Switches between Simple (Preset Wizard) and Complex (Planner Wizard) subtabs
+ * within the Planning hub view.
+ *
+ * @param {string} mode - Subtab mode ('simple' or 'complex').
+ */
+function switchPlanningSubtab(mode) {
+    currentPlanningSubtab = mode;
+    const isSimple = (mode === 'simple');
+    const btnSimple = document.getElementById('subtabBtnPlanSimple');
+    const btnComplex = document.getElementById('subtabBtnPlanComplex');
+    const viewSimple = document.getElementById('planSubviewSimple');
+    const viewComplex = document.getElementById('planSubviewComplex');
+    const descEl = document.getElementById('planSubtabDesc');
+
+    if (btnSimple) btnSimple.classList.toggle('active', isSimple);
+    if (btnComplex) btnComplex.classList.toggle('active', !isSimple);
+    if (viewSimple) viewSimple.classList.toggle('active', isSimple);
+    if (viewComplex) viewComplex.classList.toggle('active', !isSimple);
+
+    if (descEl) {
+        descEl.textContent = isSimple
+            ? 'Fast preset recommendation questionnaire'
+            : 'Interactive criteria questionnaire and weighted score optimizer';
+    }
+
+    if (!isSimple) {
+        const frame = document.getElementById('plannerFrame');
+        if (frame && (!frame.src || frame.src === 'about:blank' || frame.src.endsWith('/'))) {
+            frame.src = '/planner';
+        }
+    }
+}
+
+/**
+ * Reloads the Planner Wizard iframe with the latest data shape configuration.
+ */
+function reloadPlannerIframe() {
+    const frame = document.getElementById('plannerFrame');
+    if (frame) frame.src = '/planner';
+}
+
+/**
+ * Toggles the nested visual flow viewer iframe between embedded and full page display.
+ */
+function toggleViewerFullscreen() {
+    const container = document.getElementById('viewerFrameContainer');
+    const btn = document.getElementById('btnToggleViewerFull');
+    if (!container) return;
+    const isFull = container.classList.toggle('viewer-fullscreen');
+    document.body.classList.toggle('viewer-open-fullscreen', isFull);
+    if (btn) btn.textContent = isFull ? 'Exit full view' : 'Open full view';
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const container = document.getElementById('viewerFrameContainer');
+        if (container && container.classList.contains('viewer-fullscreen')) {
+            toggleViewerFullscreen();
+        }
+    }
+});
 
 /**
  * Sets the document path input value when a discovered document chip is clicked.
