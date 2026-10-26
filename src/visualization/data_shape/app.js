@@ -11,7 +11,10 @@ window.addEventListener("DOMContentLoaded", async () => {
         if (res.ok) {
             const cfg = await res.json();
             if (cfg.default_doc) {
-                document.getElementById("docPath").value = cfg.default_doc;
+                const docEl = document.getElementById("docPath");
+                if (docEl) docEl.value = cfg.default_doc;
+                const inpPdf = document.getElementById("inpPdfPath");
+                if (inpPdf && !inpPdf.value) inpPdf.value = cfg.default_doc;
             }
             if (cfg.default_lang) {
                 document.getElementById("enableLangHint").checked = true;
@@ -41,6 +44,12 @@ window.addEventListener("DOMContentLoaded", async () => {
         } catch (e) {
             // Ignore offline errors
         }
+    }
+
+    const docInput = document.getElementById("docPath");
+    const inpInput = document.getElementById("inpPdfPath");
+    if (docInput && inpInput && !docInput.value && inpInput.value) {
+        docInput.value = inpInput.value;
     }
 
     renderOptionGrid("taxonomyGrid", TAXONOMY_OPTIONS, selectedTaxonomy, val => selectedTaxonomy = val);

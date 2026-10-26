@@ -13,6 +13,17 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof loadRunsGrid === 'function') loadRunsGrid();
 
+    const inpPdf = document.getElementById('inpPdfPath');
+    const docPathInput = document.getElementById('docPath');
+    if (inpPdf && docPathInput) {
+        inpPdf.addEventListener('input', () => {
+            docPathInput.value = inpPdf.value;
+        });
+        docPathInput.addEventListener('input', () => {
+            inpPdf.value = docPathInput.value;
+        });
+    }
+
     const frame = document.getElementById('viewerFrame');
     if (frame) {
         function hideViewerHeader() {

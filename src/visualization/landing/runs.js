@@ -48,6 +48,9 @@ async function loadPreviousRunsList() {
         activeRunOutputDir = data.active_run || 'output';
 
         updateRunSelectorsUI();
+        if (typeof populatePreviousRunsDropdown === 'function') {
+            populatePreviousRunsDropdown(availableRuns);
+        }
         prefetchAllRunResults(availableRuns);
     } catch (e) {
         console.log('[WARN] Failed to load previous runs:', e);
@@ -132,6 +135,8 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
         if (run.document_path) {
             const inpDoc = document.getElementById('inpPdfPath');
             if (inpDoc) inpDoc.value = run.document_path;
+            const docPathEl = document.getElementById('docPath');
+            if (docPathEl) docPathEl.value = run.document_path;
         }
         if (decision.language) {
             const langSel = document.getElementById('inpLanguage');
@@ -168,6 +173,12 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
             document.getElementById('planHardware').value = plan.hardware;
         }
         if (typeof updateSuggestedPlan === 'function') updateSuggestedPlan();
+
+        const prevRunSel = document.getElementById('prevRunSelect');
+        if (prevRunSel && prevRunSel.value !== outputDir) {
+            prevRunSel.value = outputDir;
+            if (typeof onPreviousRunSelected === 'function') onPreviousRunSelected(outputDir);
+        }
 
         const planNotice = document.getElementById('planLoadedNotice');
         if (planNotice) {

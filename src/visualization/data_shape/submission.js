@@ -51,6 +51,19 @@ async function submitPlan() {
         if (response.ok) {
             showBanner("[SUCCESS] Data shape plan configured successfully. Starting pipeline execution...", "success");
             submitBtn.textContent = "[COMPLETED] Plan Active";
+            if (typeof triggerRunPipeline === "function") {
+                const inpPdf = document.getElementById("inpPdfPath");
+                if (inpPdf && docPath) {
+                    inpPdf.value = docPath;
+                }
+                const inpThresh = document.getElementById("inpThreshold");
+                if (inpThresh && threshold) {
+                    inpThresh.value = threshold;
+                }
+                setTimeout(() => {
+                    triggerRunPipeline(false);
+                }, 600);
+            }
         } else {
             const err = await response.json().catch(() => ({}));
             showBanner("[ERROR] " + (err.error || "Failed to submit plan to server."), "error");

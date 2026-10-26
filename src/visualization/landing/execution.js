@@ -13,7 +13,12 @@ let progressInterval = null;
  * @param {boolean} [withPlan=false] - Whether to include planner questionnaire parameters.
  */
 async function triggerRunPipeline(withPlan = false) {
-    const pdfPath = document.getElementById('inpPdfPath').value.trim();
+    let pdfPath = document.getElementById('inpPdfPath').value.trim();
+    const docPathEl = document.getElementById('docPath');
+    if (!pdfPath && docPathEl && docPathEl.value.trim()) {
+        pdfPath = docPathEl.value.trim();
+        document.getElementById('inpPdfPath').value = pdfPath;
+    }
     const language = document.getElementById('inpLanguage').value;
     const threshold = parseFloat(document.getElementById('inpThreshold').value);
     const preset = document.getElementById('inpPreset').value;

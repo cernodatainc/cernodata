@@ -26,11 +26,10 @@ function switchNavTab(tabName) {
     if (sec) sec.classList.add('active');
 
     if (tabName === 'plan') {
-        if (currentPlanningSubtab === 'complex') {
-            const frame = document.getElementById('plannerFrame');
-            if (frame && (!frame.src || frame.src === 'about:blank' || frame.src.endsWith('/'))) {
-                frame.src = '/planner';
-            }
+        const inp = document.getElementById('inpPdfPath');
+        const doc = document.getElementById('docPath');
+        if (inp && doc && inp.value && !doc.value) {
+            doc.value = inp.value;
         }
     } else if (tabName === 'results') {
         if (typeof refreshResultsData === 'function') refreshResultsData();
@@ -68,19 +67,22 @@ function switchPlanningSubtab(mode) {
     }
 
     if (!isSimple) {
-        const frame = document.getElementById('plannerFrame');
-        if (frame && (!frame.src || frame.src === 'about:blank' || frame.src.endsWith('/'))) {
-            frame.src = '/planner';
+        const inp = document.getElementById('inpPdfPath');
+        const doc = document.getElementById('docPath');
+        if (inp && doc && inp.value && !doc.value) {
+            doc.value = inp.value;
+        }
+        if (typeof recalculate === 'function') {
+            recalculate();
         }
     }
 }
 
 /**
- * Reloads the Planner Wizard iframe with the latest data shape configuration.
+ * Synchronizes and updates planner wizard parameters.
  */
 function reloadPlannerIframe() {
-    const frame = document.getElementById('plannerFrame');
-    if (frame) frame.src = '/planner';
+    if (typeof recalculate === 'function') recalculate();
 }
 
 /**

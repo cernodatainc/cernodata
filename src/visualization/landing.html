@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="/data_shape_config.css">
     <link rel="stylesheet" href="/landing.css">
 </head>
 
@@ -313,20 +314,111 @@
                 </div>
             </div>
 
-            <!-- 2b. Complex Planning View (Planner Wizard) -->
+            <!-- 2b. Complex Planning View (Planner Wizard Component) -->
             <div class="planning-subview" id="planSubviewComplex">
-                <div class="card card-flush">
-                    <div class="card-section">
-                        <div class="section-toolbar">
-                            <span class="form-label">Planner Wizard</span>
-                            <div class="card-footer-actions">
-                                <button class="btn btn-secondary btn-xs" onclick="reloadPlannerIframe()">Reload wizard</button>
-                                <a href="/planner" target="_blank" class="btn btn-secondary btn-xs">Open in new tab</a>
+                <div class="planner-wizard-component main-container" id="plannerWizardComponent">
+                    <div>
+                        <div class="status-banner" id="statusBanner"></div>
+
+                        <div class="form-section">
+                            <div class="section-header">
+                                <div class="section-title">Previous results</div>
+                                <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label" for="prevRunSelect">Completed run output</label>
+                                <div class="prev-run-row">
+                                    <select id="prevRunSelect" class="override-select prev-run-select"
+                                        onchange="onPreviousRunSelected(this.value)">
+                                        <option value="">Choose a previous run</option>
+                                    </select>
+                                    <button type="button" class="btn btn-secondary btn-load-params"
+                                        onclick="loadSelectedPreviousRunIntoWizard()">Load parameters</button>
+                                    <a id="btnInspectViewer" href="/viewer.html" target="_blank" class="btn btn-secondary btn-view-params">Open in viewer</a>
+                                </div>
+                                <div id="prevRunSummary" class="prev-run-summary"></div>
                             </div>
                         </div>
-                        <div class="planner-frame-container">
-                            <iframe class="planner-frame" id="plannerFrame" src="/planner"
-                                title="cernodata Interactive Planner Wizard"></iframe>
+
+                        <div class="form-section">
+                            <div class="section-header">
+                                <div class="section-title">Quality targets</div>
+                                <div class="section-desc">File source, language hint and confidence goal</div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label" for="docPath">Document file path</label>
+                                <input type="text" id="docPath" class="input-text" placeholder="e.g. src/e2e/Dokument 5.pdf" />
+                            </div>
+                            <div class="inline-inputs">
+                                <div class="input-group">
+                                    <div class="lang-hint-header">
+                                        <label class="input-label lang-hint-title" for="langCode">Language hint</label>
+                                        <label class="lang-hint-checkbox-label">
+                                            <input type="checkbox" id="enableLangHint" class="lang-hint-checkbox"
+                                                onchange="toggleLanguageHint()" /> Provide hint
+                                        </label>
+                                    </div>
+                                    <select id="langCode" class="override-select lang-select-disabled" onchange="recalculate()" disabled>
+                                        <option value="en">English (en)</option>
+                                        <option value="pl">Polish (pl)</option>
+                                        <option value="de">German (de)</option>
+                                        <option value="fr">French (fr)</option>
+                                        <option value="es">Spanish (es)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label" for="thresholdSlider">Target confidence threshold</label>
+                                    <div class="slider-wrapper">
+                                        <input type="range" id="thresholdSlider" min="0.50" max="0.99" step="0.01" value="0.82"
+                                            oninput="updateThreshold(this.value)" />
+                                        <span class="slider-value" id="complexThresholdDisplay">0.82</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="section-header">
+                                <div class="section-title">Document taxonomy</div>
+                                <div class="section-desc">Primary structural layout shape</div>
+                            </div>
+                            <div class="options-grid" id="taxonomyGrid"></div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="section-header">
+                                <div class="section-title">Processing priority</div>
+                                <div class="section-desc">Throughput priority versus layout fidelity</div>
+                            </div>
+                            <div class="options-grid" id="targetGrid"></div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="section-header">
+                                <div class="section-title">Security</div>
+                                <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
+                            </div>
+                            <div class="options-grid" id="securityGrid"></div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar">
+                        <div class="ranking-card">
+                            <div class="ranking-header">Suitability ranking</div>
+                            <div class="ranking-sub">Confidence scores update as you answer</div>
+                            <div id="presetsList"></div>
+                            <div class="override-box">
+                                <label class="override-title" for="overrideSelect">Primary preset override</label>
+                                <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
+                                    <option value="auto">Auto (recommended ranking)</option>
+                                    <option value="pypdfium_rapidocr">pypdfium_rapidocr</option>
+                                    <option value="docling_fast">docling_fast</option>
+                                    <option value="docling_deep">docling_deep</option>
+                                    <option value="vision_llm_direct">vision_llm_direct</option>
+                                </select>
+                            </div>
+                            <button class="submit-btn" id="submitBtn" onclick="submitPlan()"
+                                data-submit-endpoint="/api/submit_plan">Start pipeline</button>
                         </div>
                     </div>
                 </div>
@@ -425,6 +517,7 @@
     </main>
 
     <script src="/landing.js"></script>
+    <script src="/data_shape_config.js"></script>
 </body>
 
 </html>

@@ -1766,20 +1766,15 @@ body.viewer-open-fullscreen {
     display: block;
 }
 
-.planner-frame-container {
-    width: 100%;
-    height: 720px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    overflow: hidden;
-    margin-top: 10px;
-    background: #FFFFFF;
+.planning-subview .main-container {
+    padding: 0;
+    max-width: 100%;
+    margin: 0;
 }
 
-.planner-frame {
+.planner-wizard-component {
     width: 100%;
-    height: 100%;
-    border: none;
+    margin-top: 6px;
 }
 
 /* Run Removal & Prompt for Empty Runs */

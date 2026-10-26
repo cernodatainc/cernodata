@@ -54,7 +54,7 @@ function renderOptionGrid(containerId, options, selectedValue, onSelectCallback)
  * @param {string|number} val - Target threshold numeric value.
  */
 function updateThreshold(val) {
-    const el = document.getElementById("thresholdDisplay");
+    const el = document.getElementById("complexThresholdDisplay") || document.getElementById("thresholdDisplay");
     if (el) el.textContent = parseFloat(val).toFixed(2);
 }
 
