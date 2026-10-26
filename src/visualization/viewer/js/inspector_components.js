@@ -276,8 +276,8 @@ function renderSingleNodeEditorComponent(node, options) {
                 <label style="display:block; font-size:12px; color:${p.textPrimary}; font-weight:500; margin-bottom:2px;">Parsed text / correction note</label>
                 <textarea class="note-area" placeholder="Parsed text or manual correction note…" oninput="updateCorrectionNote('${node.node_id}', this.value)">${escapeHtml(noteVal)}</textarea>
             </div>
-            <div style="margin-top:8px; display:flex; justify-content:flex-end;">
-                <!-- TODO(TASK-702): Add a "Split at Cursor" button to split merged headings/paragraphs into two vertically stacked DOMNodes. -->
+            <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <button class="action-btn action-btn-decollide-sm" style="color:${p.blue}; border-color:${p.blueBorder};" onclick="splitSelectedDOMNode('${node.node_id}')">[SPLIT] Split at Cursor</button>
                 <button class="action-btn action-btn-decollide-sm" style="color:${p.red}; border-color:${p.redBorder};" onclick="deleteDOMNode('${node.node_id}')">Delete element</button>
             </div>
             <div style="margin-top:10px; font-size:11px; color:${p.textMuted}; border-top:1px solid ${p.border}; padding-top:8px; line-height:1.45;">

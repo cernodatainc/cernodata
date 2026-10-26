@@ -322,5 +322,41 @@ class TestDOMPrimitives(unittest.TestCase):
         self.assertEqual(PipelineAction.PATH_B_WIGGLE_PARAMETERS, "PATH_B_WIGGLE_PARAMETERS")
 
 
+    def test_dom_node_split_at_offset(self):
+        node = DOMNode(
+            node_id="para_1",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 20.0, 110.0, 120.0),
+            content={"raw_text": "Heading Section\nBody paragraph text here"},
+        )
+        # Invalid offsets
+        self.assertEqual(node.split_at_offset(0), [node])
+        self.assertEqual(node.split_at_offset(len(node.content["raw_text"])), [node])
+
+        # Valid split at newline
+        split_res = node.split_at_offset(15)
+        self.assertEqual(len(split_res), 2)
+        n1, n2 = split_res[0], split_res[1]
+
+        self.assertEqual(n1.node_id, "para_1_s1")
+        self.assertEqual(n2.node_id, "para_1_s2")
+        self.assertEqual(n1.content["raw_text"], "Heading Section")
+        self.assertEqual(n2.content["raw_text"], "Body paragraph text here")
+        self.assertEqual(n1.bounding_box.x0, 10.0)
+        self.assertEqual(n1.bounding_box.y0, 20.0)
+        self.assertEqual(n2.bounding_box.x1, 110.0)
+        self.assertEqual(n2.bounding_box.y1, 120.0)
+        self.assertEqual(n1.bounding_box.y1, n2.bounding_box.y0)
+        self.assertTrue(n1.is_custom)
+        self.assertTrue(n2.is_custom)
+
+        # Custom ratio split
+        ratio_res = node.split_at_offset(15, vertical_ratio=0.30)
+        self.assertEqual(ratio_res[0].bounding_box.y1, 50.0)
+        self.assertEqual(ratio_res[1].bounding_box.y0, 50.0)
+
+
 if __name__ == "__main__":
     unittest.main()

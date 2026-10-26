@@ -76,16 +76,15 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 - `TASK-607`: Decision guide on dataset skew vs. availability bias in RAG and fine-tuning
 
 ### 07. Viewer Manual Correction & Validation (`07-viewer-validation/`)
-- `TASK-701`: Single-node type switcher in the viewer inspector
-- `TASK-702`: Split merged nodes in the viewer
 - `TASK-703`: Viewer undo and redo stack (`Ctrl+Z` / `Ctrl+Y`)
 - `TASK-704`: DOM reading-order badges and reordering controls
-- `TASK-705`: Interactive table grid editor in the viewer (depends on `701`)
+- `TASK-705`: Interactive table grid editor in the viewer
 - `TASK-706`: Keyboard violation jumping, node approval, and text search in the viewer
 - `TASK-707`: Direct formatted export from the viewer toolbar (depends on `302`, `303`)
 - `TASK-708`: Viewer accessibility, color palette, and keyboard workflow spec
 - `TASK-709`: Live formatted output preview in the viewer (depends on `704`)
 - `TASK-710`: In-viewer violation sensitivity and acceptance threshold tuner
+- `TASK-711`: Visual diff and dual-run comparison in the viewer
 
 ### 08. Page-Level Subdivision & Reassembly (`08-page-subdivision/`)
 - `TASK-801`: Single-page PDF slicer (`slice_pdf_pages`)

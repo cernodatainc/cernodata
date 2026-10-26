@@ -48,6 +48,7 @@
  
         <div class="toolbar-actions">
             <!-- TODO(TASK-710): Add a "Rule Tolerances" button and sliding configuration drawer to tune quality violation sensitivities and recalculate scores in real time. -->
+            <!-- TODO(TASK-711): Add a "Diff Overlay" button to toggle dual-run visual diff highlighting (added, removed, modified boxes). -->
             <button class="action-btn action-btn-draw-section" id="btnDrawSection" hidden onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">Add section</button>
             <button class="action-btn action-btn-decollide" id="btnDecollidePage" hidden onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">Decollide page</button>
             <button class="action-btn action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">Revert to raw</button>

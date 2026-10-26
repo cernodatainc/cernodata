@@ -1,7 +1,5 @@
 # TASK-705: Interactive table grid editor in the viewer
 
-Depends on: TASK-701
-
 When a `table_grid` node is selected in the viewer (`src/visualization/viewer/js/inspector_components.js:211`), the user only gets a raw `<textarea>` full of pipe-delimited text. Editing a multi-column table in a small plain-text box is awkward and easy to break.
 
 - Create `src/visualization/viewer/js/table_editor.js` (and register it in `src/visualization/viewer/scripts.py`):

@@ -92,11 +92,75 @@ class DOMNode:
         )
 
     def split_at_offset(
-        self, char_offset: int, vertical_ratio: float = 0.5
+        self, char_offset: int, vertical_ratio: Optional[float] = None
     ) -> List["DOMNode"]:
-        """No-op hook returning this node until interactive node splitting is implemented."""
-        # TODO(stride): Split `self.content["raw_text"]` at `char_offset` and `self.bounding_box`
-        # vertically by `vertical_ratio` into two DOMNode instances (supports TASK-702).
-        _ = (char_offset, vertical_ratio)
-        return [self]
+        """
+        Splits this node's text and vertical bounding box into two separate nodes.
+
+        Args:
+            char_offset: Character index in raw text where the split occurs.
+            vertical_ratio: Fraction [0.05, 0.95] for vertical bounding box split.
+                           If None, defaults to proportional text length ratio.
+
+        Returns:
+            List of two new DOMNode instances, or [self] if offset is out of bounds.
+        """
+        raw_text = str(self.content.get("raw_text") or self.user_correction_note or "")
+        if char_offset <= 0 or char_offset >= len(raw_text):
+            return [self]
+
+        text1 = raw_text[:char_offset].rstrip("\r\n")
+        text2 = raw_text[char_offset:].lstrip("\r\n")
+
+        if vertical_ratio is not None:
+            ratio = max(0.05, min(0.95, float(vertical_ratio)))
+        else:
+            total_len = len(text1) + len(text2)
+            ratio = max(0.05, min(0.95, len(text1) / total_len)) if total_len > 0 else 0.5
+
+        y_mid = round(self.bounding_box.y0 + (self.bounding_box.y1 - self.bounding_box.y0) * ratio, 2)
+
+        bbox1 = BoundingBox(
+            x0=self.bounding_box.x0,
+            y0=self.bounding_box.y0,
+            x1=self.bounding_box.x1,
+            y1=y_mid,
+            angle=self.bounding_box.angle,
+        )
+        bbox2 = BoundingBox(
+            x0=self.bounding_box.x0,
+            y0=y_mid,
+            x1=self.bounding_box.x1,
+            y1=self.bounding_box.y1,
+            angle=self.bounding_box.angle,
+        )
+
+        content1 = dict(self.content)
+        content1["raw_text"] = text1
+        content2 = dict(self.content)
+        content2["raw_text"] = text2
+
+        node1 = DOMNode(
+            node_id=f"{self.node_id}_s1",
+            type=self.type,
+            global_page_index=self.global_page_index,
+            temp_slice_index=self.temp_slice_index,
+            bounding_box=bbox1,
+            content=content1,
+            violations=[],
+            user_correction_note=text1,
+            is_custom=True,
+        )
+        node2 = DOMNode(
+            node_id=f"{self.node_id}_s2",
+            type=self.type,
+            global_page_index=self.global_page_index,
+            temp_slice_index=self.temp_slice_index,
+            bounding_box=bbox2,
+            content=content2,
+            violations=[],
+            user_correction_note=text2,
+            is_custom=True,
+        )
+        return [node1, node2]
 

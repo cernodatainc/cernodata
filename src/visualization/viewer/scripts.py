@@ -18,6 +18,7 @@ JS_MODULE_ORDER: List[str] = [
     "overlay.js",
     "inspector_components.js",
     "inspector.js",
+    "node_split.js",
     "cutout.js",
     "decollide_components.js",
     "decollide.js",

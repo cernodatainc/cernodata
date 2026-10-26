@@ -163,6 +163,7 @@ class TestPipelineServer(unittest.TestCase):
         self.assertIn("extractViolationsList", content_js)
         self.assertIn("executeMergeElements", content_js)
         self.assertIn("mergeDOMNodes", content_js)
+        self.assertIn("splitSelectedDOMNode", content_js)
         self.assertIn("computeDomDiff", content_js)
         self.assertIn("recalculateScoring", content_js)
         self.assertIn("accepted_violations", content_js)
