@@ -122,11 +122,25 @@ def inspect_file(
                         f"{file_path}:{node.lineno}: Mutable default argument in '{node.name}'"
                     )
 
-        # Check for bare excepts
-        if isinstance(node, ast.ExceptHandler) and node.type is None:
-            bare_excepts.append(
-                f"{file_path}:{node.lineno}: Bare except clause detected."
-            )
+        # Check for bare excepts and silent generic exception swallowing
+        if isinstance(node, ast.ExceptHandler):
+            if node.type is None:
+                bare_excepts.append(
+                    f"{file_path}:{node.lineno}: Bare except clause detected."
+                )
+            elif isinstance(node.type, ast.Name) and node.type.id in ("Exception", "BaseException"):
+                non_trivial_stmts = [
+                    s
+                    for s in node.body
+                    if not (
+                        isinstance(s, ast.Pass)
+                        or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
+                    )
+                ]
+                if not non_trivial_stmts:
+                    bare_excepts.append(
+                        f"{file_path}:{node.lineno}: Silent exception swallowing ('except {node.type.id}: pass')."
+                    )
 
     used_names = collect_used_names(tree)
 
@@ -197,7 +211,7 @@ def run_checks(root_dir: str = "src") -> int:
             print(f"  - {item}")
 
     if all_bare:
-        print("[ISSUE] Bare except clauses detected:")
+        print("[ISSUE] Bare except clauses or silent exception swallowing detected:")
         for item in all_bare:
             print(f"  - {item}")
 

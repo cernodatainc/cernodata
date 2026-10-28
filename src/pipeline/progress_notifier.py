@@ -4,7 +4,10 @@ src/pipeline/progress_notifier.py
 Progress notification dispatcher and milestone event definitions for pipeline runs.
 """
 
+import logging
 from typing import Callable, Optional
+
+logger = logging.getLogger("cernodata.pipeline.progress_notifier")
 
 
 class PipelineProgressNotifier:
@@ -18,8 +21,8 @@ class PipelineProgressNotifier:
         if self.callback is not None:
             try:
                 self.callback(pct, step_desc, log_msg)
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.debug("Progress callback error: %s", ex)
 
     def notify_initiation(self, path: str, preset: str, lang: Optional[str]) -> None:
         self.notify(20, "Step 1: Document Validation & Subdivision", f"Ingestion initiated for '{path}' (Preset: {preset}, Lang: {lang}).")

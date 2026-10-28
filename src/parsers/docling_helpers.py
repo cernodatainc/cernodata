@@ -4,10 +4,13 @@ src/parsers/docling_helpers.py
 Helper functions for Docling item normalization, bounding box translation, and content parsing.
 """
 
+import logging
 import re
 from typing import Dict, Any, Tuple
 from src.dom.enums import DOMNodeType
 from src.quality.language_config import get_language_config
+
+logger = logging.getLogger("cernodata.parsers.docling_helpers")
 
 LANG_CODE_MAP = {
     "pl": ["pl", "pol"],
@@ -146,8 +149,8 @@ def build_node_content(
     if node_type == "table_grid" and hasattr(item, "export_to_markdown"):
         try:
             content_dict["markdown_table"] = item.export_to_markdown()
-        except Exception:
-            pass
+        except Exception as ex:
+            logger.debug("Failed exporting item to markdown table: %s", ex)
         # TODO(TASK-103): Compute `cell_alignment_score` from actual parsed Markdown table row/column raggedness
         # instead of hardcoding 0.98 / 0.96 by preset name.
         content_dict["cell_alignment_score"] = 0.98 if preset == "docling_deep" else 0.96

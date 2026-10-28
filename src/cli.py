@@ -8,6 +8,7 @@ Supports direct pipeline runs, interactive plan generation, and plan-driven exec
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from typing import Any, Mapping
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
@@ -83,8 +84,8 @@ def print_summary(result: Mapping[str, Any]) -> None:
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+        except Exception as ex:
+            logging.getLogger("cernodata.cli").debug("Unable to reconfigure stdout encoding: %s", ex)
 
     decision = result["decision"]
     dom_dict = result["dom"]

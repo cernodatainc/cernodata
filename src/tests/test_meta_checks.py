@@ -346,6 +346,26 @@ class TestMetaChecks(unittest.TestCase):
         self.assertIn("digraph", dot_output)
         self.assertIn("cluster_planner", dot_output)
 
+    def test_check_ast_flags_silent_exception_swallowing(self) -> None:
+        """Verifies AST checker flags 'except Exception: pass' as silent exception swallowing."""
+        from pathlib import Path
+        from src.meta_checks.check_ast import inspect_file
+
+        bad_py = self._create_file(
+            "bad_except.py",
+            "try:\n    x = 1\nexcept Exception:\n    pass\n"
+        )
+        _, _, _, _, bare_issues = inspect_file(Path(bad_py))
+        self.assertEqual(len(bare_issues), 1)
+        self.assertIn("Silent exception swallowing", bare_issues[0])
+
+        clean_py = self._create_file(
+            "clean_except.py",
+            "import logging\nlogger = logging.getLogger(__name__)\ntry:\n    x = 1\nexcept Exception as e:\n    logger.debug('Error: %s', e)\n"
+        )
+        _, _, _, _, clean_bare_issues = inspect_file(Path(clean_py))
+        self.assertEqual(len(clean_bare_issues), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

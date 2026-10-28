@@ -27,8 +27,9 @@ def _get_default_diacritic_hit() -> Optional[float]:
                 cfg = json.load(f)
             if "diacritic_hit" in cfg:
                 return float(cfg["diacritic_hit"])
-        except Exception:
-            pass
+        except Exception as ex:
+            import logging
+            logging.getLogger("cernodata.quality.languages").debug("Failed reading quality config: %s", ex)
     return None
 
 

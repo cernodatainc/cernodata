@@ -188,7 +188,7 @@ class TestDataShapeServer(unittest.TestCase):
                     with urllib.request.urlopen(req) as resp:
                         if resp.status == 200:
                             break
-                except Exception:
+                except (urllib.error.URLError, TimeoutError, OSError):
                     pass
 
         client_thread = threading.Thread(target=simulate_browser_client, daemon=True)

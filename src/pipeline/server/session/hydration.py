@@ -6,6 +6,7 @@ Results assembly and interactive visual viewer dataset hydration for server sess
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
@@ -24,6 +25,8 @@ from src.utils import resolve_pdf_path
 
 if TYPE_CHECKING:
     from src.pipeline.server.preset_cache import PresetCache
+
+logger = logging.getLogger("cernodata.server.session.hydration")
 
 
 class ViewerHydrationMixin:
@@ -61,8 +64,8 @@ class ViewerHydrationMixin:
                         prev = self.get_previous_runs()
                         if prev and prev[0].get("dir_path"):
                             target_to_load = prev[0]["dir_path"]
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        logger.debug("Failed resolving target to load from previous runs: %s", ex)
                 self.load_previous_run(target_to_load)
             v_list = normalize_violations(self.current_result.get("violations")) if self.current_result else []
             return {
@@ -101,8 +104,8 @@ class ViewerHydrationMixin:
                                 if prev_artifacts.dom:
                                     self.load_previous_run(prev_dir)
                                     return self.get_viewer_data(output_dir=prev_dir)
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        logger.debug("Failed discovering previous run for viewer hydration: %s", ex)
 
                 raise ValueError(
                     f"DocumentDOM artifact is missing or empty in run directory '{target_full}'. "
