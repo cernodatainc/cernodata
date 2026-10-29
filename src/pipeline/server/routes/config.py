@@ -14,6 +14,7 @@ from src.pipeline.planner.options import (
     TAXONOMY_OPTIONS,
     WIZARD_DIMENSIONS,
 )
+from src.quality.layers import ALL_VERIFICATION_LAYERS, DEFAULT_VERIFICATION_LAYERS, LAYER_METADATA
 from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
 
@@ -78,6 +79,9 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             "security_options": SECURITY_OPTIONS,
             "previous_runs": self.session.get_previous_runs(),
             "active_run": self.session.output_dir,
+            "verification_layers": ALL_VERIFICATION_LAYERS,
+            "default_verification_layers": DEFAULT_VERIFICATION_LAYERS,
+            "verification_layer_metadata": LAYER_METADATA,
             "custom_presets": self._get_custom_presets_catalog(),
             "ollama_status": self._get_ollama_models_status(),
             "template_hints": self._get_template_hints_catalog(),

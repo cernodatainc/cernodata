@@ -234,6 +234,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             self._handle_post_calculate_scores(payload)
         elif raw_path == "/api/submit_plan":
             self._handle_post_submit_plan(payload)
+        elif raw_path in ("/api/verify_layers", "/api/reverify", "/api/verify"):
+            self._handle_post_verify_layers(payload)
         elif raw_path == "/api/save_dom":
             self._handle_post_save_dom(payload)
         elif raw_path in ("/api/parse_section_ocr", "/api/ocr_section"):

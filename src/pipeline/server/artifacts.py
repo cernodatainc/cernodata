@@ -30,6 +30,7 @@ class RunArtifacts:
     raw_dom: Dict[str, Any] = field(default_factory=dict)
     diff: Dict[str, Any] = field(default_factory=dict)
     violations: List[Dict[str, Any]] = field(default_factory=list)
+    verification_result: Dict[str, Any] = field(default_factory=dict)
     chosen_preset: str = "N/A"
     status: str = "ACCEPT"
     overall_confidence: Optional[float] = None
@@ -55,6 +56,7 @@ class RunArtifacts:
             "raw_dom": self.raw_dom,
             "diff": self.diff,
             "violations": self.violations,
+            "verification_result": self.verification_result,
             "chosen_preset": self.chosen_preset,
             "status": self.status,
             "overall_confidence": self.overall_confidence,
@@ -78,6 +80,9 @@ class ViewerDataset(TypedDict, total=False):
     pageDimensions: List[Dict[str, float]]
     totalPages: int
     outputDir: str
+    verificationResult: Dict[str, Any]
+    verificationLayers: List[str]
+    layerScores: Dict[str, float]
     activeStep: Optional[int]
 
 
@@ -171,6 +176,9 @@ def load_run_artifacts(run_dir: str) -> RunArtifacts:
     raw_dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "raw_document_dom.json"), {}) or dom_data
     diff_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "run_diff.json"), {})
 
+    verif_res_path = os.path.join(run_dir, "verification_result.json")
+    verif_res_data: Dict[str, Any] = safe_load_json(verif_res_path, {})
+
     q_viols_path = os.path.join(run_dir, "quality_violations.json")
     saved_viols = safe_load_json(q_viols_path, None)
     raw_viols = saved_viols if saved_viols is not None else plan_res_data.get("violations", [])
@@ -230,6 +238,7 @@ def load_run_artifacts(run_dir: str) -> RunArtifacts:
         raw_dom=raw_dom_data,
         diff=diff_data,
         violations=violations,
+        verification_result=verif_res_data,
         chosen_preset=chosen_preset,
         status=status,
         overall_confidence=overall_confidence,
@@ -300,6 +309,15 @@ def build_viewer_dataset(
     det_langs = decision.get("detected_languages") if isinstance(decision, dict) else None
     detected_languages = det_langs if isinstance(det_langs, dict) else {}
 
+    verif_res = safe_load_json(os.path.join(resolved_output_dir, "verification_result.json"), {})
+    verif_layers = (
+        decision.get("selected_layers")
+        or verif_res.get("selected_layers")
+        or (plan.get("verification_layers") if plan else None)
+        or []
+    )
+    layer_scores = decision.get("layer_scores") or verif_res.get("layer_scores") or {}
+
     dataset: ViewerDataset = {
         "dom": dom,
         "raw_dom": resolved_raw_dom,
@@ -314,6 +332,9 @@ def build_viewer_dataset(
         "pageDimensions": page_dimensions,
         "totalPages": total_pages,
         "outputDir": resolved_output_dir,
+        "verificationResult": verif_res,
+        "verificationLayers": list(verif_layers),
+        "layerScores": dict(layer_scores),
     }
     return dataset
 

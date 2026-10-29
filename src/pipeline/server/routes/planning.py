@@ -86,6 +86,8 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
 
             override_primary = payload.get("override_primary")
             override_order = payload.get("override_order")
+            raw_layers = payload.get("verification_layers")
+            verification_layers = [str(x) for x in raw_layers] if isinstance(raw_layers, (list, tuple)) else None
 
             plan = planner.create_plan(
                 document_path=document_path,
@@ -94,6 +96,7 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
                 target_threshold=target_threshold,
                 override_primary=override_primary,
                 override_order=override_order,
+                verification_layers=verification_layers,
             )
 
         self.session.submitted_plan = plan

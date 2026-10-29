@@ -5,8 +5,10 @@ End-to-end pipeline runner orchestrating parsing, text skew alignment, quality e
 Supports executing custom and planner-generated execution plans.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Union
+import os
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
+from src.dom import DocumentDOM
 from src.pipeline.artifact_pipeline import PipelineArtifactPipeline
 from src.pipeline.attempt_runner import AttemptRunner
 from src.pipeline.config_resolver import PipelineConfigResolver
@@ -15,6 +17,10 @@ from src.pipeline.execution_models import PipelineExecutionResult
 from src.pipeline.fallback_handler import FallbackLoopHandler
 from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 from src.pipeline.progress_notifier import PipelineProgressNotifier
+from src.quality.materialization import (
+    MaterializedVerificationResult,
+    materialize_document_verification,
+)
 from src.utils import resolve_pdf_path
 
 __all__ = [
@@ -99,6 +105,34 @@ class PipelineOrchestrator:
 
         return result
 
+    def reverify(
+        self,
+        output_dir: str,
+        selected_layers: Optional[Sequence[str]] = None,
+        language: Optional[str] = None,
+        target_threshold: Optional[float] = None,
+        dom: Optional[DocumentDOM] = None,
+    ) -> MaterializedVerificationResult:
+        """
+        Re-evaluates document verification after finishing a run based on selected criteria
+        and materializes the updated scores and violations into run artifacts.
+        """
+        if dom is None:
+            dom_path = os.path.join(output_dir, "document_dom.json")
+            if not os.path.exists(dom_path):
+                raise FileNotFoundError(f"document_dom.json not found in output directory: {output_dir}")
+            dom = DocumentDOM.load(dom_path)
+
+        thresh = target_threshold if target_threshold is not None else DEFAULT_TARGET_CONFIDENCE_THRESHOLD
+        return materialize_document_verification(
+            dom=dom,
+            selected_layers=selected_layers,
+            language=language,
+            target_threshold=thresh,
+            output_dir=output_dir,
+            persist=True,
+        )
+
     def run(
         self,
         pdf_path: Optional[str] = None,
@@ -110,6 +144,7 @@ class PipelineOrchestrator:
         output_dir: str = "output",
         plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
         config: Optional[IngestionConfig] = None,
+        verification_layers: Optional[Sequence[str]] = None,
         progress_callback: Optional[Callable[[int, str, str], None]] = None,
     ) -> PipelineExecutionResult:
         """Resolves inputs and executes pipeline."""
@@ -123,6 +158,7 @@ class PipelineOrchestrator:
             output_dir=output_dir,
             plan=plan,
             config=config,
+            verification_layers=verification_layers,
         )
         return self.execute(
             pdf_path=resolved_path,
@@ -142,6 +178,7 @@ def run_pipeline(
     output_dir: str = "output",
     plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
     config: Optional[IngestionConfig] = None,
+    verification_layers: Optional[Sequence[str]] = None,
     progress_callback: Optional[Callable[[int, str, str], None]] = None,
 ) -> PipelineExecutionResult:
     """Convenience functional entrypoint delegating to PipelineOrchestrator."""
@@ -155,5 +192,6 @@ def run_pipeline(
         output_dir=output_dir,
         plan=plan,
         config=config,
+        verification_layers=verification_layers,
         progress_callback=progress_callback,
     )

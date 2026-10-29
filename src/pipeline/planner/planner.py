@@ -31,7 +31,7 @@ class PresetPlanner:
     def calculate_scores(
         self,
         criteria: Optional[Union[PlannerCriteria, str]] = None,
-        taxonomy: Optional[str] = None,
+        taxonomy: Optional[Union[PlannerCriteria, str]] = None,
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
     ) -> Dict[str, float]:
@@ -64,28 +64,41 @@ class PresetPlanner:
         self,
         document_path: str = "",
         criteria: Optional[Union[PlannerCriteria, str]] = None,
-        taxonomy: Optional[str] = None,
+        taxonomy: Optional[Union[PlannerCriteria, str]] = None,
         target: str = "high_precision_structure",
         security: str = "air_gapped_local",
         language: Optional[str] = None,
         target_threshold: float = 0.82,
         override_order: Optional[List[str]] = None,
         override_primary: Optional[str] = None,
+        verification_layers: Optional[List[str]] = None,
         *args: Any,
         **kwargs: Any,
     ) -> DocumentPlan:
         """Constructs an executable DocumentPlan instance using strongly-typed PlannerCriteria."""
         if isinstance(criteria, PlannerCriteria):
             resolved_criteria = criteria
+            if verification_layers is not None:
+                resolved_criteria.verification_layers = list(verification_layers)
         elif isinstance(taxonomy, PlannerCriteria):
             resolved_criteria = taxonomy
+            if verification_layers is not None:
+                resolved_criteria.verification_layers = list(verification_layers)
         else:
             tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
-            resolved_criteria = PlannerCriteria(
-                taxonomy=tax,
-                target=target,
-                security=security,
-            )
+            if verification_layers is not None:
+                resolved_criteria = PlannerCriteria(
+                    taxonomy=tax,
+                    target=target,
+                    security=security,
+                    verification_layers=list(verification_layers),
+                )
+            else:
+                resolved_criteria = PlannerCriteria(
+                    taxonomy=tax,
+                    target=target,
+                    security=security,
+                )
 
         scores = self.calculate_scores(criteria=resolved_criteria)
         suggested = self.suggest_preset_order(scores)
@@ -118,6 +131,7 @@ class PresetPlanner:
             suggested_order=suggested,
             overridden=overridden,
             scores=scores,
+            verification_layers=resolved_criteria.verification_layers,
             created_at=created_at_iso,
         )
 

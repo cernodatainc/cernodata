@@ -131,3 +131,51 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
         print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({nodes_len} nodes).")
         send_json_response(self, 200, {"success": True, "path": dom_file})  # type: ignore[arg-type]
 
+    def _handle_post_verify_layers(self, payload: Dict[str, Any]) -> None:
+        """
+        Re-evaluates document verification after finishing a run based on selected criteria
+        and materializes the updated scores and violations into run artifacts and server session.
+
+        Args:
+            payload: Dictionary containing output_dir, verification_layers, language, and target_threshold.
+        """
+        raw_out = payload.get("output_dir")
+        target_dir, _ = parse_run_dir_and_step(raw_out or self.session.output_dir or "output")
+        raw_layers = payload.get("verification_layers")
+        selected_layers = [str(x) for x in raw_layers] if isinstance(raw_layers, (list, tuple)) else None
+        language = payload.get("language") or self.session.language or "en"
+        try:
+            target_threshold = float(payload.get("target_threshold", 0.82))
+        except (ValueError, TypeError):
+            target_threshold = 0.82
+
+        from src.pipeline.orchestrator import PipelineOrchestrator
+        try:
+            orchestrator = PipelineOrchestrator()
+            result = orchestrator.reverify(
+                output_dir=target_dir,
+                selected_layers=selected_layers,
+                language=language,
+                target_threshold=target_threshold,
+            )
+            self.session.viewer_data = None
+            if self.session.current_result:
+                self.session.current_result["violations"] = result.violations
+                if "decision" in self.session.current_result:
+                    dec = self.session.current_result["decision"]
+                    dec["overall_confidence"] = result.overall_confidence
+                    dec["per_page_confidence"] = result.per_page_confidence
+                    dec["selected_layers"] = result.selected_layers
+                    dec["layer_scores"] = result.layer_scores
+                    dec["status"] = result.status
+
+            send_json_response(self, 200, {  # type: ignore[arg-type]
+                "success": True,
+                "result": result.to_dict(),
+            })
+        except Exception as e:
+            send_json_response(self, 500, {  # type: ignore[arg-type]
+                "success": False,
+                "error": str(e),
+            })
+

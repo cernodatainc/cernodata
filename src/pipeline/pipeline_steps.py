@@ -4,7 +4,7 @@ src/pipeline/pipeline_steps.py
 Discrete execution steps for skew alignment, quality inspection, and decision evaluation.
 """
 
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Sequence
 
 from src.dom import DocumentDOM
 from src.quality import detect_quality_violations, apply_text_skew_alignment
@@ -47,21 +47,28 @@ def evaluate_quality_and_decision_tree(
     current_preset_score: float = 0.90,
     next_preset_score: float = 0.72,
     config: Optional[IngestionConfig] = None,
+    verification_layers: Optional[Sequence[str]] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """Extracts quality violation records and evaluates confidence scores against target threshold."""
+    """Extracts quality violation records and evaluates confidence scores against target threshold across verification layers."""
+    layers = verification_layers
     if config is not None:
         target_threshold = config.target_threshold
         language = config.language
         preset = config.preset
+        if config.verification_layers is not None:
+            layers = config.verification_layers
 
     engine = DecisionTreeEngine(
         target_threshold=target_threshold,
         current_preset_score=current_preset_score,
         next_preset_score=next_preset_score,
         language=language,
+        verification_layers=layers,
     )
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset
     detected_langs = decision.get("detected_languages")
-    violations = detect_quality_violations(dom, language=language, page_languages=detected_langs)
+    violations = detect_quality_violations(
+        dom, language=language, page_languages=detected_langs, layers=layers
+    )
     return decision, violations

@@ -17,10 +17,13 @@ from src.utils import mkdirs
 
 @dataclass
 class PlannerCriteria:
-    """Strongly-typed criteria inputs for preset suitability ranking."""
+    """Strongly-typed criteria inputs for preset suitability ranking and verification."""
     taxonomy: str = "general_text"
     target: str = "high_precision_structure"
     security: str = "air_gapped_local"
+    verification_layers: List[str] = field(
+        default_factory=lambda: ["symbols", "diacritics", "structure", "tables", "geometry"]
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -30,10 +33,16 @@ class PlannerCriteria:
         taxonomy = str(data.get("taxonomy", "general_text"))
         target = str(data.get("target", "high_precision_structure"))
         security = str(data.get("security", "air_gapped_local"))
+        raw_layers = data.get("verification_layers")
+        if raw_layers is not None and isinstance(raw_layers, (list, tuple)):
+            layers = [str(x) for x in raw_layers]
+        else:
+            layers = ["symbols", "diacritics", "structure", "tables", "geometry"]
         return cls(
             taxonomy=taxonomy,
             target=target,
             security=security,
+            verification_layers=layers,
         )
 
     def values(self) -> List[str]:
@@ -53,6 +62,7 @@ class IngestionConfig:
     ocr_scale: Optional[float] = None
     force_full_page_ocr: bool = False
     do_table_structure: bool = True
+    verification_layers: Optional[List[str]] = None
     # TODO(stride): Extend `IngestionConfig` with optional paths/flags for `test_suite_path` (TASK-107),
     # `custom_presets_path` (TASK-204), `postprocess_steps` (TASK-506), and `template_hint_path` (TASK-903).
 
@@ -71,6 +81,8 @@ class IngestionConfig:
         ocr_scale = float(raw_scale) if raw_scale is not None else None
         force_full_page_ocr = bool(data.get("force_full_page_ocr", False))
         do_table_structure = bool(data.get("do_table_structure", True))
+        raw_layers = data.get("verification_layers")
+        verification_layers = [str(x) for x in raw_layers] if raw_layers is not None else None
 
         return cls(
             target_threshold=target_threshold,
@@ -82,6 +94,7 @@ class IngestionConfig:
             ocr_scale=ocr_scale,
             force_full_page_ocr=force_full_page_ocr,
             do_table_structure=do_table_structure,
+            verification_layers=verification_layers,
         )
 
 
@@ -98,6 +111,9 @@ class DocumentPlan:
     suggested_order: List[str] = field(default_factory=lambda: ["docling_fast"])
     overridden: bool = False
     scores: Dict[str, float] = field(default_factory=dict)
+    verification_layers: List[str] = field(
+        default_factory=lambda: ["symbols", "diacritics", "structure", "tables", "geometry"]
+    )
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
@@ -134,6 +150,7 @@ class DocumentPlan:
             "suggested_order": self.suggested_order,
             "overridden": self.overridden,
             "scores": self.scores,
+            "verification_layers": self.verification_layers,
             "created_at": self.created_at,
         }
 
@@ -151,6 +168,7 @@ class DocumentPlan:
             align_skew=align_skew,
             visualize=visualize,
             output_dir=output_dir,
+            verification_layers=self.verification_layers,
         )
 
     def evolve(self, **changes: Any) -> DocumentPlan:
@@ -182,6 +200,8 @@ class DocumentPlan:
         suggested_order = list(data.get("suggested_order", ["docling_fast"]))
         overridden = bool(data.get("overridden", False))
         scores = dict(data.get("scores", {}))
+        raw_layers = data.get("verification_layers", criteria.verification_layers)
+        verification_layers = [str(x) for x in raw_layers] if raw_layers is not None else ["symbols", "diacritics", "structure", "tables", "geometry"]
         now_iso = datetime.now(timezone.utc).isoformat()
         created_at = str(data.get("created_at", now_iso))
 
@@ -196,6 +216,7 @@ class DocumentPlan:
             suggested_order=suggested_order,
             overridden=overridden,
             scores=scores,
+            verification_layers=verification_layers,
             created_at=created_at,
         )
 

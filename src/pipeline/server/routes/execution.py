@@ -129,12 +129,16 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             elif primary_override:
                 override_order = [str(primary_override)]
 
+            raw_verif_layers = plan_config.get("verification_layers") or payload.get("verification_layers")
+            resolved_verif_layers = [str(x) for x in raw_verif_layers] if isinstance(raw_verif_layers, (list, tuple)) else None
+
             plan_obj = planner.create_plan(
                 document_path=pdf_path,
                 criteria=criteria,
                 language=language,
                 target_threshold=threshold,
                 override_order=override_order,
+                verification_layers=resolved_verif_layers,
             )
             if plan_obj and plan_obj.primary_preset:
                 preset = plan_obj.primary_preset
@@ -145,6 +149,12 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
 
         session = self.session
         on_progress = session.make_progress_callback()
+        direct_verif_layers = payload.get("verification_layers")
+        resolved_run_layers = (
+            [str(x) for x in direct_verif_layers]
+            if isinstance(direct_verif_layers, (list, tuple))
+            else None
+        )
 
         def _execute_run() -> PipelineExecutionResult:
             res = run_pipeline(
@@ -155,6 +165,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 align_skew=align_skew,
                 visualize=visualize,
                 plan=plan_obj,
+                verification_layers=resolved_run_layers,
                 progress_callback=on_progress,
             )
             session.update_result_state(res, pdf_path=pdf_path, language=language)
