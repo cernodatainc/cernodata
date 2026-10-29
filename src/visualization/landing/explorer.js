@@ -105,6 +105,7 @@ function renderExplorerUI() {
 
     renderExplorerTree();
     renderExplorerMainView();
+    if (typeof updateNextStepHints === 'function') updateNextStepHints();
 }
 
 /** Renders hierarchical tree on the left. Exactly one row is highlighted for active scope. */
@@ -491,9 +492,8 @@ function onExplorerSearchChanged(query) {
     explorerSearchQuery = query;
     renderExplorerTree();
     renderExplorerMainView();
+    if (typeof updateNextStepHints === 'function') updateNextStepHints();
 }
 
 /** Refreshes explorer data from backend. */
-function refreshExplorerData() {
-    loadFileRunMappings();
-}
+function refreshExplorerData() { loadFileRunMappings(); }

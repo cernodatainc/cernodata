@@ -12,6 +12,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof loadFileRunMappings === 'function') loadFileRunMappings();
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof loadRunsGrid === 'function') loadRunsGrid();
+    if (typeof updateNextStepHints === 'function') updateNextStepHints();
 
     const inpPdf = document.getElementById('inpPdfPath');
     const docPathInput = document.getElementById('docPath');

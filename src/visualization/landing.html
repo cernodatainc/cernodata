@@ -103,8 +103,12 @@
                                 <input type="text" class="form-input explorer-search-input" id="explorerSearchInput"
                                     placeholder="Filter files, file sets, or runs..." oninput="onExplorerSearchChanged(this.value)">
                                 <button class="btn btn-secondary btn-sm" onclick="refreshExplorerData()" title="Rescan files and runs">Rescan</button>
+                                <button class="btn btn-subtle btn-sm hint-toggle-btn" id="btnToggleHints" onclick="toggleHintsFromToolbar()" title="Toggle next-step guidance hints">Hints: On</button>
                             </div>
                         </div>
+
+                        <!-- Contextual Next-Step Hint Layer -->
+                        <div id="explorerHintContainer" class="explorer-hint-container"></div>
 
                         <div class="explorer-active-bar">
                             <div class="explorer-breadcrumb">
