@@ -11,6 +11,7 @@ import os
 from typing import Any, Dict, Optional
 
 from src.pipeline.server.http_utils import parse_run_dir_and_step, send_json_response
+from src.pipeline.server.router import api_router
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
 from src.utils import mkdirs
 
@@ -131,6 +132,7 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
         print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({nodes_len} nodes).")
         send_json_response(self, 200, {"success": True, "path": dom_file})  # type: ignore[arg-type]
 
+    @api_router.post("/api/verify_layers", "/api/reverify", "/api/verify")
     def _handle_post_verify_layers(self, payload: Dict[str, Any]) -> None:
         """
         Re-evaluates document verification after finishing a run based on selected criteria

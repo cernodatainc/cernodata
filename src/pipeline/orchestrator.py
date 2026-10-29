@@ -146,6 +146,7 @@ class PipelineOrchestrator:
         config: Optional[IngestionConfig] = None,
         verification_layers: Optional[Sequence[str]] = None,
         progress_callback: Optional[Callable[[int, str, str], None]] = None,
+        **extra_options: Any,
     ) -> PipelineExecutionResult:
         """Resolves inputs and executes pipeline."""
         resolved_path, cfg, plan_obj = PipelineConfigResolver.resolve_request(
@@ -159,6 +160,7 @@ class PipelineOrchestrator:
             plan=plan,
             config=config,
             verification_layers=verification_layers,
+            **extra_options,
         )
         return self.execute(
             pdf_path=resolved_path,
@@ -180,6 +182,7 @@ def run_pipeline(
     config: Optional[IngestionConfig] = None,
     verification_layers: Optional[Sequence[str]] = None,
     progress_callback: Optional[Callable[[int, str, str], None]] = None,
+    **extra_options: Any,
 ) -> PipelineExecutionResult:
     """Convenience functional entrypoint delegating to PipelineOrchestrator."""
     return PipelineOrchestrator().run(
@@ -194,4 +197,5 @@ def run_pipeline(
         config=config,
         verification_layers=verification_layers,
         progress_callback=progress_callback,
+        **extra_options,
     )

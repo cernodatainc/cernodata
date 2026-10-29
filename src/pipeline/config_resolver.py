@@ -38,11 +38,14 @@ class PipelineConfigResolver:
         visualize: bool = True,
         output_dir: str = "output",
         verification_layers: Optional[Sequence[str]] = None,
+        **extra_options: Any,
     ) -> IngestionConfig:
         """Resolves concrete IngestionConfig from explicit config, plan, or parameters."""
         if config is not None:
             if verification_layers is not None:
                 config.verification_layers = list(verification_layers)
+            for k, v in extra_options.items():
+                config.options[k] = v
             return config
         if plan_obj is not None:
             cfg = plan_obj.to_ingestion_config(
@@ -52,6 +55,8 @@ class PipelineConfigResolver:
             )
             if verification_layers is not None:
                 cfg.verification_layers = list(verification_layers)
+            for k, v in extra_options.items():
+                cfg.options[k] = v
             return cfg
         layers = list(verification_layers) if verification_layers is not None else None
         return IngestionConfig(
@@ -62,6 +67,7 @@ class PipelineConfigResolver:
             visualize=visualize,
             output_dir=output_dir,
             verification_layers=layers,
+            options=dict(extra_options),
         )
 
     @classmethod
@@ -77,6 +83,7 @@ class PipelineConfigResolver:
         plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
         config: Optional[IngestionConfig] = None,
         verification_layers: Optional[Sequence[str]] = None,
+        **extra_options: Any,
     ) -> Tuple[str, IngestionConfig, Optional[DocumentPlan]]:
         """Resolves target PDF path, IngestionConfig, and DocumentPlan."""
         plan_obj = cls.resolve_plan(plan)
@@ -90,6 +97,7 @@ class PipelineConfigResolver:
             visualize=visualize,
             output_dir=output_dir,
             verification_layers=verification_layers,
+            **extra_options,
         )
         resolved_path = pdf_path or (plan_obj.document_path if plan_obj else None)
         if not resolved_path:

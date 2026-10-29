@@ -25,6 +25,7 @@ from src.pipeline.server.http_utils import (
 )
 from src.pipeline.server.routes import ApiRoutesMixin
 from src.pipeline.server.routes_static import StaticRoutesMixin
+from src.pipeline.server.router import api_router
 from src.pipeline.server.session import ServerSessionContext
 
 logger = logging.getLogger("cernodata.server.handler")
@@ -133,6 +134,9 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
         raw_path = parsed_url.path
         query_params = parse_qs(parsed_url.query)
 
+        if api_router.dispatch_get(self, raw_path, query_params):
+            return
+
         if raw_path in ("", "/", "/index.html", "/landing", "/hub"):
             self._serve_landing_page()
         elif raw_path == "/viewer.html":
@@ -220,6 +224,9 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
         parsed_url = urlparse(self.path)
         raw_path = parsed_url.path
         payload = read_json_payload(self)
+
+        if api_router.dispatch_post(self, raw_path, payload):
+            return
 
         if raw_path == "/api/load_run":
             target_dir = payload.get("output_dir") or payload.get("run_id") or "output"

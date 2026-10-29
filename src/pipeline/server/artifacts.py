@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
+from src.pipeline.artifact_registry import default_artifact_registry
 from src.pipeline.execution_models import AttemptRecord
 
 logger = logging.getLogger("cernodata.server.artifacts")
@@ -31,6 +32,7 @@ class RunArtifacts:
     diff: Dict[str, Any] = field(default_factory=dict)
     violations: List[Dict[str, Any]] = field(default_factory=list)
     verification_result: Dict[str, Any] = field(default_factory=dict)
+    artifacts: Dict[str, Any] = field(default_factory=dict)
     chosen_preset: str = "N/A"
     status: str = "ACCEPT"
     overall_confidence: Optional[float] = None
@@ -41,14 +43,18 @@ class RunArtifacts:
         try:
             return getattr(self, key)
         except AttributeError:
+            if key in self.artifacts:
+                return self.artifacts[key]
             raise KeyError(key)
 
     def get(self, key: str, default: Any = None) -> Any:
-        return getattr(self, key, default)
+        if hasattr(self, key):
+            return getattr(self, key)
+        return self.artifacts.get(key, default)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes artifacts to dictionary mapping."""
-        return {
+        res = {
             "plan_execution_result": self.plan_execution_result,
             "plan": self.plan,
             "decision": self.decision,
@@ -63,6 +69,11 @@ class RunArtifacts:
             "document_path": self.document_path,
             "document_name": self.document_name,
         }
+        if self.artifacts:
+            res["artifacts"] = self.artifacts
+            for k, v in self.artifacts.items():
+                res.setdefault(k, v)
+        return res
 
 
 class ViewerDataset(TypedDict, total=False):
@@ -239,6 +250,7 @@ def load_run_artifacts(run_dir: str) -> RunArtifacts:
         diff=diff_data,
         violations=violations,
         verification_result=verif_res_data,
+        artifacts=default_artifact_registry.load_artifacts(run_dir),
         chosen_preset=chosen_preset,
         status=status,
         overall_confidence=overall_confidence,

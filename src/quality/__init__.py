@@ -27,6 +27,11 @@ from src.quality.layers import (
     normalize_layer_name,
     normalize_layers,
 )
+from src.quality.registry import (
+    QualityRegistry,
+    VerificationLayerHandler,
+    default_quality_registry,
+)
 from src.quality.materialization import (
     MaterializedVerificationResult,
     materialize_document_verification,
@@ -41,11 +46,14 @@ __all__ = [
     "LAYER_METADATA",
     "LanguageConfig",
     "MaterializedVerificationResult",
+    "QualityRegistry",
     "VerificationLayer",
+    "VerificationLayerHandler",
     "apply_text_skew_alignment",
     "compute_garbage_details",
     "compute_garbage_ratio",
     "compute_language_score",
+    "default_quality_registry",
     "detect_document_languages",
     "detect_node_text_skew",
     "detect_page_language",

@@ -97,13 +97,13 @@ def normalize_layer_name(name: str) -> Optional[str]:
     if not name:
         return None
     cleaned = name.strip().lower()
-    return LAYER_ALIASES.get(cleaned, cleaned if cleaned in ALL_VERIFICATION_LAYERS else None)
+    return LAYER_ALIASES.get(cleaned, cleaned)
 
 
 def normalize_layers(layers: Optional[Sequence[str]]) -> List[str]:
     """
     Normalizes a sequence of layer names into an ordered list of unique canonical layers.
-    If input is None or empty, returns a copy of ALL_VERIFICATION_LAYERS.
+    If input is None, returns a copy of ALL_VERIFICATION_LAYERS.
     """
     if layers is None:
         return list(ALL_VERIFICATION_LAYERS)
@@ -116,4 +116,4 @@ def normalize_layers(layers: Optional[Sequence[str]]) -> List[str]:
             seen.add(resolved)
             normalized.append(resolved)
 
-    return normalized if normalized else list(ALL_VERIFICATION_LAYERS)
+    return normalized
