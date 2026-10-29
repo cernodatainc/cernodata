@@ -235,6 +235,23 @@ def remove_run_mapping(
         return True
 
 
+def _is_run_removed(r: Dict[str, Any], removed_runs: Set[str]) -> bool:
+    """Returns True if a discovered run matches any recorded removal key."""
+    r_id = normalize_path(str(r.get("id") or ""))
+    r_dir = normalize_path(str(r.get("dir_path") or "output"))
+    r_doc = normalize_path(str(r.get("document_path") or ""))
+    r_doc_name = os.path.basename(r_doc) if r_doc else str(r.get("document_name") or "")
+    if r_id != "output" and r_id in removed_runs:
+        return True
+    if r_dir != "output" and r_dir in removed_runs:
+        return True
+    if r_doc and (f"{r_doc}::{r_id}" in removed_runs or f"{r_doc}::{r_dir}" in removed_runs):
+        return True
+    if r_doc_name and (f"{r_doc_name}::{r_id}" in removed_runs or f"{r_doc_name}::{r_dir}" in removed_runs):
+        return True
+    return False
+
+
 def get_file_run_mappings(
     repo_root: Optional[str] = None,
     available_docs: Optional[List[str]] = None,
@@ -250,22 +267,8 @@ def get_file_run_mappings(
         if not isinstance(raw_removed, list):
             raw_removed = []
         removed_runs: Set[str] = {normalize_path(str(x)) for x in raw_removed if x}
-        def _is_run_removed(r: Dict[str, Any]) -> bool:
-            r_id = normalize_path(str(r.get("id") or ""))
-            r_dir = normalize_path(str(r.get("dir_path") or "output"))
-            r_doc = normalize_path(str(r.get("document_path") or ""))
-            r_doc_name = os.path.basename(r_doc) if r_doc else str(r.get("document_name") or "")
-            if r_id != "output" and r_id in removed_runs:
-                return True
-            if r_dir != "output" and r_dir in removed_runs:
-                return True
-            if r_doc and (f"{r_doc}::{r_id}" in removed_runs or f"{r_doc}::{r_dir}" in removed_runs):
-                return True
-            if r_doc_name and (f"{r_doc_name}::{r_id}" in removed_runs or f"{r_doc_name}::{r_dir}" in removed_runs):
-                return True
-            return False
 
-        discovered_runs = [r for r in find_previous_runs(root) if not _is_run_removed(r)]
+        discovered_runs = [r for r in find_previous_runs(root) if not _is_run_removed(r, removed_runs)]
 
         # 1. Discover all candidate PDF files
         doc_paths: Set[str] = set()

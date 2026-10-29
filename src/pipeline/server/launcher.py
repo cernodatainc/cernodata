@@ -7,6 +7,7 @@ Entry points for launching the pipeline viewer hub and standalone data shape wiz
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import webbrowser
 from typing import Any, List, Optional
@@ -22,14 +23,16 @@ from src.pipeline.server.handler import PipelineViewerHandler
 from src.pipeline.server.session import ServerSessionContext
 from src.utils import find_available_port, mkdirs
 
+logger = logging.getLogger("cernodata.server.launcher")
+
 
 def print_banner(lines: List[str]) -> None:
     """Prints a standardized server startup banner."""
     sep = "=" * 68
-    print(sep, flush=True)
+    print(sep, flush=True)  # allow-print: interactive server startup banner shown to the console user
     for line in lines:
-        print(line, flush=True)
-    print(sep, flush=True)
+        print(line, flush=True)  # allow-print: interactive server startup banner shown to the console user
+    print(sep, flush=True)  # allow-print: interactive server startup banner shown to the console user
 
 
 def export_standalone_wizard_assets(output_dir: str, html_content: str) -> None:
@@ -91,7 +94,7 @@ def serve_data_shape_wizard(
     try:
         httpd.serve_forever(poll_interval=0.1)
     except KeyboardInterrupt:
-        print("\n[SERVER] Data shape session interrupted by user.")
+        logger.info("Data shape session interrupted by user.")
         httpd.server_close()
         raise
 
@@ -136,7 +139,7 @@ def start_pipeline_server(
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n[SERVER] Stopping pipeline server.")
+        logger.info("Stopping pipeline server.")
         httpd.server_close()
 
 

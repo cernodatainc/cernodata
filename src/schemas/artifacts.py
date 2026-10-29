@@ -82,8 +82,8 @@ def load_validated_run_artifacts(run_dir: str) -> Optional[ValidatedRunArtifacts
     if isinstance(plan_res_raw, dict):
         try:
             exec_result = PipelineExecutionResultSchema.model_validate(plan_res_raw)
-        except ValidationError:
-            pass
+        except ValidationError as e:
+            logger.debug("Ignoring invalid plan_execution_result.json in %s: %s", run_dir, e)
 
     if dec_raw is None and exec_result and exec_result.decision:
         dec_schema = exec_result.decision
@@ -107,8 +107,8 @@ def load_validated_run_artifacts(run_dir: str) -> Optional[ValidatedRunArtifacts
         if isinstance(plan_raw, dict):
             try:
                 plan_schema = DocumentPlanSchema.model_validate(plan_raw)
-            except ValidationError:
-                pass
+            except ValidationError as e:
+                logger.debug("Ignoring invalid plan.json in %s: %s", run_dir, e)
 
     # Load violations
     q_viols_path = os.path.join(run_dir, "quality_violations.json")
@@ -128,8 +128,8 @@ def load_validated_run_artifacts(run_dir: str) -> Optional[ValidatedRunArtifacts
     if isinstance(raw_dom_data, dict):
         try:
             raw_dom_schema = DocumentDOMSchema.model_validate(raw_dom_data)
-        except ValidationError:
-            pass
+        except ValidationError as e:
+            logger.debug("Ignoring invalid raw_document_dom.json in %s: %s", run_dir, e)
 
     diff_path = os.path.join(run_dir, "run_diff.json")
     diff_data = _read_json_file(diff_path) or {}

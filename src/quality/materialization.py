@@ -66,8 +66,8 @@ class MaterializedVerificationResult:
         for p_k, p_v in raw_per_page.items():
             try:
                 per_page[int(p_k)] = float(p_v)
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as ex:
+                logger.debug("Skipping invalid page score %r=%r: %s", p_k, p_v, ex)
         return per_page
 
     @staticmethod
@@ -77,8 +77,8 @@ class MaterializedVerificationResult:
             if isinstance(p_v, dict):
                 try:
                     per_page_layers[int(p_k)] = {str(k): float(v) for k, v in p_v.items()}
-                except (ValueError, TypeError):
-                    pass
+                except (ValueError, TypeError) as ex:
+                    logger.debug("Skipping invalid page layer scores for page %r: %s", p_k, ex)
         return per_page_layers
 
     @classmethod

@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 from src.parsers.section_ocr import parse_image_ocr, parse_section_from_pdf
 from src.pipeline.server.http_utils import send_json_response
-from src.pipeline.server.routes.base import BaseApiRoutesMixin
+from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 
 
 class OcrRoutesMixin(BaseApiRoutesMixin):
@@ -33,7 +33,7 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
         pdf_path = payload.get("pdf_path") or self.session.pdf_path
         language = payload.get("language") or self.session.language or "en"
 
-        print(f"\n[SERVER API] Parsing selected section '{node_id}' using OCR (Lang: {language})...")
+        logger.info("Parsing selected section '%s' using OCR (Lang: %s)", node_id, language)
 
         ocr_result: Any
         if image_base64:

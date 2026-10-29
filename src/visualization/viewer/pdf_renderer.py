@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import base64
 import io
+import logging
 from typing import List, Dict, Optional
 
 from src.parsers.pdf_utils import open_pdf
+
+logger = logging.getLogger("cernodata.visualization.pdf_renderer")
 
 
 def page_to_base64(pdf_path: str, page_index: int = 0, scale: float = 150 / 72.0) -> str:
@@ -23,7 +26,7 @@ def page_to_base64(pdf_path: str, page_index: int = 0, scale: float = 150 / 72.0
                 pil_img.save(buf, format="PNG")
                 return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
             except Exception as e:
-                print(f"[WARN] Base64 page render error: {e}")
+                logger.warning("Base64 page render error: %s", e)
 
     svg_canvas = '<svg xmlns="http://www.w3.org/2000/svg" width="612" height="792" style="background:#111827;"></svg>'
     return f"data:image/svg+xml;base64,{base64.b64encode(svg_canvas.encode('utf-8')).decode('utf-8')}"
@@ -39,7 +42,7 @@ def get_pdf_page_dimensions(pdf_path: str) -> List[Dict[str, float]]:
                     w, h = page.get_size()
                     dimensions.append({"width": round(float(w), 2), "height": round(float(h), 2)})
                 except Exception as e:
-                    print(f"[WARN] Could not retrieve PDF page dimensions: {e}")
+                    logger.warning("Could not retrieve PDF page dimensions: %s", e)
     return dimensions
 
 
@@ -56,7 +59,7 @@ def render_all_pages_to_base64(pdf_path: str, total_pages: Optional[int] = None,
                     pil_img.save(buf, format="PNG")
                     images.append(f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}")
                 except Exception as e:
-                    print(f"[WARN] Base64 all pages render error on page {i}: {e}")
+                    logger.warning("Base64 all pages render error on page %d: %s", i, e)
             if images:
                 return images
 

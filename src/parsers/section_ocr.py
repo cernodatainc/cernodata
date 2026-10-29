@@ -179,7 +179,8 @@ class SectionOCRParser:
             if box_val is not None:
                 try:
                     box_coords = [[float(p[0]), float(p[1])] for p in box_val]
-                except Exception:
+                except Exception as ex:
+                    logger.debug("Skipping malformed OCR box for line %d: %s", i, ex)
                     box_coords = None
 
             lines.append({
@@ -220,6 +221,7 @@ class SectionOCRParser:
         except TypeError as ex:
             return create_ocr_result(success=False, error=str(ex))
         except Exception as ex:
+            logger.warning("Failed to load OCR input image: %s", ex, exc_info=True)
             return create_ocr_result(success=False, error=f"Failed to load image: {str(ex)}")
 
         if pil_img.width <= 0 or pil_img.height <= 0:
@@ -232,6 +234,7 @@ class SectionOCRParser:
         try:
             result = self._run_engine(engine, pil_img)
         except Exception as ex:
+            logger.warning("OCR inference error: %s", ex, exc_info=True)
             return create_ocr_result(success=False, error=f"OCR inference error: {str(ex)}")
 
         joined_text, avg_confidence, lines = self._parse_engine_result(result)
@@ -275,6 +278,7 @@ class SectionOCRParser:
         except (FileNotFoundError, ValueError, IndexError, RuntimeError) as ex:
             return create_ocr_result(success=False, error=str(ex))
         except Exception as ex:
+            logger.warning("Failed to crop PDF section: %s", ex, exc_info=True)
             return create_ocr_result(success=False, error=f"Failed to crop PDF section: {str(ex)}")
 
         return self.parse_image(cropped_img, language=language)

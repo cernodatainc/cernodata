@@ -66,7 +66,8 @@ def extract_page_no_and_bbox(doc: Any, item: Any, prov_item: Any) -> Tuple[int, 
         try:
             tl = bbox.to_top_left_origin(page_height)
             x0, y0, x1, y1 = tl.l, tl.t, tl.r, tl.b
-        except Exception:
+        except Exception as ex:
+            logger.debug("to_top_left_origin failed, using fallback bbox conversion: %s", ex)
             x0, y0, x1, y1 = fallback_top_left_bbox(bbox, page_height)
     else:
         x0, y0, x1, y1 = fallback_top_left_bbox(bbox, page_height)
@@ -102,7 +103,8 @@ def figure_caption(item: Any, doc: Any) -> str:
         return ""
     try:
         caption = item.caption_text(doc)
-    except Exception:
+    except Exception as ex:
+        logger.debug("Figure caption extraction failed: %s", ex)
         return ""
     return caption.strip() if isinstance(caption, str) else ""
 

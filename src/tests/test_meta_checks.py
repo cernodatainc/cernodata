@@ -366,6 +366,50 @@ class TestMetaChecks(unittest.TestCase):
         _, _, _, _, clean_bare_issues = inspect_file(Path(clean_py))
         self.assertEqual(len(clean_bare_issues), 0)
 
+    def test_check_ast_flags_broad_handler_without_logging(self) -> None:
+        """Broad handlers must log or re-raise; narrow pass-only handlers are flagged too."""
+        from pathlib import Path
+        from src.meta_checks.check_ast import inspect_file
+
+        silent_return = self._create_file(
+            "silent_return.py",
+            "def f() -> int:\n    try:\n        return 1\n    except Exception:\n        return 0\n",
+        )
+        _, _, _, _, issues = inspect_file(Path(silent_return))
+        self.assertEqual(len(issues), 1)
+
+        narrow_pass = self._create_file(
+            "narrow_pass.py",
+            "try:\n    x = 1\nexcept OSError:\n    pass\n",
+        )
+        _, _, _, _, issues = inspect_file(Path(narrow_pass))
+        self.assertEqual(len(issues), 1)
+
+        reraise = self._create_file(
+            "reraise.py",
+            "try:\n    x = 1\nexcept Exception as e:\n    raise RuntimeError('x') from e\n",
+        )
+        _, _, _, _, issues = inspect_file(Path(reraise))
+        self.assertEqual(issues, [])
+
+        narrow_fallback = self._create_file(
+            "narrow_fallback.py",
+            "try:\n    x = int('1')\nexcept ValueError:\n    x = 0\n",
+        )
+        _, _, _, _, issues = inspect_file(Path(narrow_fallback))
+        self.assertEqual(issues, [])
+
+    def test_check_ast_flags_print_calls(self) -> None:
+        """print() is flagged unless the line carries an allow-print marker."""
+        from pathlib import Path
+        from src.meta_checks.check_ast import inspect_prints
+
+        bad = self._create_file("bad_print.py", "print('hello')\n")
+        self.assertEqual(len(inspect_prints(Path(bad))), 1)
+
+        allowed = self._create_file("ok_print.py", "print('banner')  # allow-print: CLI banner\n")
+        self.assertEqual(inspect_prints(Path(allowed)), [])
+
 
 if __name__ == "__main__":
     unittest.main()

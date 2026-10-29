@@ -2,7 +2,9 @@
 src/meta_checks/check_ast.py
 
 AST-based verification tool for detecting unused imports, undefined type annotations,
-BOM markers, mutable default argument anti-patterns, and bare except clauses in Python code.
+BOM markers, mutable default argument anti-patterns, bare except clauses, silent exception
+swallowing (broad handlers that neither log nor re-raise, or pass-only handlers), and print() calls
+in Python code.
 """
 
 from __future__ import annotations
@@ -36,6 +38,67 @@ def extract_names_from_annotation_string(node_str: str) -> set[str]:
         return {n.id for n in ast.walk(sub_tree) if isinstance(n, ast.Name)}
     except Exception:
         return set()
+
+
+_BROAD_EXCEPTIONS = {"Exception", "BaseException"}
+_LOG_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}
+PRINT_ALLOW_MARKER = "allow-print"
+# Top-level CLI entry points whose stdout is their user-facing interface (src/cli.py, src/main.py).
+CLI_ENTRYPOINT_FILES = {"cli.py", "main.py"}
+
+
+def _is_trivial_body(body: list[ast.stmt]) -> bool:
+    """Returns True if a handler body contains only pass, ellipsis, or bare constants (docstring-like)."""
+    return all(
+        isinstance(s, ast.Pass) or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
+        for s in body
+    )
+
+
+def _catches_broad_exception(exc_type: ast.expr) -> bool:
+    """Returns True if the handler type is Exception/BaseException or a tuple containing either."""
+    if isinstance(exc_type, ast.Name):
+        return exc_type.id in _BROAD_EXCEPTIONS
+    if isinstance(exc_type, ast.Tuple):
+        return any(_catches_broad_exception(elt) for elt in exc_type.elts)
+    return False
+
+
+def _handler_reports_error(handler: ast.ExceptHandler) -> bool:
+    """Returns True if the handler body re-raises or calls a logging method (logger.warning, etc.)."""
+    for stmt in handler.body:
+        for sub in ast.walk(stmt):
+            if isinstance(sub, ast.Raise):
+                return True
+            if (
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Attribute)
+                and sub.func.attr in _LOG_METHODS
+            ):
+                return True
+    return False
+
+
+def inspect_prints(file_path: Path) -> list[str]:
+    """
+    Flags print() calls in library code. Use a logger instead. A deliberate console
+    output (e.g. a CLI banner) can be allowed with a trailing '# allow-print: <reason>' comment.
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
+            content = f.read()
+        tree = ast.parse(content, filename=str(file_path))
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        return []
+    lines = content.splitlines()
+    issues: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print":
+            span = lines[node.lineno - 1 : (node.end_lineno or node.lineno)]
+            if any(PRINT_ALLOW_MARKER in line for line in span):
+                continue
+            issues.append(f"{file_path}:{node.lineno}: print() call; use a logger instead.")
+    return issues
 
 
 def collect_used_names(tree: ast.AST) -> set[str]:
@@ -128,19 +191,16 @@ def inspect_file(
                 bare_excepts.append(
                     f"{file_path}:{node.lineno}: Bare except clause detected."
                 )
-            elif isinstance(node.type, ast.Name) and node.type.id in ("Exception", "BaseException"):
-                non_trivial_stmts = [
-                    s
-                    for s in node.body
-                    if not (
-                        isinstance(s, ast.Pass)
-                        or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
-                    )
-                ]
-                if not non_trivial_stmts:
-                    bare_excepts.append(
-                        f"{file_path}:{node.lineno}: Silent exception swallowing ('except {node.type.id}: pass')."
-                    )
+            elif _is_trivial_body(node.body):
+                bare_excepts.append(
+                    f"{file_path}:{node.lineno}: Silent exception swallowing "
+                    f"('except {ast.unparse(node.type)}: pass')."
+                )
+            elif _catches_broad_exception(node.type) and not _handler_reports_error(node):
+                bare_excepts.append(
+                    f"{file_path}:{node.lineno}: Silent exception swallowing "
+                    f"('except {ast.unparse(node.type)}' neither logs nor re-raises)."
+                )
 
     used_names = collect_used_names(tree)
 
@@ -171,6 +231,7 @@ def run_checks(root_dir: str = "src") -> int:
     all_undefined: list[str] = []
     all_mutable: list[str] = []
     all_bare: list[str] = []
+    all_prints: list[str] = []
 
     for py_file in py_files:
         if "meta_checks" in py_file.parts:
@@ -180,7 +241,11 @@ def run_checks(root_dir: str = "src") -> int:
         all_unused.extend(unused)
         all_undefined.extend(undefined)
         all_mutable.extend(mutable)
-        all_bare.extend(bare)
+        is_test_file = "tests" in py_file.parts
+        if not is_test_file:
+            all_bare.extend(bare)
+            if py_file.name not in CLI_ENTRYPOINT_FILES or py_file.parent.name != target_path.name:
+                all_prints.extend(inspect_prints(py_file))
 
     total_issues = (
         len(all_bom)
@@ -188,6 +253,7 @@ def run_checks(root_dir: str = "src") -> int:
         + len(all_undefined)
         + len(all_mutable)
         + len(all_bare)
+        + len(all_prints)
     )
 
     if all_bom:
@@ -213,6 +279,11 @@ def run_checks(root_dir: str = "src") -> int:
     if all_bare:
         print("[ISSUE] Bare except clauses or silent exception swallowing detected:")
         for item in all_bare:
+            print(f"  - {item}")
+
+    if all_prints:
+        print("[ISSUE] print() calls detected in library code (use logging):")
+        for item in all_prints:
             print(f"  - {item}")
 
     if total_issues == 0:

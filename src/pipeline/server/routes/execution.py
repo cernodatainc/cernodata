@@ -90,6 +90,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             logger.info("Client disconnected before pipeline result could be returned.")
         except Exception as e:
+            logger.exception("Pipeline run failed for preset '%s'", preset)
             if record_session_error:
                 t_err = datetime.now().strftime("%H:%M:%S")
                 self.session.set_error(str(e), log=f"[{t_err}] [ERROR] Pipeline failure: {e}")
@@ -259,7 +260,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         if not force and self._try_serve_cached_preset(pdf_path, preset, language):
             return
 
-        print(f"\n[SERVER API] Triggering live pipeline rerun for preset: '{preset}' (PDF: {pdf_path}, Lang: {language})...")
+        logger.info("Triggering live pipeline rerun for preset: '%s' (PDF: %s, Lang: %s)", preset, pdf_path, language)
         from src.pipeline.orchestrator import run_pipeline
 
         session = self.session

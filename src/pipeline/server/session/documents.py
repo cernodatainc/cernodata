@@ -35,7 +35,7 @@ class DocumentsMixin:
             for match in glob.glob(pat):
                 try:
                     rel = os.path.relpath(match, self.repo_root).replace("\\", "/")
-                except Exception:
+                except ValueError:
                     rel = match.replace("\\", "/")
                 if rel not in docs:
                     docs.append(rel)

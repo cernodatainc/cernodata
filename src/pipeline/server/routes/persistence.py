@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 
 from src.pipeline.server.http_utils import parse_run_dir_and_step, send_json_response
 from src.pipeline.server.router import api_router
-from src.pipeline.server.routes.base import BaseApiRoutesMixin
+from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 from src.utils import mkdirs
 
 
@@ -126,10 +126,10 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
                         with open(h_path, "w", encoding="utf-8") as f:
                             f.write(new_h)
                 except Exception as exc:
-                    print(f"\n[SERVER API] Note: Could not update interactive_viewer.html: {exc}")
+                    logger.warning("Could not update interactive_viewer.html at %s: %s", h_path, exc)
 
         nodes_len = len(dom_data.get("nodes", [])) if isinstance(dom_data, dict) else 0
-        print(f"\n[SERVER API] Saved updated DocumentDOM to '{dom_file}' ({nodes_len} nodes).")
+        logger.info("Saved updated DocumentDOM to '%s' (%d nodes).", dom_file, nodes_len)
         send_json_response(self, 200, {"success": True, "path": dom_file})  # type: ignore[arg-type]
 
     @api_router.post("/api/verify_layers", "/api/reverify", "/api/verify")
@@ -176,6 +176,7 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
                 "result": result.to_dict(),
             })
         except Exception as e:
+            logger.exception("Layer re-verification failed for '%s'", target_dir)
             send_json_response(self, 500, {  # type: ignore[arg-type]
                 "success": False,
                 "error": str(e),
