@@ -14,7 +14,6 @@ import threading
 import time
 import unittest
 import urllib.parse
-import urllib.request
 from http.server import HTTPServer
 from typing import Any, Dict
 
@@ -23,6 +22,7 @@ from src.pipeline.server import (
     find_available_port,
     find_previous_runs,
 )
+from src.tests.conftest import http_get, http_post_json
 
 
 class TestPipelineServer(unittest.TestCase):
@@ -76,37 +76,10 @@ class TestPipelineServer(unittest.TestCase):
             shutil.rmtree(os.path.join(os.getcwd(), "output"), ignore_errors=True)
 
     def _get(self, path: str) -> tuple[int, str, Dict[str, str]]:
-        url = f"{self.base_url}{path}"
-        req = urllib.request.Request(url)
-        try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                status = response.status
-                headers = dict(response.getheaders())
-                content = response.read().decode("utf-8")
-                return status, content, headers
-        except urllib.error.HTTPError as e:
-            content = e.read().decode("utf-8") if e.fp else ""
-            return e.code, content, dict(e.headers)
+        return http_get(f"{self.base_url}{path}")
 
     def _post_json(self, path: str, data: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
-        url = f"{self.base_url}{path}"
-        body = json.dumps(data).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                status = response.status
-                res_body = response.read().decode("utf-8")
-                parsed = json.loads(res_body) if res_body else {}
-                return status, parsed
-        except urllib.error.HTTPError as e:
-            res_body = e.read().decode("utf-8") if e.fp else "{}"
-            parsed = json.loads(res_body) if res_body else {}
-            return e.code, parsed
+        return http_post_json(f"{self.base_url}{path}", data)
 
     def test_landing_page_renders_four_navigation_sections(self) -> None:
         status, content, headers = self._get("/")

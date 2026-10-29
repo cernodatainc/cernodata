@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from src.pipeline.artifact_registry import default_artifact_registry
 from src.pipeline.execution_models import AttemptRecord
+from src.utils import safe_load_json
 
 logger = logging.getLogger("cernodata.server.artifacts")
 
@@ -95,27 +96,6 @@ class ViewerDataset(TypedDict, total=False):
     verificationLayers: List[str]
     layerScores: Dict[str, float]
     activeStep: Optional[int]
-
-
-def safe_load_json(file_path: str, default: Any = None) -> Any:
-    """
-    Safely reads and deserializes a JSON file if it exists.
-
-    Args:
-        file_path: Path to target JSON file.
-        default: Fallback value returned if file is missing or invalid.
-
-    Returns:
-        Deserialized JSON object or specified default.
-    """
-    if not os.path.exists(file_path):
-        return default
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
-        logger.debug("Failed reading JSON file %s: %s", file_path, e)
-        return default
 
 
 def normalize_violations(raw_violations: Any) -> List[Dict[str, Any]]:

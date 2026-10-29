@@ -11,12 +11,25 @@ import os
 from typing import List, Dict, Any, Optional, Sequence, Tuple, TypedDict
 from collections import Counter
 from src.dom import DOMNode, DocumentDOM
-from src.quality.garbage import compute_garbage_ratio
-from src.quality.language import compute_language_score, detect_page_language
+from src.quality.handlers import (
+    DiacriticsLayerHandler,
+    GeometryLayerHandler,
+    StructureLayerHandler,
+    SymbolsLayerHandler,
+    TablesLayerHandler,
+    get_suppressed_violation_types,
+)
+from src.quality.language import detect_page_language
 from src.quality.language_config import get_language_config
 from src.quality.layers import VerificationLayer, normalize_layers
 
 logger = logging.getLogger("cernodata.quality.evaluator")
+
+_SYMBOLS_HANDLER = SymbolsLayerHandler()
+_DIACRITICS_HANDLER = DiacriticsLayerHandler()
+_STRUCTURE_HANDLER = StructureLayerHandler()
+_TABLES_HANDLER = TablesLayerHandler()
+_GEOMETRY_HANDLER = GeometryLayerHandler()
 
 
 class DocumentConfidenceMetrics(TypedDict, total=False):
@@ -87,77 +100,55 @@ def evaluate_page_confidence_details(
     struct_scores = []
     table_scores = []
     geom_scores = []
-    diacritic_anomalies_count = 0
 
     for node in nodes:
-        raw_text = node.content.get("raw_text", "")
+        suppressed_types = get_suppressed_violation_types(node)
 
-        suppressed_types = {
-            str(v.get("type", "")): True
-            for v in getattr(node, "violations", [])
-            if (v.get("suppressed") is True) or (str(v.get("suppressed", "false")).lower() in ("true", "1"))
-        }
-
-        # Level 1: Symbols
+        c_score = 1.0
         if check_symbols:
-            if suppressed_types.get("symbols"):
-                c_score = 1.0
-            else:
-                c_score = max(0.0, 1.0 - (compute_garbage_ratio(raw_text) * garbage_multiplier))
+            c_score = _SYMBOLS_HANDLER.evaluate_node(
+                node, suppressed_types=suppressed_types, garbage_multiplier=garbage_multiplier
+            )
             char_scores.append(c_score)
-        else:
-            c_score = 1.0
 
-        # Level 2: Diacritics & Language
+        l_score = 1.0
         if check_diacritics:
-            effective_hit = 0.0 if suppressed_types.get("diacritic") else hit
-            l_score = compute_language_score(raw_text, language=language, diacritic_hit=effective_hit)
+            l_score = _DIACRITICS_HANDLER.evaluate_node(
+                node, language=language, diacritic_hit=hit, config=config, suppressed_types=suppressed_types
+            )
             lang_scores.append(l_score)
-            if config and not suppressed_types.get("diacritic"):
-                diacritic_anomalies_count += len(config.find_anomalous_substitutions(raw_text))
-                diacritic_anomalies_count += len(config.find_diacritic_conflicts(raw_text))
-        else:
-            l_score = 1.0
 
-        # Level 3: Structure
+        s_score = 1.0
         if check_structure:
-            s_score = 0.0 if (node.type in ("paragraph", "heading") and not raw_text.strip()) else 1.0
+            s_score = _STRUCTURE_HANDLER.evaluate_node(node)
             struct_scores.append(s_score)
-        else:
-            s_score = 1.0
 
-        # Level 5: Geometry
+        g_score = 1.0
         if check_geometry:
-            bbox = node.bounding_box
-            if bbox.width <= 0.0 or bbox.height <= 0.0 or bbox.x1 < bbox.x0 or bbox.y1 < bbox.y0:
-                g_score = 0.0
-            else:
-                g_score = 1.0
+            g_score = _GEOMETRY_HANDLER.evaluate_node(node)
             geom_scores.append(g_score)
-        else:
-            g_score = 1.0
 
         combined_text_score = c_score * l_score * s_score * g_score
 
-        # Level 4: Tables
-        if node.type == "table_grid":
+        if node.type == "table_grid" and check_tables:
             # TODO(TASK-103): Replace static `cell_alignment_score` fallback with real Level 4 Markdown table
             # grid validation (column count consistency across rows, numeric alignment, and empty header checks).
-            t_score = float(node.content.get("cell_alignment_score", 0.95))
-            if check_tables:
-                table_scores.append(t_score)
-                score = 0.5 * combined_text_score + 0.5 * t_score
-            else:
-                score = combined_text_score
+            t_score = _TABLES_HANDLER.evaluate_node(node)
+            table_scores.append(t_score)
+            score = 0.5 * combined_text_score + 0.5 * t_score
         else:
             score = combined_text_score
 
         node_scores.append(score)
 
     base_score = float(sum(node_scores) / len(node_scores))
-    page_penalty = 0.0
-    if check_diacritics and hit > 0 and diacritic_anomalies_count > 0:
-        page_penalty = min(max_diacritic_penalty, diacritic_anomalies_count * hit)
+    page_penalty = (
+        _DIACRITICS_HANDLER.compute_page_penalty(
+            nodes, language=language, diacritic_hit=hit, config=config, max_penalty=max_diacritic_penalty
+        )
+        if check_diacritics
+        else 0.0
+    )
 
     final_score = max(0.0, float(base_score - page_penalty))
 

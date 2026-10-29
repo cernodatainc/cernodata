@@ -8,12 +8,12 @@ and the standalone pypdfium_rapidocr preset outside of Docling.
 import os
 import unittest
 import pytest
-from src.dom import DocumentDOM, DOMNode, BoundingBox
 from src.parsers.docling_parser import DoclingParser
 from src.parsers.pypdfium_parser import PyPdfiumParser
 from src.pipeline.planner import PresetPlanner
 from src.pipeline.parsers.dispatch import parse_document
 from src.pipeline.orchestrator import run_pipeline
+from src.tests.conftest import make_test_dom, patch_pipeline_io
 
 
 class TestDoclingOCRPresets(unittest.TestCase):
@@ -82,10 +82,7 @@ class TestDoclingOCRPresets(unittest.TestCase):
     def test_orchestrator_parse_document_presets(self):
         """Verifies parse_document handles both docling and pypdfium_rapidocr presets."""
         from unittest.mock import patch
-        mock_dom = DocumentDOM(document_id="d1", source_filename="test.pdf", total_pages=1, nodes=[
-            DOMNode(node_id="n1", type="text", global_page_index=1, temp_slice_index=1,
-                    bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Sample text"})
-        ])
+        mock_dom = make_test_dom("Sample text", document_id="d1", source_filename="test.pdf", node_type="text")
         with patch.object(DoclingParser, "parse", return_value=mock_dom), \
              patch.object(PyPdfiumParser, "parse", return_value=mock_dom):
             dom_docling = parse_document(self.sample_pdf, language="en", preset="docling_fast")
@@ -111,13 +108,8 @@ class TestDoclingOCRPresets(unittest.TestCase):
 
     def test_pipeline_path_b_parameter_wiggling(self):
         """Verifies pipeline executes Path B parameter wiggling when delta >= 0.20 and threshold fails."""
-        from unittest.mock import patch
-        mock_dom = DocumentDOM(document_id="d1", source_filename="test_dummy.pdf", total_pages=1, nodes=[
-            DOMNode(node_id="n1", type="text", global_page_index=1, temp_slice_index=1,
-                    bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Sample text"})
-        ])
+        mock_dom = make_test_dom("Sample text", document_id="d1", source_filename="test_dummy.pdf", node_type="text")
         planner = PresetPlanner()
-        # Create a custom plan where primary is pypdfium_rapidocr and fallback delta >= 0.20
         plan = planner.create_plan(
             document_path="test_dummy.pdf",
             taxonomy="general_text",
@@ -127,16 +119,11 @@ class TestDoclingOCRPresets(unittest.TestCase):
             target_threshold=0.99,  # High threshold to trigger fallback evaluation
             override_primary="pypdfium_rapidocr"
         )
-        # Ensure scores delta >= 0.20 to exercise Path B
         plan.scores["pypdfium_rapidocr"] = 0.95
         if plan.fallback_queue:
             plan.scores[plan.fallback_queue[0]["preset"]] = 0.65
 
-        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
-             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch_pipeline_io(parse_return=mock_dom):
             res = run_pipeline(
                 pdf_path="test_dummy.pdf",
                 plan=plan,
@@ -149,11 +136,7 @@ class TestDoclingOCRPresets(unittest.TestCase):
 
     def test_pipeline_fallback_multi_step_continuation(self):
         """Verifies pipeline continues down fallback queue when both primary and first fallback fail."""
-        from unittest.mock import patch
-        mock_dom = DocumentDOM(document_id="d1", source_filename="test_multi.pdf", total_pages=1, nodes=[
-            DOMNode(node_id="n1", type="text", global_page_index=1, temp_slice_index=1,
-                    bounding_box=BoundingBox(0, 0, 10, 10), content={"raw_text": "Sample text"})
-        ])
+        mock_dom = make_test_dom("Sample text", document_id="d1", source_filename="test_multi.pdf", node_type="text")
         planner = PresetPlanner()
         plan = planner.create_plan(
             document_path="test_multi.pdf",
@@ -184,12 +167,7 @@ class TestDoclingOCRPresets(unittest.TestCase):
                 "decision_tree": {"action": "ACCEPT_OUTPUT"},
             }, []
 
-        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
-             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.attempt_runner.evaluate_quality_and_decision_tree", side_effect=mock_eval_fn), \
-             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch_pipeline_io(parse_return=mock_dom, eval_side_effect=mock_eval_fn):
             res = run_pipeline(
                 pdf_path="test_multi.pdf",
                 plan=plan,
@@ -197,7 +175,6 @@ class TestDoclingOCRPresets(unittest.TestCase):
                 visualize=False,
             )
             attempts = res["decision"].get("attempts", [])
-            # Must have executed fallback chain to docling_deep
             executed_presets = [a.get("preset") for a in attempts]
             self.assertIn("docling_deep", executed_presets)
             self.assertEqual(res["decision"].get("chosen_preset"), "docling_deep")

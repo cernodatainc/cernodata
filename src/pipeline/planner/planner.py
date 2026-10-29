@@ -28,6 +28,25 @@ class PresetPlanner:
         # TODO(TASK-1004): Calibrate preset speed/suitability weights using empirical hardware timing logs.
         return scores
 
+    @staticmethod
+    def _resolve_criteria(
+        criteria: Optional[Union[PlannerCriteria, str]] = None,
+        taxonomy: Optional[Union[PlannerCriteria, str]] = None,
+        target: str = "high_precision_structure",
+        security: str = "air_gapped_local",
+        verification_layers: Optional[List[str]] = None,
+    ) -> PlannerCriteria:
+        if isinstance(criteria, PlannerCriteria):
+            resolved = criteria
+        elif isinstance(taxonomy, PlannerCriteria):
+            resolved = taxonomy
+        else:
+            tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
+            resolved = PlannerCriteria(taxonomy=tax, target=target, security=security)
+        if verification_layers is not None:
+            resolved.verification_layers = list(verification_layers)
+        return resolved
+
     def calculate_scores(
         self,
         criteria: Optional[Union[PlannerCriteria, str]] = None,
@@ -36,23 +55,11 @@ class PresetPlanner:
         security: str = "air_gapped_local",
     ) -> Dict[str, float]:
         """Calculates preset suitability scores based on strongly-typed PlannerCriteria or dimension arguments."""
-        if isinstance(criteria, PlannerCriteria):
-            resolved_criteria = criteria
-        elif isinstance(taxonomy, PlannerCriteria):
-            resolved_criteria = taxonomy
-        else:
-            tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
-            resolved_criteria = PlannerCriteria(
-                taxonomy=tax,
-                target=target,
-                security=security,
-            )
-
+        resolved_criteria = self._resolve_criteria(criteria, taxonomy, target, security)
         scores: Dict[str, float] = {}
         for preset_id, weight_map in self.weights.items():
             matched_weights = [weight_map.get(ans, 0.50) for ans in resolved_criteria.values()]
-            score = sum(matched_weights) / len(matched_weights)
-            scores[preset_id] = round(score, 3)
+            scores[preset_id] = round(sum(matched_weights) / len(matched_weights), 3)
 
         return self._apply_hardware_calibration(scores)
 
@@ -76,63 +83,32 @@ class PresetPlanner:
         **kwargs: Any,
     ) -> DocumentPlan:
         """Constructs an executable DocumentPlan instance using strongly-typed PlannerCriteria."""
-        if isinstance(criteria, PlannerCriteria):
-            resolved_criteria = criteria
-            if verification_layers is not None:
-                resolved_criteria.verification_layers = list(verification_layers)
-        elif isinstance(taxonomy, PlannerCriteria):
-            resolved_criteria = taxonomy
-            if verification_layers is not None:
-                resolved_criteria.verification_layers = list(verification_layers)
-        else:
-            tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
-            if verification_layers is not None:
-                resolved_criteria = PlannerCriteria(
-                    taxonomy=tax,
-                    target=target,
-                    security=security,
-                    verification_layers=list(verification_layers),
-                )
-            else:
-                resolved_criteria = PlannerCriteria(
-                    taxonomy=tax,
-                    target=target,
-                    security=security,
-                )
-
+        resolved_criteria = self._resolve_criteria(criteria, taxonomy, target, security, verification_layers)
         scores = self.calculate_scores(criteria=resolved_criteria)
         suggested = self.suggest_preset_order(scores)
 
-        overridden = False
         if override_order:
             order = list(override_order)
-            overridden = (order != suggested)
         elif override_primary:
             order = [override_primary] + [p for p in suggested if p != override_primary]
-            overridden = (order != suggested)
         else:
             order = list(suggested)
+        overridden = bool(override_order or override_primary) and (order != suggested)
+        fallback_queue = [{"preset": p, "score": scores.get(p, 0.50)} for p in order[1:]]
 
-        primary_preset = order[0]
-        fallback_queue: List[Dict[str, Any]] = []
-        for p in order[1:]:
-            p_score = scores.get(p, 0.50)
-            fallback_queue.append({"preset": p, "score": p_score})
-
-        created_at_iso = datetime.now(timezone.utc).isoformat()
         return DocumentPlan(
             document_path=document_path,
             criteria=resolved_criteria,
             language=language,
             target_threshold=target_threshold,
-            primary_preset=primary_preset,
+            primary_preset=order[0],
             fallback_queue=fallback_queue,
             preset_order=order,
             suggested_order=suggested,
             overridden=overridden,
             scores=scores,
             verification_layers=resolved_criteria.verification_layers,
-            created_at=created_at_iso,
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
 
     @staticmethod

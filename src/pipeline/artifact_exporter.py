@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from src.utils import mkdirs
 from src.dom import DocumentDOM
-from src.quality.layers import normalize_layer_name
+from src.quality.layers import normalize_layers
 from src.quality.materialization import MaterializedVerificationResult
 from src.visualization import PageVisualizer, generate_interactive_html
 
@@ -135,47 +135,13 @@ def export_pipeline_artifacts(
 
     # Materialize verification result artifact
     raw_layers = decision.get("selected_layers") or (plan.get("verification_layers") if plan else None)
-    active_layers = [str(x) for x in raw_layers] if raw_layers is not None else ["symbols", "diacritics", "structure", "tables", "geometry"]
+    active_layers = [str(x) for x in raw_layers] if raw_layers is not None else normalize_layers(None)
 
-    viols_by_layer: Dict[str, List[Dict[str, Any]]] = {lyr: [] for lyr in active_layers}
-    for v in violations:
-        v_type = normalize_layer_name(v.get("type", "")) or v.get("type", "other")
-        viols_by_layer.setdefault(v_type, []).append(v)
-
-    raw_overall = decision.get("overall_confidence", 1.0)
-    conf_val = float(raw_overall) if raw_overall is not None else 1.0
-    raw_thresh = decision.get("target_confidence_threshold", 0.82)
-    thresh_val = float(raw_thresh) if raw_thresh is not None else 0.82
-
-    per_page_dict: Dict[int, float] = {}
-    for p_k, p_v in decision.get("per_page_confidence", {}).items():
-        try:
-            per_page_dict[int(p_k)] = float(p_v)
-        except (ValueError, TypeError):
-            pass
-
-    per_page_layers_dict: Dict[int, Dict[str, float]] = {}
-    for p_k, p_sub in decision.get("per_page_layer_scores", {}).items():
-        if isinstance(p_sub, dict):
-            try:
-                per_page_layers_dict[int(p_k)] = {str(lk): float(lv) for lk, lv in p_sub.items()}
-            except (ValueError, TypeError):
-                pass
-
-    verif_res = MaterializedVerificationResult(
-        document_id=dom.document_id,
-        source_filename=dom.source_filename,
-        selected_layers=active_layers,
-        overall_confidence=conf_val,
-        per_page_confidence=per_page_dict,
-        layer_scores={str(k): float(v) for k, v in decision.get("layer_scores", {}).items()},
-        per_page_layer_scores=per_page_layers_dict,
-        total_violations=len(violations),
+    verif_res = MaterializedVerificationResult.from_decision(
+        dom=dom,
+        decision=decision,
         violations=violations,
-        violations_by_layer=viols_by_layer,
-        is_accepted=bool(decision.get("is_accepted", conf_val >= thresh_val)),
-        target_threshold=thresh_val,
-        status=str(decision.get("status", "ACCEPT")),
+        active_layers=active_layers,
         output_dir=output_dir,
     )
     verif_res.save(output_dir)

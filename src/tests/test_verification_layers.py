@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from src.dom import BoundingBox, DOMNode, DocumentDOM
+from src.dom import BoundingBox
 from src.pipeline.orchestrator import PipelineOrchestrator, run_pipeline
 from src.pipeline.planner import DocumentPlan, PlannerCriteria, PresetPlanner
 from src.quality.layers import (
@@ -28,6 +28,7 @@ from src.quality.materialization import (
 )
 from src.quality.violations import detect_quality_violations
 from src.quality.evaluator import evaluate_document_confidence, evaluate_page_confidence
+from src.tests.conftest import http_post_json, make_test_dom, make_test_node, running_test_server
 
 
 class TestVerificationLayers(unittest.TestCase):
@@ -96,20 +97,10 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_violations_filtered_by_selected_layers(self) -> None:
         """Verifies violation detection strictly respects selected verification criteria."""
-        # Node with both garbage text and Polish diacritic anomaly
-        node = DOMNode(
-            node_id="n_multi",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 200.0, 50.0),
-            content={"raw_text": "* Oplata w piqtku oc   )  ch h)"},
-        )
-        dom = DocumentDOM(
+        dom = make_test_dom(
+            "* Oplata w piqtku oc   )  ch h)",
             document_id="doc_multi",
-            source_filename="sample.pdf",
-            total_pages=1,
-            nodes=[node],
+            node_id="n_multi",
         )
 
         # 1. When only 'symbols' is selected
@@ -130,56 +121,26 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_scoring_calculated_based_on_selected_criteria(self) -> None:
         """Verifies confidence scoring penalizes only active verification layers."""
-        # Node with clean character text but diacritic conflict
-        node_diacritic_only = DOMNode(
-            node_id="n_diac",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 200.0, 50.0),
-            content={"raw_text": "Sprawdź termin wykupu Möbel w piątku."},
-        )
+        node_diacritic_only = make_test_node("Sprawdź termin wykupu Möbel w piątku.", node_id="n_diac")
 
-        # In Polish context:
-        # Under symbols layer only: text has no garbage, so confidence should be 1.0
         score_symbols_only = evaluate_page_confidence(
             [node_diacritic_only], language="pl", layers=["symbols"]
         )
         self.assertEqual(score_symbols_only, 1.0)
 
-        # Under diacritics layer: 'Möbel' triggers conflict penalty in Polish
         score_diacritics_only = evaluate_page_confidence(
             [node_diacritic_only], language="pl", layers=["diacritics"]
         )
         self.assertLess(score_diacritics_only, 1.0)
 
-        dom_diac = DocumentDOM(
-            document_id="doc_diac",
-            source_filename="diac.pdf",
-            total_pages=1,
-            nodes=[node_diacritic_only],
-        )
+        dom_diac = make_test_dom(nodes=[node_diacritic_only], document_id="doc_diac", source_filename="diac.pdf")
         metrics = evaluate_document_confidence(dom_diac, language="pl", layers=["diacritics"])
         self.assertIn("diacritics", metrics["selected_layers"])
         self.assertIn("diacritics", metrics["layer_scores"])
 
     def test_run_pipeline_with_verification_layers(self) -> None:
         """Verifies run_pipeline propagates verification_layers down to artifacts."""
-        dummy_dom = DocumentDOM(
-            document_id="doc_pipe",
-            source_filename="pipe.pdf",
-            total_pages=1,
-            nodes=[
-                DOMNode(
-                    node_id="n1",
-                    type="paragraph",
-                    global_page_index=1,
-                    temp_slice_index=1,
-                    bounding_box=BoundingBox(10.0, 10.0, 100.0, 30.0),
-                    content={"raw_text": "Sample text"},
-                )
-            ],
-        )
+        dummy_dom = make_test_dom("Sample text", document_id="doc_pipe", source_filename="pipe.pdf")
         with patch("src.pipeline.attempt_runner.parse_document", return_value=dummy_dom):
             res = run_pipeline(
                 pdf_path="dummy.pdf",
@@ -194,20 +155,8 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_materialize_verification_persists_artifacts(self) -> None:
         """Verifies materialize_document_verification creates all materialized artifacts."""
-        node = DOMNode(
-            node_id="n_mat",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 150.0, 40.0),
-            content={"raw_text": "Infolinia czynna w piqtku."},
-        )
-        dom = DocumentDOM(
-            document_id="doc_mat",
-            source_filename="mat.pdf",
-            total_pages=1,
-            nodes=[node],
-        )
+        node = make_test_node("Infolinia czynna w piqtku.", node_id="n_mat")
+        dom = make_test_dom(nodes=[node], document_id="doc_mat", source_filename="mat.pdf")
 
         result = materialize_document_verification(
             dom=dom,
@@ -247,20 +196,11 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_post_run_reverification_changes_decision_and_scoring(self) -> None:
         """Verifies deciding verification layers after run completion recalculates scoring."""
-        # Step 1: Simulate a finished run with a diacritic error
-        node = DOMNode(
-            node_id="n_post",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 150.0, 40.0),
-            content={"raw_text": "Firma dostarczy nowe Möbel do biura."},
-        )
-        dom = DocumentDOM(
+        dom = make_test_dom(
+            "Firma dostarczy nowe Möbel do biura.",
             document_id="doc_post",
             source_filename="post_run.pdf",
-            total_pages=1,
-            nodes=[node],
+            node_id="n_post",
         )
 
         # Initial materialization with all layers (diacritic conflict causes score reduction)
@@ -299,30 +239,18 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_structural_and_geometry_verification_layers(self) -> None:
         """Verifies Level 3 structural and Level 5 geometry verification layers detect anomalies."""
-        empty_heading = DOMNode(
-            node_id="n_empty_heading",
-            type="heading",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 100.0, 30.0),
-            content={"raw_text": "   "},
-        )
-        zero_area_node = DOMNode(
+        empty_heading = make_test_node("   ", node_id="n_empty_heading", node_type="heading")
+        zero_area_node = make_test_node(
+            "Valid text with degenerate zero-area bounding box",
             node_id="n_zero_area",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 10.0, 10.0),  # width == 0
-            content={"raw_text": "Valid text with degenerate zero-area bounding box"},
+            bbox=BoundingBox(10.0, 10.0, 10.0, 10.0),
         )
-        dom = DocumentDOM(
+        dom = make_test_dom(
+            nodes=[empty_heading, zero_area_node],
             document_id="doc_struct_geom",
             source_filename="geom.pdf",
-            total_pages=1,
-            nodes=[empty_heading, zero_area_node],
         )
 
-        # When evaluated with structure and geometry layers
         res = materialize_document_verification(
             dom=dom,
             selected_layers=["structure", "geometry"],
@@ -336,24 +264,13 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_tables_verification_layer(self) -> None:
         """Verifies Level 4 tables verification layer detects table grid anomalies."""
-        table_node = DOMNode(
+        table_node = make_test_node(
+            "Header 1 | Header 2\nval1",
             node_id="n_table_grid",
-            type="table_grid",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 300.0, 200.0),
-            content={
-                "raw_text": "Header 1 | Header 2\nval1",
-                "cell_alignment_score": 0.45,
-                "rows": [["col1", "col2"], ["only_col1"]],
-            },
+            node_type="table_grid",
+            extra_content={"cell_alignment_score": 0.45, "rows": [["col1", "col2"], ["only_col1"]]},
         )
-        dom = DocumentDOM(
-            document_id="doc_table",
-            source_filename="table.pdf",
-            total_pages=1,
-            nodes=[table_node],
-        )
+        dom = make_test_dom(nodes=[table_node], document_id="doc_table", source_filename="table.pdf")
 
         res = materialize_document_verification(
             dom=dom,
@@ -368,62 +285,26 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_server_verify_layers_endpoint(self) -> None:
         """Verifies the /api/verify_layers HTTP route re-evaluates and materializes run artifacts."""
-        # 1. Setup mock run directory with document_dom.json
-        node = DOMNode(
-            node_id="n_srv",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(10.0, 10.0, 150.0, 40.0),
-            content={"raw_text": "Infolinia czynna w piqtku."},
-        )
-        dom = DocumentDOM(
-            document_id="doc_srv",
-            source_filename="srv.pdf",
-            total_pages=1,
-            nodes=[node],
-        )
+        dom = make_test_dom("Infolinia czynna w piqtku.", document_id="doc_srv", source_filename="srv.pdf", node_id="n_srv")
         dom.save(os.path.join(self.test_dir, "document_dom.json"))
 
-        # 2. Launch lightweight server
-        import urllib.request
-        from src.pipeline.server import PipelineViewerServer, find_available_port
-
-        port = find_available_port(18890)
-        from src.pipeline.server import PipelineViewerHandler
-        server = PipelineViewerServer(("127.0.0.1", port), PipelineViewerHandler)
-        server.output_dir = self.test_dir
-        server.session_context.output_dir = self.test_dir
-        server.session_context.repo_root = self.test_dir
-        import threading
-        t = threading.Thread(target=server.serve_forever, daemon=True)
-        t.start()
-
-        try:
-            # Send POST /api/verify_layers requesting 'symbols' layer only
-            req_data = json.dumps({
-                "output_dir": self.test_dir,
-                "verification_layers": ["symbols"],
-                "language": "pl",
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                f"http://127.0.0.1:{port}/api/verify_layers",
-                data=req_data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
+        with running_test_server(output_dir=self.test_dir) as (server, base_url):
+            server.session_context.output_dir = self.test_dir
+            server.session_context.repo_root = self.test_dir
+            status, body = http_post_json(
+                f"{base_url}/api/verify_layers",
+                {
+                    "output_dir": self.test_dir,
+                    "verification_layers": ["symbols"],
+                    "language": "pl",
+                },
             )
-            with urllib.request.urlopen(req) as resp:
-                self.assertEqual(resp.status, 200)
-                body = json.loads(resp.read().decode("utf-8"))
-
+            self.assertEqual(status, 200)
             self.assertTrue(body["success"])
             result = body["result"]
             self.assertEqual(result["selected_layers"], ["symbols"])
             self.assertEqual(result["total_violations"], 0)
             self.assertEqual(result["overall_confidence"], 1.0)
-        finally:
-            server.shutdown()
-            server.server_close()
 
 
 if __name__ == "__main__":

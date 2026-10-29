@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from src.pipeline.server.discovery import find_previous_runs
 from src.pipeline.server.http_utils import REPO_ROOT
+from src.utils import safe_load_json
 
 logger = logging.getLogger("cernodata.server.run_mappings")
 
@@ -38,6 +39,20 @@ def derive_file_set(rel_path: str) -> str:
     return "workspace"
 
 
+def _make_doc_entry(file_path: str, file_name: Optional[str] = None, with_summary: bool = False) -> Dict[str, Any]:
+    """Constructs a canonical document mapping dictionary."""
+    entry: Dict[str, Any] = {
+        "file_path": file_path,
+        "file_name": file_name or os.path.basename(file_path),
+        "file_set": derive_file_set(file_path),
+        "runs": [],
+    }
+    if with_summary:
+        entry["runs_count"] = 0
+        entry["latest_run"] = None
+    return entry
+
+
 def get_mappings_file_path(repo_root: Optional[str] = None) -> str:
     """Returns absolute path to the persistent run_mappings.json store."""
     root = repo_root or REPO_ROOT
@@ -48,16 +63,8 @@ def get_mappings_file_path(repo_root: Optional[str] = None) -> str:
 
 def load_persistent_mappings(repo_root: Optional[str] = None) -> Dict[str, Any]:
     """Loads recorded file-to-run mappings from disk if present."""
-    path = get_mappings_file_path(repo_root)
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception as ex:
-        logger.warning("Failed to load run mappings from %s: %s", path, ex)
-        return {}
+    data = safe_load_json(get_mappings_file_path(repo_root), {})
+    return data if isinstance(data, dict) else {}
 
 
 def save_persistent_mappings(mappings: Dict[str, Any], repo_root: Optional[str] = None) -> None:
@@ -90,18 +97,7 @@ def record_run_mapping(
     with _LOCK:
         mappings = load_persistent_mappings(repo_root)
         norm_path = normalize_path(document_path)
-        doc_name = os.path.basename(norm_path)
-        file_set = derive_file_set(norm_path)
-
-        doc_entry = mappings.get(norm_path)
-        if not doc_entry:
-            doc_entry = {
-                "file_path": norm_path,
-                "file_name": doc_name,
-                "file_set": file_set,
-                "runs": [],
-            }
-            mappings[norm_path] = doc_entry
+        doc_entry = mappings.setdefault(norm_path, _make_doc_entry(norm_path))
 
         run_record = {
             "run_id": run_id,
@@ -304,18 +300,10 @@ def get_file_run_mappings(
                     doc_paths.add(norm_d)
 
         # 2. Build mapping for each document
-        doc_mappings: Dict[str, Dict[str, Any]] = {}
-        for d_path in sorted(doc_paths):
-            doc_name = os.path.basename(d_path)
-            file_set = derive_file_set(d_path)
-            doc_mappings[d_path] = {
-                "file_path": d_path,
-                "file_name": doc_name,
-                "file_set": file_set,
-                "runs": [],
-                "runs_count": 0,
-                "latest_run": None,
-            }
+        doc_mappings: Dict[str, Dict[str, Any]] = {
+            d_path: _make_doc_entry(d_path, with_summary=True)
+            for d_path in sorted(doc_paths)
+        }
 
         # Helper to find matching document key by path or base filename
         def _match_doc_key(target: str) -> Optional[str]:
@@ -368,14 +356,9 @@ def get_file_run_mappings(
                 candidate_key = r_doc_path or r_doc_name
                 if candidate_key and not candidate_key.startswith("_"):
                     matched_key = candidate_key
-                    doc_mappings[matched_key] = {
-                        "file_path": matched_key,
-                        "file_name": r_doc_name,
-                        "file_set": derive_file_set(matched_key),
-                        "runs": [],
-                        "runs_count": 0,
-                        "latest_run": None,
-                    }
+                    doc_mappings[matched_key] = _make_doc_entry(
+                        matched_key, file_name=r_doc_name, with_summary=True
+                    )
 
             if matched_key:
                 doc_entry = doc_mappings[matched_key]

@@ -43,6 +43,16 @@ class ViewerHydrationMixin:
     language: str
     _preset_cache: PresetCache
 
+    @staticmethod
+    def _validate_total_pages(dom_dict: Mapping[str, Any], context_msg: str) -> int:
+        raw_pages = dom_dict.get("total_pages")
+        if raw_pages is None:
+            raise ValueError(f"DocumentDOM is missing required 'total_pages' {context_msg}.")
+        total_pages = int(raw_pages)
+        if total_pages < 1:
+            raise ValueError(f"DocumentDOM has non-positive total_pages ({total_pages}) {context_msg}.")
+        return total_pages
+
     def load_previous_run(self, output_dir: str) -> Dict[str, Any]:
         """Method stub implemented by RunLoaderMixin."""
         raise NotImplementedError
@@ -151,13 +161,7 @@ class ViewerHydrationMixin:
                     )
 
             pdf_path = resolved_pdf
-
-            raw_pages = dom_data.get("total_pages")
-            if raw_pages is None:
-                raise ValueError(f"DocumentDOM is missing required 'total_pages' in '{target_full}'.")
-            total_pages = int(raw_pages)
-            if total_pages < 1:
-                raise ValueError(f"DocumentDOM has non-positive total_pages ({total_pages}) in '{target_full}'.")
+            total_pages = self._validate_total_pages(dom_data, f"in '{target_full}'")
 
             page_images, page_dimensions = load_or_render_page_images(
                 pdf_path=pdf_path,
@@ -207,12 +211,7 @@ class ViewerHydrationMixin:
                 raise ValueError("Pipeline execution result must contain a non-empty 'decision' mapping.")
 
             violations_list = normalize_violations(result.get("violations", []))
-            raw_pages = dom_dict.get("total_pages")
-            if raw_pages is None:
-                raise ValueError("DocumentDOM in execution result is missing 'total_pages'.")
-            total_pages = int(raw_pages)
-            if total_pages < 1:
-                raise ValueError(f"Invalid non-positive total_pages ({total_pages}) in DocumentDOM.")
+            total_pages = self._validate_total_pages(dom_dict, "in execution result")
 
             target_output_dir = self.output_dir or "output"
             page_images, page_dimensions = load_or_render_page_images(

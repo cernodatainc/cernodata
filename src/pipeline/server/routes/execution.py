@@ -7,7 +7,7 @@ Pipeline execution and rerun API route handlers for cernodata HTTP server.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.http_utils import send_json_response
@@ -34,6 +34,67 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         _ = payload
         return None
 
+    def _try_serve_cached_preset(self, pdf_path: str, preset: str, language: str) -> bool:
+        """Checks session preset cache and sends a 200 JSON response if a cached result exists."""
+        cached = self.session.get_cached_preset_result(pdf_path, preset, language)
+        if cached is None:
+            return False
+        logger.info("Reusing existing result for preset '%s' (PDF: %s, Lang: %s)", preset, pdf_path, language)
+        self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
+        dec = cached.get("decision", {})
+        raw_score = dec.get("overall_confidence")
+        score = float(raw_score) if raw_score is not None else 0.0
+        raw_status = dec.get("status")
+        status = str(raw_status) if raw_status is not None else "UNKNOWN"
+        viols = cached.get("violations", [])
+        self.session.set_completed(
+            status=status,
+            confidence=score,
+            violations_count=len(viols),
+            log=f"[CACHE] Reused previous result for preset '{preset}' (Status: {status}, Confidence: {score:.4f}).",
+        )
+        send_json_response(self, 200, {  # type: ignore[arg-type]
+            "success": True,
+            "preset": preset,
+            "language": language,
+            "dom": cached["dom"],
+            "violations": cached["violations"],
+            "decision": cached["decision"],
+            "plan": cached.get("plan"),
+            "cached": True,
+        })
+        return True
+
+    def _submit_and_send_run_result(
+        self,
+        task_fn: Callable[[], PipelineExecutionResult],
+        preset: str,
+        language: str,
+        include_plan: bool = True,
+        record_session_error: bool = False,
+    ) -> None:
+        """Submits an execution callable to the thread pool and sends the formatted HTTP response."""
+        try:
+            result = self.executor.submit(task_fn).result()
+            response_body: Dict[str, Any] = {
+                "success": True,
+                "preset": preset,
+                "language": language,
+                "dom": result["dom"],
+                "violations": result["violations"],
+                "decision": result["decision"],
+            }
+            if include_plan:
+                response_body["plan"] = result.get("plan")
+            send_json_response(self, 200, response_body)  # type: ignore[arg-type]
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            logger.info("Client disconnected before pipeline result could be returned.")
+        except Exception as e:
+            if record_session_error:
+                t_err = datetime.now().strftime("%H:%M:%S")
+                self.session.set_error(str(e), log=f"[{t_err}] [ERROR] Pipeline failure: {e}")
+            send_json_response(self, 500, {"success": False, "error": str(e)})  # type: ignore[arg-type]
+
     def _handle_post_run(self, payload: Dict[str, Any]) -> None:
         """
         Executes full document pipeline run asynchronously in server executor.
@@ -51,39 +112,8 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         plan_config = payload.get("plan_config")
 
         force = bool(payload.get("force", payload.get("force_rerun", False)))
-        if not force and not with_plan:
-            cached = self.session.get_cached_preset_result(pdf_path, preset, language)
-            if cached is not None:
-                logger.info(
-                    "Reusing existing result for preset '%s' (PDF: %s, Lang: %s)",
-                    preset, pdf_path, language,
-                )
-                self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
-                dec = cached.get("decision", {})
-                raw_score = dec.get("overall_confidence")
-                score = float(raw_score) if raw_score is not None else 0.0
-
-                raw_status = dec.get("status")
-                status = str(raw_status) if raw_status is not None else "UNKNOWN"
-
-                viols = cached.get("violations", [])
-                self.session.set_completed(
-                    status=status,
-                    confidence=score,
-                    violations_count=len(viols),
-                    log=f"[CACHE] Reused previous result for preset '{preset}' (Status: {status}, Confidence: {score:.4f}).",
-                )
-                send_json_response(self, 200, {  # type: ignore[arg-type]
-                    "success": True,
-                    "preset": preset,
-                    "language": language,
-                    "dom": cached["dom"],
-                    "violations": cached["violations"],
-                    "decision": cached["decision"],
-                    "plan": cached.get("plan"),
-                    "cached": True,
-                })
-                return
+        if not force and not with_plan and self._try_serve_cached_preset(pdf_path, preset, language):
+            return
 
         self.session.reset_progress(
             initial_step="Step 1: Document Validation & Subdivision",
@@ -207,24 +237,13 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             )
             return res
 
-        try:
-            future = self.executor.submit(_execute_run)
-            result = future.result()
-            send_json_response(self, 200, {  # type: ignore[arg-type]
-                "success": True,
-                "preset": preset,
-                "language": language,
-                "dom": result["dom"],
-                "violations": result["violations"],
-                "decision": result["decision"],
-                "plan": result.get("plan"),
-            })
-        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
-            logger.info("Client disconnected before pipeline result could be returned.")
-        except Exception as e:
-            t_err = datetime.now().strftime("%H:%M:%S")
-            session.set_error(str(e), log=f"[{t_err}] [ERROR] Pipeline failure: {e}")
-            send_json_response(self, 500, {"success": False, "error": str(e)})  # type: ignore[arg-type]
+        self._submit_and_send_run_result(
+            task_fn=_execute_run,
+            preset=preset,
+            language=language,
+            include_plan=True,
+            record_session_error=True,
+        )
 
     def _handle_post_rerun(self, payload: Dict[str, Any]) -> None:
         """
@@ -237,39 +256,8 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         pdf_path, language = self._extract_document_and_language(payload)
         force = bool(payload.get("force", payload.get("force_rerun", False)))
 
-        if not force:
-            cached = self.session.get_cached_preset_result(pdf_path, preset, language)
-            if cached is not None:
-                logger.info(
-                    "Reusing existing result for preset '%s' (PDF: %s, Lang: %s)",
-                    preset, pdf_path, language,
-                )
-                self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
-                dec = cached.get("decision", {})
-                raw_score = dec.get("overall_confidence")
-                score = float(raw_score) if raw_score is not None else 0.0
-
-                raw_status = dec.get("status")
-                status = str(raw_status) if raw_status is not None else "UNKNOWN"
-
-                viols = cached.get("violations", [])
-                self.session.set_completed(
-                    status=status,
-                    confidence=score,
-                    violations_count=len(viols),
-                    log=f"[CACHE] Reused previous result for preset '{preset}' (Status: {status}, Confidence: {score:.4f}).",
-                )
-                send_json_response(self, 200, {  # type: ignore[arg-type]
-                    "success": True,
-                    "preset": preset,
-                    "language": language,
-                    "dom": cached["dom"],
-                    "violations": cached["violations"],
-                    "decision": cached["decision"],
-                    "plan": cached.get("plan"),
-                    "cached": True,
-                })
-                return
+        if not force and self._try_serve_cached_preset(pdf_path, preset, language):
+            return
 
         print(f"\n[SERVER API] Triggering live pipeline rerun for preset: '{preset}' (PDF: {pdf_path}, Lang: {language})...")
         from src.pipeline.orchestrator import run_pipeline
@@ -287,21 +275,13 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             session.update_result_state(res, pdf_path=pdf_path, language=language)
             return res
 
-        try:
-            future = self.executor.submit(_execute_rerun)
-            result = future.result()
-            send_json_response(self, 200, {  # type: ignore[arg-type]
-                "success": True,
-                "preset": preset,
-                "language": language,
-                "dom": result["dom"],
-                "violations": result["violations"],
-                "decision": result["decision"],
-            })
-        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
-            logger.info("Client disconnected before rerun result could be returned.")
-        except Exception as e:
-            send_json_response(self, 500, {"success": False, "error": str(e)})  # type: ignore[arg-type]
+        self._submit_and_send_run_result(
+            task_fn=_execute_rerun,
+            preset=preset,
+            language=language,
+            include_plan=False,
+            record_session_error=False,
+        )
 
     def _handle_post_remove_run(self, payload: Dict[str, Any]) -> None:
         """

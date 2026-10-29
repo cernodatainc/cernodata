@@ -11,7 +11,6 @@ import json
 import threading
 import time
 import unittest
-import urllib.request
 from typing import Dict, Any, List
 
 from src.utils import find_available_port
@@ -20,6 +19,7 @@ from src.pipeline.server import (
     PipelineViewerServer,
     PipelineViewerHandler,
 )
+from src.tests.conftest import http_get
 
 
 class TestServerSessionContext(unittest.TestCase):
@@ -123,11 +123,8 @@ class TestPipelineViewerServerConcurrency(unittest.TestCase):
             cls.server.server_close()
 
     def _get_json(self, path: str) -> Dict[str, Any]:
-        url = f"{self.base_url}{path}"
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=5) as response:
-            content = response.read().decode("utf-8")
-            return json.loads(content) if content else {}
+        _, content, _ = http_get(f"{self.base_url}{path}")
+        return json.loads(content) if content else {}
 
     def test_progress_polling_during_simulated_pipeline_run(self) -> None:
         session = self.server.session_context

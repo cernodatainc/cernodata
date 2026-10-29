@@ -8,13 +8,9 @@ and the /api/parse_section_ocr live server endpoint.
 import os
 import io
 import re
-import json
 import base64
 import unittest
 import pytest
-import threading
-import urllib.request
-from http.server import HTTPServer
 from PIL import Image, ImageDraw
 
 from src.dom.bounding_box import BoundingBox
@@ -27,7 +23,6 @@ from src.parsers.section_ocr import (
     parse_section_from_pdf,
     set_default_section_parser,
 )
-from src.pipeline.server import PipelineViewerHandler
 
 
 def _create_test_image_with_text(text: str = "Total Due: $1,250.00") -> Image.Image:
@@ -146,54 +141,24 @@ class TestSectionOCRParser(unittest.TestCase):
     @pytest.mark.slow
     def test_server_ocr_endpoint(self):
         """Verifies POST /api/parse_section_ocr HTTP server endpoint."""
-        server_address = ("127.0.0.1", 0)  # OS allocates free port
-        httpd = HTTPServer(server_address, PipelineViewerHandler)
-        assigned_port = httpd.server_port
+        from src.tests.conftest import http_post_json, running_test_server
 
-        server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-        server_thread.start()
-
-        base_url = f"http://127.0.0.1:{assigned_port}"
-
-        try:
-            # 1. Test POST /api/parse_section_ocr with base64 image
+        with running_test_server() as (_, base_url):
             test_img = _create_test_image_with_text("Order Code: ORD-7719")
             data_uri = _image_to_base64_data_uri(test_img)
 
-            payload = json.dumps({
-                "node_id": "node_p1_n3",
-                "image_base64": data_uri,
-                "language": "en"
-            }).encode("utf-8")
-
-            req = urllib.request.Request(
+            status, body = http_post_json(
                 f"{base_url}/api/parse_section_ocr",
-                data=payload,
-                headers={"Content-Type": "application/json"}
+                {"node_id": "node_p1_n3", "image_base64": data_uri, "language": "en"},
             )
+            self.assertEqual(status, 200)
+            self.assertTrue(body["success"])
+            self.assertEqual(body["node_id"], "node_p1_n3")
+            self.assertIn("ORD-7719", body["text"])
+            self.assertGreater(body["confidence"], 0.5)
 
-            with urllib.request.urlopen(req) as resp:
-                self.assertEqual(resp.status, 200)
-                body = json.loads(resp.read().decode("utf-8"))
-                self.assertTrue(body["success"])
-                self.assertEqual(body["node_id"], "node_p1_n3")
-                self.assertIn("ORD-7719", body["text"])
-                self.assertGreater(body["confidence"], 0.5)
-
-            # 2. Test missing payload returns 400
-            empty_req = urllib.request.Request(
-                f"{base_url}/api/parse_section_ocr",
-                data=json.dumps({"node_id": "missing_data"}).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            with self.assertRaises(urllib.error.HTTPError) as ctx:
-                urllib.request.urlopen(empty_req)
-            self.assertEqual(ctx.exception.code, 400)
-            ctx.exception.close()
-
-        finally:
-            httpd.shutdown()
-            httpd.server_close()
+            status_err, _ = http_post_json(f"{base_url}/api/parse_section_ocr", {"node_id": "missing_data"})
+            self.assertEqual(status_err, 400)
 
     def test_custom_engine_dependency_injection(self) -> None:
         """Verifies custom engine dependency injection without loading default models."""

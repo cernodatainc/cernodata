@@ -9,6 +9,8 @@ import os
 import json
 from typing import List
 
+from src.visualization.bundler import bundle_js_modules
+
 _VIEWER_DIR = os.path.dirname(os.path.abspath(__file__))
 _JS_DIR = os.path.join(_VIEWER_DIR, "js")
 
@@ -31,13 +33,7 @@ JS_MODULE_ORDER: List[str] = [
 
 def bundle_viewer_js() -> str:
     """Concatenates the modular client scripts by concern in dependency order."""
-    parts: List[str] = []
-    for mod_name in JS_MODULE_ORDER:
-        mod_path = os.path.join(_JS_DIR, mod_name)
-        if os.path.exists(mod_path):
-            with open(mod_path, "r", encoding="utf-8") as f:
-                parts.append(f"/* === Concern Module: {mod_name} === */\n" + f.read())
-    return "\n\n".join(parts)
+    return bundle_js_modules(_JS_DIR, JS_MODULE_ORDER)
 
 
 def get_viewer_js() -> str:

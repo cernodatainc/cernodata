@@ -7,10 +7,9 @@ and plan-driven pipeline execution.
 
 import os
 import unittest
-from unittest.mock import patch
-from src.dom import DocumentDOM, DOMNode, BoundingBox
 from src.pipeline.planner import PresetPlanner, DocumentPlan, PlannerCriteria, IngestionConfig
 from src.pipeline.orchestrator import run_pipeline
+from src.tests.conftest import make_test_dom, patch_pipeline_io
 
 
 class TestPlanner(unittest.TestCase):
@@ -163,20 +162,11 @@ class TestPlanner(unittest.TestCase):
         self.assertFalse(plan.overridden)
 
     def test_run_pipeline_with_plan(self):
-        mock_dom = DocumentDOM(
+        mock_dom = make_test_dom(
+            "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych.",
             document_id="d1",
             source_filename="test.pdf",
-            total_pages=1,
-            nodes=[
-                DOMNode(
-                    node_id="n1",
-                    type="text",
-                    global_page_index=1,
-                    temp_slice_index=1,
-                    bounding_box=BoundingBox(0.0, 0.0, 100.0, 100.0),
-                    content={"raw_text": "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych."}
-                )
-            ]
+            node_type="text",
         )
         plan = self.planner.create_plan(
             document_path="test.pdf",
@@ -186,11 +176,7 @@ class TestPlanner(unittest.TestCase):
             language="pl",
             target_threshold=0.82
         )
-        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
-             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch_pipeline_io(parse_return=mock_dom):
             res = run_pipeline(
                 pdf_path="test.pdf",
                 plan=plan,
@@ -265,20 +251,11 @@ class TestPlanner(unittest.TestCase):
         self.assertFalse(restored.do_table_structure)
 
     def test_run_pipeline_with_ingestion_config(self):
-        mock_dom = DocumentDOM(
+        mock_dom = make_test_dom(
+            "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych.",
             document_id="d1",
             source_filename="test.pdf",
-            total_pages=1,
-            nodes=[
-                DOMNode(
-                    node_id="n1",
-                    type="text",
-                    global_page_index=1,
-                    temp_slice_index=1,
-                    bounding_box=BoundingBox(0.0, 0.0, 100.0, 100.0),
-                    content={"raw_text": "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych."}
-                )
-            ]
+            node_type="text",
         )
         cfg = IngestionConfig(
             target_threshold=0.82,
@@ -287,11 +264,7 @@ class TestPlanner(unittest.TestCase):
             visualize=False,
             output_dir="test_output"
         )
-        with patch("src.pipeline.attempt_runner.parse_document", return_value=mock_dom), \
-             patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d), \
-             patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
-             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("a.json", "b.json", "c.json")), \
-             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer", return_value="viewer.html"):
+        with patch_pipeline_io(parse_return=mock_dom):
             res = run_pipeline(
                 pdf_path="test.pdf",
                 config=cfg,

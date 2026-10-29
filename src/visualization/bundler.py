@@ -8,7 +8,7 @@ Concatenates modular concern scripts at runtime without persisting bundled asset
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import List, Optional, Sequence
 
 _VIS_DIR: str = os.path.dirname(os.path.abspath(__file__))
 
@@ -34,75 +34,55 @@ DATA_SHAPE_MODULE_ORDER: List[str] = [
 ]
 
 
-def bundle_landing_js() -> str:
-    """
-    Concatenates modular landing page JavaScript sources on the fly in dependency order.
-
-    Returns:
-        Complete client JavaScript payload for the ingestion dashboard.
-    """
-    landing_dir = os.path.join(_VIS_DIR, "landing")
-    parts: List[str] = [
-        "/* ==========================================================================\n"
-        " * cernodata Ingestion Hub Dashboard Runtime (Built On The Fly)\n"
-        " * ========================================================================== */\n"
-    ]
-    for mod_name in LANDING_MODULE_ORDER:
-        mod_path = os.path.join(landing_dir, mod_name)
+def bundle_js_modules(
+    directory: str, module_order: Sequence[str], header_title: Optional[str] = None
+) -> str:
+    """Concatenates modular JavaScript source files from a directory in dependency order."""
+    parts: List[str] = []
+    if header_title:
+        parts.append(
+            "/* ==========================================================================\n"
+            f" * {header_title}\n"
+            " * ========================================================================== */\n"
+        )
+    for mod_name in module_order:
+        mod_path = os.path.join(directory, mod_name)
         if os.path.exists(mod_path):
             with open(mod_path, "r", encoding="utf-8") as f:
                 parts.append(f"/* === Concern Module: {mod_name} === */\n" + f.read())
     return "\n\n".join(parts)
 
 
-def get_landing_js() -> str:
-    """
-    Retrieves dynamically assembled landing dashboard JavaScript content.
+def bundle_landing_js() -> str:
+    """Concatenates modular landing page JavaScript sources on the fly in dependency order."""
+    return bundle_js_modules(
+        os.path.join(_VIS_DIR, "landing"),
+        LANDING_MODULE_ORDER,
+        "cernodata Ingestion Hub Dashboard Runtime (Built On The Fly)",
+    )
 
-    Returns:
-        JavaScript source string assembled on the fly.
-    """
+
+def get_landing_js() -> str:
+    """Retrieves dynamically assembled landing dashboard JavaScript content."""
     return bundle_landing_js()
 
 
 def bundle_data_shape_config_js() -> str:
-    """
-    Concatenates modular data shape planner JavaScript sources on the fly in dependency order.
-
-    Returns:
-        Complete client JavaScript payload for the data shape wizard.
-    """
-    data_shape_dir = os.path.join(_VIS_DIR, "data_shape")
-    parts: List[str] = [
-        "/* ==========================================================================\n"
-        " * cernodata Data Shape Wizard Runtime (Built On The Fly)\n"
-        " * ========================================================================== */\n"
-    ]
-    for mod_name in DATA_SHAPE_MODULE_ORDER:
-        mod_path = os.path.join(data_shape_dir, mod_name)
-        if os.path.exists(mod_path):
-            with open(mod_path, "r", encoding="utf-8") as f:
-                parts.append(f"/* === Concern Module: {mod_name} === */\n" + f.read())
-    return "\n\n".join(parts)
+    """Concatenates modular data shape planner JavaScript sources on the fly in dependency order."""
+    return bundle_js_modules(
+        os.path.join(_VIS_DIR, "data_shape"),
+        DATA_SHAPE_MODULE_ORDER,
+        "cernodata Data Shape Wizard Runtime (Built On The Fly)",
+    )
 
 
 def get_data_shape_config_js() -> str:
-    """
-    Retrieves dynamically assembled data shape planner JavaScript content.
-
-    Returns:
-        JavaScript source string assembled on the fly.
-    """
+    """Retrieves dynamically assembled data shape planner JavaScript content."""
     return bundle_data_shape_config_js()
 
 
 def get_viewer_js() -> str:
-    """
-    Retrieves dynamically assembled interactive visual flow viewer JavaScript content.
-
-    Returns:
-        JavaScript source string assembled on the fly.
-    """
+    """Retrieves dynamically assembled interactive visual flow viewer JavaScript content."""
     from src.visualization.viewer.scripts import get_viewer_js as _get_viewer_js
 
     return _get_viewer_js()
@@ -111,6 +91,7 @@ def get_viewer_js() -> str:
 __all__ = [
     "LANDING_MODULE_ORDER",
     "DATA_SHAPE_MODULE_ORDER",
+    "bundle_js_modules",
     "bundle_landing_js",
     "get_landing_js",
     "bundle_data_shape_config_js",

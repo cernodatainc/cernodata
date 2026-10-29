@@ -52,9 +52,7 @@ def main() -> None:
                 open_browser=not getattr(args, "no_browser", False)
             )
         if args.override_preset:
-            active_plan.primary_preset = args.override_preset
-            active_plan.overridden = True
-            active_plan.preset_order = [args.override_preset] + [p for p in active_plan.preset_order if p != args.override_preset]
+            active_plan.apply_preset_override(args.override_preset)
         plan_path = os.path.join(args.output_dir, "plan.json")
         active_plan.save(plan_path)
         print(f"\n[OK] Plan saved to '{plan_path}'.")
@@ -67,9 +65,7 @@ def main() -> None:
             sys.exit(1)
         active_plan = DocumentPlan.load(args.plan)
         if args.override_preset:
-            active_plan.primary_preset = args.override_preset
-            active_plan.overridden = True
-            active_plan.preset_order = [args.override_preset] + [p for p in active_plan.preset_order if p != args.override_preset]
+            active_plan.apply_preset_override(args.override_preset)
 
     # Canonical workflow: Launch the interactive landing page hub if --serve is requested
     # or if no batch CLI arguments (--input, --plan, --create-plan) are specified.

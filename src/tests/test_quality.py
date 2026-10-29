@@ -6,7 +6,7 @@ Unit tests for quality continuum, garbage metrics, language checks, diacritic an
 
 import unittest
 import numpy as np
-from src.dom import BoundingBox, DOMNode, DocumentDOM
+from src.dom import BoundingBox
 from src.quality import (
     compute_garbage_ratio,
     compute_language_score,
@@ -17,6 +17,7 @@ from src.quality import (
     get_language_config,
     register_language_config
 )
+from src.tests.conftest import make_test_dom, make_test_node
 
 
 class TestQualityMetrics(unittest.TestCase):
@@ -36,12 +37,8 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertLess(pl_score_corrupted, 1.0)
 
     def test_detect_quality_violations(self):
-        node = DOMNode(
-            node_id="n_viol", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Infolinia czynna w piqtku."}
-        )
-        dom = DocumentDOM(document_id="doc_viol", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        node = make_test_node("Infolinia czynna w piqtku.", node_id="n_viol")
+        dom = make_test_dom(nodes=[node], document_id="doc_viol")
 
         violations = detect_quality_violations(dom, language="pl")
         self.assertEqual(len(violations), 1)
@@ -59,12 +56,8 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertFalse(node.violations[0]["suppressed"])
 
     def test_suppressed_violations_affect_confidence(self):
-        node = DOMNode(
-            node_id="n_viol_supp", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Infolinia czynna w piqtku."}
-        )
-        dom = DocumentDOM(document_id="doc_viol_supp", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        node = make_test_node("Infolinia czynna w piqtku.", node_id="n_viol_supp")
+        dom = make_test_dom(nodes=[node], document_id="doc_viol_supp")
         detect_quality_violations(dom, language="pl")
 
         # Before suppression, confidence is lower due to diacritic anomaly penalty
@@ -82,12 +75,7 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(score, 1.0)
 
         # Verify detect_quality_violations handles None language without AttributeError
-        node = DOMNode(
-            node_id="n1", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Clean English text sample."}
-        )
-        dom = DocumentDOM(document_id="doc1", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        dom = make_test_dom("Clean English text sample.", document_id="doc1")
         violations = detect_quality_violations(dom, language=None)
         self.assertEqual(violations, [])
 
@@ -95,12 +83,7 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertIsNone(get_language_config(None))
 
     def test_detect_quality_violations_with_page_languages(self):
-        node = DOMNode(
-            node_id="n_lang_map", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Firma dostarczy nowe Möbel do biura."}
-        )
-        dom = DocumentDOM(document_id="doc_map", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        dom = make_test_dom("Firma dostarczy nowe Möbel do biura.", document_id="doc_map", node_id="n_lang_map")
         violations = detect_quality_violations(dom, language="auto", page_languages={1: "pl"})
         self.assertTrue(any(v.get("rule_type") == "diacritic_conflict" for v in violations))
 
@@ -134,16 +117,8 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertIn("ö", config.conflicting_diacritics)
 
     def test_diacritic_conflict_reduces_page_confidence(self):
-        clean_node = DOMNode(
-            node_id="n_clean", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Sprawdź termin wykupu obligacji w piątku."}
-        )
-        conflicted_node = DOMNode(
-            node_id="n_conflict", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Sprawdź termin wykupu Möbel w piątku."}
-        )
+        clean_node = make_test_node("Sprawdź termin wykupu obligacji w piątku.", node_id="n_clean")
+        conflicted_node = make_test_node("Sprawdź termin wykupu Möbel w piątku.", node_id="n_conflict")
         clean_confidence = evaluate_page_confidence([clean_node], language="pl")
         conflicted_confidence = evaluate_page_confidence([conflicted_node], language="pl")
 
@@ -151,12 +126,7 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertLess(conflicted_confidence, clean_confidence)
 
     def test_detect_diacritic_conflict_violation(self):
-        node = DOMNode(
-            node_id="n_umlaut", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Firma dostarczy nowe Möbel do biura."}
-        )
-        dom = DocumentDOM(document_id="doc_umlaut", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        dom = make_test_dom("Firma dostarczy nowe Möbel do biura.", document_id="doc_umlaut", node_id="n_umlaut")
         violations = detect_quality_violations(dom, language="pl")
 
         conflict_viols = [v for v in violations if v["rule_type"] == "diacritic_conflict"]
@@ -211,15 +181,12 @@ class TestQualityMetrics(unittest.TestCase):
             )
 
     def test_node_p1_n12_damaged_sample_raises_high_violation(self):
-        node = DOMNode(
+        node = make_test_node(
+            "* Oplata zgodna z taryfą operatora. Infolinia czynna od poniedzialku do piątku oc   )  ch h)",
             node_id="node_p1_n12",
-            type="paragraph",
-            global_page_index=1,
-            temp_slice_index=1,
-            bounding_box=BoundingBox(204.33, 786.67, 512.0, 816.0),
-            content={"raw_text": "* Oplata zgodna z taryfą operatora. Infolinia czynna od poniedzialku do piątku oc   )  ch h)"}
+            bbox=BoundingBox(204.33, 786.67, 512.0, 816.0),
         )
-        dom = DocumentDOM(document_id="doc_sample", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        dom = make_test_dom(nodes=[node], document_id="doc_sample")
 
         violations = detect_quality_violations(dom, language="pl")
         garbage_viols = [v for v in violations if v["rule_type"] == "garbage_character_ratio"]
@@ -236,12 +203,7 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertGreater(soup_chars, 0)
 
     def test_diacritic_violation_single_replacement(self):
-        node = DOMNode(
-            node_id="n_repeat", type="paragraph", global_page_index=1, temp_slice_index=1,
-            bounding_box=BoundingBox(10, 10, 100, 50),
-            content={"raw_text": "Infolinia czynna w piqtku. Pytanie qqq."}
-        )
-        dom = DocumentDOM(document_id="doc_repeat", source_filename="sample.pdf", total_pages=1, nodes=[node])
+        dom = make_test_dom("Infolinia czynna w piqtku. Pytanie qqq.", document_id="doc_repeat", node_id="n_repeat")
         violations = detect_quality_violations(dom, language="pl")
         sub_viols = [v for v in violations if v.get("rule_type") == "ocr_character_substitution"]
         self.assertGreater(len(sub_viols), 0)

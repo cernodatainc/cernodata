@@ -18,11 +18,8 @@ import urllib.parse
 
 from src.utils import mkdirs
 from src.pipeline.planner import PresetPlanner, DocumentPlan
-from src.pipeline.server import (
-    PipelineViewerHandler,
-    PipelineViewerServer,
-    find_available_port,
-)
+from src.pipeline.server import find_available_port
+from src.tests.conftest import http_get, http_post_json, running_test_server
 
 
 class TestDataShapeServer(unittest.TestCase):
@@ -72,81 +69,64 @@ class TestDataShapeServer(unittest.TestCase):
         self.assertGreaterEqual(port, 8100)
 
     def test_server_endpoints(self):
-        port = find_available_port(start_port=9200, max_attempts=20)
-        httpd = PipelineViewerServer(("127.0.0.1", port), PipelineViewerHandler)
-        httpd.planner = self.planner
-        httpd.default_doc = "sample_test.pdf"
-        httpd.default_lang = "pl"
-        httpd.default_threshold = 0.85
-        httpd.output_dir = self.test_output
-
         with open(self.html_path, "r", encoding="utf-8") as f:
-            httpd.html_content = f.read()
+            html_content = f.read()
 
-        server_thread = threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.1), daemon=True)
-        server_thread.start()
-
-        base_url = f"http://127.0.0.1:{port}"
-
-        try:
+        with running_test_server(
+            planner=self.planner,
+            default_doc="sample_test.pdf",
+            default_lang="pl",
+            default_threshold=0.85,
+            output_dir=self.test_output,
+            html_content=html_content,
+        ) as (_, base_url):
             # 1. Test GET /data_shape_config.html
-            with urllib.request.urlopen(f"{base_url}/data_shape_config.html") as resp:
-                self.assertEqual(resp.status, 200)
-                html = resp.read().decode("utf-8")
-                self.assertIn("cernodata", html.lower())
+            status, html, _ = http_get(f"{base_url}/data_shape_config.html")
+            self.assertEqual(status, 200)
+            self.assertIn("cernodata", html.lower())
 
             # 2. Test GET /api/config
-            with urllib.request.urlopen(f"{base_url}/api/config") as resp:
-                self.assertEqual(resp.status, 200)
-                cfg = json.loads(resp.read().decode("utf-8"))
-                self.assertEqual(cfg["default_doc"], "sample_test.pdf")
-                self.assertEqual(cfg["default_lang"], "pl")
-                self.assertEqual(cfg["default_threshold"], 0.85)
-                self.assertIn("preset_weights", cfg)
-                self.assertIn("taxonomy_options", cfg)
+            status_cfg, cfg_body, _ = http_get(f"{base_url}/api/config")
+            self.assertEqual(status_cfg, 200)
+            cfg = json.loads(cfg_body)
+            self.assertEqual(cfg["default_doc"], "sample_test.pdf")
+            self.assertEqual(cfg["default_lang"], "pl")
+            self.assertEqual(cfg["default_threshold"], 0.85)
+            self.assertIn("preset_weights", cfg)
+            self.assertIn("taxonomy_options", cfg)
 
             # 3. Test POST /api/calculate_scores
-            score_req_data = json.dumps({
-                "taxonomy": "financial_report",
-                "target": "high_precision_structure",
-                "security": "air_gapped_local",
-            }).encode("utf-8")
-
-            req = urllib.request.Request(
+            status_sc, calc_resp = http_post_json(
                 f"{base_url}/api/calculate_scores",
-                data=score_req_data,
-                headers={"Content-Type": "application/json"}
+                {
+                    "taxonomy": "financial_report",
+                    "target": "high_precision_structure",
+                    "security": "air_gapped_local",
+                },
             )
-            with urllib.request.urlopen(req) as resp:
-                self.assertEqual(resp.status, 200)
-                calc_resp = json.loads(resp.read().decode("utf-8"))
-                self.assertTrue(calc_resp["success"])
-                self.assertIn("docling_deep", calc_resp["scores"])
-                self.assertEqual(calc_resp["suggested_order"][0], "docling_deep")
+            self.assertEqual(status_sc, 200)
+            self.assertTrue(calc_resp["success"])
+            self.assertIn("docling_deep", calc_resp["scores"])
+            self.assertEqual(calc_resp["suggested_order"][0], "docling_deep")
 
             # 4. Test POST /api/submit_plan without language hint (language=None)
-            plan_submit_data = json.dumps({
-                "document_path": "sample_test.pdf",
-                "taxonomy": "scanned_form",
-                "target": "high_precision_structure",
-                "security": "hosted_vision_api",
-                "language": None,
-                "target_threshold": 0.88,
-                "override_primary": "vision_llm_direct",
-            }).encode("utf-8")
-
-            req = urllib.request.Request(
+            status_sub, submit_resp = http_post_json(
                 f"{base_url}/api/submit_plan",
-                data=plan_submit_data,
-                headers={"Content-Type": "application/json"}
+                {
+                    "document_path": "sample_test.pdf",
+                    "taxonomy": "scanned_form",
+                    "target": "high_precision_structure",
+                    "security": "hosted_vision_api",
+                    "language": None,
+                    "target_threshold": 0.88,
+                    "override_primary": "vision_llm_direct",
+                },
             )
-            with urllib.request.urlopen(req) as resp:
-                self.assertEqual(resp.status, 200)
-                submit_resp = json.loads(resp.read().decode("utf-8"))
-                self.assertTrue(submit_resp["success"])
-                self.assertIn("plan", submit_resp)
-                self.assertEqual(submit_resp["plan"]["primary_preset"], "vision_llm_direct")
-                self.assertIsNone(submit_resp["plan"]["language"])
+            self.assertEqual(status_sub, 200)
+            self.assertTrue(submit_resp["success"])
+            self.assertIn("plan", submit_resp)
+            self.assertEqual(submit_resp["plan"]["primary_preset"], "vision_llm_direct")
+            self.assertIsNone(submit_resp["plan"]["language"])
 
             # Verify saved plan file
             saved_plan_file = os.path.join(self.test_output, "plan.json")
@@ -155,10 +135,6 @@ class TestDataShapeServer(unittest.TestCase):
             self.assertEqual(loaded.primary_preset, "vision_llm_direct")
             self.assertEqual(loaded.taxonomy, "scanned_form")
             self.assertIsNone(loaded.language)
-
-        finally:
-            httpd.shutdown()
-            httpd.server_close()
 
     @pytest.mark.slow
     def test_browser_session_flow(self):

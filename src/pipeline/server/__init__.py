@@ -7,29 +7,23 @@ Provides thread-safe session tracking, dynamic viewer data hydration, and intera
 
 from __future__ import annotations
 
-from src.pipeline.server.artifacts import (
+from src.pipeline.server.common import (
+    REPO_ROOT,
+    RunArtifacts,
+    SRC_DIR,
+    build_runs_grid,
     build_viewer_dataset,
     calculate_progress_step,
+    copy_file_if_exists,
     create_preset_attempt_record,
     extract_decision_from_html,
+    find_previous_runs,
     load_or_render_page_images,
     load_run_artifacts,
     normalize_violations,
-    safe_load_json,
-    RunArtifacts,
-)
-from src.pipeline.server.core import PipelineViewerServer
-from src.pipeline.server.discovery import (
-    build_runs_grid,
-    find_previous_runs,
-)
-from src.pipeline.server.handler import PipelineViewerHandler
-from src.pipeline.server.http_utils import (
-    REPO_ROOT,
-    SRC_DIR,
-    copy_file_if_exists,
     read_html_template,
     read_json_payload,
+    safe_load_json,
     send_file_response,
     send_first_existing_file,
     send_html_response,
@@ -37,6 +31,8 @@ from src.pipeline.server.http_utils import (
     send_response_bytes,
     send_text_response,
 )
+from src.pipeline.server.core import PipelineViewerServer
+from src.pipeline.server.handler import PipelineViewerHandler
 from src.pipeline.server.launcher import (
     export_standalone_wizard_assets,
     main,

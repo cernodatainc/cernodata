@@ -24,6 +24,18 @@ from src.utils import mkdirs
 logger = logging.getLogger("cernodata.quality.materialization")
 
 
+def group_violations_by_layer(
+    violations: List[Dict[str, Any]], active_layers: Sequence[str]
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Groups violation dictionaries into buckets keyed by normalized verification layer."""
+    by_layer: Dict[str, List[Dict[str, Any]]] = {lyr: [] for lyr in active_layers}
+    for v in violations:
+        raw_type = v.get("type", "")
+        norm_type = normalize_layer_name(raw_type) or raw_type or "other"
+        by_layer.setdefault(norm_type, []).append(v)
+    return by_layer
+
+
 @dataclass
 class MaterializedVerificationResult:
     """Strongly-typed materialized verification record containing criteria scores and violations."""
@@ -48,26 +60,38 @@ class MaterializedVerificationResult:
         """Converts result object to standard dictionary representation."""
         return asdict(self)
 
+    @staticmethod
+    def _parse_page_scores(raw_per_page: Dict[Any, Any]) -> Dict[int, float]:
+        per_page: Dict[int, float] = {}
+        for p_k, p_v in raw_per_page.items():
+            try:
+                per_page[int(p_k)] = float(p_v)
+            except (ValueError, TypeError):
+                pass
+        return per_page
+
+    @staticmethod
+    def _parse_page_layer_scores(raw_per_page_layers: Dict[Any, Any]) -> Dict[int, Dict[str, float]]:
+        per_page_layers: Dict[int, Dict[str, float]] = {}
+        for p_k, p_v in raw_per_page_layers.items():
+            if isinstance(p_v, dict):
+                try:
+                    per_page_layers[int(p_k)] = {str(k): float(v) for k, v in p_v.items()}
+                except (ValueError, TypeError):
+                    pass
+        return per_page_layers
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> MaterializedVerificationResult:
         """Hydrates a MaterializedVerificationResult instance from dictionary payload."""
-        per_page = {
-            int(k): float(v)
-            for k, v in data.get("per_page_confidence", {}).items()
-        }
-        per_page_layers: Dict[int, Dict[str, float]] = {}
-        for p_k, p_v in data.get("per_page_layer_scores", {}).items():
-            if isinstance(p_v, dict):
-                per_page_layers[int(p_k)] = {str(k): float(v) for k, v in p_v.items()}
-
         return cls(
             document_id=str(data.get("document_id", "")),
             source_filename=str(data.get("source_filename", "")),
             selected_layers=list(data.get("selected_layers", [])),
             overall_confidence=float(data.get("overall_confidence", 0.0)),
-            per_page_confidence=per_page,
+            per_page_confidence=cls._parse_page_scores(data.get("per_page_confidence", {})),
             layer_scores={str(k): float(v) for k, v in data.get("layer_scores", {}).items()},
-            per_page_layer_scores=per_page_layers,
+            per_page_layer_scores=cls._parse_page_layer_scores(data.get("per_page_layer_scores", {})),
             total_violations=int(data.get("total_violations", 0)),
             violations=list(data.get("violations", [])),
             violations_by_layer={
@@ -79,6 +103,41 @@ class MaterializedVerificationResult:
             materialized_at=str(data.get("materialized_at", datetime.now(timezone.utc).isoformat())),
             output_dir=data.get("output_dir"),
             metadata=dict(data.get("metadata", {})),
+        )
+
+    @classmethod
+    def from_decision(
+        cls,
+        dom: DocumentDOM,
+        decision: Dict[str, Any],
+        violations: List[Dict[str, Any]],
+        active_layers: List[str],
+        output_dir: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        materialized_at: Optional[str] = None,
+    ) -> MaterializedVerificationResult:
+        """Constructs a MaterializedVerificationResult from evaluated DOM, decision payload, and violations."""
+        raw_overall = decision.get("overall_confidence", 1.0)
+        conf_val = float(raw_overall) if raw_overall is not None else 1.0
+        raw_thresh = decision.get("target_confidence_threshold", 0.82)
+        thresh_val = float(raw_thresh) if raw_thresh is not None else 0.82
+        return cls(
+            document_id=dom.document_id,
+            source_filename=dom.source_filename,
+            selected_layers=active_layers,
+            overall_confidence=conf_val,
+            per_page_confidence=cls._parse_page_scores(decision.get("per_page_confidence", {})),
+            layer_scores={str(k): float(v) for k, v in decision.get("layer_scores", {}).items()},
+            per_page_layer_scores=cls._parse_page_layer_scores(decision.get("per_page_layer_scores", {})),
+            total_violations=len(violations),
+            violations=violations,
+            violations_by_layer=group_violations_by_layer(violations, active_layers),
+            is_accepted=bool(decision.get("is_accepted", conf_val >= thresh_val)),
+            target_threshold=thresh_val,
+            status=str(decision.get("status", "ACCEPT")),
+            materialized_at=materialized_at or datetime.now(timezone.utc).isoformat(),
+            output_dir=output_dir,
+            metadata=metadata or {},
         )
 
     def save(self, target_dir: Optional[str] = None) -> str:
@@ -104,44 +163,45 @@ def materialize_document_verification(
     Mutates node.violations in-place on DOM and persists artifacts when output_dir is provided.
     """
     active_layers = normalize_layers(selected_layers)
-
-    # Step 1: Detect violations for active layers and materialize onto DOM nodes
     violations = detect_quality_violations(dom, language=language, layers=active_layers)
-
-    # Step 2: Evaluate confidence scores and layer breakdowns
     metrics = evaluate_document_confidence(dom, language=language, layers=active_layers)
     overall_conf = metrics["overall_confidence"]
     per_page_conf = metrics["per_page_confidence"]
     layer_scores = metrics.get("layer_scores", {})
-    per_page_layer_scores = metrics.get("per_page_layer_scores", {})
-
-    # Step 3: Group violations by layer
-    violations_by_layer: Dict[str, List[Dict[str, Any]]] = {lyr: [] for lyr in active_layers}
-    for v in violations:
-        raw_type = v.get("type", "")
-        norm_type = normalize_layer_name(raw_type) or raw_type
-        violations_by_layer.setdefault(norm_type, []).append(v)
 
     is_accepted = overall_conf >= target_threshold
     status = "ACCEPT" if is_accepted else "TRIGGER_FALLBACK"
     materialized_time = datetime.now(timezone.utc).isoformat()
+    slice_pages = [page for page, sc in per_page_conf.items() if sc < target_threshold]
 
-    result = MaterializedVerificationResult(
-        document_id=dom.document_id,
-        source_filename=dom.source_filename,
-        selected_layers=active_layers,
-        overall_confidence=overall_conf,
-        per_page_confidence=per_page_conf,
-        layer_scores=layer_scores,
-        per_page_layer_scores=per_page_layer_scores,
-        total_violations=len(violations),
+    decision_record: Dict[str, Any] = {
+        "language": language,
+        "target_confidence_threshold": target_threshold,
+        "overall_confidence": overall_conf,
+        "per_page_confidence": per_page_conf,
+        "per_page_layer_scores": metrics.get("per_page_layer_scores", {}),
+        "is_accepted": is_accepted,
+        "status": status,
+        "selected_layers": active_layers,
+        "layer_scores": layer_scores,
+        "pages_requiring_slicing": slice_pages,
+        "materialized_at": materialized_time,
+        "decision_tree": {
+            "action": "ACCEPT_OUTPUT" if is_accepted else "PATH_B_WIGGLE_PARAMETERS",
+            "reason": (
+                f"Overall confidence ({overall_conf}) {'meets' if is_accepted else 'below'} "
+                f"target threshold ({target_threshold}) across layers: {', '.join(active_layers)}."
+            ),
+        },
+    }
+
+    result = MaterializedVerificationResult.from_decision(
+        dom=dom,
+        decision=decision_record,
         violations=violations,
-        violations_by_layer=violations_by_layer,
-        is_accepted=is_accepted,
-        target_threshold=target_threshold,
-        status=status,
-        materialized_at=materialized_time,
+        active_layers=active_layers,
         output_dir=output_dir,
+        materialized_at=materialized_time,
         metadata={
             "detected_languages": metrics.get("detected_languages", {}),
             "primary_detected_language": metrics.get("primary_detected_language", "en"),
@@ -149,13 +209,10 @@ def materialize_document_verification(
         },
     )
 
-    # Step 4: Persist materialized view to disk if output_dir is supplied and persist is True
     if output_dir and persist:
         mkdirs(output_dir)
         result.save(output_dir)
 
-        # 1. Update quality_violations.json
-        viol_file = os.path.join(output_dir, "quality_violations.json")
         viol_data = {
             "document_id": dom.document_id,
             "source_filename": dom.source_filename,
@@ -168,50 +225,28 @@ def materialize_document_verification(
             "violations": violations,
             "materialized_at": materialized_time,
         }
-        with open(viol_file, "w", encoding="utf-8") as f:
+        with open(os.path.join(output_dir, "quality_violations.json"), "w", encoding="utf-8") as f:
             json.dump(viol_data, f, indent=2)
 
-        # 2. Update decision_tree.json
-        dec_file = os.path.join(output_dir, "decision_tree.json")
-        slice_pages = [page for page, sc in per_page_conf.items() if sc < target_threshold]
-        decision_record: Dict[str, Any] = {
-            "language": language,
-            "target_confidence_threshold": target_threshold,
-            "overall_confidence": overall_conf,
-            "per_page_confidence": per_page_conf,
-            "is_accepted": is_accepted,
-            "status": status,
-            "selected_layers": active_layers,
-            "layer_scores": layer_scores,
-            "pages_requiring_slicing": slice_pages,
-            "materialized_at": materialized_time,
-            "decision_tree": {
-                "action": "ACCEPT_OUTPUT" if is_accepted else "PATH_B_WIGGLE_PARAMETERS",
-                "reason": (
-                    f"Overall confidence ({overall_conf}) {'meets' if is_accepted else 'below'} "
-                    f"target threshold ({target_threshold}) across layers: {', '.join(active_layers)}."
-                ),
-            },
-        }
-        with open(dec_file, "w", encoding="utf-8") as f:
+        decision_record.pop("per_page_layer_scores", None)
+        with open(os.path.join(output_dir, "decision_tree.json"), "w", encoding="utf-8") as f:
             json.dump(decision_record, f, indent=2)
 
-        # 3. Update document_dom.json with newly materialized node.violations
-        dom_file = os.path.join(output_dir, "document_dom.json")
-        with open(dom_file, "w", encoding="utf-8") as f:
+        with open(os.path.join(output_dir, "document_dom.json"), "w", encoding="utf-8") as f:
             json.dump(dom.to_dict(), f, indent=2)
 
-        # 4. Update plan_execution_result.json if present
         plan_res_file = os.path.join(output_dir, "plan_execution_result.json")
         if os.path.exists(plan_res_file):
             try:
                 with open(plan_res_file, "r", encoding="utf-8") as f:
                     plan_data = json.load(f)
-                plan_data["decision"] = decision_record
-                plan_data["total_violations"] = len(violations)
-                plan_data["status"] = status
-                plan_data["selected_layers"] = active_layers
-                plan_data["materialized_at"] = materialized_time
+                plan_data.update({
+                    "decision": decision_record,
+                    "total_violations": len(violations),
+                    "status": status,
+                    "selected_layers": active_layers,
+                    "materialized_at": materialized_time,
+                })
                 with open(plan_res_file, "w", encoding="utf-8") as f:
                     json.dump(plan_data, f, indent=2)
             except Exception as ex:

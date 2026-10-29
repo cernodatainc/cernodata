@@ -6,7 +6,6 @@ Validated artifact container and filesystem loader for pipeline execution runs.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -17,6 +16,7 @@ from src.schemas.dom import DocumentDOMSchema
 from src.schemas.execution import PipelineExecutionResultSchema
 from src.schemas.plan import DocumentPlanSchema
 from src.schemas.violations import QualityViolationSchema, parse_violations_payload
+from src.utils import safe_load_json as _read_json_file
 
 logger = logging.getLogger("cernodata.schemas.artifacts")
 
@@ -47,18 +47,6 @@ class ValidatedRunArtifacts(BaseModel):
     def to_dict(self) -> Dict[str, Any]:
         """Serializes validated artifacts to dictionary for backwards-compatible consumers."""
         return self.model_dump()
-
-
-def _read_json_file(file_path: str) -> Optional[Any]:
-    """Reads and deserializes a JSON file if it exists, returning None on missing or corrupt files."""
-    if not os.path.exists(file_path):
-        return None
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
-        logger.debug("Failed reading JSON file %s: %s", file_path, e)
-        return None
 
 
 def load_validated_run_artifacts(run_dir: str) -> Optional[ValidatedRunArtifacts]:

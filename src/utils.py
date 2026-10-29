@@ -4,11 +4,23 @@ src/utils.py
 Shared utility functions for file system operations.
 """
 
+import json
 import os
 import socket
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
-__all__ = ["mkdirs", "find_available_port", "resolve_pdf_path"]
+__all__ = ["mkdirs", "find_available_port", "resolve_pdf_path", "safe_load_json"]
+
+
+def safe_load_json(file_path: str, default: Any = None) -> Any:
+    """Safely reads and deserializes a UTF-8 JSON file if it exists, returning default on failure."""
+    if not os.path.exists(file_path):
+        return default
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return default
 
 
 def resolve_pdf_path(path: str) -> str:
