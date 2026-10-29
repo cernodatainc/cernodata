@@ -216,8 +216,12 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
             loadRunsGrid(run.document_name);
         }
         if (typeof renderExplorerUI === 'function') {
-            currentExplorerRun = activeRunOutputDir;
             if (run.document_path) currentExplorerDoc = run.document_path;
+            const hasMatchingRun = window.explorerData && window.explorerData.all_mappings &&
+                window.explorerData.all_mappings.some(m => m.runs && m.runs.some(r => r.run_id === currentExplorerRun));
+            if (!hasMatchingRun) {
+                currentExplorerRun = activeRunOutputDir;
+            }
             renderExplorerUI();
         }
         if (shouldReloadViewer && typeof reloadViewerIframe === 'function') {
