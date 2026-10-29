@@ -167,57 +167,11 @@
                     </div>
                 </div>
 
-                <div class="card-section">
-                    <div class="form-grid-3">
-                        <div class="form-group">
-                            <label class="form-label" for="inpLanguage">Language hint</label>
-                            <select class="form-select" id="inpLanguage">
-                                <option value="auto">Auto-Detect Document Language</option>
-                                <option value="pl" selected>Polish (pl)</option>
-                                <option value="en">English (en)</option>
-                                <option value="de">German (de)</option>
-                                <option value="fr">French (fr)</option>
-                                <option value="es">Spanish (es)</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="inpPreset">Ingestion preset</label>
-                            <select class="form-select" id="inpPreset">
-                                <option value="docling_fast" selected>docling_fast (Hybrid Parser)</option>
-                                <option value="docling_deep">docling_deep (Deep Visual OCR &amp; Tables)</option>
-                                <option value="pypdfium_rapidocr">pypdfium_rapidocr (RapidOCR Standalone)</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label form-label-split" for="inpThreshold">
-                                Confidence threshold <span id="thresholdDisplay" class="threshold-display">0.85</span>
-                            </label>
-                            <input type="range" id="inpThreshold" class="threshold-slider" min="0.50" max="0.98"
-                                step="0.01" value="0.85"
-                                oninput="document.getElementById('thresholdDisplay').textContent = Number(this.value).toFixed(2);">
-                        </div>
-                    </div>
-
-                    <div class="checkbox-row">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="inpAlignSkew" checked> Auto-align text skew
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="inpVisualize" checked> Generate visual overlays
-                        </label>
-                        <label class="checkbox-label" title="Bypass previous results">
-                            <input type="checkbox" id="inpForceRerun"> Force rerun
-                        </label>
-                    </div>
-                </div>
-
                 <div class="card-footer">
                     <span class="badge badge-idle" id="inputStatusBadge">Ready</span>
                     <div class="card-footer-actions">
-                        <button class="btn btn-secondary" onclick="switchNavTab('plan')">Configure plan</button>
-                        <button class="btn btn-primary" id="btnRunDirect" onclick="triggerRunPipeline(false)">Run
+                        <button class="btn btn-primary" onclick="switchNavTab('plan')">Configure plan</button>
+                        <button class="btn btn-secondary" id="btnRunDirect" onclick="triggerRunPipeline(false)">Run
                             pipeline</button>
                     </div>
                 </div>
@@ -227,202 +181,169 @@
 
         <!-- 2. Planning Section -->
         <section class="tab-section" id="secPlan">
-            <div class="planning-subtabs-bar">
-                <div class="subtab-pills">
-                    <button class="subtab-pill active" id="subtabBtnPlanSimple" onclick="switchPlanningSubtab('simple')">Simple</button>
-                    <button class="subtab-pill" id="subtabBtnPlanComplex" onclick="switchPlanningSubtab('complex')">Complex</button>
+            <div class="planner-wizard-component main-container" id="plannerWizardComponent">
+                <div>
+                    <div class="status-banner" id="statusBanner"></div>
+
+                    <div class="form-section">
+                        <div class="section-header">
+                            <div class="section-title">Previous results</div>
+                            <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label" for="prevRunSelect">Completed run output</label>
+                            <div class="prev-run-row">
+                                <select id="prevRunSelect" class="override-select prev-run-select plan-run-select"
+                                    onchange="onPreviousRunSelected(this.value)">
+                                    <option value="">Choose a previous run</option>
+                                </select>
+                                <button type="button" class="btn btn-secondary btn-load-params"
+                                    onclick="loadSelectedPreviousRunIntoWizard()">Load parameters</button>
+                                <a id="btnInspectViewer" href="/viewer.html" target="_blank" class="btn btn-secondary btn-view-params">Open in viewer</a>
+                            </div>
+                            <div id="prevRunSummary" class="prev-run-summary"></div>
+                            <div id="planLoadedNotice" class="plan-loaded-notice"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-header">
+                            <div class="section-title">Quality targets &amp; settings</div>
+                            <div class="section-desc">File source, language hint, preset selection, and confidence goal</div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label" for="docPath">Document file path</label>
+                            <input type="text" id="docPath" class="input-text" placeholder="e.g. src/e2e/Document 8.pdf" />
+                        </div>
+
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="input-label" for="inpLanguage">Language hint</label>
+                                <select class="form-select override-select" id="inpLanguage">
+                                    <option value="auto">Auto-Detect Document Language</option>
+                                    <option value="pl" selected>Polish (pl)</option>
+                                    <option value="en">English (en)</option>
+                                    <option value="de">German (de)</option>
+                                    <option value="fr">French (fr)</option>
+                                    <option value="es">Spanish (es)</option>
+                                </select>
+                                <div class="hidden-compat">
+                                    <input type="checkbox" id="enableLangHint" checked />
+                                    <select id="langCode"><option value="pl">pl</option></select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="input-label" for="inpPreset">Ingestion preset</label>
+                                <select class="form-select override-select" id="inpPreset" onchange="onInpPresetChanged()">
+                                    <option value="docling_fast" selected>docling_fast (Hybrid Parser)</option>
+                                    <option value="docling_deep">docling_deep (Deep Visual OCR &amp; Tables)</option>
+                                    <option value="pypdfium_rapidocr">pypdfium_rapidocr (RapidOCR Standalone)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="input-label form-label-split" for="inpThreshold">
+                                    Confidence threshold <span id="thresholdDisplay" class="threshold-display">0.85</span>
+                                </label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="inpThreshold" class="threshold-slider" min="0.50" max="0.99"
+                                        step="0.01" value="0.85"
+                                        oninput="updateThreshold(this.value)">
+                                    <span class="slider-value" id="complexThresholdDisplay">0.85</span>
+                                </div>
+                                <input type="range" id="thresholdSlider" min="0.50" max="0.99" step="0.01" value="0.85" class="hidden-compat" />
+                            </div>
+                        </div>
+
+                        <div class="checkbox-row">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="inpAlignSkew" checked> Auto-align text skew
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="inpVisualize" checked> Generate visual overlays
+                            </label>
+                            <label class="checkbox-label" title="Bypass previous results">
+                                <input type="checkbox" id="inpForceRerun"> Force rerun
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-header">
+                            <div class="section-title">Document taxonomy</div>
+                            <div class="section-desc">Primary structural layout shape</div>
+                        </div>
+                        <div class="options-grid" id="taxonomyGrid"></div>
+                        <select id="planTaxonomy" class="hidden-compat" onchange="updateSuggestedPlan()">
+                            <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
+                            <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
+                            <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
+                            <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-header">
+                            <div class="section-title">Processing priority</div>
+                            <div class="section-desc">Throughput priority versus layout fidelity</div>
+                        </div>
+                        <div class="options-grid" id="targetGrid"></div>
+                        <select id="planTarget" class="hidden-compat" onchange="updateSuggestedPlan()">
+                            <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
+                            <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
+                            <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)</option>
+                        </select>
+                        <select id="planLatency" class="hidden-compat" onchange="updateSuggestedPlan()">
+                            <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
+                            <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
+                            <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-header">
+                            <div class="section-title">Security &amp; Environment</div>
+                            <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
+                        </div>
+                        <div class="options-grid" id="securityGrid"></div>
+                        <select id="planHardware" class="hidden-compat" onchange="updateSuggestedPlan()">
+                            <option value="cpu" selected>Local CPU (Standard host)</option>
+                            <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
+                            <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
+                        </select>
+                    </div>
                 </div>
-                <span class="planning-subtab-desc" id="planSubtabDesc">Fast preset recommendation questionnaire</span>
-            </div>
 
-            <!-- 2a. Simple Planning View -->
-            <div class="planning-subview active" id="planSubviewSimple">
-                <div class="card card-flush">
+                <div class="sidebar">
+                    <div class="ranking-card">
+                        <div class="ranking-header">Suitability ranking</div>
+                        <div class="ranking-sub">Confidence scores update as you answer</div>
+                        <div id="presetsList"></div>
 
-                    <div class="card-section">
-                        <div class="form-group">
-                            <label class="form-label" for="planPreviousRunSelect">Start from previous run</label>
-                            <select class="form-select plan-run-select" id="planPreviousRunSelect"
-                                onchange="if(this.value) choosePreviousRun(this.value)">
-                                <option value="">Choose a previous run</option>
+                        <div class="plan-hierarchy-list" id="planPresetOrderList">
+                            <div class="plan-primary-desc">Primary: <span class="preset-badge"
+                                    id="planPrimaryBadge">docling_fast</span></div>
+                            <div class="plan-fallback-desc">Fallback: <span class="preset-badge"
+                                    id="planFallbackBadge">docling_deep</span></div>
+                        </div>
+
+                        <div class="override-box">
+                            <label class="override-title" for="overrideSelect">Primary preset override</label>
+                            <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
+                                <option value="auto">Auto (recommended ranking)</option>
+                                <option value="pypdfium_rapidocr">pypdfium_rapidocr</option>
+                                <option value="docling_fast">docling_fast</option>
+                                <option value="docling_deep">docling_deep</option>
+                                <option value="vision_llm_direct">vision_llm_direct</option>
                             </select>
                         </div>
-                        <div id="planLoadedNotice" class="plan-loaded-notice"></div>
-                    </div>
-
-                    <div class="card-section">
-                        <div class="form-grid-2">
-                            <div class="form-group">
-                                <label class="form-label" for="planTaxonomy">Document taxonomy</label>
-                                <select class="form-select" id="planTaxonomy" onchange="updateSuggestedPlan()">
-                                    <option value="standard" selected>Standard Born-Digital (PDF, Reports)</option>
-                                    <option value="scanned_archive">Scanned Archive (Faint text, historical)</option>
-                                    <option value="form_heavy">Form-Heavy / Financial (Dense tables, lines)</option>
-                                    <option value="multi_column_dense">Multi-Column Dense (Scientific journals)</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="planTarget">Target use case</label>
-                                <select class="form-select" id="planTarget" onchange="updateSuggestedPlan()">
-                                    <option value="rag_vector_search" selected>RAG Vector Search (Chunk retrieval)</option>
-                                    <option value="slm_fine_tuning">SLM / LLM Fine-Tuning Dataset</option>
-                                    <option value="audit_compliance">Audit &amp; Compliance (Zero OCR damage tolerance)
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="planLatency">Latency vs quality</label>
-                                <select class="form-select" id="planLatency" onchange="updateSuggestedPlan()">
-                                    <option value="balanced" selected>Balanced (Fast attempt with deep fallback)</option>
-                                    <option value="fast_low_cost">Fast &amp; Low Cost (Favor speed)</option>
-                                    <option value="maximum_accuracy">Maximum Accuracy (Deep layout priority)</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="planHardware">Hardware</label>
-                                <select class="form-select" id="planHardware" onchange="updateSuggestedPlan()">
-                                    <option value="cpu" selected>Local CPU (Standard host)</option>
-                                    <option value="gpu_low">Consumer GPU (4-8GB VRAM)</option>
-                                    <option value="gpu_high">Enterprise GPU (16GB+ VRAM)</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card-section">
-                        <div class="form-group">
-                            <span class="form-label">Suggested presets</span>
-                            <div id="planPresetOrderList" class="plan-hierarchy-list">
-                                <div class="plan-primary-desc">Primary: <span class="preset-badge"
-                                        id="planPrimaryBadge">docling_fast</span> Initial execution pass</div>
-                                <div class="plan-fallback-desc">Fallback: <span class="preset-badge"
-                                        id="planFallbackBadge">docling_deep</span> Automated confidence fallback</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card-footer">
-                        <div class="card-footer-actions">
-                            <button class="btn btn-secondary" onclick="switchNavTab('input')">Back</button>
-                            <button class="btn btn-primary" onclick="triggerRunPipeline(true)">Start parsing</button>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- 2b. Complex Planning View (Planner Wizard Component) -->
-            <div class="planning-subview" id="planSubviewComplex">
-                <div class="planner-wizard-component main-container" id="plannerWizardComponent">
-                    <div>
-                        <div class="status-banner" id="statusBanner"></div>
-
-                        <div class="form-section">
-                            <div class="section-header">
-                                <div class="section-title">Previous results</div>
-                                <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label" for="prevRunSelect">Completed run output</label>
-                                <div class="prev-run-row">
-                                    <select id="prevRunSelect" class="override-select prev-run-select"
-                                        onchange="onPreviousRunSelected(this.value)">
-                                        <option value="">Choose a previous run</option>
-                                    </select>
-                                    <button type="button" class="btn btn-secondary btn-load-params"
-                                        onclick="loadSelectedPreviousRunIntoWizard()">Load parameters</button>
-                                    <a id="btnInspectViewer" href="/viewer.html" target="_blank" class="btn btn-secondary btn-view-params">Open in viewer</a>
-                                </div>
-                                <div id="prevRunSummary" class="prev-run-summary"></div>
-                            </div>
-                        </div>
-
-                        <div class="form-section">
-                            <div class="section-header">
-                                <div class="section-title">Quality targets</div>
-                                <div class="section-desc">File source, language hint and confidence goal</div>
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label" for="docPath">Document file path</label>
-                                <input type="text" id="docPath" class="input-text" placeholder="e.g. src/e2e/Dokument 5.pdf" />
-                            </div>
-                            <div class="inline-inputs">
-                                <div class="input-group">
-                                    <div class="lang-hint-header">
-                                        <label class="input-label lang-hint-title" for="langCode">Language hint</label>
-                                        <label class="lang-hint-checkbox-label">
-                                            <input type="checkbox" id="enableLangHint" class="lang-hint-checkbox"
-                                                onchange="toggleLanguageHint()" /> Provide hint
-                                        </label>
-                                    </div>
-                                    <select id="langCode" class="override-select lang-select-disabled" onchange="recalculate()" disabled>
-                                        <option value="en">English (en)</option>
-                                        <option value="pl">Polish (pl)</option>
-                                        <option value="de">German (de)</option>
-                                        <option value="fr">French (fr)</option>
-                                        <option value="es">Spanish (es)</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label class="input-label" for="thresholdSlider">Target confidence threshold</label>
-                                    <div class="slider-wrapper">
-                                        <input type="range" id="thresholdSlider" min="0.50" max="0.99" step="0.01" value="0.82"
-                                            oninput="updateThreshold(this.value)" />
-                                        <span class="slider-value" id="complexThresholdDisplay">0.82</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-section">
-                            <div class="section-header">
-                                <div class="section-title">Document taxonomy</div>
-                                <div class="section-desc">Primary structural layout shape</div>
-                            </div>
-                            <div class="options-grid" id="taxonomyGrid"></div>
-                        </div>
-
-                        <div class="form-section">
-                            <div class="section-header">
-                                <div class="section-title">Processing priority</div>
-                                <div class="section-desc">Throughput priority versus layout fidelity</div>
-                            </div>
-                            <div class="options-grid" id="targetGrid"></div>
-                        </div>
-
-                        <div class="form-section">
-                            <div class="section-header">
-                                <div class="section-title">Security</div>
-                                <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
-                            </div>
-                            <div class="options-grid" id="securityGrid"></div>
-                        </div>
-                    </div>
-
-                    <div class="sidebar">
-                        <div class="ranking-card">
-                            <div class="ranking-header">Suitability ranking</div>
-                            <div class="ranking-sub">Confidence scores update as you answer</div>
-                            <div id="presetsList"></div>
-                            <div class="override-box">
-                                <label class="override-title" for="overrideSelect">Primary preset override</label>
-                                <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
-                                    <option value="auto">Auto (recommended ranking)</option>
-                                    <option value="pypdfium_rapidocr">pypdfium_rapidocr</option>
-                                    <option value="docling_fast">docling_fast</option>
-                                    <option value="docling_deep">docling_deep</option>
-                                    <option value="vision_llm_direct">vision_llm_direct</option>
-                                </select>
-                            </div>
-                            <button class="submit-btn" id="submitBtn" onclick="submitPlan()"
-                                data-submit-endpoint="/api/submit_plan">Start pipeline</button>
-                        </div>
+                        <button class="submit-btn" id="submitBtn" onclick="submitPlan()"
+                            data-submit-endpoint="/api/submit_plan">Start pipeline</button>
                     </div>
                 </div>
             </div>
+        </section>
         </section>
 
         <!-- 3. Parsing Progress Section -->

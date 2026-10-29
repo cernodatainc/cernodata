@@ -9,10 +9,18 @@
  * Validates wizard questionnaire answers and submits the compiled DocumentPlan to the backend.
  */
 async function submitPlan() {
-    const docPath = document.getElementById("docPath").value.trim();
-    const enableHint = document.getElementById("enableLangHint").checked;
-    const language = enableHint ? document.getElementById("langCode").value : null;
-    const threshold = parseFloat(document.getElementById("thresholdSlider").value);
+    const docPathEl = document.getElementById("docPath") || document.getElementById("inpPdfPath");
+    const docPath = docPathEl ? docPathEl.value.trim() : "";
+    const inpLang = document.getElementById("inpLanguage");
+    const enableHint = document.getElementById("enableLangHint") ? document.getElementById("enableLangHint").checked : true;
+    let language = null;
+    if (inpLang) {
+        language = (inpLang.value === "auto") ? null : inpLang.value;
+    } else if (enableHint && document.getElementById("langCode")) {
+        language = document.getElementById("langCode").value;
+    }
+    const threshEl = document.getElementById("inpThreshold") || document.getElementById("thresholdSlider");
+    const threshold = threshEl ? parseFloat(threshEl.value) : 0.85;
 
     if (!docPath) {
         showBanner("Please specify a document file path before proceeding.", "error");

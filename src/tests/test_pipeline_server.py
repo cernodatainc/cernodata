@@ -133,10 +133,10 @@ class TestPipelineServer(unittest.TestCase):
             self.assertIn(item, content)
         for old_btn in (">Planner Wizard</a>", ">Visual Flow Viewer</a>", ">Dashboard</a>", "resultsTableContainer"):
             self.assertNotIn(old_btn, content)
-        for expected in ("subtabBtnPlanSimple", "subtabBtnPlanComplex", "plannerWizardComponent", "btnToggleViewerFull"):
+        for expected in ("plannerWizardComponent", "btnToggleViewerFull"):
             self.assertIn(expected, content)
-        self.assertNotIn("plannerFrame", content)
-        self.assertNotIn('class="planner-frame"', content)
+        for removed in ("subtabBtnPlanSimple", "subtabBtnPlanComplex", "plannerFrame", 'class="planner-frame"'):
+            self.assertNotIn(removed, content)
 
         for removed in ("run-selector-card", "previous-runs-box", "Quick Preset Actions"):
             self.assertNotIn(removed, content)

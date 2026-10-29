@@ -54,16 +54,52 @@ function renderOptionGrid(containerId, options, selectedValue, onSelectCallback)
  * @param {string|number} val - Target threshold numeric value.
  */
 function updateThreshold(val) {
-    const el = document.getElementById("complexThresholdDisplay") || document.getElementById("thresholdDisplay");
-    if (el) el.textContent = parseFloat(val).toFixed(2);
+    const formatted = parseFloat(val).toFixed(2);
+    const disp1 = document.getElementById("complexThresholdDisplay");
+    const disp2 = document.getElementById("thresholdDisplay");
+    if (disp1) disp1.textContent = formatted;
+    if (disp2) disp2.textContent = formatted;
+
+    const s1 = document.getElementById("inpThreshold");
+    const s2 = document.getElementById("thresholdSlider");
+    if (s1 && s1.value !== String(val)) s1.value = val;
+    if (s2 && s2.value !== String(val)) s2.value = val;
 }
 
 /**
  * Handler for user selection changes in the primary preset override dropdown.
  */
 function onOverrideChanged() {
-    const val = document.getElementById("overrideSelect").value;
+    const overrideSel = document.getElementById("overrideSelect");
+    if (!overrideSel) return;
+    const val = overrideSel.value;
     overridePrimary = (val === "auto") ? null : val;
+
+    const inpPreset = document.getElementById("inpPreset");
+    if (inpPreset && val !== "auto") {
+        for (let opt of inpPreset.options) {
+            if (opt.value === val) {
+                inpPreset.value = val;
+                break;
+            }
+        }
+    }
+    renderPresetsList();
+}
+
+/**
+ * Handler for changes in the ingestion preset selector to synchronize override state.
+ */
+function onInpPresetChanged() {
+    const inpPreset = document.getElementById("inpPreset");
+    if (!inpPreset) return;
+    const val = inpPreset.value;
+
+    const overrideSel = document.getElementById("overrideSelect");
+    if (overrideSel) {
+        overrideSel.value = val;
+        overridePrimary = (val === "auto") ? null : val;
+    }
     renderPresetsList();
 }
 
@@ -78,6 +114,15 @@ function renderPresetsList() {
     let displayOrder = [...suggestedOrder];
     if (overridePrimary && overridePrimary !== suggestedOrder[0]) {
         displayOrder = [overridePrimary, ...suggestedOrder.filter(p => p !== overridePrimary)];
+    }
+
+    const primBadge = document.getElementById("planPrimaryBadge");
+    const fbBadge = document.getElementById("planFallbackBadge");
+    if (primBadge && displayOrder.length > 0) {
+        primBadge.textContent = displayOrder[0];
+    }
+    if (fbBadge && displayOrder.length > 1) {
+        fbBadge.textContent = displayOrder[1];
     }
 
     displayOrder.forEach((preset, idx) => {
