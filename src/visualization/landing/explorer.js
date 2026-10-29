@@ -1,23 +1,20 @@
 /**
  * src/visualization/landing/explorer.js
- *
- * Quasi file explorer and run mapping repository interface.
- * Displays discovered document files, file sets, and associated historical parsing runs
- * in a hierarchical tree and coherent mappings comparison table.
- * Includes interactive per-page confidence scores, run removal, and navigation to planning.
+ * Scoped workspace file explorer and run mapping repository interface.
+ * Allows exclusive exploration of directories (showing files), files (showing runs),
+ * or individual runs (showing page-by-page breakdown).
  */
 
 window.explorerData = null;
+let currentExplorerScope = 'file';
+let currentExplorerFolder = '';
 let currentExplorerDoc = '';
 let currentExplorerRun = '';
-let filterTableBySelectedDoc = true;
 let explorerSearchQuery = '';
 const expandedFolders = new Set();
 const expandedRuns = new Set();
 
-/**
- * Retrieves file and run mappings from /api/file_run_mappings and renders the explorer.
- */
+/** Retrieves file and run mappings from /api/file_run_mappings and renders explorer. */
 async function loadFileRunMappings() {
     try {
         const resp = await fetch('/api/file_run_mappings');
@@ -25,18 +22,17 @@ async function loadFileRunMappings() {
         const data = await resp.json();
         window.explorerData = data;
         const allMappings = data.all_mappings || [];
+        const fileSets = data.file_sets || [];
 
-        if (currentExplorerDoc) {
-            const docExists = allMappings.some(m => m.file_path === currentExplorerDoc);
-            if (!docExists) {
-                currentExplorerDoc = data.active_file || '';
-            }
-        } else if (data.active_file) {
-            currentExplorerDoc = data.active_file;
+        if (currentExplorerDoc && !allMappings.some(m => m.file_path === currentExplorerDoc)) {
+            currentExplorerDoc = data.active_file || (allMappings[0] ? allMappings[0].file_path : '');
+        } else if (!currentExplorerDoc) {
+            currentExplorerDoc = data.active_file || (allMappings[0] ? allMappings[0].file_path : '');
         }
 
         const activeDocEntry = allMappings.find(m => m.file_path === currentExplorerDoc);
         if (activeDocEntry) {
+            currentExplorerFolder = activeDocEntry.file_set || 'workspace';
             if (activeDocEntry.runs && activeDocEntry.runs.length > 0) {
                 const hasRun = activeDocEntry.runs.some(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
                 if (!hasRun) {
@@ -49,6 +45,7 @@ async function loadFileRunMappings() {
             }
         } else {
             currentExplorerRun = data.active_run || '';
+            if (fileSets.length > 0 && !currentExplorerFolder) currentExplorerFolder = fileSets[0].file_set;
         }
 
         if (expandedFolders.size === 0 && data.file_sets) {
@@ -60,11 +57,7 @@ async function loadFileRunMappings() {
     }
 }
 
-/**
- * Finds the currently selected run metadata object from explorer dataset.
- *
- * @returns {Object|null} Matching run and document object or null.
- */
+/** Finds the currently selected run metadata object from explorer dataset. */
 function getSelectedRunObject() {
     if (!window.explorerData || !currentExplorerRun) return null;
     const allMappings = window.explorerData.all_mappings || [];
@@ -84,10 +77,7 @@ function getSelectedRunObject() {
     return null;
 }
 
-/**
- * Renders both the hierarchical tree explorer pane, the runs mapping table,
- * and the active run's per-page confidence/violations breakdown.
- */
+/** Renders both hierarchical tree explorer pane and active main explorer view. */
 function renderExplorerUI() {
     const data = window.explorerData;
     if (!data) return;
@@ -97,26 +87,31 @@ function renderExplorerUI() {
     const hiddenDocInput = document.getElementById('inpPdfPath');
     const docCountBadge = document.getElementById('explorerDocCount');
 
-    if (docBreadcrumb) docBreadcrumb.textContent = currentExplorerDoc || 'None selected';
-    if (runBreadcrumb) runBreadcrumb.textContent = currentExplorerRun || 'None selected';
+    if (currentExplorerScope === 'directory') {
+        if (docBreadcrumb) docBreadcrumb.textContent = `[DIR] ${currentExplorerFolder || 'workspace'}`;
+        if (runBreadcrumb) runBreadcrumb.textContent = '(directory scope)';
+    } else if (currentExplorerScope === 'run') {
+        if (docBreadcrumb) docBreadcrumb.textContent = currentExplorerDoc || 'Document';
+        if (runBreadcrumb) runBreadcrumb.textContent = currentExplorerRun || 'Active Run';
+    } else {
+        if (docBreadcrumb) docBreadcrumb.textContent = currentExplorerDoc || 'None selected';
+        if (runBreadcrumb) runBreadcrumb.textContent = currentExplorerRun ? `[RUN] ${currentExplorerRun}` : '(select run)';
+    }
+
     if (hiddenDocInput && currentExplorerDoc) hiddenDocInput.value = currentExplorerDoc;
     if (docCountBadge) docCountBadge.textContent = `${data.total_documents} files · ${data.total_runs} runs`;
 
     renderExplorerTree();
-    renderRunMappingsTable();
-    renderPageBreakdownSection();
+    renderExplorerMainView();
 }
 
-/**
- * Renders the hierarchical folder and document tree on the left explorer pane.
- */
+/** Renders hierarchical tree on the left. Exactly one row is highlighted for active scope. */
 function renderExplorerTree() {
     const container = document.getElementById('explorerTreeContainer');
     if (!container || !window.explorerData) return;
 
     const query = explorerSearchQuery.toLowerCase().trim();
     const fileSets = window.explorerData.file_sets || [];
-
     if (fileSets.length === 0) {
         container.innerHTML = '<div class="explorer-empty-msg">No documents discovered.</div>';
         return;
@@ -133,49 +128,42 @@ function renderExplorerTree() {
 
         const isExpanded = expandedFolders.has(fs.file_set);
         const folderArrow = isExpanded ? '▾' : '▸';
+        const folderClass = (currentExplorerScope === 'directory' && fs.file_set === currentExplorerFolder) ? ' selected' : '';
 
-        html += `
-            <div class="tree-node tree-folder-node">
-                <div class="tree-row folder-row" onclick="toggleExplorerFolder('${escapeHtml(fs.file_set)}')">
-                    <span class="tree-toggle-arrow">${folderArrow}</span><span class="tree-icon folder-icon">[DIR]</span>
-                    <span class="tree-label folder-label">${escapeHtml(fs.file_set)}</span>
-                    <span class="tree-node-badge">${matchingDocs.length}</span>
-                </div>`;
+        html += `<div class="tree-node tree-folder-node">`
+            + `<div class="tree-row folder-row${folderClass}" onclick="selectExplorerFolder('${escapeHtml(fs.file_set)}')">`
+            + `<span class="tree-toggle-arrow" onclick="event.stopPropagation(); toggleExplorerFolder('${escapeHtml(fs.file_set)}')">${folderArrow}</span>`
+            + `<span class="tree-icon folder-icon">[DIR]</span><span class="tree-label folder-label">${escapeHtml(fs.file_set)}</span>`
+            + `<span class="tree-node-badge">${matchingDocs.length}</span></div>`;
 
         if (isExpanded) {
             html += '<div class="tree-children">';
             matchingDocs.forEach(doc => {
-                const isDocSelected = (doc.file_path === currentExplorerDoc);
-                const docClass = isDocSelected ? ' selected' : '';
+                const docClass = (currentExplorerScope === 'file' && doc.file_path === currentExplorerDoc) ? ' selected' : '';
                 const runCount = doc.runs_count || 0;
 
-                html += `
-                    <div class="tree-node tree-file-node">
-                        <div class="tree-row file-row${docClass}" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">
-                            <span class="tree-icon file-icon">[PDF]</span>
-                            <span class="tree-label file-label" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span>
-                            <span class="tree-runs-count-badge" title="${runCount} past runs">${runCount} runs</span>
-                        </div>`;
+                html += `<div class="tree-node tree-file-node">`
+                    + `<div class="tree-row file-row${docClass}" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">`
+                    + `<span class="tree-icon file-icon">[PDF]</span>`
+                    + `<span class="tree-label file-label" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span>`
+                    + `<span class="tree-runs-count-badge" title="${runCount} past runs">${runCount} runs</span></div>`;
 
                 if (doc.runs && doc.runs.length > 0) {
                     html += '<div class="tree-runs-list">';
                     doc.runs.forEach(r => {
-                        const isRunSelected = (r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
-                        const runClass = isRunSelected ? ' active-run-node' : '';
+                        const isRunSelected = (currentExplorerScope === 'run' && (r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun));
+                        const runClass = isRunSelected ? ' active-run-node selected' : '';
                         const statusClass = (r.status === 'ACCEPT') ? 'status-pass' : 'status-warn';
                         const scoreDisplay = Number(r.overall_confidence).toFixed(2);
                         const hasPages = Boolean(r.total_pages && r.total_pages > 0);
                         const isRunExpanded = expandedRuns.has(r.run_id);
                         const runArrow = hasPages ? (isRunExpanded ? '▾' : '▸') : '';
 
-                        html += `
-                            <div class="tree-row run-row${runClass}" onclick="selectExplorerRun('${escapeHtml(r.run_id)}', '${escapeHtml(r.output_dir)}', '${escapeHtml(doc.file_path)}')">
-                                ${hasPages ? `<span class="tree-toggle-arrow run-pages-toggle" onclick="event.stopPropagation(); toggleExplorerRunPages('${escapeHtml(r.run_id)}')">${runArrow}</span>` : '<span class="tree-arrow-spacer"></span>'}
-                                <span class="tree-icon run-icon">[RUN]</span>
-                                <span class="run-preset-tag">${escapeHtml(r.preset)}</span>
-                                <span class="run-score-badge ${statusClass}">${scoreDisplay}</span>
-                                <span class="run-name-label" title="${escapeHtml(r.run_id)}">${escapeHtml(r.run_id)}</span>
-                            </div>`;
+                        html += `<div class="tree-row run-row${runClass}" onclick="selectExplorerRun('${escapeHtml(r.run_id)}', '${escapeHtml(r.output_dir)}', '${escapeHtml(doc.file_path)}')">`
+                            + (hasPages ? `<span class="tree-toggle-arrow run-pages-toggle" onclick="event.stopPropagation(); toggleExplorerRunPages('${escapeHtml(r.run_id)}')">${runArrow}</span>` : '<span class="tree-arrow-spacer"></span>')
+                            + `<span class="tree-icon run-icon">[RUN]</span><span class="run-preset-tag">${escapeHtml(r.preset)}</span>`
+                            + `<span class="run-score-badge ${statusClass}">${scoreDisplay}</span>`
+                            + `<span class="run-name-label" title="${escapeHtml(r.run_id)}">${escapeHtml(r.run_id)}</span></div>`;
 
                         if (hasPages && isRunExpanded) {
                             html += '<div class="tree-pages-list">';
@@ -187,23 +175,17 @@ function renderExplorerTree() {
                                     ? r.per_page_violations[pStr] : 0;
                                 const pStatus = (conf >= 0.85) ? 'status-pass' : 'status-warn';
 
-                                html += `
-                                    <div class="tree-page-row" onclick="event.stopPropagation(); chooseRunAndPage('${escapeHtml(r.run_id)}', ${p})" title="Open page ${p} in viewer">
-                                        <span class="tree-icon page-icon">[P${p}]</span>
-                                        <span class="run-score-badge ${pStatus}">${Number(conf).toFixed(2)}</span>
-                                        <span class="page-viols-badge">${viols}v</span>
-                                    </div>`;
+                                html += `<div class="tree-page-row" onclick="event.stopPropagation(); chooseRunAndPage('${escapeHtml(r.run_id)}', ${p})" title="Open page ${p} in viewer">`
+                                    + `<span class="tree-icon page-icon">[P${p}]</span><span class="run-score-badge ${pStatus}">${Number(conf).toFixed(2)}</span>`
+                                    + `<span class="page-viols-badge">${viols}v</span></div>`;
                             }
                             html += '</div>';
                         }
                     });
                     html += '</div>';
                 } else {
-                    html += `
-                        <div class="tree-empty-runs-prompt" onclick="event.stopPropagation(); selectDocAndOpenPlanning('${escapeHtml(doc.file_path)}')">
-                            <span class="tree-prompt-plus">+</span>
-                            <span class="tree-prompt-label">Parsing planning</span>
-                        </div>`;
+                    html += `<div class="tree-empty-runs-prompt" onclick="event.stopPropagation(); selectDocAndOpenPlanning('${escapeHtml(doc.file_path)}')">`
+                        + `<span class="tree-prompt-plus">+</span><span class="tree-prompt-label">Parsing planning</span></div>`;
                 }
                 html += '</div>';
             });
@@ -216,105 +198,117 @@ function renderExplorerTree() {
     container.innerHTML = html;
 }
 
-/**
- * Renders the coherent runs mapping table on the right explorer pane.
- */
-function renderRunMappingsTable() {
-    const tbody = document.getElementById('explorerTableBody');
+/** Renders the primary view in the right pane based on currentExplorerScope. */
+function renderExplorerMainView() {
+    const tableContainer = document.getElementById('explorerTableContainer');
+    const breakdownContainer = document.getElementById('explorerPageBreakdown');
     const titleEl = document.getElementById('explorerTableTitle');
-    if (!tbody || !window.explorerData) return;
+    const tableHead = document.getElementById('explorerTableHead');
+    const tbody = document.getElementById('explorerTableBody');
+    if (!tableContainer || !breakdownContainer || !window.explorerData) return;
 
-    const query = explorerSearchQuery.toLowerCase().trim();
-    const allMappings = window.explorerData.all_mappings || [];
-
-    let targetDocs = allMappings;
-    if (filterTableBySelectedDoc && currentExplorerDoc) {
-        targetDocs = allMappings.filter(m => m.file_path === currentExplorerDoc);
-        if (titleEl) {
-            const activeName = (targetDocs[0] && targetDocs[0].file_name) || currentExplorerDoc;
-            titleEl.textContent = `Parsing runs for: ${activeName}`;
-        }
-    } else if (titleEl) {
-        titleEl.textContent = 'All workspace document run mappings';
+    if (currentExplorerScope === 'directory') {
+        tableContainer.style.display = 'block';
+        breakdownContainer.style.display = 'none';
+        renderDirectoryFilesView(titleEl, tableHead, tbody);
+    } else if (currentExplorerScope === 'run') {
+        tableContainer.style.display = 'none';
+        breakdownContainer.style.display = 'block';
+        renderRunPagesView(titleEl, breakdownContainer);
+    } else {
+        tableContainer.style.display = 'block';
+        breakdownContainer.style.display = 'none';
+        renderFileRunsView(titleEl, tableHead, tbody);
     }
+}
 
-    const rows = [];
-    targetDocs.forEach(doc => {
-        if (doc.runs && doc.runs.length > 0) {
-            doc.runs.forEach(r => {
-                if (query) {
-                    const matchDoc = doc.file_name.toLowerCase().includes(query) || doc.file_path.toLowerCase().includes(query);
-                    const matchRun = r.preset.toLowerCase().includes(query) || r.run_id.toLowerCase().includes(query) || r.status.toLowerCase().includes(query);
-                    if (!matchDoc && !matchRun) return;
-                }
-                rows.push({ doc, run: r });
-            });
-        } else if (!filterTableBySelectedDoc) {
-            if (!query || doc.file_name.toLowerCase().includes(query)) {
-                rows.push({ doc, run: null });
-            }
-        }
-    });
+/** Renders directory view showing files in the selected folder. */
+function renderDirectoryFilesView(titleEl, tableHead, tbody) {
+    const fileSets = window.explorerData.file_sets || [];
+    const activeSet = fileSets.find(fs => fs.file_set === currentExplorerFolder) || fileSets[0];
+    const folderName = activeSet ? activeSet.file_set : (currentExplorerFolder || 'workspace');
+    const query = explorerSearchQuery.toLowerCase().trim();
 
-    if (rows.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7" class="table-empty-message">
-                    ${filterTableBySelectedDoc ? 'No past runs recorded for this document yet. Click "Start parsing" below to run.' : 'No run mappings matching filter.'}
-                </td>
-            </tr>
-        `;
+    if (titleEl) titleEl.textContent = `Directory: ${folderName}`;
+    if (tableHead) tableHead.innerHTML = '<tr><th>Document</th><th>File Path</th><th>Runs</th><th>Latest Preset</th><th>Latest Score</th><th>Status</th><th>Action</th></tr>';
+    if (!tbody) return;
+
+    const docs = activeSet ? activeSet.documents : [];
+    const filteredDocs = docs.filter(d => !query || d.file_name.toLowerCase().includes(query) || d.file_path.toLowerCase().includes(query));
+
+    if (filteredDocs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-empty-message">No documents found in this directory.</td></tr>';
         return;
     }
 
     let rowsHtml = '';
-    rows.forEach(({ doc, run }) => {
-        const isSelectedRun = run && (run.run_id === currentExplorerRun || run.output_dir === currentExplorerRun);
-        const rowClass = isSelectedRun ? 'explorer-row-selected' : '';
+    filteredDocs.forEach(doc => {
+        const runCount = doc.runs_count || 0;
+        const latest = doc.latest_run;
+        const presetBadge = latest ? `<span class="preset-badge">${escapeHtml(latest.preset)}</span>` : '<span class="table-muted-cell">-</span>';
+        const scoreBadge = latest ? `<span class="score-num">${Number(latest.overall_confidence).toFixed(4)}</span>` : '<span class="table-muted-cell">-</span>';
+        const statusBadge = latest
+            ? `<span class="badge ${latest.status === 'ACCEPT' ? 'badge-accept' : 'badge-warn'}">${escapeHtml(latest.status)}</span>`
+            : '<span class="table-muted-cell">Unparsed</span>';
 
-        if (!run) {
-            rowsHtml += `
-                <tr class="${rowClass}">
-                    <td><span class="file-name-cell">${escapeHtml(doc.file_name)}</span> <span class="file-set-tag">${escapeHtml(doc.file_set)}</span></td>
-                    <td colspan="5" class="table-muted-cell">Not parsed yet</td>
-                    <td><button class="btn btn-secondary btn-xs" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">Select</button></td>
-                </tr>`;
-            return;
-        }
-
-        const statusBadgeClass = (run.status === 'ACCEPT') ? 'badge-accept' : 'badge-warn';
-        const scoreFormatted = Number(run.overall_confidence).toFixed(4);
-
-        rowsHtml += `
-            <tr class="${rowClass}" onclick="selectExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')">
-                <td><span class="file-name-cell" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span> <span class="file-set-tag">${escapeHtml(doc.file_set)}</span></td>
-                <td><span class="run-id-cell">${escapeHtml(run.run_id)}</span>${run.timestamp ? `<span class="run-time-sub">${escapeHtml(run.timestamp)}</span>` : ''}</td>
-                <td><span class="preset-badge">${escapeHtml(run.preset)}</span></td>
-                <td><span class="score-num">${scoreFormatted}</span></td>
-                <td><span class="viol-count">${run.violations_count || 0}</span></td>
-                <td><span class="badge ${statusBadgeClass}">${escapeHtml(run.status)}</span></td>
-                <td class="action-cell">
-                    <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); selectExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')">Load run</button>
-                    <button class="btn btn-subtle btn-xs" onclick="event.stopPropagation(); selectExplorerDoc('${escapeHtml(doc.file_path)}')">Select</button>
-                    <button class="btn btn-subtle btn-xs btn-remove-run" onclick="event.stopPropagation(); removeExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')" title="Remove run to force replay">Remove</button>
-                </td>
-            </tr>`;
+        rowsHtml += `<tr onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">`
+            + `<td><span class="file-name-cell" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span></td>`
+            + `<td><span class="file-path-sub">${escapeHtml(doc.file_path)}</span></td>`
+            + `<td><span class="tree-runs-count-badge">${runCount} runs</span></td>`
+            + `<td>${presetBadge}</td><td>${scoreBadge}</td><td>${statusBadge}</td>`
+            + `<td class="action-cell"><button class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); selectExplorerDoc('${escapeHtml(doc.file_path)}')">Explore runs</button></td></tr>`;
     });
-
     tbody.innerHTML = rowsHtml;
 }
 
-/**
- * Renders the dedicated page-by-page quality breakdown section
- * showing individual page confidence scores, violations, and direct jump buttons.
- */
-function renderPageBreakdownSection() {
-    const container = document.getElementById('explorerPageBreakdown');
-    if (!container) return;
+/** Renders file view showing historical parsing runs for the selected document. */
+function renderFileRunsView(titleEl, tableHead, tbody) {
+    const allMappings = window.explorerData.all_mappings || [];
+    const doc = allMappings.find(m => m.file_path === currentExplorerDoc) || allMappings[0];
+    const docName = doc ? doc.file_name : (currentExplorerDoc || 'None');
+    const query = explorerSearchQuery.toLowerCase().trim();
 
+    if (titleEl) titleEl.textContent = `File runs: ${docName}`;
+    if (tableHead) tableHead.innerHTML = '<tr><th>Run ID</th><th>Preset</th><th>Score</th><th>Viols</th><th>Status</th><th>Time</th><th>Action</th></tr>';
+    if (!tbody) return;
+
+    const runs = (doc && doc.runs) ? doc.runs : [];
+    const filteredRuns = runs.filter(r => !query || r.run_id.toLowerCase().includes(query) || r.preset.toLowerCase().includes(query) || r.status.toLowerCase().includes(query));
+
+    if (filteredRuns.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-empty-message">No parsing runs recorded for this file yet. Start parsing in the Planner to create one.</td></tr>';
+        return;
+    }
+
+    let rowsHtml = '';
+    filteredRuns.forEach(run => {
+        const isSelectedRun = (run.run_id === currentExplorerRun || run.output_dir === currentExplorerRun);
+        const rowClass = isSelectedRun ? 'explorer-row-selected' : '';
+        const statusBadgeClass = (run.status === 'ACCEPT') ? 'badge-accept' : 'badge-warn';
+        const scoreFormatted = Number(run.overall_confidence).toFixed(4);
+
+        rowsHtml += `<tr class="${rowClass}" onclick="selectExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')">`
+            + `<td><span class="run-id-cell">${escapeHtml(run.run_id)}</span></td>`
+            + `<td><span class="preset-badge">${escapeHtml(run.preset)}</span></td>`
+            + `<td><span class="score-num">${scoreFormatted}</span></td>`
+            + `<td><span class="viol-count">${run.violations_count || 0}</span></td>`
+            + `<td><span class="badge ${statusBadgeClass}">${escapeHtml(run.status)}</span></td>`
+            + `<td><span class="run-time-sub">${escapeHtml(run.timestamp || '-')}</span></td>`
+            + `<td class="action-cell">`
+            + `<button class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); selectExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')">Inspect pages</button>`
+            + `<button class="btn btn-subtle btn-xs btn-remove-run" onclick="event.stopPropagation(); removeExplorerRun('${escapeHtml(run.run_id)}', '${escapeHtml(run.output_dir)}', '${escapeHtml(doc.file_path)}')" title="Remove run">Remove</button>`
+            + `</td></tr>`;
+    });
+    tbody.innerHTML = rowsHtml;
+}
+
+/** Renders run view showing page-by-page quality breakdown. */
+function renderRunPagesView(titleEl, container) {
+    if (!container) return;
     const selected = getSelectedRunObject();
     if (!selected || !selected.run) {
-        container.innerHTML = '<div class="page-breakdown-empty"><span class="page-breakdown-empty-text">Select a run from the table or explorer tree to inspect page-by-page confidence scores and violations.</span></div>';
+        if (titleEl) titleEl.textContent = 'Run pages';
+        container.innerHTML = '<div class="page-breakdown-empty"><span class="page-breakdown-empty-text">No active run selected. Select a run from the tree to inspect pages.</span></div>';
         return;
     }
 
@@ -322,6 +316,8 @@ function renderPageBreakdownSection() {
     const totalP = run.total_pages || 1;
     const statusClass = (run.status === 'ACCEPT') ? 'badge-accept' : 'badge-warn';
     const scoreFormatted = Number(run.overall_confidence).toFixed(4);
+
+    if (titleEl) titleEl.textContent = `Run pages: ${run.run_id} (${doc.file_name})`;
 
     let cardsHtml = '';
     for (let p = 1; p <= totalP; p++) {
@@ -333,28 +329,24 @@ function renderPageBreakdownSection() {
         const scoreCls = (pConf >= 0.85) ? 'status-pass' : 'status-warn';
         const violCls = (pViols > 0) ? 'has-viols' : '';
 
-        cardsHtml += `
-            <div class="page-breakdown-card" onclick="chooseRunAndPage('${escapeHtml(run.run_id)}', ${p})" title="Open page ${p} in viewer">
-                <div class="page-card-header"><span class="page-card-title">Page ${p}</span><span class="page-card-score ${scoreCls}">${Number(pConf).toFixed(4)}</span></div>
-                <div class="page-card-body"><span class="page-card-viols ${violCls}">${pViols} viols</span><button class="btn btn-xs btn-secondary page-card-btn">View page</button></div>
-            </div>`;
+        cardsHtml += `<div class="page-breakdown-card" onclick="chooseRunAndPage('${escapeHtml(run.run_id)}', ${p})" title="Open page ${p} in viewer">`
+            + `<div class="page-card-header"><span class="page-card-title">Page ${p}</span><span class="page-card-score ${scoreCls}">${Number(pConf).toFixed(4)}</span></div>`
+            + `<div class="page-card-body"><span class="page-card-viols ${violCls}">${pViols} viols</span><button class="btn btn-xs btn-secondary page-card-btn">View page</button></div></div>`;
     }
 
-    container.innerHTML = `
-        <div class="page-breakdown-header">
-            <div class="page-breakdown-title">Page breakdown: <span class="breakdown-run-id">${escapeHtml(run.run_id)}</span> <span class="breakdown-doc-sub">(${escapeHtml(doc.file_name)} · ${escapeHtml(run.preset)})</span></div>
-            <div class="page-breakdown-meta"><span class="score-num breakdown-score-text">Score: ${scoreFormatted}</span> <span class="badge ${statusClass}">${escapeHtml(run.status)}</span> <span class="breakdown-viols-sub">${run.violations_count || 0} total viols</span></div>
-        </div>
-        <div class="page-cards-grid">${cardsHtml}</div>`;
+    container.innerHTML = `<div class="page-breakdown-header">`
+        + `<div class="page-breakdown-title">`
+        + `<button class="btn btn-secondary btn-xs" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">Back to file runs</button>`
+        + `<span class="breakdown-run-id">${escapeHtml(run.run_id)}</span>`
+        + `<span class="breakdown-doc-sub">(${escapeHtml(doc.file_name)} · ${escapeHtml(run.preset)})</span></div>`
+        + `<div class="page-breakdown-meta">`
+        + `<span class="score-num breakdown-score-text">Score: ${scoreFormatted}</span>`
+        + `<span class="badge ${statusClass}">${escapeHtml(run.status)}</span>`
+        + `<span class="breakdown-viols-sub">${run.violations_count || 0} total viols</span></div></div>`
+        + `<div class="page-cards-grid">${cardsHtml}</div>`;
 }
 
-/**
- * Loads the chosen run into active session and instructs the viewer iframe
- * to navigate directly to the clicked page number.
- *
- * @param {string} runId - Run identifier or directory path.
- * @param {number} pageNo - Target page number (1-indexed).
- */
+/** Loads the chosen run into active session and navigates to the page in the viewer. */
 async function chooseRunAndPage(runId, pageNo) {
     const targetPage = parseInt(pageNo, 10) || 1;
     if (typeof choosePreviousRun === 'function') await choosePreviousRun(runId, targetPage, false);
@@ -362,12 +354,17 @@ async function chooseRunAndPage(runId, pageNo) {
     if (typeof reloadViewerIframe === 'function') reloadViewerIframe(targetPage, runId);
 }
 
-/**
- * Selects an input document from the tree or table, updating input state.
- *
- * @param {string} docPath - Normalized document filesystem path.
- */
+/** Selects an explorer directory and shifts main window scope to directory files. */
+function selectExplorerFolder(folder) {
+    currentExplorerScope = 'directory';
+    currentExplorerFolder = folder;
+    if (!expandedFolders.has(folder)) expandedFolders.add(folder);
+    renderExplorerUI();
+}
+
+/** Selects an input document from tree or table, updating input state. */
 function selectExplorerDoc(docPath) {
+    currentExplorerScope = 'file';
     currentExplorerDoc = docPath;
     const inp = document.getElementById('inpPdfPath');
     if (inp) inp.value = docPath;
@@ -375,55 +372,49 @@ function selectExplorerDoc(docPath) {
 
     const allMappings = (window.explorerData && window.explorerData.all_mappings) || [];
     const docEntry = allMappings.find(m => m.file_path === docPath);
-    if (docEntry && docEntry.runs && docEntry.runs.length > 0) {
-        const hasCurrentRun = docEntry.runs.some(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
-        if (!hasCurrentRun) {
-            currentExplorerRun = docEntry.latest_run
-                ? (docEntry.latest_run.output_dir || docEntry.latest_run.run_id)
-                : (docEntry.runs[0].output_dir || docEntry.runs[0].run_id);
+    if (docEntry) {
+        currentExplorerFolder = docEntry.file_set;
+        if (docEntry.runs && docEntry.runs.length > 0) {
+            const hasCurrentRun = docEntry.runs.some(r => r.run_id === currentExplorerRun || r.output_dir === currentExplorerRun);
+            if (!hasCurrentRun) {
+                currentExplorerRun = docEntry.latest_run
+                    ? (docEntry.latest_run.output_dir || docEntry.latest_run.run_id)
+                    : (docEntry.runs[0].output_dir || docEntry.runs[0].run_id);
+            }
+        } else {
+            currentExplorerRun = '';
         }
     } else {
         currentExplorerRun = '';
     }
-
     renderExplorerUI();
 }
 
-/**
- * Selects an input document and switches directly to the Planning tab.
- *
- * @param {string} docPath - Normalized document filesystem path.
- */
+/** Selects an input document and switches directly to Planning tab. */
 function selectDocAndOpenPlanning(docPath) {
     selectExplorerDoc(docPath);
     if (typeof switchNavTab === 'function') switchNavTab('plan');
 }
 
-/**
- * Selects a specific historical run, updates document selection, and loads results.
- *
- * @param {string} runId - Identifier of parsing run.
- * @param {string} outputDir - Output directory path.
- * @param {string} docPath - Associated document path.
- */
+/** Selects a specific historical run, shifting main window scope to run pages breakdown. */
 async function selectExplorerRun(runId, outputDir, docPath) {
+    currentExplorerScope = 'run';
     currentExplorerRun = runId;
     if (docPath) {
         currentExplorerDoc = docPath;
+        const allMappings = (window.explorerData && window.explorerData.all_mappings) || [];
+        const docEntry = allMappings.find(m => m.file_path === docPath);
+        if (docEntry) currentExplorerFolder = docEntry.file_set;
         const inp = document.getElementById('inpPdfPath');
         if (inp) inp.value = docPath;
     }
     renderExplorerUI();
-    if (typeof choosePreviousRun === 'function') await choosePreviousRun(outputDir || runId);
+    if (typeof choosePreviousRun === 'function') {
+        await choosePreviousRun(outputDir || runId, 1, false);
+    }
 }
 
-/**
- * Removes a specific parsing run from the repository and refreshes explorer data.
- *
- * @param {string} runId - Run identifier.
- * @param {string} outputDir - Output directory path.
- * @param {string} docPath - Associated document path.
- */
+/** Removes a specific parsing run from repository and refreshes explorer data. */
 async function removeExplorerRun(runId, outputDir, docPath) {
     try {
         await fetch('/api/remove_run', {
@@ -431,63 +422,38 @@ async function removeExplorerRun(runId, outputDir, docPath) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ run_id: runId, output_dir: outputDir, document_path: docPath }),
         });
-        if (currentExplorerRun === runId || currentExplorerRun === outputDir) currentExplorerRun = '';
+        if (currentExplorerRun === runId || currentExplorerRun === outputDir) {
+            currentExplorerRun = '';
+            currentExplorerScope = 'file';
+        }
         await loadFileRunMappings();
     } catch (e) {
         console.log('[WARN] Failed to remove run:', e);
     }
 }
 
-/**
- * Toggles expanding and collapsing of folder nodes in the tree.
- *
- * @param {string} folder - Folder name.
- */
+/** Toggles expanding and collapsing of folder nodes in the tree. */
 function toggleExplorerFolder(folder) {
     if (expandedFolders.has(folder)) expandedFolders.delete(folder);
     else expandedFolders.add(folder);
     renderExplorerTree();
 }
 
-/**
- * Toggles expanding and collapsing of per-page items under a specific run in the tree.
- *
- * @param {string} runId - Run identifier.
- */
+/** Toggles expanding and collapsing of per-page items under a specific run in the tree. */
 function toggleExplorerRunPages(runId) {
     if (expandedRuns.has(runId)) expandedRuns.delete(runId);
     else expandedRuns.add(runId);
     renderExplorerTree();
 }
 
-/**
- * Toggles whether the right table shows runs for the selected document or all documents.
- *
- * @param {boolean} showSelectedOnly - Whether to filter table to selected document.
- */
-function toggleExplorerTableScope(showSelectedOnly) {
-    filterTableBySelectedDoc = showSelectedOnly;
-    const btnActive = document.getElementById('btnFilterActiveDoc');
-    const btnAll = document.getElementById('btnFilterAllDocs');
-    if (btnActive) btnActive.className = showSelectedOnly ? 'btn-text-toggle active' : 'btn-text-toggle';
-    if (btnAll) btnAll.className = showSelectedOnly ? 'btn-text-toggle' : 'btn-text-toggle active';
-    renderRunMappingsTable();
-}
-
-/**
- * Live search input handler filtering both tree and table items.
- *
- * @param {string} query - Filter query text.
- */
+/** Live search input handler filtering both tree and table items. */
 function onExplorerSearchChanged(query) {
     explorerSearchQuery = query;
     renderExplorerTree();
-    renderRunMappingsTable();
+    renderExplorerMainView();
 }
 
-/**
- * Refreshes explorer data from backend.
- */
+/** Refreshes explorer data from backend. */
 function refreshExplorerData() {
     loadFileRunMappings();
 }

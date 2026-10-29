@@ -136,14 +136,10 @@
                             <div class="explorer-table-pane">
                                 <div class="explorer-pane-header">
                                     <span id="explorerTableTitle">Parsing runs for active document</span>
-                                    <div class="explorer-view-actions">
-                                        <button class="btn-text-toggle active" id="btnFilterActiveDoc" onclick="toggleExplorerTableScope(true)">Selected Document</button>
-                                        <button class="btn-text-toggle" id="btnFilterAllDocs" onclick="toggleExplorerTableScope(false)">All Documents</button>
-                                    </div>
                                 </div>
-                                <div class="explorer-table-container">
-                                    <table class="comparison-table explorer-runs-table">
-                                        <thead>
+                                <div class="explorer-table-container" id="explorerTableContainer">
+                                    <table class="comparison-table explorer-runs-table" id="explorerMainTable">
+                                        <thead id="explorerTableHead">
                                             <tr>
                                                 <th>Document / Set</th>
                                                 <th>Run ID</th>
