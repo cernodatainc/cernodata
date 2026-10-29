@@ -11,13 +11,27 @@ import glob
 import logging
 import os
 from dataclasses import asdict, dataclass, field, replace
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, Iterable, List, Optional, Set, Union
 
 from src.pipeline.server.artifacts import RunArtifacts
 from src.pipeline.server.http_utils import REPO_ROOT
 from src.schemas import ValidatedRunArtifacts, load_validated_run_artifacts
 
 logger = logging.getLogger("cernodata.server.discovery")
+
+PAGE_PASS_CONFIDENCE = 0.85
+DEFAULT_OVERALL_CONFIDENCE = 1.0
+
+
+def _max_int_key(keys: Iterable[Any], current: int) -> int:
+    """Returns the max of `current` and all keys parseable as integers; non-numeric keys are skipped."""
+    result = current
+    for key in keys:
+        try:
+            result = max(result, int(key))
+        except (ValueError, TypeError):
+            logger.debug("Skipping non-numeric page key: %r", key)
+    return result
 
 
 @dataclass
@@ -260,16 +274,8 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
     max_pages = 1
     for r in file_runs:
         max_pages = max(max_pages, int(r.get("total_pages", 1) or 1))
-        for p_key in r.get("per_page_confidence", {}).keys():
-            try:
-                max_pages = max(max_pages, int(p_key))
-            except (ValueError, TypeError):
-                pass
-        for p_key in r.get("per_page_violations", {}).keys():
-            try:
-                max_pages = max(max_pages, int(p_key))
-            except (ValueError, TypeError):
-                pass
+        for key_map in (r.get("per_page_confidence", {}), r.get("per_page_violations", {})):
+            max_pages = _max_int_key(key_map.keys(), max_pages)
 
     pages = list(range(1, max_pages + 1))
 
@@ -287,7 +293,7 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
             nodes = r.get("per_page_nodes", {}).get(p_str, 0)
 
             if conf is not None:
-                is_passed = conf >= 0.85
+                is_passed = conf >= PAGE_PASS_CONFIDENCE
             else:
                 is_passed = (r.get("status") == "ACCEPT")
 
@@ -304,7 +310,7 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
         preset = str(r.get("chosen_preset") or "docling_fast")
         status_val = str(r.get("status") or "ACCEPT")
         raw_conf = r.get("overall_confidence")
-        overall_conf = float(raw_conf) if raw_conf is not None else 1.0
+        overall_conf = float(raw_conf) if raw_conf is not None else DEFAULT_OVERALL_CONFIDENCE
         violations_cnt = int(r.get("violations_count") or 0)
         timestamp_val = str(r.get("timestamp") or "")
 

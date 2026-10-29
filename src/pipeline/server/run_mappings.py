@@ -39,6 +39,16 @@ def derive_file_set(rel_path: str) -> str:
     return "workspace"
 
 
+def _safe_remove(path: str) -> None:
+    """Removes a file if it exists, logging (not raising) on OS errors."""
+    if not os.path.isfile(path):
+        return
+    try:
+        os.remove(path)
+    except OSError as ex:
+        logger.debug("Failed to remove %s: %s", path, ex)
+
+
 def _make_doc_entry(file_path: str, file_name: Optional[str] = None, with_summary: bool = False) -> Dict[str, Any]:
     """Constructs a canonical document mapping dictionary."""
     entry: Dict[str, Any] = {
@@ -208,8 +218,8 @@ def remove_run_mapping(
                             if (doc_base and doc_base in content) or norm_doc in content:
                                 should_clean = True
                                 break
-                    except OSError:
-                        pass
+                    except OSError as ex:
+                        logger.debug("Failed to read %s: %s", fpath, ex)
             if should_clean:
                 for art in (
                     "plan_execution_result.json",
@@ -218,17 +228,9 @@ def remove_run_mapping(
                     "interactive_viewer.html",
                     "quality_violations.json",
                 ):
-                    f_path = os.path.join(out_dir, art)
-                    if os.path.isfile(f_path):
-                        try:
-                            os.remove(f_path)
-                        except OSError:
-                            pass
+                    _safe_remove(os.path.join(out_dir, art))
                 for png in glob.glob(os.path.join(out_dir, "overlay_page_*.png")):
-                    try:
-                        os.remove(png)
-                    except OSError:
-                        pass
+                    _safe_remove(png)
 
         return True
 
@@ -279,7 +281,7 @@ def get_file_run_mappings(
                 try:
                     rel = os.path.relpath(match, root)
                     doc_paths.add(normalize_path(rel))
-                except Exception:
+                except ValueError:
                     doc_paths.add(normalize_path(match))
 
         # Also include any documents previously recorded or found in runs

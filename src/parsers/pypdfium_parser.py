@@ -8,6 +8,7 @@ with automatic fallback to SectionOCRParser (RapidOCR) for scanned or image page
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import List, Any, Optional, Tuple
 
@@ -16,6 +17,8 @@ from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.dom.enums import DOMNodeType
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
 from src.parsers.pdf_utils import open_pdf
+
+logger = logging.getLogger("cernodata.parsers.pypdfium_parser")
 
 
 def _convert_pdf_rect_to_bbox(rect: Any, page_w: float, page_h: float) -> BoundingBox:
@@ -156,6 +159,7 @@ class PyPdfiumParser:
                 start_node_counter=start_node_counter
             )
         except Exception:
+            logger.exception("Failed to extract nodes from page %d; returning empty page", page_no)
             return [], start_node_counter
 
     def _extract_digital_page_nodes(

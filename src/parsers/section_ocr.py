@@ -82,7 +82,8 @@ class SectionOCRParser:
             logger.warning("RapidOCR torch engine initialization failed: %s", ex)
             try:
                 return RapidOCR()
-            except Exception:
+            except Exception as fallback_ex:
+                logger.warning("RapidOCR default engine initialization failed: %s", fallback_ex, exc_info=True)
                 return None
 
     def _create_cli_subprocess_engine(self) -> Optional[Any]:
@@ -101,7 +102,7 @@ class SectionOCRParser:
             try:
                 return self._engine_factory()
             except Exception as ex:
-                print(f"[WARN] Custom OCR engine factory failed: {ex}")
+                logger.warning("Custom OCR engine factory failed: %s", ex, exc_info=True)
                 return None
         custom_engine = self._create_cli_subprocess_engine() or self._create_http_endpoint_engine()
         if custom_engine is not None:
