@@ -76,6 +76,11 @@ class TestModularityAndIsolation(unittest.TestCase):
         _, cfg, _ = PipelineConfigResolver.resolve_request(
             pdf_path="test.pdf",
             target_threshold=0.85,
+            language="en",
+            preset="docling_fast",
+            align_skew=True,
+            visualize=True,
+            output_dir="test_output",
             experimental_feature=True,
             max_parallel_slices=4,
         )

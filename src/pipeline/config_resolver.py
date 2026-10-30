@@ -6,7 +6,6 @@ Input resolution and normalization for pipeline execution requests.
 
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 
 
@@ -29,14 +28,14 @@ class PipelineConfigResolver:
     @classmethod
     def resolve_config(
         cls,
-        config: Optional[IngestionConfig] = None,
-        plan_obj: Optional[DocumentPlan] = None,
-        target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-        language: Optional[str] = "en",
-        preset: str = "docling_fast",
-        align_skew: bool = True,
-        visualize: bool = True,
-        output_dir: str = "output",
+        config: Optional[IngestionConfig],
+        plan_obj: Optional[DocumentPlan],
+        target_threshold: float,
+        language: Optional[str],
+        preset: str,
+        align_skew: bool,
+        visualize: bool,
+        output_dir: str,
         verification_layers: Optional[Sequence[str]] = None,
         **extra_options: Any,
     ) -> IngestionConfig:
@@ -73,13 +72,13 @@ class PipelineConfigResolver:
     @classmethod
     def resolve_request(
         cls,
-        pdf_path: Optional[str] = None,
-        target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-        language: Optional[str] = "en",
-        preset: str = "docling_fast",
-        align_skew: bool = True,
-        visualize: bool = True,
-        output_dir: str = "output",
+        pdf_path: Optional[str],
+        target_threshold: float,
+        language: Optional[str],
+        preset: str,
+        align_skew: bool,
+        visualize: bool,
+        output_dir: str,
         plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
         config: Optional[IngestionConfig] = None,
         verification_layers: Optional[Sequence[str]] = None,

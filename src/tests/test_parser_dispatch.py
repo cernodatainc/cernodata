@@ -121,6 +121,10 @@ class TestModularParserDispatch(unittest.TestCase):
             pdf_path="test.pdf",
             preset="docling_deep",
             target_threshold=0.88,
+            language="en",
+            align_skew=True,
+            visualize=True,
+            output_dir="test_output",
         )
         self.assertEqual(pdf_path, "test.pdf")
         self.assertEqual(cfg.preset, "docling_deep")
