@@ -228,7 +228,7 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
  */
 function renderSingleNodeEditorComponent(node, options) {
     const p = INSPECTOR_PALETTE;
-    const { bbox, effectiveAngle, hasAngle, hasQuad, isIncorrect, noteVal, isCutoutUnskewed, violationsHtml } = options;
+    const { bbox, effectiveAngle, hasAngle, hasQuad, isIncorrect, noteVal, isCutoutUnskewed, violationsHtml, pageSeq } = options;
     const mergedBadgeHtml = renderMergedNodeBadgeComponent(node);
     const cutoutCardHtml = renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, isCutoutUnskewed);
     const angleVal = (bbox.angle !== undefined && bbox.angle !== 0) ? bbox.angle : effectiveAngle;
@@ -247,6 +247,7 @@ function renderSingleNodeEditorComponent(node, options) {
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <h4 style="margin-bottom:0;">Selected: <span style="font-family:monospace; font-weight:500;">${escapeHtml(node.node_id)}</span></h4>
+                    <span class="badge-status" style="${inspectorBadgeStyle('neutral')}" title="Reading sequence position">#${pageSeq || 1}</span>
                     <select id="selectNodeType_${escapeHtml(node.node_id)}" class="type-filter" style="font-size:12px; padding:2px 6px;" onchange="onNodeTypeChange('${node.node_id}', this.value)" title="Change node semantic type">
                         ${typeOptionsHtml}
                     </select>
@@ -260,6 +261,14 @@ function renderSingleNodeEditorComponent(node, options) {
                 <div class="coord-field"><label>X1</label><input type="number" step="0.5" id="inpX1" value="${bbox.x1}" onchange="onManualCoordChange()"></div>
                 <div class="coord-field"><label>Y1</label><input type="number" step="0.5" id="inpY1" value="${bbox.y1}" onchange="onManualCoordChange()"></div>
                 <div class="coord-field"><label>Angle</label><input type="number" step="0.1" id="inpAngle" value="${angleVal}" onchange="onManualCoordChange()"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:8px; margin-bottom:8px; padding:4px 8px; background:${p.bgCard}; border:1px solid ${p.border}; border-radius:4px;">
+                <span style="font-size:11px; color:${p.textMuted};">Reading order:</span>
+                <div style="display:flex; gap:4px;">
+                    <button class="action-btn action-btn-decollide-sm" onclick="moveNodeOrderUp('${node.node_id}')" title="Move earlier in reading order">Move up</button>
+                    <button class="action-btn action-btn-decollide-sm" onclick="moveNodeOrderDown('${node.node_id}')" title="Move later in reading order">Move down</button>
+                </div>
             </div>
  
             ${cutoutCardHtml}
@@ -298,13 +307,16 @@ function renderSingleNodeEditorComponent(node, options) {
  * @returns {string} HTML markup.
  */
 function renderDOMTreeNodeCardComponent(node, options) {
-    const { nodePage, isOnCurrentPage, isFixed, isIncorrect, hasActiveViol, hasSuppressedViol, displayText } = options;
+    const { nodePage, isOnCurrentPage, isFixed, isIncorrect, hasActiveViol, hasSuppressedViol, displayText, pageSeq } = options;
     const pageBadgeVariant = isOnCurrentPage ? 'blueSolid' : 'muted';
     const isMerged = node.is_merged || (node.merged_from && node.merged_from.length > 0);
 
     return `
         <div class="node-header">
-            <span class="node-id">${escapeHtml(node.node_id)}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <span class="badge-status" style="${inspectorBadgeStyle('neutral')}" title="Sequence #${pageSeq || 1}">#${pageSeq || 1}</span>
+                <span class="node-id">${escapeHtml(node.node_id)}</span>
+            </div>
             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
                 <span class="badge-status" style="${inspectorBadgeStyle(pageBadgeVariant)}">P${nodePage}</span>
                 <span class="node-type type-${escapeHtml(node.type)}">${escapeHtml(node.type)}</span>

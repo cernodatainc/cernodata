@@ -175,6 +175,12 @@ async function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
 
     const origUpper = JSON.parse(JSON.stringify(upper));
     const origLower = JSON.parse(JSON.stringify(lower));
+    const upperIdx = domData.nodes.findIndex(n => n.node_id === upper.node_id);
+    const lowerIdx = domData.nodes.findIndex(n => n.node_id === lower.node_id);
+    const beforeSel = {
+        selectedNodeId: (typeof selectedNodeId !== 'undefined' ? selectedNodeId : null),
+        selectedNodeIds: (typeof selectedNodeIds !== 'undefined' ? [...selectedNodeIds] : [])
+    };
 
     const mergedContent = Object.assign({}, upper.content, lower.content, { raw_text: mergedText });
 
@@ -189,14 +195,42 @@ async function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     domData.nodes = domData.nodes.filter(n => n.node_id !== lower.node_id);
 
     const viols = getViolationsList();
+    const violationReassignments = [];
     viols.forEach(v => {
         if (v.node_id === lower.node_id) {
+            violationReassignments.push({
+                violation_id: v.violation_id,
+                old_node_id: lower.node_id,
+                new_node_id: upper.node_id
+            });
             v.node_id = upper.node_id;
         }
     });
 
     selectedNodeIds = [upper.node_id];
     selectedNodeId = upper.node_id;
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'merge_nodes',
+            description: `Merge '${origUpper.node_id}' and '${origLower.node_id}' into '${upper.node_id}'`,
+            page: getNodePage(upper),
+            removed: [
+                { index: upperIdx, node: origUpper },
+                { index: lowerIdx, node: origLower }
+            ],
+            inserted: [
+                { index: Math.min(upperIdx, lowerIdx), node: JSON.parse(JSON.stringify(upper)) }
+            ],
+            beforeSelection: beforeSel,
+            afterSelection: { selectedNodeId: upper.node_id, selectedNodeIds: [upper.node_id] },
+            meta: {
+                merged_id: upper.node_id,
+                merged_from: [origUpper.node_id, origLower.node_id],
+                violation_reassignments: violationReassignments
+            }
+        });
+    }
 
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();
@@ -242,6 +276,12 @@ async function unmergeDOMNode(nodeId) {
     const targetIdx = domData.nodes.findIndex(n => n.node_id === nodeId);
     if (targetIdx === -1) return null;
 
+    const origTarget = JSON.parse(JSON.stringify(target));
+    const beforeSel = {
+        selectedNodeId: (typeof selectedNodeId !== 'undefined' ? selectedNodeId : null),
+        selectedNodeIds: (typeof selectedNodeIds !== 'undefined' ? [...selectedNodeIds] : [])
+    };
+
     domData.nodes.splice(targetIdx, 1, ...restoredNodes);
 
     const viols = getViolationsList();
@@ -258,6 +298,19 @@ async function unmergeDOMNode(nodeId) {
 
     selectedNodeIds = restoredNodes.map(n => n.node_id);
     selectedNodeId = restoredNodes[0] ? restoredNodes[0].node_id : null;
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'unmerge_nodes',
+            description: `Unmerge '${nodeId}' into ${restoredNodes.map(n => "'" + n.node_id + "'").join(', ')}`,
+            page: getNodePage(target),
+            removed: [{ index: targetIdx, node: origTarget }],
+            inserted: restoredNodes.map((rn, i) => ({ index: targetIdx + i, node: JSON.parse(JSON.stringify(rn)) })),
+            beforeSelection: beforeSel,
+            afterSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            meta: { unmerged_id: nodeId }
+        });
+    }
 
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();
@@ -306,6 +359,10 @@ function decollideSelectedPair() {
 
     const bUpper = upper.bounding_box;
     const bLower = lower.bounding_box;
+    const origUpper = JSON.parse(JSON.stringify(upper));
+    const origLower = JSON.parse(JSON.stringify(lower));
+    const upperIdx = domData.nodes.findIndex(n => n.node_id === upper.node_id);
+    const lowerIdx = domData.nodes.findIndex(n => n.node_id === lower.node_id);
 
     const midY = roundCoord((bUpper.y1 + bLower.y0) / 2);
     const gap = 0.5;
@@ -314,6 +371,25 @@ function decollideSelectedPair() {
     bLower.y0 = roundCoord(Math.min(bLower.y1 - 2, midY + gap / 2));
     bUpper.quad = null;
     bLower.quad = null;
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'modify_node',
+            description: `De-collide '${upper.node_id}' and '${lower.node_id}'`,
+            page: getNodePage(upper),
+            removed: [
+                { index: upperIdx, node: origUpper },
+                { index: lowerIdx, node: origLower }
+            ],
+            inserted: [
+                { index: upperIdx, node: JSON.parse(JSON.stringify(upper)) },
+                { index: lowerIdx, node: JSON.parse(JSON.stringify(lower)) }
+            ],
+            beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            afterSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            meta: { decollided: [upper.node_id, lower.node_id] }
+        });
+    }
 
     renderSVGOverlays();
     renderDOMTree();

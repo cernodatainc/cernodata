@@ -27,11 +27,7 @@ function handleNodeClick(evt, nodeId) {
         if (selectedNodeIds.includes(nodeId)) {
             selectedNodeIds = selectedNodeIds.filter(id => id !== nodeId);
         } else {
-            if (selectedNodeIds.length >= 2) {
-                selectedNodeIds = [selectedNodeIds[1], nodeId];
-            } else {
-                selectedNodeIds.push(nodeId);
-            }
+            selectedNodeIds = (selectedNodeIds.length >= 2) ? [selectedNodeIds[1], nodeId] : [...selectedNodeIds, nodeId];
         }
     } else {
         selectedNodeIds = [nodeId];
@@ -62,12 +58,45 @@ function handleNodeClick(evt, nodeId) {
  * @param {number|null} [pageIndex=null] - Target 1-indexed page index.
  */
 function selectNode(nodeId, pageIndex = null) {
-    // TODO(TASK-706): Add keyboard shortcuts (`]` / `[` for next/prev violation, `v` to mark node verified) in `review_navigation.js`.
     if (pageIndex && pageIndex !== currentPage) {
         switchPage(pageIndex);
     }
     const evt = window.event || null;
     handleNodeClick(evt, nodeId);
+}
+
+function selectAdjacentViolation(delta) {
+    const viols = getViolationsList();
+    const activeViols = viols.filter(v => !v.is_fixed && !isSuppressed(v));
+    if (activeViols.length === 0) {
+        if (typeof showStatusBanner === 'function') {
+            showStatusBanner('No active quality violations found.', 'info', 2000);
+        }
+        return;
+    }
+    const currentIdx = activeViols.findIndex(v => v.node_id === selectedNodeId);
+    const targetIdx = (currentIdx === -1)
+        ? (delta > 0 ? 0 : activeViols.length - 1)
+        : (currentIdx + delta + activeViols.length) % activeViols.length;
+    const targetViol = activeViols[targetIdx];
+    selectNode(targetViol.node_id, getViolationPage(targetViol));
+    if (typeof showStatusBanner === 'function') {
+        showStatusBanner(`Violation [${targetIdx + 1}/${activeViols.length}]: ${targetViol.rule_type || targetViol.type}`, 'info', 2000);
+    }
+}
+
+/**
+ * Selects the next active quality violation across document nodes.
+ */
+function selectNextViolation() {
+    selectAdjacentViolation(1);
+}
+
+/**
+ * Selects the previous active quality violation across document nodes.
+ */
+function selectPreviousViolation() {
+    selectAdjacentViolation(-1);
 }
 
 /**
@@ -118,15 +147,11 @@ function renderSelectedEditor() {
     const nodeViols = viols.filter(v => v.node_id === node.node_id);
     const violationsHtml = renderNodeViolationsComponent(nodeViols, node, activePresetIndex);
 
+    const pageNodes = (domData && domData.nodes) ? domData.nodes.filter(n => getNodePage(n) === currentPage) : [];
+    const pageSeq = pageNodes.findIndex(n => n.node_id === node.node_id) + 1;
+
     container.innerHTML = renderSingleNodeEditorComponent(node, {
-        bbox,
-        effectiveAngle,
-        hasAngle,
-        hasQuad,
-        isIncorrect,
-        noteVal,
-        isCutoutUnskewed,
-        violationsHtml
+        bbox, effectiveAngle, hasAngle, hasQuad, isIncorrect, noteVal, isCutoutUnskewed, violationsHtml, pageSeq
     });
     renderCutoutPreview(node.node_id, node.bounding_box, 'cutoutPreviewImg_' + node.node_id, isCutoutUnskewed);
 }
@@ -197,10 +222,28 @@ function toggleIncorrectText(nodeId) {
  */
 async function onNodeTypeChange(nodeId, newType) {
     if (!domData || !domData.nodes) return;
-    const node = domData.nodes.find(n => n.node_id === nodeId);
-    if (!node || node.type === newType) return;
+    const idx = domData.nodes.findIndex(n => n.node_id === nodeId);
+    if (idx === -1) return;
+    const node = domData.nodes[idx];
+    if (node.type === newType) return;
 
+    const origNode = JSON.parse(JSON.stringify(node));
     node.type = newType;
+    const updatedNode = JSON.parse(JSON.stringify(node));
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'change_type',
+            description: `Change type of '${nodeId}' to '${newType}'`,
+            page: getNodePage(node),
+            removed: [{ index: idx, node: origNode }],
+            inserted: [{ index: idx, node: updatedNode }],
+            beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            afterSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            meta: { node_id: nodeId, old_type: origNode.type, new_type: newType }
+        });
+    }
+
     renderDOMTree();
     renderSVGOverlays();
     renderSelectedEditor();
@@ -209,12 +252,8 @@ async function onNodeTypeChange(nodeId, newType) {
         await saveAnnotations(true);
     }
 
-    const banner = document.getElementById('statusBanner');
-    if (banner) {
-        banner.className = 'status-banner';
-        banner.style.display = 'block';
-        banner.textContent = `[OK] Changed element '${nodeId}' type to '${newType}'. Persisted.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    if (typeof showStatusBanner === 'function') {
+        showStatusBanner(`Changed element '${nodeId}' type to '${newType}'. Persisted.`, 'success', 3000);
     }
 }
 
@@ -242,23 +281,139 @@ function updateCorrectionNote(nodeId, text) {
  * @param {string} nodeId - Target DOM node identifier.
  */
 async function deleteDOMNode(nodeId) {
-    // TODO(TASK-703): Push a snapshot to the Undo/Redo history stack (`history.js`) before mutating `domData.nodes`.
     if (!domData || !domData.nodes) return;
     const idx = domData.nodes.findIndex(n => n.node_id === nodeId);
     if (idx === -1) return;
+
+    const origNode = JSON.parse(JSON.stringify(domData.nodes[idx]));
+    const beforeSel = {
+        selectedNodeId: (typeof selectedNodeId !== 'undefined' ? selectedNodeId : null),
+        selectedNodeIds: (typeof selectedNodeIds !== 'undefined' ? [...selectedNodeIds] : [])
+    };
+
     domData.nodes.splice(idx, 1);
     clearSelection();
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'delete_node',
+            description: `Delete element '${nodeId}'`,
+            page: getNodePage(origNode),
+            removed: [{ index: idx, node: origNode }],
+            inserted: [],
+            beforeSelection: beforeSel,
+            afterSelection: { selectedNodeId: null, selectedNodeIds: [] },
+            meta: { deleted_node_id: nodeId }
+        });
+    }
+
     renderDOMTree();
     renderSVGOverlays();
     if (typeof saveAnnotations === 'function') {
         await saveAnnotations(true);
     }
-    const banner = document.getElementById('statusBanner');
-    if (banner) {
-        banner.className = 'status-banner';
-        banner.style.display = 'block';
-        banner.textContent = `[OK] Deleted element '${nodeId}'. Persisted.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    if (typeof showStatusBanner === 'function') {
+        showStatusBanner(`Deleted element '${nodeId}'. Persisted.`, 'info', 3000);
+    }
+}
+
+/**
+ * Moves a DOM element earlier in the page reading sequence order.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
+function moveNodeOrderUp(nodeId) {
+    if (!domData || !domData.nodes) return;
+    const targetId = nodeId || selectedNodeId;
+    if (!targetId) return;
+
+    const pageNodes = domData.nodes.filter(n => getNodePage(n) === currentPage);
+    const pageIdx = pageNodes.findIndex(n => n.node_id === targetId);
+    if (pageIdx <= 0) {
+        if (typeof showStatusBanner === 'function') {
+            showStatusBanner('Element is already at the beginning of reading order.', 'info', 2000);
+        }
+        return;
+    }
+
+    const prevNode = pageNodes[pageIdx - 1];
+    const gIdx1 = domData.nodes.findIndex(n => n.node_id === prevNode.node_id);
+    const gIdx2 = domData.nodes.findIndex(n => n.node_id === targetId);
+    const origN1 = JSON.parse(JSON.stringify(domData.nodes[gIdx1]));
+    const origN2 = JSON.parse(JSON.stringify(domData.nodes[gIdx2]));
+
+    const temp = domData.nodes[gIdx2];
+    domData.nodes.splice(gIdx2, 1);
+    domData.nodes.splice(gIdx1, 0, temp);
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'reorder_node',
+            description: `Move reading order up: ${targetId}`,
+            page: currentPage,
+            removed: [{ index: Math.min(gIdx1, gIdx2), node: origN1 }, { index: Math.max(gIdx1, gIdx2), node: origN2 }],
+            inserted: [{ index: Math.min(gIdx1, gIdx2), node: origN2 }, { index: Math.max(gIdx1, gIdx2), node: origN1 }],
+            beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            afterSelection: { selectedNodeId: targetId, selectedNodeIds: [targetId] },
+            meta: { node_id: targetId, direction: 'up' }
+        });
+    }
+
+    renderDOMTree();
+    renderSVGOverlays();
+    renderSelectedEditor();
+    if (typeof showStatusBanner === 'function') {
+        showStatusBanner(`Moved '${targetId}' earlier in reading order.`, 'success', 2500);
+    }
+}
+
+/**
+ * Moves a DOM element later in the page reading sequence order.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
+function moveNodeOrderDown(nodeId) {
+    if (!domData || !domData.nodes) return;
+    const targetId = nodeId || selectedNodeId;
+    if (!targetId) return;
+
+    const pageNodes = domData.nodes.filter(n => getNodePage(n) === currentPage);
+    const pageIdx = pageNodes.findIndex(n => n.node_id === targetId);
+    if (pageIdx === -1 || pageIdx >= pageNodes.length - 1) {
+        if (typeof showStatusBanner === 'function') {
+            showStatusBanner('Element is already at the end of reading order.', 'info', 2000);
+        }
+        return;
+    }
+
+    const nextNode = pageNodes[pageIdx + 1];
+    const gIdx1 = domData.nodes.findIndex(n => n.node_id === targetId);
+    const gIdx2 = domData.nodes.findIndex(n => n.node_id === nextNode.node_id);
+    const origN1 = JSON.parse(JSON.stringify(domData.nodes[gIdx1]));
+    const origN2 = JSON.parse(JSON.stringify(domData.nodes[gIdx2]));
+
+    const temp = domData.nodes[gIdx1];
+    domData.nodes.splice(gIdx1, 1);
+    domData.nodes.splice(gIdx2, 0, temp);
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'reorder_node',
+            description: `Move reading order down: ${targetId}`,
+            page: currentPage,
+            removed: [{ index: Math.min(gIdx1, gIdx2), node: origN1 }, { index: Math.max(gIdx1, gIdx2), node: origN2 }],
+            inserted: [{ index: Math.min(gIdx1, gIdx2), node: origN2 }, { index: Math.max(gIdx1, gIdx2), node: origN1 }],
+            beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            afterSelection: { selectedNodeId: targetId, selectedNodeIds: [targetId] },
+            meta: { node_id: targetId, direction: 'down' }
+        });
+    }
+
+    renderDOMTree();
+    renderSVGOverlays();
+    renderSelectedEditor();
+    if (typeof showStatusBanner === 'function') {
+        showStatusBanner(`Moved '${targetId}' later in reading order.`, 'success', 2500);
     }
 }
 
@@ -288,9 +443,14 @@ function renderDOMTree() {
         return;
     }
 
+    const pageSeqMap = new Map();
+    const currPageNodes = domData.nodes.filter(n => getNodePage(n) === currentPage);
+    currPageNodes.forEach((n, idx) => { pageSeqMap.set(n.node_id, idx + 1); });
+
     nodesToDisplay.forEach(node => {
         const nodePage = getNodePage(node);
         const isOnCurrentPage = (nodePage === currentPage);
+        const pageSeq = pageSeqMap.get(node.node_id) || 1;
         const viols = getViolationsList();
         const hasActiveViol = viols.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v));
         const hasSuppressedViol = viols.some(v => v.node_id === node.node_id && isSuppressed(v));
@@ -312,34 +472,20 @@ function renderDOMTree() {
         card.id = `card-${node.node_id}`;
         card.onclick = (e) => handleNodeClick(e, node.node_id);
         card.innerHTML = renderDOMTreeNodeCardComponent(node, {
-            nodePage,
-            isOnCurrentPage,
-            isFixed,
-            isIncorrect,
-            hasActiveViol,
-            hasSuppressedViol,
-            displayText
+            nodePage, isOnCurrentPage, isFixed, isIncorrect, hasActiveViol, hasSuppressedViol, displayText, pageSeq
         });
         container.appendChild(card);
     });
 }
 
-/**
- * Formats and renders raw decision JSON payload into the decision log tab.
- */
+/** Formats and renders raw decision JSON payload into the decision log tab. */
 function renderDecisionLog() {
     const el = document.getElementById('logContent');
-    if (el) {
-        el.textContent = JSON.stringify(decisionData, null, 2);
-    }
+    if (el) el.textContent = JSON.stringify(decisionData, null, 2);
 }
 
-/**
- * Formats and renders raw DocumentPlan JSON payload into the plan tab.
- */
+/** Formats and renders raw DocumentPlan JSON payload into the plan tab. */
 function renderPlanTab() {
     const el = document.getElementById('planContent');
-    if (el) {
-        el.textContent = planData ? JSON.stringify(planData, null, 2) : "No planner config associated with this run.";
-    }
+    if (el) el.textContent = planData ? JSON.stringify(planData, null, 2) : 'No planner config associated with this run.';
 }

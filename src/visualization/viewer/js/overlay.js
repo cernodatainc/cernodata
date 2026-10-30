@@ -359,7 +359,7 @@ function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
     evt.preventDefault();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
- 
+
     const svgPt = getSvgCoordinates(evt);
     const corners = getBoxCorners(node.bounding_box);
     activeDrag = {
@@ -368,10 +368,12 @@ function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
         nodeId: nodeId,
         startSvgX: svgPt.x,
         startSvgY: svgPt.y,
-        initialCorners: corners.map(p => ({ ...p }))
+        initialCorners: corners.map(p => ({ ...p })),
+        origNode: JSON.parse(JSON.stringify(node)),
+        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
     };
 }
- 
+
 /**
  * Initiates dragging interaction on a specific edge midpoint handle.
  *
@@ -384,7 +386,7 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
     evt.preventDefault();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
- 
+
     const svgPt = getSvgCoordinates(evt);
     const corners = getBoxCorners(node.bounding_box);
     activeDrag = {
@@ -393,10 +395,12 @@ function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
         nodeId: nodeId,
         startSvgX: svgPt.x,
         startSvgY: svgPt.y,
-        initialCorners: corners.map(p => ({ ...p }))
+        initialCorners: corners.map(p => ({ ...p })),
+        origNode: JSON.parse(JSON.stringify(node)),
+        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
     };
 }
- 
+
 /**
  * Initiates dragging interaction to translate/move an entire bounding box.
  *
@@ -409,7 +413,7 @@ function onPolygonMouseDown(evt, nodeId) {
     evt.stopPropagation();
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
- 
+
     const svgPt = getSvgCoordinates(evt);
     const corners = getBoxCorners(node.bounding_box);
     activeDrag = {
@@ -417,6 +421,8 @@ function onPolygonMouseDown(evt, nodeId) {
         nodeId: nodeId,
         startSvgX: svgPt.x,
         startSvgY: svgPt.y,
-        initialCorners: corners.map(p => ({ ...p }))
+        initialCorners: corners.map(p => ({ ...p })),
+        origNode: JSON.parse(JSON.stringify(node)),
+        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
     };
 }

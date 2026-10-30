@@ -224,7 +224,12 @@ function roundCoord(val) {
  * @returns {string} Sanitized string safe for HTML rendering.
  */
 function escapeHtml(str) {
-    return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return String(str || '')
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 /**
@@ -346,6 +351,12 @@ function computeDomDiff() {
         modified,
         removed,
         accepted_violations: acceptedViolations,
+        active_diff_list: (window.runDiffManager && typeof window.runDiffManager.getActiveDiffs === 'function')
+            ? window.runDiffManager.getActiveDiffs()
+            : [],
+        diff_cursor: (window.runDiffManager && typeof window.runDiffManager.cursor === 'number')
+            ? window.runDiffManager.cursor
+            : 0,
         scoring: {
             raw_overall_confidence: rawOverall,
             current_overall_confidence: currOverall,
@@ -521,6 +532,10 @@ function hydrateViewer(data, pageNum = null) {
     domData = JSON.parse(JSON.stringify(initialDomData));
     violationsData = extractViolationsList(JSON.parse(JSON.stringify(initialViolationsData)));
     decisionData = JSON.parse(JSON.stringify(initialDecisionData));
+
+    if (window.runDiffManager && typeof window.runDiffManager.clear === 'function') {
+        window.runDiffManager.clear();
+    }
 
     if (typeof saveCurrentPresetToClientCache === 'function') {
         saveCurrentPresetToClientCache();

@@ -3,7 +3,7 @@
  *
  * Input layer abstraction and interaction manager for the visual flow canvas.
  * Decouples pointer and keyboard handling into concrete layers for selection,
- * dragging, and adding custom DOM elements.
+ * dragging, review shortcuts, and adding custom DOM elements.
  */
 
 class BaseInputLayer {
@@ -106,7 +106,23 @@ class SelectInputLayer extends BaseInputLayer {
 
     onPointerUp(evt, pt) {
         if (activeDrag) {
+            const drag = activeDrag;
             activeDrag = null;
+            if (drag.origNode && typeof recordRunDiff === 'function') {
+                const node = domData.nodes.find(n => n.node_id === drag.nodeId);
+                if (node && JSON.stringify(node.bounding_box) !== JSON.stringify(drag.origNode.bounding_box)) {
+                    recordRunDiff({
+                        action: 'modify_node',
+                        description: `Adjust bounds of '${node.node_id}'`,
+                        page: getNodePage(node),
+                        removed: [{ index: drag.origIdx, node: drag.origNode }],
+                        inserted: [{ index: drag.origIdx, node: JSON.parse(JSON.stringify(node)) }],
+                        beforeSelection: { selectedNodeId: drag.nodeId, selectedNodeIds: [drag.nodeId] },
+                        afterSelection: { selectedNodeId: drag.nodeId, selectedNodeIds: [drag.nodeId] },
+                        meta: { node_id: drag.nodeId }
+                    });
+                }
+            }
             renderDOMTree();
             renderSelectedEditor();
             return true;
@@ -116,15 +132,33 @@ class SelectInputLayer extends BaseInputLayer {
 
     onKeyDown(evt) {
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return false;
+
+        if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'z' && !evt.shiftKey) {
+            evt.preventDefault(); if (typeof undo === 'function') undo(); return true;
+        }
+        if ((evt.ctrlKey || evt.metaKey) && (evt.key.toLowerCase() === 'y' || (evt.key.toLowerCase() === 'z' && evt.shiftKey))) {
+            evt.preventDefault(); if (typeof redo === 'function') redo(); return true;
+        }
+        if (evt.key === ']') {
+            evt.preventDefault(); if (typeof selectNextViolation === 'function') selectNextViolation(); return true;
+        }
+        if (evt.key === '[') {
+            evt.preventDefault(); if (typeof selectPreviousViolation === 'function') selectPreviousViolation(); return true;
+        }
+        if ((evt.key === 'v' || evt.key === 'V') && selectedNodeId) {
+            evt.preventDefault(); toggleIncorrectText(selectedNodeId); return true;
+        }
+        if ((evt.key === 'Delete' || evt.key === 'Backspace') && selectedNodeId) {
+            evt.preventDefault(); deleteDOMNode(selectedNodeId); return true;
+        }
         if (evt.key === 'ArrowLeft' || evt.key === 'PageUp') {
-            prevPage();
-            return true;
-        } else if (evt.key === 'ArrowRight' || evt.key === 'PageDown') {
-            nextPage();
-            return true;
-        } else if (evt.key === 'Escape') {
-            clearSelection();
-            return true;
+            prevPage(); return true;
+        }
+        if (evt.key === 'ArrowRight' || evt.key === 'PageDown') {
+            nextPage(); return true;
+        }
+        if (evt.key === 'Escape') {
+            clearSelection(); return true;
         }
         return false;
     }
@@ -151,15 +185,12 @@ class DrawSectionInputLayer extends BaseInputLayer {
         isDrawSectionMode = true;
         const btn = document.getElementById('btnDrawSection');
         const visualPane = document.getElementById('visualPane');
-        const banner = document.getElementById('statusBanner');
         const svg = document.getElementById('svgOverlay');
         if (btn) btn.classList.add('active');
         if (visualPane) visualPane.style.cursor = 'crosshair';
         if (svg) svg.classList.add('draw-section-active');
-        if (banner) {
-            banner.className = 'status-banner';
-            banner.style.display = 'block';
-            banner.textContent = 'Click and drag on the page to draw a new section. Press Escape to cancel.';
+        if (typeof showStatusBanner === 'function') {
+            showStatusBanner('Click and drag on the page to draw a new section. Press Escape to cancel.', 'info', 0);
         }
     }
 
@@ -198,15 +229,9 @@ class DrawSectionInputLayer extends BaseInputLayer {
         }
 
         this.previewEl = createSvgElem('rect', {
-            x: pt.x,
-            y: pt.y,
-            width: 0,
-            height: 0,
-            fill: OVERLAY_COLORS.drawFill,
-            stroke: OVERLAY_COLORS.drawStroke,
-            'stroke-width': '2',
-            'stroke-dasharray': '4 2',
-            id: 'drawSectionPreview'
+            x: pt.x, y: pt.y, width: 0, height: 0,
+            fill: OVERLAY_COLORS.drawFill, stroke: OVERLAY_COLORS.drawStroke,
+            'stroke-width': '2', 'stroke-dasharray': '4 2', id: 'drawSectionPreview'
         });
         drawRectEl = this.previewEl;
         svg.appendChild(this.previewEl);
@@ -246,14 +271,8 @@ class DrawSectionInputLayer extends BaseInputLayer {
 
         if (w >= 15 && h >= 10) {
             const newNode = this.manager.createDOMElement({
-                x0: minX,
-                y0: minY,
-                x1: maxX,
-                y1: maxY,
-                type: 'paragraph',
-                page: currentPage
+                x0: minX, y0: minY, x1: maxX, y1: maxY, type: 'paragraph', page: currentPage
             });
-
             this.manager.setMode('select');
             renderDOMTree();
             renderSVGOverlays();
@@ -367,27 +386,31 @@ class ViewerInputManager {
         const rawText = options.text || '';
 
         const newNode = {
-            node_id: newNodeId,
-            type: nodeType,
-            global_page_index: page,
-            temp_slice_index: page,
+            node_id: newNodeId, type: nodeType,
+            global_page_index: page, temp_slice_index: page,
             bounding_box: {
-                x0: Math.min(x0, x1),
-                y0: Math.min(y0, y1),
-                x1: Math.max(x0, x1),
-                y1: Math.max(y0, y1),
-                angle: 0.0,
-                quad: null
+                x0: Math.min(x0, x1), y0: Math.min(y0, y1),
+                x1: Math.max(x0, x1), y1: Math.max(y0, y1),
+                angle: 0.0, quad: null
             },
-            content: {
-                raw_text: rawText
-            },
-            user_correction_note: rawText,
-            is_custom: true,
-            violations: []
+            content: { raw_text: rawText }, user_correction_note: rawText, is_custom: true, violations: []
         };
 
+        const newIdx = domData.nodes.length;
         domData.nodes.push(newNode);
+
+        if (typeof recordRunDiff === 'function') {
+            recordRunDiff({
+                action: 'add_node',
+                description: `Add custom section '${newNodeId}'`,
+                page: page,
+                removed: [],
+                inserted: [{ index: newIdx, node: JSON.parse(JSON.stringify(newNode)) }],
+                beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+                afterSelection: { selectedNodeId: newNodeId, selectedNodeIds: [newNodeId] },
+                meta: { node_id: newNodeId }
+            });
+        }
         return newNode;
     }
 

@@ -105,8 +105,31 @@ async function splitSelectedDOMNode(nodeId) {
     const idx = domData.nodes.findIndex(n => n.node_id === targetId);
     if (idx === -1) return;
 
+    const origNode = JSON.parse(JSON.stringify(node));
+    const beforeSel = {
+        selectedNodeId: (typeof selectedNodeId !== 'undefined' ? selectedNodeId : null),
+        selectedNodeIds: (typeof selectedNodeIds !== 'undefined' ? [...selectedNodeIds] : [])
+    };
+
     domData.nodes.splice(idx, 1, node1, node2);
     selectedNodeId = node1Id;
+    selectedNodeIds = [node1Id];
+
+    if (typeof recordRunDiff === 'function') {
+        recordRunDiff({
+            action: 'split_node',
+            description: `Split element '${targetId}' into '${node1Id}' and '${node2Id}'`,
+            page: getNodePage(origNode),
+            removed: [{ index: idx, node: origNode }],
+            inserted: [
+                { index: idx, node: JSON.parse(JSON.stringify(node1)) },
+                { index: idx + 1, node: JSON.parse(JSON.stringify(node2)) }
+            ],
+            beforeSelection: beforeSel,
+            afterSelection: { selectedNodeId: node1Id, selectedNodeIds: [node1Id] },
+            meta: { split_from: targetId, split_into: [node1Id, node2Id] }
+        });
+    }
 
     renderDOMTree();
     renderSelectedEditor();
@@ -116,11 +139,7 @@ async function splitSelectedDOMNode(nodeId) {
         await saveAnnotations(true);
     }
 
-    const banner = document.getElementById('statusBanner');
-    if (banner) {
-        banner.className = 'status-banner';
-        banner.style.display = 'block';
-        banner.textContent = `[OK] Split element '${targetId}' into '${node1Id}' and '${node2Id}'. Persisted.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    if (typeof showStatusBanner === 'function') {
+        showStatusBanner(`Split element '${targetId}' into '${node1Id}' and '${node2Id}'. Persisted.`, 'success', 3000);
     }
 }

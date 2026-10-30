@@ -192,6 +192,31 @@ header {
     padding: 8px 24px;
     font-size: 13px;
     font-weight: 500;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.status-banner.status-info {
+    background: var(--ui-blue);
+    color: #FFFFFF;
+    border-color: var(--ui-blue);
+}
+
+.status-banner.status-success {
+    background: var(--ui-green);
+    color: #FFFFFF;
+    border-color: var(--ui-green);
+}
+
+.status-banner.status-warn {
+    background: var(--ui-yellow);
+    color: #FFFFFF;
+    border-color: var(--ui-yellow);
+}
+
+.status-banner.status-error {
+    background: var(--ui-red);
+    color: #FFFFFF;
+    border-color: var(--ui-red);
 }
  
 /* Toolbar */
