@@ -136,20 +136,16 @@ def detect_quality_violations(
         node.violations = node_viols
         violations.extend(node_viols)
 
-    if active_layers.structure:
-        struct_viols = _check_structural_assertion_violations(dom, counter=counter)
-        counter += len(struct_viols)
-        violations.extend(struct_viols)
-
-    if active_layers.tables:
-        table_viols = _check_table_grid_violations(dom, counter=counter)
-        counter += len(table_viols)
-        violations.extend(table_viols)
-
-    if active_layers.geometry:
-        geom_viols = _check_geometry_violations(dom, counter=counter)
-        counter += len(geom_viols)
-        violations.extend(geom_viols)
+    document_level_checkers = [
+        (active_layers.structure, _check_structural_assertion_violations),
+        (active_layers.tables, _check_table_grid_violations),
+        (active_layers.geometry, _check_geometry_violations),
+    ]
+    for is_active, check_fn in document_level_checkers:
+        if is_active:
+            layer_viols = check_fn(dom, counter=counter)
+            counter += len(layer_viols)
+            violations.extend(layer_viols)
 
     violations.extend(_check_template_misapplication_violations(dom))
     violations.extend(_check_dataset_retrieval_violations(dom))

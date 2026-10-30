@@ -6,9 +6,9 @@ Provides registry management and language retrieval routines.
 """
 
 import os
-import json
 from typing import Dict, Optional, Any
 from src.quality.languages.models import LanguageConfig
+from src.utils import safe_load_json
 
 _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configurations")
 _LEGACY_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "languages.json")
@@ -39,17 +39,16 @@ def load_all_language_configs(config_dir: Optional[str] = None) -> Dict[str, Lan
             entry_path = os.path.join(base_dir, entry)
             if os.path.isdir(entry_path):
                 cfg_file = os.path.join(entry_path, "config.json")
-                if os.path.isfile(cfg_file):
-                    with open(cfg_file, "r", encoding="utf-8") as f:
-                        data = json.load(f)
+                data = safe_load_json(cfg_file)
+                if isinstance(data, dict):
                     cfg = _build_language_config(data)
                     configs[cfg.code.lower().strip()] = cfg
 
     # Fallback to legacy languages.json if configurations directory was empty or missing
-    if not configs and os.path.isfile(_LEGACY_CONFIG_PATH):
-        with open(_LEGACY_CONFIG_PATH, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        configs = {code: _build_language_config(cfg_dict) for code, cfg_dict in raw.items()}
+    if not configs:
+        raw = safe_load_json(_LEGACY_CONFIG_PATH)
+        if isinstance(raw, dict):
+            configs = {code: _build_language_config(cfg_dict) for code, cfg_dict in raw.items()}
 
     return configs
 

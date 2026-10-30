@@ -39,10 +39,15 @@ function renderOptionGrid(containerId, options, selectedValue, onSelectCallback)
 
         card.innerHTML = `
             <div class="card-header">
-                <div class="card-title">${escapeHtml(key)}</div>
+                <div class="card-title-group">
+                    <div class="card-title">${escapeHtml(key)}</div>
+                    <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="${escapeHtml(desc)}">
+                        <span class="help-icon">?</span>
+                        <div class="card-desc">${escapeHtml(desc)}</div>
+                    </div>
+                </div>
                 <div class="radio-indicator"></div>
             </div>
-            <div class="card-desc">${escapeHtml(desc)}</div>
         `;
         container.appendChild(card);
     });

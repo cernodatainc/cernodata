@@ -188,7 +188,10 @@
                     <div class="form-section">
                         <div class="section-header">
                             <div class="section-title">Previous results</div>
-                            <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
+                            <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Select an existing run to inspect or reuse its parameters">
+                                <span class="help-icon">?</span>
+                                <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
+                            </div>
                         </div>
                         <div class="input-group">
                             <label class="input-label" for="prevRunSelect">Completed run output</label>
@@ -209,7 +212,10 @@
                     <div class="form-section">
                         <div class="section-header">
                             <div class="section-title">Quality targets &amp; settings</div>
-                            <div class="section-desc">File source, language hint, preset selection, and confidence goal</div>
+                            <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="File source, language hint, preset selection, and confidence goal">
+                                <span class="help-icon">?</span>
+                                <div class="section-desc">File source, language hint, preset selection, and confidence goal</div>
+                            </div>
                         </div>
                         <div class="input-group">
                             <label class="input-label" for="docPath">Document file path</label>
@@ -272,7 +278,10 @@
                     <div class="form-section">
                         <div class="section-header">
                             <div class="section-title">Document taxonomy</div>
-                            <div class="section-desc">Primary structural layout shape</div>
+                            <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Primary structural layout shape">
+                                <span class="help-icon">?</span>
+                                <div class="section-desc">Primary structural layout shape</div>
+                            </div>
                         </div>
                         <div class="options-grid" id="taxonomyGrid"></div>
                         <select id="planTaxonomy" class="hidden-compat" onchange="updateSuggestedPlan()">
@@ -286,7 +295,10 @@
                     <div class="form-section">
                         <div class="section-header">
                             <div class="section-title">Processing priority</div>
-                            <div class="section-desc">Throughput priority versus layout fidelity</div>
+                            <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Throughput priority versus layout fidelity">
+                                <span class="help-icon">?</span>
+                                <div class="section-desc">Throughput priority versus layout fidelity</div>
+                            </div>
                         </div>
                         <div class="options-grid" id="targetGrid"></div>
                         <select id="planTarget" class="hidden-compat" onchange="updateSuggestedPlan()">
@@ -304,7 +316,10 @@
                     <div class="form-section">
                         <div class="section-header">
                             <div class="section-title">Security &amp; Environment</div>
-                            <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
+                            <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Cloud API allowance vs. air-gapped local model">
+                                <span class="help-icon">?</span>
+                                <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
+                            </div>
                         </div>
                         <div class="options-grid" id="securityGrid"></div>
                         <select id="planHardware" class="hidden-compat" onchange="updateSuggestedPlan()">

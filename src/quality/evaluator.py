@@ -5,7 +5,6 @@ Page-level (S_i) and document-level (S) confidence score evaluators.
 """
 
 import functools
-import json
 import logging
 import os
 from typing import List, Dict, Any, Optional, Sequence, Tuple, TypedDict
@@ -22,6 +21,7 @@ from src.quality.handlers import (
 from src.quality.language import detect_page_language
 from src.quality.language_config import get_language_config
 from src.quality.layers import ActiveVerificationLayers, VerificationLayer, normalize_layers
+from src.utils import safe_load_json
 
 logger = logging.getLogger("cernodata.quality.evaluator")
 
@@ -50,14 +50,9 @@ def load_quality_config() -> Dict[str, Any]:
     config_dir = os.path.dirname(os.path.abspath(__file__))
     for fname in ("config.json", "quality_config.json", "diacritic_config.json"):
         fpath = os.path.join(config_dir, fname)
-        if os.path.exists(fpath):
-            try:
-                with open(fpath, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except json.JSONDecodeError as jde:
-                logger.warning("Corrupt JSON in quality config file %s: %s", fpath, jde)
-            except Exception as ex:
-                logger.warning("Failed loading quality config from %s: %s", fpath, ex)
+        cfg = safe_load_json(fpath)
+        if isinstance(cfg, dict):
+            return cfg
     return {
         "diacritic_hit": 0.20,
         "max_diacritic_penalty": 0.60,

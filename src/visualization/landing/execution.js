@@ -32,7 +32,7 @@ async function triggerRunPipeline(withPlan = false) {
     }
 
     // Check if a previous run is already available for this document and preset
-    if (!withPlan && !forceRerun && typeof availableRuns !== 'undefined') {
+    if (!forceRerun && typeof availableRuns !== 'undefined') {
         const targetDocName = pdfPath.split(/[/\\]/).pop().toLowerCase();
         const existingRun = availableRuns.find(r => {
             const docName = (r.document_name || r.document_path || '').split(/[/\\]/).pop().toLowerCase();
@@ -40,7 +40,8 @@ async function triggerRunPipeline(withPlan = false) {
             return docName === targetDocName && rPreset === preset.toLowerCase();
         });
         if (existingRun) {
-            appendLog(`[INFO] Found previous run for '${targetDocName}' with preset '${preset}' in '${existingRun.dir_path}'. Loading existing result without rerun.`);
+            const conf = existingRun.overall_confidence !== undefined ? Number(existingRun.overall_confidence).toFixed(4) : "1.0000";
+            appendLog(`[INFO] Found previous run for '${targetDocName}' with preset '${preset}' in '${existingRun.dir_path}' (Confidence: ${conf}). Loading existing result without rerun.`);
             await choosePreviousRun(existingRun.dir_path);
             switchNavTab('results');
             return;

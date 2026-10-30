@@ -57,8 +57,42 @@ async function submitPlan() {
         });
 
         if (response.ok) {
-            showBanner("[SUCCESS] Data shape plan configured successfully. Starting pipeline execution...", "success");
             submitBtn.textContent = "[COMPLETED] Plan Active";
+            const chosenPreset = overridePrimary || (effectiveOrder && effectiveOrder.length > 0 ? effectiveOrder[0] : "docling_fast");
+            const targetDocName = docPath.split(/[/\\]/).pop().toLowerCase();
+            const forceRerunEl = document.getElementById("inpForceRerun");
+            const forceRerun = forceRerunEl ? forceRerunEl.checked : false;
+
+            const allRuns = (typeof availablePreviousRuns !== "undefined" && availablePreviousRuns.length > 0)
+                ? availablePreviousRuns
+                : (typeof availableRuns !== "undefined" ? availableRuns : []);
+
+            const existingRun = allRuns.find(r => {
+                const docName = (r.document_name || r.document_path || "").split(/[/\\]/).pop().toLowerCase();
+                const rPreset = (r.chosen_preset || "").toLowerCase();
+                return docName === targetDocName && rPreset === chosenPreset.toLowerCase();
+            });
+
+            if (!forceRerun && existingRun) {
+                const confStr = existingRun.overall_confidence !== undefined ? Number(existingRun.overall_confidence).toFixed(4) : "1.0000";
+                showBanner(`[INFO] Run already completed for '${targetDocName}' with preset '${chosenPreset}' (Confidence: ${confStr}). Reusing existing result without rerun.`, "success");
+                submitBtn.disabled = false;
+
+                const inpPdf = document.getElementById("inpPdfPath");
+                if (inpPdf) inpPdf.value = docPath;
+                const inpPreset = document.getElementById("inpPreset");
+                if (inpPreset) inpPreset.value = chosenPreset;
+
+                if (typeof choosePreviousRun === "function") {
+                    await choosePreviousRun(existingRun.dir_path || existingRun.run_id);
+                }
+                if (typeof switchNavTab === "function") {
+                    setTimeout(() => switchNavTab("results"), 400);
+                }
+                return;
+            }
+
+            showBanner("[SUCCESS] Data shape plan configured successfully. Starting pipeline execution...", "success");
             if (typeof triggerRunPipeline === "function") {
                 const inpPdf = document.getElementById("inpPdfPath");
                 if (inpPdf && docPath) {
@@ -67,6 +101,10 @@ async function submitPlan() {
                 const inpThresh = document.getElementById("inpThreshold");
                 if (inpThresh && threshold) {
                     inpThresh.value = threshold;
+                }
+                const inpPreset = document.getElementById("inpPreset");
+                if (inpPreset && chosenPreset) {
+                    inpPreset.value = chosenPreset;
                 }
                 setTimeout(() => {
                     triggerRunPipeline(false);

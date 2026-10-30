@@ -52,17 +52,20 @@ def _convert_ocr_box_to_bbox(
     return BoundingBox(x0=bx0, y0=by0, x1=bx1, y1=by1, angle=0.0)
 
 
+def _is_short_line(text: str, max_words: int = 8) -> bool:
+    """Returns True if text contains fewer than max_words words."""
+    return len(text.split()) < max_words
+
+
 def _classify_digital_node_type(text: str, is_first_on_page: bool) -> str:
     """Classifies extracted digital text as heading or paragraph."""
-    is_short = len(text.split()) < 8
     is_title_case = text.isupper() or text.istitle()
-    return DOMNodeType.HEADING.value if (is_first_on_page and is_short and is_title_case) else DOMNodeType.PARAGRAPH.value
+    return DOMNodeType.HEADING.value if (is_first_on_page and _is_short_line(text) and is_title_case) else DOMNodeType.PARAGRAPH.value
 
 
 def _classify_ocr_node_type(text: str, is_first_line: bool) -> str:
     """Classifies OCR line text as heading or paragraph."""
-    is_short = len(text.split()) < 8
-    return DOMNodeType.HEADING.value if (is_first_line and is_short) else DOMNodeType.PARAGRAPH.value
+    return DOMNodeType.HEADING.value if (is_first_line and _is_short_line(text)) else DOMNodeType.PARAGRAPH.value
 
 
 class PyPdfiumParser:

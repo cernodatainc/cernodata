@@ -73,16 +73,26 @@ async function loadSelectedPreviousRunIntoWizard() {
         const decision = (run && run.decision) ? run.decision : (data.decision || {});
 
         if (run.document_path) {
-            document.getElementById("docPath").value = run.document_path;
+            const docEl = document.getElementById("docPath");
+            if (docEl) docEl.value = run.document_path;
+            const inpPdf = document.getElementById("inpPdfPath");
+            if (inpPdf) inpPdf.value = run.document_path;
         }
         if (decision.language) {
-            document.getElementById("enableLangHint").checked = true;
+            const langCheck = document.getElementById("enableLangHint");
+            if (langCheck) langCheck.checked = true;
             toggleLanguageHint();
-            document.getElementById("langCode").value = decision.language;
+            const langCode = document.getElementById("langCode");
+            if (langCode) langCode.value = decision.language;
+            const inpLang = document.getElementById("inpLanguage");
+            if (inpLang) inpLang.value = decision.language;
         }
         if (decision.target_confidence_threshold) {
             updateThreshold(decision.target_confidence_threshold);
-            document.getElementById("thresholdSlider").value = decision.target_confidence_threshold;
+            const slider = document.getElementById("thresholdSlider");
+            if (slider) slider.value = decision.target_confidence_threshold;
+            const inpThresh = document.getElementById("inpThreshold");
+            if (inpThresh) inpThresh.value = decision.target_confidence_threshold;
         }
         if (plan.taxonomy && TAXONOMY_OPTIONS.some(([k]) => k === plan.taxonomy)) {
             selectedTaxonomy = plan.taxonomy;
@@ -97,8 +107,11 @@ async function loadSelectedPreviousRunIntoWizard() {
             renderOptionGrid("securityGrid", SECURITY_OPTIONS, selectedSecurity, val => selectedSecurity = val);
         }
         if (decision.chosen_preset) {
-            document.getElementById("overrideSelect").value = decision.chosen_preset;
+            const overrideSel = document.getElementById("overrideSelect");
+            if (overrideSel) overrideSel.value = decision.chosen_preset;
             onOverrideChanged();
+            const inpPreset = document.getElementById("inpPreset");
+            if (inpPreset) inpPreset.value = decision.chosen_preset;
         } else {
             recalculate();
         }

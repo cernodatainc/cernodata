@@ -56,6 +56,9 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             violations_count=len(viols),
             log=f"[CACHE] Reused previous result for preset '{preset}' (Status: {status}, Confidence: {score:.4f}).",
         )
+        plan_dict = cached.get("plan")
+        if not plan_dict and self.session.submitted_plan:
+            plan_dict = self.session.submitted_plan.to_dict()
         send_json_response(self, 200, {  # type: ignore[arg-type]
             "success": True,
             "preset": preset,
@@ -63,7 +66,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             "dom": cached["dom"],
             "violations": cached["violations"],
             "decision": cached["decision"],
-            "plan": cached.get("plan"),
+            "plan": plan_dict,
             "cached": True,
         })
         return True
@@ -116,7 +119,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         plan_config = payload.get("plan_config")
 
         force = bool(payload.get("force", payload.get("force_rerun", False)))
-        if not force and not with_plan and self._try_serve_cached_preset(pdf_path, preset, language):
+        if not force and self._try_serve_cached_preset(pdf_path, preset, language):
             return
 
         self.session.reset_progress(
@@ -180,6 +183,9 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             plan_obj = self.session.submitted_plan
             if plan_obj and plan_obj.primary_preset:
                 preset = plan_obj.primary_preset
+
+        if not force and self._try_serve_cached_preset(pdf_path, preset, language):
+            return
 
         session = self.session
         on_progress = session.make_progress_callback()

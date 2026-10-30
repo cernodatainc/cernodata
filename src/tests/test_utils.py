@@ -27,17 +27,12 @@ class TestUtils(unittest.TestCase):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_mkdirs_ignores_empty_string(self) -> None:
+    def test_mkdirs_ignores_typical_empty_values(self) -> None:
         # Should execute cleanly without raising FileNotFoundError or ValueError
         mkdirs("")
-
-    def test_mkdirs_ignores_none(self) -> None:
         mkdirs(None)
-
-    def test_mkdirs_ignores_empty_pathlib_path(self) -> None:
         mkdirs(Path(""))
 
-    def test_mkdirs_ignores_dirname_of_bare_filename(self) -> None:
         bare_filename_dir = os.path.dirname("document.pdf")
         self.assertEqual(bare_filename_dir, "")
         mkdirs(bare_filename_dir)
