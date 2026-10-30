@@ -67,7 +67,13 @@ class PresetCache:
         with self._lock:
             for k in self.make_cache_keys(pdf_path, preset, language):
                 if k in self.preset_results:
-                    return dict(self.preset_results[k])
+                    cached = self.preset_results[k]
+                    decision = cached.get("decision")
+                    chosen = str(getattr(decision, "chosen_preset", "") or "").strip().lower()
+                    wanted = preset.strip().lower() if preset else "docling_fast"
+                    if chosen and chosen != wanted:
+                        continue
+                    return dict(cached)
             return None
 
     def put(

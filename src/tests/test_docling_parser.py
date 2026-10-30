@@ -63,13 +63,14 @@ class TestDoclingParserContent(unittest.TestCase):
         content = _build_node_content(item, "figure", doc=object())
         self.assertEqual(content["raw_text"], "Figure 1. Bond yield curve")
 
-    def test_figure_caption_requires_doc(self):
+    def test_figure_caption_fallback_on_missing_doc_or_lookup_error(self):
+        # Graceful fallback to empty string when doc is None
         item = _StubPictureItem(caption="Figure 1. Bond yield curve")
         self.assertEqual(_resolve_raw_text(item, "figure", doc=None), "")
 
-    def test_figure_caption_lookup_error_is_swallowed(self):
-        item = _StubPictureItem(raise_on_caption=True)
-        self.assertEqual(_resolve_raw_text(item, "figure", doc=object()), "")
+        # Graceful fallback to empty string when caption lookup fails
+        failing_item = _StubPictureItem(raise_on_caption=True)
+        self.assertEqual(_resolve_raw_text(failing_item, "figure", doc=object()), "")
 
     def test_non_string_text_attribute_is_ignored(self):
         item = _StubTextItem(None)

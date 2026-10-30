@@ -32,7 +32,7 @@ def normalize_path(path: str) -> str:
 def derive_file_set(rel_path: str) -> str:
     """Derives logical file set category from relative parent directory."""
     norm = normalize_path(rel_path)
-    parts = norm.split("/")
+    parts = [p for p in norm.split("/") if p and p != "."]
     if len(parts) > 1:
         # e.g. "src/e2e/doc.pdf" -> "e2e", "data/invoices/inv.pdf" -> "invoices"
         return parts[-2]

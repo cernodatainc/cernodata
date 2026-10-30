@@ -9,7 +9,6 @@ import json
 import datetime
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
-from src.dom.bounding_box import BoundingBox
 from src.dom.node import DOMNode
 
 
@@ -107,13 +106,7 @@ class DocumentDOM:
 
         upper, lower = (n1, n2) if (n1.bounding_box.y0 <= n2.bounding_box.y0) else (n2, n1)
         res_type = target_type if target_type is not None else upper.type
-
-        merged_bbox = BoundingBox(
-            x0=min(n1.bounding_box.x0, n2.bounding_box.x0),
-            y0=min(n1.bounding_box.y0, n2.bounding_box.y0),
-            x1=max(n1.bounding_box.x1, n2.bounding_box.x1),
-            y1=max(n1.bounding_box.y1, n2.bounding_box.y1)
-        )
+        merged_bbox = n1.bounding_box.union(n2.bounding_box)
 
         merged_content = dict(upper.content)
         for k, v in lower.content.items():

@@ -181,7 +181,8 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 preset = plan_obj.primary_preset
         elif not with_plan and self.session.submitted_plan:
             plan_obj = self.session.submitted_plan
-            if plan_obj and plan_obj.primary_preset:
+            # An explicitly requested preset must never be overridden by the stored plan.
+            if plan_obj and plan_obj.primary_preset and not payload.get("preset"):
                 preset = plan_obj.primary_preset
 
         if not force and self._try_serve_cached_preset(pdf_path, preset, language):

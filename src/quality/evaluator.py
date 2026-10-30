@@ -45,8 +45,8 @@ class DocumentConfidenceMetrics(TypedDict, total=False):
 
 
 @functools.lru_cache(maxsize=1)
-def load_quality_config() -> Dict[str, Any]:
-    """Loads quality configuration from config.json located in the quality module directory."""
+def _load_quality_config_cached() -> Dict[str, Any]:
+    """Internal cached loader reading quality configuration from disk."""
     config_dir = os.path.dirname(os.path.abspath(__file__))
     for fname in ("config.json", "quality_config.json", "diacritic_config.json"):
         fpath = os.path.join(config_dir, fname)
@@ -57,8 +57,13 @@ def load_quality_config() -> Dict[str, Any]:
         "diacritic_hit": 0.20,
         "max_diacritic_penalty": 0.60,
         "garbage_multiplier": 3.0,
-        "garbage_threshold": 0.05
+        "garbage_threshold": 0.05,
     }
+
+
+def load_quality_config() -> Dict[str, Any]:
+    """Loads quality configuration from disk, returning a copy to prevent cache mutation."""
+    return dict(_load_quality_config_cached())
 
 
 def evaluate_page_confidence_details(

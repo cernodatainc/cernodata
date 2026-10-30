@@ -44,6 +44,38 @@ class BoundingBox:
         """Indicates whether bounding box has non-positive area."""
         return self.width <= 0.0 or self.height <= 0.0
 
+    def union(self, other: "BoundingBox") -> "BoundingBox":
+        """Returns the minimal bounding box enclosing both self and other."""
+        return BoundingBox(
+            x0=min(self.x0, other.x0),
+            y0=min(self.y0, other.y0),
+            x1=max(self.x1, other.x1),
+            y1=max(self.y1, other.y1),
+        )
+
+    def intersects(self, other: "BoundingBox") -> bool:
+        """Returns True if self and other overlap with positive area."""
+        return max(self.x0, other.x0) < min(self.x1, other.x1) and max(self.y0, other.y0) < min(self.y1, other.y1)
+
+    def intersection(self, other: "BoundingBox") -> Optional["BoundingBox"]:
+        """Returns the overlapping BoundingBox between self and other, or None if no overlap."""
+        ix0 = max(self.x0, other.x0)
+        iy0 = max(self.y0, other.y0)
+        ix1 = min(self.x1, other.x1)
+        iy1 = min(self.y1, other.y1)
+        if ix0 < ix1 and iy0 < iy1:
+            return BoundingBox(x0=ix0, y0=iy0, x1=ix1, y1=iy1)
+        return None
+
+    def iou(self, other: "BoundingBox") -> float:
+        """Computes Intersection over Union (IoU) ratio with another bounding box."""
+        inter = self.intersection(other)
+        if inter is None or inter.is_empty:
+            return 0.0
+        inter_area = inter.area
+        union_area = self.area + other.area - inter_area
+        return inter_area / union_area if union_area > 0.0 else 0.0
+
     def to_dict(self) -> Dict[str, Any]:
         res: Dict[str, Any] = {
             "x0": round(self.x0, 2),

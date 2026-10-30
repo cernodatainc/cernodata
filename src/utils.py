@@ -20,12 +20,13 @@ __all__ = [
 ]
 
 
-def safe_load_json(file_path: str, default: Any = None) -> Any:
+def safe_load_json(file_path: Union[str, os.PathLike[str]], default: Any = None) -> Any:
     """Safely reads and deserializes a UTF-8 JSON file if it exists, returning default on failure."""
-    if not os.path.exists(file_path):
+    fpath = os.fspath(file_path)
+    if not os.path.exists(fpath):
         return default
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(fpath, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return default
@@ -85,7 +86,8 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
     Finds an available TCP port starting from start_port by testing bind availability.
     Falls back to an OS-assigned ephemeral port if the scanned range is exhausted.
     """
-    for port in range(start_port, start_port + max_attempts):
+    attempts = max(0, max_attempts)
+    for port in range(start_port, start_port + attempts):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
@@ -100,7 +102,7 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
 
 
 def mkdirs(
-    path: Optional[Union[str, os.PathLike]] = None,
+    path: Optional[Union[str, os.PathLike[str]]] = None,
     mode: int = 0o777,
     exist_ok: bool = True,
 ) -> None:

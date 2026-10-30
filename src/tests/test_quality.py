@@ -223,6 +223,11 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertIn("garbage_threshold", cfg)
         self.assertEqual(cfg["garbage_threshold"], 0.05)
 
+        # Mutating returned config dictionary must not pollute cached config
+        cfg["diacritic_hit"] = 999.0
+        fresh_cfg = load_quality_config()
+        self.assertEqual(fresh_cfg["diacritic_hit"], 0.20)
+
 
 if __name__ == "__main__":
     unittest.main()

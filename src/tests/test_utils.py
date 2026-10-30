@@ -15,6 +15,7 @@ from src.utils import (
     generate_document_id,
     mkdirs,
     resolve_and_validate_pdf_path,
+    safe_load_json,
 )
 
 
@@ -59,10 +60,9 @@ class TestUtils(unittest.TestCase):
         port = find_available_port(start_port=8200, max_attempts=20)
         self.assertGreaterEqual(port, 8200)
 
-    def test_find_available_port_fallback(self) -> None:
         # With 0 attempts, loop will not run and should fallback to port 0 ephemeral allocation
-        port = find_available_port(start_port=8200, max_attempts=0)
-        self.assertGreater(port, 0)
+        fallback_port = find_available_port(start_port=8200, max_attempts=0)
+        self.assertGreater(fallback_port, 0)
 
     def test_generate_document_id(self) -> None:
         doc_id1 = generate_document_id("sample.pdf")
@@ -70,13 +70,23 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(doc_id1.startswith("doc_"))
         self.assertEqual(doc_id1, doc_id2)
 
-    def test_resolve_and_validate_pdf_path_existing(self) -> None:
+    def test_resolve_and_validate_pdf_path(self) -> None:
         pdf_file = os.path.join(self.test_dir, "test_doc.pdf")
         with open(pdf_file, "wb") as f:
             f.write(b"%PDF-1.4 test")
         resolved = resolve_and_validate_pdf_path(pdf_file)
         self.assertEqual(resolved, pdf_file)
 
-    def test_resolve_and_validate_pdf_path_missing(self) -> None:
         with self.assertRaises(FileNotFoundError):
             resolve_and_validate_pdf_path(os.path.join(self.test_dir, "nonexistent.pdf"))
+
+    def test_safe_load_json(self) -> None:
+        json_path = Path(self.test_dir) / "data.json"
+        with open(json_path, "w", encoding="utf-8") as f:
+            f.write('{"key": "value"}')
+
+        loaded = safe_load_json(json_path)
+        self.assertEqual(loaded, {"key": "value"})
+
+        missing = safe_load_json(Path(self.test_dir) / "missing.json", default={"fallback": True})
+        self.assertEqual(missing, {"fallback": True})

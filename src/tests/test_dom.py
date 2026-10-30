@@ -43,6 +43,30 @@ class TestDOMPrimitives(unittest.TestCase):
         empty_box = BoundingBox(10.0, 10.0, 10.0, 20.0)
         self.assertTrue(empty_box.is_empty)
 
+    def test_bounding_box_set_operations(self):
+        b1 = BoundingBox(0.0, 0.0, 10.0, 10.0)
+        b2 = BoundingBox(5.0, 5.0, 15.0, 15.0)
+        b3 = BoundingBox(20.0, 20.0, 30.0, 30.0)
+
+        # Union
+        u = b1.union(b2)
+        self.assertEqual((u.x0, u.y0, u.x1, u.y1), (0.0, 0.0, 15.0, 15.0))
+
+        # Intersects & Intersection
+        self.assertTrue(b1.intersects(b2))
+        self.assertFalse(b1.intersects(b3))
+
+        inter = b1.intersection(b2)
+        self.assertIsNotNone(inter)
+        assert inter is not None
+        self.assertEqual((inter.x0, inter.y0, inter.x1, inter.y1), (5.0, 5.0, 10.0, 10.0))
+        self.assertIsNone(b1.intersection(b3))
+
+        # IoU
+        # b1 area: 100, b2 area: 100, inter area: 25, union area: 175 -> IoU = 25 / 175
+        self.assertAlmostEqual(b1.iou(b2), 25.0 / 175.0, places=4)
+        self.assertEqual(b1.iou(b3), 0.0)
+
     def test_bounding_box_rotation_polygon(self):
         # 0 degree rotation unrotated corners
         bbox0 = BoundingBox(0.0, 0.0, 10.0, 20.0, angle=0.0)

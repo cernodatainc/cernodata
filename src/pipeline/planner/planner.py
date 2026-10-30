@@ -59,13 +59,13 @@ class PresetPlanner:
         scores: Dict[str, float] = {}
         for preset_id, weight_map in self.weights.items():
             matched_weights = [weight_map.get(ans, 0.50) for ans in resolved_criteria.values()]
-            scores[preset_id] = round(sum(matched_weights) / len(matched_weights), 3)
+            scores[preset_id] = round(sum(matched_weights) / len(matched_weights), 3) if matched_weights else 0.50
 
         return self._apply_hardware_calibration(scores)
 
     def suggest_preset_order(self, scores: Dict[str, float]) -> List[str]:
         """Sorts presets in descending order of calculated score."""
-        return sorted(scores.keys(), key=lambda p: scores[p], reverse=True)
+        return sorted(scores.keys(), key=lambda p: scores.get(p, 0.0), reverse=True)
 
     def create_plan(
         self,
