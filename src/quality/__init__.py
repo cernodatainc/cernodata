@@ -23,6 +23,7 @@ from src.quality.layers import (
     ALL_VERIFICATION_LAYERS,
     DEFAULT_VERIFICATION_LAYERS,
     LAYER_METADATA,
+    ActiveVerificationLayers,
     VerificationLayer,
     normalize_layer_name,
     normalize_layers,
@@ -41,6 +42,7 @@ from src.quality.skew import detect_node_text_skew, apply_text_skew_alignment
 
 __all__ = [
     "ALL_VERIFICATION_LAYERS",
+    "ActiveVerificationLayers",
     "DEFAULT_VERIFICATION_LAYERS",
     "DocumentConfidenceMetrics",
     "LAYER_METADATA",

@@ -32,6 +32,7 @@ __all__ = [
     "PyPdfiumPresetAdapter",
     "get_default_parser_registry",
     "parse_document",
+    "resolve_pdf_path",
 ]
 
 
@@ -70,7 +71,6 @@ class DocumentParserDispatcher:
         resolved_path = resolve_pdf_path(pdf_path)
         if not os.path.exists(resolved_path):
             raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
-
         return self._registry.execute(resolved_path, options)
 
 

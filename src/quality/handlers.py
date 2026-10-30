@@ -47,13 +47,35 @@ def make_node_violation(
     return record
 
 
+def is_violation_suppressed(violation: Any) -> bool:
+    """Evaluates whether a violation record dictionary has been flagged as suppressed."""
+    if not isinstance(violation, dict):
+        return False
+    supp_val = violation.get("suppressed", False)
+    return (supp_val is True) or (str(supp_val).lower() in ("true", "1"))
+
+
+def get_suppressed_violation_lookup(node: DOMNode) -> Dict[str, bool]:
+    """Extracts a lookup mapping keyed by violation_id, rule_type, and type to suppression status."""
+    lookup: Dict[str, bool] = {}
+    for ev in getattr(node, "violations", []):
+        if isinstance(ev, dict):
+            is_supp = is_violation_suppressed(ev)
+            if ev.get("violation_id"):
+                lookup[str(ev["violation_id"])] = is_supp
+            if ev.get("rule_type"):
+                lookup[str(ev["rule_type"])] = is_supp
+            if ev.get("type"):
+                lookup[str(ev["type"])] = is_supp
+    return lookup
+
+
 def get_suppressed_violation_types(node: DOMNode) -> Dict[str, bool]:
     """Extracts a mapping of violation types that have been marked as suppressed on a DOMNode."""
     return {
         str(v.get("type", "")): True
         for v in getattr(node, "violations", [])
-        if isinstance(v, dict)
-        and ((v.get("suppressed") is True) or (str(v.get("suppressed", "false")).lower() in ("true", "1")))
+        if isinstance(v, dict) and is_violation_suppressed(v)
     }
 
 
@@ -295,6 +317,8 @@ __all__ = [
     "SymbolsLayerHandler",
     "TablesLayerHandler",
     "VerificationLayerHandler",
+    "get_suppressed_violation_lookup",
     "get_suppressed_violation_types",
+    "is_violation_suppressed",
     "make_node_violation",
 ]

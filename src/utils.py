@@ -9,7 +9,14 @@ import os
 import socket
 from typing import Any, Optional, Union
 
-__all__ = ["mkdirs", "find_available_port", "resolve_pdf_path", "safe_load_json"]
+__all__ = [
+    "mkdirs",
+    "find_available_port",
+    "resolve_pdf_path",
+    "resolve_and_validate_pdf_path",
+    "generate_document_id",
+    "safe_load_json",
+]
 
 
 def safe_load_json(file_path: str, default: Any = None) -> Any:
@@ -21,6 +28,12 @@ def safe_load_json(file_path: str, default: Any = None) -> Any:
             return json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return default
+
+
+def generate_document_id(source_filename: str) -> str:
+    """Generates a standardized pseudo-unique document ID from a source filename."""
+    base_name = os.path.basename(source_filename)
+    return f"doc_{abs(hash(base_name)) % 1000000:06d}"
 
 
 def resolve_pdf_path(path: str) -> str:
@@ -49,6 +62,17 @@ def resolve_pdf_path(path: str) -> str:
             return os.path.abspath(cand)
 
     return path
+
+
+def resolve_and_validate_pdf_path(path: str) -> str:
+    """
+    Resolves relative or bare PDF filenames to actual filesystem paths
+    and verifies the file exists on disk, raising FileNotFoundError otherwise.
+    """
+    resolved = resolve_pdf_path(path)
+    if not os.path.exists(resolved):
+        raise FileNotFoundError(f"PDF document not found: '{path}'")
+    return resolved
 
 
 def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:

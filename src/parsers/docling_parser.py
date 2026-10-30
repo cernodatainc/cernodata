@@ -11,7 +11,7 @@ import os
 import logging
 from typing import List, Optional, Any
 
-from src.utils import resolve_pdf_path
+from src.utils import generate_document_id, resolve_and_validate_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 
 logger = logging.getLogger("cernodata.docling_parser")
@@ -118,14 +118,12 @@ class DoclingParser:
         return pipeline_options
 
     def parse(self, pdf_path: str) -> DocumentDOM:
-        resolved_path = resolve_pdf_path(pdf_path)
-        if not os.path.exists(resolved_path):
-            raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
+        resolved_path = resolve_and_validate_pdf_path(pdf_path)
         if not HAS_DOCLING:
             raise RuntimeError("Docling library is not installed or available in this Python environment.")
 
         source_filename = os.path.basename(resolved_path)
-        doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
+        doc_id = generate_document_id(source_filename)
         return self._parse_with_docling(resolved_path, doc_id, source_filename)
 
     def _parse_with_docling(self, pdf_path: str, doc_id: str, source_filename: str) -> DocumentDOM:

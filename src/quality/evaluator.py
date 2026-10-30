@@ -21,7 +21,7 @@ from src.quality.handlers import (
 )
 from src.quality.language import detect_page_language
 from src.quality.language_config import get_language_config
-from src.quality.layers import VerificationLayer, normalize_layers
+from src.quality.layers import ActiveVerificationLayers, VerificationLayer, normalize_layers
 
 logger = logging.getLogger("cernodata.quality.evaluator")
 
@@ -79,12 +79,7 @@ def evaluate_page_confidence_details(
     if not nodes:
         return 0.0, {}
 
-    active_layers = set(normalize_layers(layers))
-    check_symbols = VerificationLayer.SYMBOLS.value in active_layers
-    check_diacritics = VerificationLayer.DIACRITICS.value in active_layers
-    check_structure = VerificationLayer.STRUCTURE.value in active_layers
-    check_tables = VerificationLayer.TABLES.value in active_layers
-    check_geometry = VerificationLayer.GEOMETRY.value in active_layers
+    active_layers = ActiveVerificationLayers.from_layers(layers)
 
     q_cfg = load_quality_config()
     config = get_language_config(language)
@@ -105,32 +100,32 @@ def evaluate_page_confidence_details(
         suppressed_types = get_suppressed_violation_types(node)
 
         c_score = 1.0
-        if check_symbols:
+        if active_layers.symbols:
             c_score = _SYMBOLS_HANDLER.evaluate_node(
                 node, suppressed_types=suppressed_types, garbage_multiplier=garbage_multiplier
             )
             char_scores.append(c_score)
 
         l_score = 1.0
-        if check_diacritics:
+        if active_layers.diacritics:
             l_score = _DIACRITICS_HANDLER.evaluate_node(
                 node, language=language, diacritic_hit=hit, config=config, suppressed_types=suppressed_types
             )
             lang_scores.append(l_score)
 
         s_score = 1.0
-        if check_structure:
+        if active_layers.structure:
             s_score = _STRUCTURE_HANDLER.evaluate_node(node)
             struct_scores.append(s_score)
 
         g_score = 1.0
-        if check_geometry:
+        if active_layers.geometry:
             g_score = _GEOMETRY_HANDLER.evaluate_node(node)
             geom_scores.append(g_score)
 
         combined_text_score = c_score * l_score * s_score * g_score
 
-        if node.type == "table_grid" and check_tables:
+        if node.type == "table_grid" and active_layers.tables:
             # TODO(TASK-103): Replace static `cell_alignment_score` fallback with real Level 4 Markdown table
             # grid validation (column count consistency across rows, numeric alignment, and empty header checks).
             t_score = _TABLES_HANDLER.evaluate_node(node)
@@ -146,23 +141,23 @@ def evaluate_page_confidence_details(
         _DIACRITICS_HANDLER.compute_page_penalty(
             nodes, language=language, diacritic_hit=hit, config=config, max_penalty=max_diacritic_penalty
         )
-        if check_diacritics
+        if active_layers.diacritics
         else 0.0
     )
 
     final_score = max(0.0, float(base_score - page_penalty))
 
     layer_breakdown: Dict[str, float] = {}
-    if check_symbols and char_scores:
+    if active_layers.symbols and char_scores:
         layer_breakdown[VerificationLayer.SYMBOLS.value] = round(float(sum(char_scores) / len(char_scores)), 4)
-    if check_diacritics and lang_scores:
+    if active_layers.diacritics and lang_scores:
         d_avg = float(sum(lang_scores) / len(lang_scores))
         layer_breakdown[VerificationLayer.DIACRITICS.value] = round(max(0.0, float(d_avg - page_penalty)), 4)
-    if check_structure and struct_scores:
+    if active_layers.structure and struct_scores:
         layer_breakdown[VerificationLayer.STRUCTURE.value] = round(float(sum(struct_scores) / len(struct_scores)), 4)
-    if check_tables and table_scores:
+    if active_layers.tables and table_scores:
         layer_breakdown[VerificationLayer.TABLES.value] = round(float(sum(table_scores) / len(table_scores)), 4)
-    if check_geometry and geom_scores:
+    if active_layers.geometry and geom_scores:
         layer_breakdown[VerificationLayer.GEOMETRY.value] = round(float(sum(geom_scores) / len(geom_scores)), 4)
 
     return final_score, layer_breakdown

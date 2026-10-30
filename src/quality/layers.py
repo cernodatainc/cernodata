@@ -7,6 +7,7 @@ Provides layer enumeration, aliases normalization, and criteria descriptions.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -117,3 +118,25 @@ def normalize_layers(layers: Optional[Sequence[str]]) -> List[str]:
             normalized.append(resolved)
 
     return normalized
+
+
+@dataclass(frozen=True)
+class ActiveVerificationLayers:
+    """Pre-computed boolean presence flags for canonical verification layers."""
+    symbols: bool
+    diacritics: bool
+    structure: bool
+    tables: bool
+    geometry: bool
+
+    @classmethod
+    def from_layers(cls, layers: Optional[Sequence[str]]) -> ActiveVerificationLayers:
+        """Builds layer presence flags from a sequence of raw or alias layer names."""
+        active = set(normalize_layers(layers))
+        return cls(
+            symbols=VerificationLayer.SYMBOLS.value in active,
+            diacritics=VerificationLayer.DIACRITICS.value in active,
+            structure=VerificationLayer.STRUCTURE.value in active,
+            tables=VerificationLayer.TABLES.value in active,
+            geometry=VerificationLayer.GEOMETRY.value in active,
+        )

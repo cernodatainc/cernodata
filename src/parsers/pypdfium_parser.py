@@ -12,7 +12,7 @@ import logging
 import os
 from typing import List, Any, Optional, Tuple
 
-from src.utils import resolve_pdf_path
+from src.utils import generate_document_id, resolve_and_validate_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.dom.enums import DOMNodeType
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
@@ -95,12 +95,10 @@ class PyPdfiumParser:
         For pages with embedded digital text, extracts native text rectangles.
         For scanned or image-dominant pages, renders page bitmaps and runs RapidOCR.
         """
-        resolved_path = resolve_pdf_path(pdf_path)
-        if not os.path.exists(resolved_path):
-            raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
+        resolved_path = resolve_and_validate_pdf_path(pdf_path)
 
         source_filename = os.path.basename(resolved_path)
-        doc_id = f"doc_{abs(hash(source_filename)) % 1000000:06d}"
+        doc_id = generate_document_id(source_filename)
 
         total_pages = 0
         nodes: List[DOMNode] = []

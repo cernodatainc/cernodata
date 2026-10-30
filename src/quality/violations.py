@@ -16,9 +16,10 @@ from src.quality.handlers import (
     StructureLayerHandler,
     SymbolsLayerHandler,
     TablesLayerHandler,
+    get_suppressed_violation_lookup,
 )
 from src.quality.language_config import LanguageConfig, get_language_config
-from src.quality.layers import VerificationLayer, normalize_layers
+from src.quality.layers import ActiveVerificationLayers
 
 
 def _check_garbage_violations(
@@ -90,7 +91,7 @@ def detect_quality_violations(
     Populates violations directly on each DOMNode.
     """
     violations: List[Dict[str, Any]] = []
-    active_layers = set(normalize_layers(layers))
+    active_layers = ActiveVerificationLayers.from_layers(layers)
     lang = language.lower().strip() if language else "en"
     is_auto = (lang == "auto")
 
@@ -108,29 +109,17 @@ def detect_quality_violations(
     garbage_threshold = float(load_quality_config().get("garbage_threshold", 0.05))
     counter = 1
 
-    check_symbols = VerificationLayer.SYMBOLS.value in active_layers
-    check_diacritics = VerificationLayer.DIACRITICS.value in active_layers
-
     for node in dom.nodes:
-        existing_suppressed: Dict[str, bool] = {}
-        for ev in getattr(node, "violations", []):
-            if isinstance(ev, dict):
-                supp_val = ev.get("suppressed", False)
-                is_supp = (supp_val is True) or (str(supp_val).lower() in ("true", "1"))
-                if ev.get("violation_id"):
-                    existing_suppressed[ev["violation_id"]] = is_supp
-                if ev.get("rule_type"):
-                    existing_suppressed[ev["rule_type"]] = is_supp
-
+        existing_suppressed = get_suppressed_violation_lookup(node)
         raw_text = node.content.get("raw_text", "")
         node_viols: List[Dict[str, Any]] = []
 
-        if check_symbols:
+        if active_layers.symbols:
             gb_viols = _check_garbage_violations(node, raw_text, counter, threshold=garbage_threshold)
             counter += len(gb_viols)
             node_viols.extend(gb_viols)
 
-        if check_diacritics:
+        if active_layers.diacritics:
             cfg = page_configs.get(node.global_page_index) if is_auto else fixed_config
             lang_viols = _check_diacritic_violations(node, raw_text, cfg, counter)
             counter += len(lang_viols)
@@ -147,17 +136,17 @@ def detect_quality_violations(
         node.violations = node_viols
         violations.extend(node_viols)
 
-    if VerificationLayer.STRUCTURE.value in active_layers:
+    if active_layers.structure:
         struct_viols = _check_structural_assertion_violations(dom, counter=counter)
         counter += len(struct_viols)
         violations.extend(struct_viols)
 
-    if VerificationLayer.TABLES.value in active_layers:
+    if active_layers.tables:
         table_viols = _check_table_grid_violations(dom, counter=counter)
         counter += len(table_viols)
         violations.extend(table_viols)
 
-    if VerificationLayer.GEOMETRY.value in active_layers:
+    if active_layers.geometry:
         geom_viols = _check_geometry_violations(dom, counter=counter)
         counter += len(geom_viols)
         violations.extend(geom_viols)

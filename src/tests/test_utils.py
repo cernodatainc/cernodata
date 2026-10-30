@@ -10,7 +10,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.utils import mkdirs, find_available_port
+from src.utils import (
+    find_available_port,
+    generate_document_id,
+    mkdirs,
+    resolve_and_validate_pdf_path,
+)
 
 
 class TestUtils(unittest.TestCase):
@@ -64,3 +69,20 @@ class TestUtils(unittest.TestCase):
         # With 0 attempts, loop will not run and should fallback to port 0 ephemeral allocation
         port = find_available_port(start_port=8200, max_attempts=0)
         self.assertGreater(port, 0)
+
+    def test_generate_document_id(self) -> None:
+        doc_id1 = generate_document_id("sample.pdf")
+        doc_id2 = generate_document_id("path/to/sample.pdf")
+        self.assertTrue(doc_id1.startswith("doc_"))
+        self.assertEqual(doc_id1, doc_id2)
+
+    def test_resolve_and_validate_pdf_path_existing(self) -> None:
+        pdf_file = os.path.join(self.test_dir, "test_doc.pdf")
+        with open(pdf_file, "wb") as f:
+            f.write(b"%PDF-1.4 test")
+        resolved = resolve_and_validate_pdf_path(pdf_file)
+        self.assertEqual(resolved, pdf_file)
+
+    def test_resolve_and_validate_pdf_path_missing(self) -> None:
+        with self.assertRaises(FileNotFoundError):
+            resolve_and_validate_pdf_path(os.path.join(self.test_dir, "nonexistent.pdf"))

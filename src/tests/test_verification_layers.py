@@ -19,9 +19,14 @@ from src.pipeline.planner import DocumentPlan, PlannerCriteria, PresetPlanner
 from src.quality.layers import (
     ALL_VERIFICATION_LAYERS,
     DEFAULT_VERIFICATION_LAYERS,
+    ActiveVerificationLayers,
     VerificationLayer,
     normalize_layer_name,
     normalize_layers,
+)
+from src.quality.handlers import (
+    get_suppressed_violation_lookup,
+    is_violation_suppressed,
 )
 from src.quality.materialization import (
     MaterializedVerificationResult,
@@ -58,6 +63,41 @@ class TestVerificationLayers(unittest.TestCase):
         # None defaults to all verification layers
         self.assertEqual(normalize_layers(None), ALL_VERIFICATION_LAYERS)
         self.assertEqual(DEFAULT_VERIFICATION_LAYERS, ALL_VERIFICATION_LAYERS)
+
+    def test_active_verification_layers_and_suppression(self) -> None:
+        """Verifies ActiveVerificationLayers flags and suppression lookup helpers."""
+        active = ActiveVerificationLayers.from_layers(["symbols", "tables"])
+        self.assertTrue(active.symbols)
+        self.assertFalse(active.diacritics)
+        self.assertFalse(active.structure)
+        self.assertTrue(active.tables)
+        self.assertFalse(active.geometry)
+
+        active_all = ActiveVerificationLayers.from_layers(None)
+        self.assertTrue(active_all.symbols)
+        self.assertTrue(active_all.diacritics)
+        self.assertTrue(active_all.structure)
+        self.assertTrue(active_all.tables)
+        self.assertTrue(active_all.geometry)
+
+        self.assertTrue(is_violation_suppressed({"suppressed": True}))
+        self.assertTrue(is_violation_suppressed({"suppressed": "true"}))
+        self.assertTrue(is_violation_suppressed({"suppressed": "1"}))
+        self.assertFalse(is_violation_suppressed({"suppressed": False}))
+        self.assertFalse(is_violation_suppressed({"suppressed": "false"}))
+        self.assertFalse(is_violation_suppressed(None))
+
+        node = make_test_node("sample text", node_id="node_test_supp")
+        node.violations = [
+            {"violation_id": "v1", "rule_type": "rule_a", "type": "symbols", "suppressed": True},
+            {"violation_id": "v2", "rule_type": "rule_b", "type": "diacritics", "suppressed": "false"},
+        ]
+        lookup = get_suppressed_violation_lookup(node)
+        self.assertTrue(lookup.get("v1"))
+        self.assertTrue(lookup.get("rule_a"))
+        self.assertTrue(lookup.get("symbols"))
+        self.assertFalse(lookup.get("v2"))
+        self.assertFalse(lookup.get("rule_b"))
 
     def test_verification_layers_decided_during_planning(self) -> None:
         """Verifies verification layers can be specified in criteria, planner, and execution plans."""
