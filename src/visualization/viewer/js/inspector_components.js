@@ -66,7 +66,10 @@ function renderEmptySelectionComponent() {
             <div style="font-size:12px; color:${p.textMuted}; line-height:1.45;">
                 Click a bounding box to inspect or edit its coordinates. <strong style="color:${p.textPrimary}; font-weight:600;">Shift+click</strong> two boxes to compare and decollide them.
             </div>
-            <button class="btn-decollide" onclick="decollideCurrentPage()" style="margin-top:10px;">Decollide all page boxes</button>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="action-btn action-btn-draw-section-sm" id="btnInspectorDrawSection" onclick="toggleDrawSectionMode()" style="flex:1;">Draw new section</button>
+                <button class="btn-decollide" onclick="decollideCurrentPage()" style="flex:1; margin-top:0;">Decollide page</button>
+            </div>
         </div>
     `;
 }

@@ -44,11 +44,38 @@ function createSvgElem(tag, attrs) {
  * @returns {SVGPoint} Scaled point in SVG coordinates.
  */
 function getSvgCoordinates(evt) {
+    if (window.viewerInputManager && typeof window.viewerInputManager.getSvgCoordinates === 'function') {
+        return window.viewerInputManager.getSvgCoordinates(evt);
+    }
     const svg = document.getElementById('svgOverlay');
-    const pt = svg.createSVGPoint();
-    pt.x = evt.clientX;
-    pt.y = evt.clientY;
-    return pt.matrixTransform(svg.getScreenCTM().inverse());
+    if (!svg) return { x: 0, y: 0 };
+    try {
+        const ctm = svg.getScreenCTM();
+        if (ctm) {
+            const pt = svg.createSVGPoint();
+            pt.x = evt.clientX;
+            pt.y = evt.clientY;
+            const inv = ctm.inverse();
+            if (inv) {
+                const transformed = pt.matrixTransform(inv);
+                if (!isNaN(transformed.x) && !isNaN(transformed.y)) {
+                    return { x: roundCoord(transformed.x), y: roundCoord(transformed.y) };
+                }
+            }
+        }
+    } catch (e) {
+        // Fallback below
+    }
+    const rect = svg.getBoundingClientRect();
+    const vb = svg.viewBox && svg.viewBox.baseVal;
+    const vbW = (vb && vb.width > 0) ? vb.width : (rect.width || 595.28);
+    const vbH = (vb && vb.height > 0) ? vb.height : (rect.height || 841.89);
+    const scaleX = rect.width > 0 ? vbW / rect.width : 1.0;
+    const scaleY = rect.height > 0 ? vbH / rect.height : 1.0;
+    return {
+        x: roundCoord((evt.clientX - rect.left) * scaleX),
+        y: roundCoord((evt.clientY - rect.top) * scaleY)
+    };
 }
  
 /**
@@ -100,6 +127,11 @@ function updateBboxFromCorners(node, corners) {
  * Toggles interactive rectangle drawing mode for creating new user-defined sections.
  */
 function toggleDrawSectionMode() {
+    if (window.viewerInputManager) {
+        const nextMode = (window.viewerInputManager.getMode() === 'draw') ? 'select' : 'draw';
+        window.viewerInputManager.setMode(nextMode);
+        return;
+    }
     isDrawSectionMode = !isDrawSectionMode;
     const btn = document.getElementById('btnDrawSection');
     const visualPane = document.getElementById('visualPane');
@@ -163,7 +195,7 @@ function renderSVGOverlays() {
     const filterType = document.getElementById('typeFilter') ? document.getElementById('typeFilter').value : 'ALL';
  
     domData.nodes.forEach(node => {
-        const nodePage = node.global_page_index || 1;
+        const nodePage = (typeof getNodePage === 'function') ? getNodePage(node) : (node.global_page_index || 1);
         if (nodePage !== currentPage) return;
         if (filterType !== 'ALL' && node.type !== filterType) return;
         const bbox = node.bounding_box;
@@ -283,7 +315,10 @@ function renderQuadResizeHandles(svg, node, corners) {
         const hRect = createSvgElem('rect', {
             x: cd.pt.x - hs / 2, y: cd.pt.y - hs / 2, width: hs, height: hs,
             class: 'resize-handle corner',
-            style: `cursor: ${cd.cursor};`
+            style: `cursor: ${cd.cursor};`,
+            'data-node-id': node.node_id,
+            'data-handle-action': 'corner',
+            'data-corner-index': String(cd.cornerIndex)
         });
         hRect.onmousedown = (e) => onCornerHandleMouseDown(e, cd.cornerIndex, node.node_id);
         svg.appendChild(hRect);
@@ -301,8 +336,11 @@ function renderQuadResizeHandles(svg, node, corners) {
         const my = (ed.p1.y + ed.p2.y) / 2;
         const hRect = createSvgElem('rect', {
             x: mx - (hs - 2) / 2, y: my - (hs - 2) / 2, width: hs - 2, height: hs - 2,
-            class: 'resize-handle',
-            style: `cursor: ${ed.cursor};`
+            class: 'resize-handle edge',
+            style: `cursor: ${ed.cursor};`,
+            'data-node-id': node.node_id,
+            'data-handle-action': 'edge',
+            'data-edge-index': String(ed.edge)
         });
         hRect.onmousedown = (e) => onEdgeHandleMouseDown(e, ed.edge, node.node_id);
         svg.appendChild(hRect);

@@ -17,6 +17,7 @@ _JS_DIR = os.path.join(_VIEWER_DIR, "js")
 JS_MODULE_ORDER: List[str] = [
     "state.js",
     "controls.js",
+    "input_layers.js",
     "overlay.js",
     "inspector_components.js",
     "inspector.js",
