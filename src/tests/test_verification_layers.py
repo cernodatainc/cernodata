@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from src.dom import BoundingBox
+from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.orchestrator import PipelineOrchestrator, run_pipeline
 from src.pipeline.planner import DocumentPlan, PlannerCriteria, PresetPlanner
 from src.quality.layers import (
@@ -144,6 +145,10 @@ class TestVerificationLayers(unittest.TestCase):
         with patch("src.pipeline.attempt_runner.parse_document", return_value=dummy_dom):
             res = run_pipeline(
                 pdf_path="dummy.pdf",
+                target_threshold=DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
+                language="en",
+                preset="docling_fast",
+                align_skew=True,
                 output_dir=self.test_dir,
                 visualize=False,
                 verification_layers=["symbols"],

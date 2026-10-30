@@ -126,9 +126,13 @@ class TestDoclingOCRPresets(unittest.TestCase):
         with patch_pipeline_io(parse_return=mock_dom):
             res = run_pipeline(
                 pdf_path="test_dummy.pdf",
-                plan=plan,
+                target_threshold=0.99,
+                language="en",
+                preset="pypdfium_rapidocr",
+                align_skew=True,
+                visualize=False,
                 output_dir="test_output",
-                visualize=False
+                plan=plan,
             )
             self.assertIn("attempts", res["decision"])
             attempts = res["decision"]["attempts"]
@@ -170,9 +174,13 @@ class TestDoclingOCRPresets(unittest.TestCase):
         with patch_pipeline_io(parse_return=mock_dom, eval_side_effect=mock_eval_fn):
             res = run_pipeline(
                 pdf_path="test_multi.pdf",
-                plan=plan,
-                output_dir="test_output",
+                target_threshold=0.85,
+                language="en",
+                preset="docling_fast",
+                align_skew=True,
                 visualize=False,
+                output_dir="test_output",
+                plan=plan,
             )
             attempts = res["decision"].get("attempts", [])
             executed_presets = [a.get("preset") for a in attempts]

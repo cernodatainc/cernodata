@@ -179,9 +179,13 @@ class TestPlanner(unittest.TestCase):
         with patch_pipeline_io(parse_return=mock_dom):
             res = run_pipeline(
                 pdf_path="test.pdf",
-                plan=plan,
+                target_threshold=0.82,
+                language="pl",
+                preset="docling_fast",
+                align_skew=True,
+                visualize=False,
                 output_dir="test_output",
-                visualize=False
+                plan=plan,
             )
             self.assertIn("plan", res)
             self.assertIsNotNone(res["plan"])
@@ -267,6 +271,12 @@ class TestPlanner(unittest.TestCase):
         with patch_pipeline_io(parse_return=mock_dom):
             res = run_pipeline(
                 pdf_path="test.pdf",
+                target_threshold=0.82,
+                language="pl",
+                preset="docling_deep",
+                align_skew=True,
+                visualize=False,
+                output_dir="test_output",
                 config=cfg,
             )
             self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")

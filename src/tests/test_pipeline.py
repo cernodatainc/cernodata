@@ -6,6 +6,7 @@ Unit tests for DecisionTreeEngine and end-to-end orchestrator pipeline.
 
 import unittest
 from src.pipeline import DecisionTreeEngine, run_pipeline
+from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.tests.conftest import make_test_dom, patch_pipeline_io
 
 
@@ -38,7 +39,15 @@ class TestPipelineEngine(unittest.TestCase):
         dom_good = make_test_dom("piątku w piątku", document_id="doc_good", source_filename="test.pdf")
 
         with patch_pipeline_io(parse_side_effect=[dom_bad, dom_good]):
-            res = run_pipeline(pdf_path="test.pdf", language="pl", preset="docling_fast")
+            res = run_pipeline(
+                pdf_path="test.pdf",
+                target_threshold=DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
+                language="pl",
+                preset="docling_fast",
+                align_skew=True,
+                visualize=True,
+                output_dir="test_output",
+            )
             decision = res["decision"]
             self.assertIn("attempts", decision)
             attempts = decision["attempts"]
@@ -65,6 +74,9 @@ class TestPipelineEngine(unittest.TestCase):
                 language="pl",
                 preset="docling_fast",
                 target_threshold=0.85,
+                align_skew=True,
+                visualize=True,
+                output_dir="test_output",
                 progress_callback=progress_cb,
             )
 
