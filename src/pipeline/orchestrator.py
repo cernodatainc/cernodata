@@ -100,7 +100,8 @@ class PipelineOrchestrator:
         )
 
         status_str = str(decision.get("status", "ACCEPT"))
-        score_val = float(decision.get("overall_confidence", 1.0) or 1.0)
+        raw_confidence = decision.get("overall_confidence")
+        score_val = 1.0 if raw_confidence is None else float(raw_confidence)
         notifier.notify_complete(status_str, score_val, len(violations))
 
         return result
@@ -135,13 +136,13 @@ class PipelineOrchestrator:
 
     def run(
         self,
-        pdf_path: Optional[str] = None,
-        target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-        language: Optional[str] = "en",
-        preset: str = "docling_fast",
-        align_skew: bool = True,
-        visualize: bool = True,
-        output_dir: str = "output",
+        pdf_path: Optional[str],
+        target_threshold: float,
+        language: Optional[str],
+        preset: str,
+        align_skew: bool,
+        visualize: bool,
+        output_dir: str,
         plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
         config: Optional[IngestionConfig] = None,
         verification_layers: Optional[Sequence[str]] = None,
@@ -171,13 +172,13 @@ class PipelineOrchestrator:
 
 
 def run_pipeline(
-    pdf_path: Optional[str] = None,
-    target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-    language: Optional[str] = "en",
-    preset: str = "docling_fast",
-    align_skew: bool = True,
-    visualize: bool = True,
-    output_dir: str = "output",
+    pdf_path: Optional[str],
+    target_threshold: float,
+    language: Optional[str],
+    preset: str,
+    align_skew: bool,
+    visualize: bool,
+    output_dir: str,
     plan: Optional[Union[str, Dict[str, Any], DocumentPlan]] = None,
     config: Optional[IngestionConfig] = None,
     verification_layers: Optional[Sequence[str]] = None,

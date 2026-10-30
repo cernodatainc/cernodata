@@ -30,8 +30,8 @@ class AttemptRunner:
         self,
         pdf_path: str,
         config: IngestionConfig,
-        curr_score: float = 0.90,
-        next_score: float = 0.72,
+        curr_score: float,
+        next_score: float,
     ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
         """Executes a single extraction attempt: parse -> skew align -> quality evaluate."""
         dom = self._parse_fn(pdf_path, config=config)

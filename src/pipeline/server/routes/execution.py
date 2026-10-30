@@ -9,12 +9,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 
 if TYPE_CHECKING:
     from src.pipeline.execution_models import PipelineExecutionResult
+
+RUN_OUTPUT_DIR = "output"
 
 
 class ExecutionRoutesMixin(BaseApiRoutesMixin):
@@ -195,6 +198,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 preset=preset,
                 align_skew=align_skew,
                 visualize=visualize,
+                output_dir=RUN_OUTPUT_DIR,
                 plan=plan_obj,
                 verification_layers=resolved_run_layers,
                 progress_callback=on_progress,
@@ -269,8 +273,12 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         def _execute_rerun() -> PipelineExecutionResult:
             res = run_pipeline(
                 pdf_path=pdf_path,
-                preset=preset,
+                target_threshold=DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
                 language=language,
+                preset=preset,
+                align_skew=True,
+                visualize=True,
+                output_dir=RUN_OUTPUT_DIR,
                 progress_callback=on_progress,
             )
             session.update_result_state(res, pdf_path=pdf_path, language=language)

@@ -13,16 +13,17 @@ import ast
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 
 def extract_internal_imports(file_path: Path, repo_root: Path) -> Set[str]:
-    """Parses a Python file and returns a set of imported internal module paths."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            tree = ast.parse(f.read(), filename=str(file_path))
-    except Exception:
-        return set()
+    """Parses a Python file and returns a set of imported internal module paths.
+
+    Raises OSError, UnicodeDecodeError or SyntaxError if the file cannot be read or parsed,
+    so that a broken file is never mistaken for a file with no imports.
+    """
+    with open(file_path, "r", encoding="utf-8") as f:
+        tree = ast.parse(f.read(), filename=str(file_path))
 
     imported: Set[str] = set()
     for node in ast.walk(tree):
@@ -61,21 +62,37 @@ def build_dependency_graph(repo_root: Path) -> Dict[str, Set[str]]:
     return graph
 
 
+PLANNER_FORBIDDEN_PREFIXES: Dict[str, str] = {
+    "src.pipeline.orchestrator": "orchestrator",
+    "src.visualization": "visualization",
+    "src.pipeline.server": "server/viewer",
+}
+
+
+def _is_planner_module(mod_id: str) -> bool:
+    """Returns True if the module belongs to the siloed planner subsystem."""
+    planner_shims = {"src.pipeline.planner_models", "src.pipeline.planner_options", "src.pipeline.planner_wizard"}
+    return mod_id == "src.pipeline.planner" or mod_id.startswith("src.pipeline.planner.") or mod_id in planner_shims
+
+
+def forbidden_planner_dependency(dep: str) -> Optional[str]:
+    """Returns the forbidden subsystem label if the module path falls under a forbidden prefix, else None."""
+    for prefix, label in PLANNER_FORBIDDEN_PREFIXES.items():
+        if dep == prefix or dep.startswith(prefix + ".") or dep.startswith(prefix + "_"):
+            return label
+    return None
+
+
 def verify_planner_silo(graph: Dict[str, Set[str]]) -> List[str]:
     """Verifies that planner modules are strictly siloed from orchestrator and viewer."""
     violations: List[str] = []
-    planner_shims = {"src.pipeline.planner_models", "src.pipeline.planner_options", "src.pipeline.planner_wizard"}
     for mod_id, dependencies in graph.items():
-        is_planner = mod_id == "src.pipeline.planner" or mod_id.startswith("src.pipeline.planner.") or mod_id in planner_shims
-        if not is_planner:
+        if not _is_planner_module(mod_id):
             continue
-        for dep in dependencies:
-            if "orchestrator" in dep:
-                violations.append(f"Silo Violation: '{mod_id}' imports orchestrator module '{dep}'")
-            if "visualization" in dep:
-                violations.append(f"Silo Violation: '{mod_id}' imports visualization module '{dep}'")
-            if "src.pipeline.server" in dep:
-                violations.append(f"Silo Violation: '{mod_id}' imports server/viewer module '{dep}'")
+        for dep in sorted(dependencies):
+            label = forbidden_planner_dependency(dep)
+            if label is not None:
+                violations.append(f"Silo Violation: '{mod_id}' imports {label} module '{dep}'")
     return violations
 
 
@@ -133,8 +150,8 @@ def generate_dot_graph(graph: Dict[str, Set[str]], title: str = "cernodata Depen
         for dep in sorted(deps):
             target = dep if dep in graph else next((c for c in graph if dep.startswith(c)), None)
             if target and target != src_mod:
-                is_planner = src_mod.startswith("src.pipeline.planner")
-                is_illegal = any(k in target for k in ("orchestrator", "server", "visualization"))
+                is_planner = _is_planner_module(src_mod)
+                is_illegal = forbidden_planner_dependency(target) is not None
                 if is_planner and is_illegal:
                     lines.append(f'    "{src_mod}" -> "{target}" [color="#DC2626", penwidth=2.5, style="dashed", label="VIOLATION"];')
                 else:

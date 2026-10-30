@@ -70,7 +70,7 @@ def check_type_annotations(root_dir: Path) -> int:
             with open(py_file, "r", encoding="utf-8") as f:
                 tree = ast.parse(f.read(), filename=str(py_file))
             TypeInspector(str(py_file)).visit(tree)
-        except Exception as ex:
+        except (OSError, SyntaxError, UnicodeDecodeError) as ex:
             missing.append((str(py_file), 0, f"Parse error: {ex}"))
 
     if missing:
@@ -99,7 +99,11 @@ def check_hygiene(root_dir: Path) -> int:
 
 def check_architectural_silos(root_dir: Path) -> int:
     """Verifies architectural silo invariants (planner is strictly siloed)."""
-    graph = build_dependency_graph(root_dir)
+    try:
+        graph = build_dependency_graph(root_dir)
+    except (OSError, SyntaxError, UnicodeDecodeError) as ex:
+        print(f"[FAIL] Could not build dependency graph: {ex}")
+        return 1
     violations = verify_planner_silo(graph)
     if violations:
         print(f"[FAIL] Architectural silo violations detected ({len(violations)}):")
