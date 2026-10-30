@@ -6,21 +6,25 @@ Helper functions for Docling item normalization, bounding box translation, and c
 
 import logging
 import re
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Tuple
 from src.dom.enums import DOMNodeType
 from src.quality.language_config import get_language_config
 
 logger = logging.getLogger("cernodata.parsers.docling_helpers")
 
-LANG_CODE_MAP = {
+DEFAULT_PAGE_HEIGHT_PT = 792.0  # US Letter page height in points
+
+_ALL_LANGS: List[str] = ["pl", "de", "fr", "es", "en"]
+
+LANG_CODE_MAP: Dict[str, List[str]] = {
     "pl": ["pl", "pol"],
     "de": ["de", "deu"],
     "fr": ["fr", "fra"],
     "es": ["es", "spa"],
     "en": ["en", "eng"],
-    "auto": ["pl", "de", "fr", "es", "en"],
-    "": ["pl", "de", "fr", "es", "en"],
-    "none": ["pl", "de", "fr", "es", "en"],
+    "auto": list(_ALL_LANGS),
+    "": list(_ALL_LANGS),
+    "none": list(_ALL_LANGS),
 }
 
 # Docling emits DocItemLabel values such as "section_header" and "page_header". Exact labels
@@ -55,12 +59,12 @@ def extract_page_no_and_bbox(doc: Any, item: Any, prov_item: Any) -> Tuple[int, 
         return page_no, 0.0, 0.0, 0.0, 0.0
 
     bbox = prov_item.bbox
-    page_height = 792.0
+    page_height = DEFAULT_PAGE_HEIGHT_PT
     if hasattr(doc, "pages") and doc.pages:
         if isinstance(doc.pages, dict) and page_no in doc.pages:
-            page_height = getattr(doc.pages[page_no].size, "height", 792.0)
+            page_height = getattr(doc.pages[page_no].size, "height", DEFAULT_PAGE_HEIGHT_PT)
         elif isinstance(doc.pages, list) and 0 <= page_no - 1 < len(doc.pages):
-            page_height = getattr(doc.pages[page_no - 1].size, "height", 792.0)
+            page_height = getattr(doc.pages[page_no - 1].size, "height", DEFAULT_PAGE_HEIGHT_PT)
 
     if hasattr(bbox, "to_top_left_origin"):
         try:

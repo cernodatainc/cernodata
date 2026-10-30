@@ -23,21 +23,18 @@ class _StubLabel(str, Enum):
 
 class TestResolveNodeType(unittest.TestCase):
 
-    def test_section_header_is_heading(self):
-        self.assertEqual(_resolve_node_type(_StubItem("section_header")), "heading")
-
-    def test_title_is_heading(self):
-        self.assertEqual(_resolve_node_type(_StubItem("title")), "heading")
-
-    def test_page_header_and_footer_are_header_footer(self):
-        self.assertEqual(_resolve_node_type(_StubItem("page_header")), "header_footer")
-        self.assertEqual(_resolve_node_type(_StubItem("page_footer")), "header_footer")
-
-    def test_table_is_table_grid(self):
-        self.assertEqual(_resolve_node_type(_StubItem("table")), "table_grid")
-
-    def test_picture_is_figure(self):
-        self.assertEqual(_resolve_node_type(_StubItem("picture")), "figure")
+    def test_exact_labels_resolve_to_node_types(self):
+        cases = (
+            ("section_header", "heading"),
+            ("title", "heading"),
+            ("page_header", "header_footer"),
+            ("page_footer", "header_footer"),
+            ("table", "table_grid"),
+            ("picture", "figure"),
+        )
+        for label, expected in cases:
+            with self.subTest(label=label):
+                self.assertEqual(_resolve_node_type(_StubItem(label)), expected)
 
     def test_body_text_labels_are_paragraph(self):
         for label in ("text", "paragraph", "list_item", "caption", "footnote"):

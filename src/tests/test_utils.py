@@ -37,11 +37,16 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(bare_filename_dir, "")
         mkdirs(bare_filename_dir)
 
-    def test_mkdirs_creates_valid_directory(self) -> None:
-        target_path = os.path.join(self.test_dir, "nested", "output_dir")
-        self.assertFalse(os.path.exists(target_path))
-        mkdirs(target_path)
-        self.assertTrue(os.path.isdir(target_path))
+    def test_mkdirs_creates_nested_directory_from_str_and_pathlib(self) -> None:
+        targets = (
+            os.path.join(self.test_dir, "nested", "output_dir"),
+            Path(self.test_dir) / "from_pathlib" / "sub",
+        )
+        for target_path in targets:
+            with self.subTest(type=type(target_path).__name__):
+                self.assertFalse(os.path.exists(target_path))
+                mkdirs(target_path)
+                self.assertTrue(os.path.isdir(target_path))
 
     def test_mkdirs_existing_directory_succeeds(self) -> None:
         target_path = os.path.join(self.test_dir, "existing_dir")
@@ -49,12 +54,6 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(os.path.isdir(target_path))
         mkdirs(target_path, exist_ok=True)
         self.assertTrue(os.path.isdir(target_path))
-
-    def test_mkdirs_with_pathlib_instance(self) -> None:
-        target_path = Path(self.test_dir) / "from_pathlib" / "sub"
-        self.assertFalse(target_path.exists())
-        mkdirs(target_path)
-        self.assertTrue(target_path.is_dir())
 
     def test_find_available_port(self) -> None:
         port = find_available_port(start_port=8200, max_attempts=20)

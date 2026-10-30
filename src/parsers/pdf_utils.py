@@ -11,7 +11,6 @@ from typing import Iterator, Optional, Any, List, Dict
 
 logger = logging.getLogger("cernodata.pdf_utils")
 
-HAS_PYPDFIUM = False
 try:
     import pypdfium2
     HAS_PYPDFIUM = True

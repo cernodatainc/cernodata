@@ -4,6 +4,7 @@ src/utils.py
 Shared utility functions for file system operations.
 """
 
+import hashlib
 import json
 import os
 import socket
@@ -30,10 +31,14 @@ def safe_load_json(file_path: str, default: Any = None) -> Any:
         return default
 
 
+_DOC_ID_MODULUS = 1_000_000
+
+
 def generate_document_id(source_filename: str) -> str:
-    """Generates a standardized pseudo-unique document ID from a source filename."""
+    """Generates a stable pseudo-unique document ID from a source filename."""
     base_name = os.path.basename(source_filename)
-    return f"doc_{abs(hash(base_name)) % 1000000:06d}"
+    digest = hashlib.sha1(base_name.encode("utf-8")).hexdigest()
+    return f"doc_{int(digest, 16) % _DOC_ID_MODULUS:06d}"
 
 
 def resolve_pdf_path(path: str) -> str:
@@ -103,9 +108,7 @@ def mkdirs(
     Recursively creates directories like os.makedirs, safely ignoring
     empty strings and None paths.
     """
-    if not path:
-        return
-    path_str = os.fspath(path)
+    path_str = os.fspath(path) if path is not None else ""
     if not path_str:
         return
     os.makedirs(path_str, mode=mode, exist_ok=exist_ok)

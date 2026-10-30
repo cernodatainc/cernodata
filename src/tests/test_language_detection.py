@@ -19,35 +19,19 @@ from src.pipeline import DecisionTreeEngine
 
 class TestLanguageDetection(unittest.TestCase):
 
-    def test_detect_text_language_polish(self):
-        pl_text = "Sprawdź termin wykupu swoich obligacji i zamień je na nowe w piątku."
-        lang, conf, scores = detect_text_language(pl_text)
-        self.assertEqual(lang, "pl")
-        self.assertGreater(conf, 0.3)
-
-    def test_detect_text_language_english(self):
-        en_text = "Automated PDF extraction pipeline with confidence-guided decision tree."
-        lang, conf, scores = detect_text_language(en_text)
-        self.assertEqual(lang, "en")
-        self.assertGreater(conf, 0.4)
-
-    def test_detect_text_language_french(self):
-        fr_text = "Le présent document atteste de la conformité aux normes françaises."
-        lang, conf, scores = detect_text_language(fr_text)
-        self.assertEqual(lang, "fr")
-        self.assertGreater(conf, 0.3)
-
-    def test_detect_text_language_german(self):
-        de_text = "Die Bestätigung der Angaben erfolgt durch die zuständige Behörde."
-        lang, conf, scores = detect_text_language(de_text)
-        self.assertEqual(lang, "de")
-        self.assertGreater(conf, 0.3)
-
-    def test_detect_text_language_spanish(self):
-        es_text = "El presente documento certifica la recepción de los fondos en la cuenta."
-        lang, conf, scores = detect_text_language(es_text)
-        self.assertEqual(lang, "es")
-        self.assertGreater(conf, 0.3)
+    def test_detect_text_language_by_language(self):
+        cases = (
+            ("pl", "Sprawdź termin wykupu swoich obligacji i zamień je na nowe w piątku.", 0.3),
+            ("en", "Automated PDF extraction pipeline with confidence-guided decision tree.", 0.4),
+            ("fr", "Le présent document atteste de la conformité aux normes françaises.", 0.3),
+            ("de", "Die Bestätigung der Angaben erfolgt durch die zuständige Behörde.", 0.3),
+            ("es", "El presente documento certifica la recepción de los fondos en la cuenta.", 0.3),
+        )
+        for expected_lang, text, min_conf in cases:
+            with self.subTest(lang=expected_lang):
+                lang, conf, _ = detect_text_language(text)
+                self.assertEqual(lang, expected_lang)
+                self.assertGreater(conf, min_conf)
 
     def test_detect_page_language(self):
         nodes = [
