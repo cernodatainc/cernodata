@@ -18,11 +18,11 @@ import ast
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import Callable
 
-_repo_root = Path(__file__).resolve().parents[2]
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from src.meta_checks.check_ast import run_checks as check_ast
 from src.meta_checks.check_emojis import check_files as check_emojis
@@ -30,46 +30,53 @@ from src.meta_checks.file_hygiene import run_meta_checks
 from src.meta_checks.visualize_dependencies import build_dependency_graph, verify_planner_silo
 
 
+class TypeInspector(ast.NodeVisitor):
+    """Collects functions lacking complete type annotations into a shared issue list."""
+
+    def __init__(self, filename: str, issues: list[tuple[str, int, str]]) -> None:
+        self.filename = filename
+        self.issues = issues
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._check_fn(node)
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._check_fn(node)
+        self.generic_visit(node)
+
+    def _report(self, node: ast.FunctionDef | ast.AsyncFunctionDef, desc: str) -> None:
+        self.issues.append((self.filename, node.lineno, f"{node.name}{desc}"))
+
+    def _check_fn(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        if node.returns is None:
+            self._report(node, ": missing return type annotation")
+        positional = [*node.args.posonlyargs, *node.args.args]
+        for arg in positional:
+            if arg.arg in ("self", "cls"):
+                continue
+            if arg.annotation is None:
+                self._report(node, f"({arg.arg}): missing argument type annotation")
+        for arg in node.args.kwonlyargs:
+            if arg.annotation is None:
+                self._report(node, f"({arg.arg}): missing kwonly argument type annotation")
+        if node.args.vararg and node.args.vararg.annotation is None:
+            self._report(node, f"(*{node.args.vararg.arg}): missing *args annotation")
+        if node.args.kwarg and node.args.kwarg.annotation is None:
+            self._report(node, f"(**{node.args.kwarg.arg}): missing **kwargs annotation")
+
+
 def check_type_annotations(root_dir: Path) -> int:
     """Verifies that all functions and methods in non-test Python files have complete type annotations."""
-    missing: List[Tuple[str, int, str]] = []
-
-    class TypeInspector(ast.NodeVisitor):
-        def __init__(self, filename: str) -> None:
-            self.filename = filename
-
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            self._check_fn(node)
-            self.generic_visit(node)
-
-        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            self._check_fn(node)
-            self.generic_visit(node)
-
-        def _check_fn(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-            if node.returns is None:
-                missing.append((self.filename, node.lineno, f"{node.name}: missing return type annotation"))
-            for arg in node.args.args:
-                if arg.arg in ("self", "cls"):
-                    continue
-                if arg.annotation is None:
-                    missing.append((self.filename, node.lineno, f"{node.name}({arg.arg}): missing argument type annotation"))
-            for arg in node.args.kwonlyargs:
-                if arg.annotation is None:
-                    missing.append((self.filename, node.lineno, f"{node.name}({arg.arg}): missing kwonly argument type annotation"))
-            if node.args.vararg and node.args.vararg.annotation is None:
-                missing.append((self.filename, node.lineno, f"{node.name}(*{node.args.vararg.arg}): missing *args annotation"))
-            if node.args.kwarg and node.args.kwarg.annotation is None:
-                missing.append((self.filename, node.lineno, f"{node.name}(**{node.args.kwarg.arg}): missing **kwargs annotation"))
+    missing: list[tuple[str, int, str]] = []
 
     src_dir = root_dir / "src"
     for py_file in src_dir.rglob("*.py"):
         if "tests" in py_file.parts:
             continue
         try:
-            with open(py_file, "r", encoding="utf-8") as f:
-                tree = ast.parse(f.read(), filename=str(py_file))
-            TypeInspector(str(py_file)).visit(tree)
+            tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+            TypeInspector(str(py_file), missing).visit(tree)
         except (OSError, SyntaxError, UnicodeDecodeError) as ex:
             missing.append((str(py_file), 0, f"Parse error: {ex}"))
 
@@ -114,7 +121,7 @@ def check_architectural_silos(root_dir: Path) -> int:
     return 0
 
 
-def run_command(cmd: List[str], desc: str, cwd: Path) -> int:
+def run_command(cmd: list[str], desc: str, cwd: Path) -> int:
     """Executes a command line tool and prints status."""
     print(f"\n--- Running: {desc} ({' '.join(cmd)}) ---")
     res = subprocess.run(cmd, cwd=cwd)
@@ -126,49 +133,33 @@ def run_command(cmd: List[str], desc: str, cwd: Path) -> int:
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = REPO_ROOT
 
     print("====================================================================")
     print("cernodata Quality Verification Suite")
     print("====================================================================")
 
-    # 1. Emoji ban
-    print("\n--- Gate 1: Strict Emoji Ban Compliance ---")
-    if check_emojis(repo_root) != 0:
-        return 1
+    # Static gates: (header, check callable). Tool gates below print their own headers.
+    static_gates: list[tuple[str, Callable[[], int]]] = [
+        ("Gate 1: Strict Emoji Ban Compliance", lambda: check_emojis(repo_root)),
+        ("Gate 2: File Hygiene & Asset Policies", lambda: check_hygiene(repo_root)),
+        ("Gate 3: Type Annotation Completeness", lambda: check_type_annotations(repo_root)),
+        ("Gate 4: AST Integrity and Code Hygiene", lambda: check_ast(str(repo_root / "src"))),
+        ("Gate 5: Architectural Silo Invariants", lambda: check_architectural_silos(repo_root)),
+    ]
+    for header, gate in static_gates:
+        print(f"\n--- {header} ---")
+        if gate() != 0:
+            return 1
 
-    # 2. File hygiene & inline CSS/JS
-    print("\n--- Gate 2: File Hygiene & Asset Policies ---")
-    if check_hygiene(repo_root) != 0:
-        return 1
-
-    # 3. Type annotation completeness
-    print("\n--- Gate 3: Type Annotation Completeness ---")
-    if check_type_annotations(repo_root) != 0:
-        return 1
-
-    # 4. AST integrity and code hygiene
-    print("\n--- Gate 4: AST Integrity and Code Hygiene ---")
-    if check_ast(str(repo_root / "src")) != 0:
-        return 1
-
-    # 5. Architectural silos
-    print("\n--- Gate 5: Architectural Silo Invariants ---")
-    if check_architectural_silos(repo_root) != 0:
-        return 1
-
-    # 6. Ruff linting
-    if run_command([sys.executable, "-m", "ruff", "check", "src/"], "Ruff Linter", repo_root) != 0:
-        return 1
-
-    # 7. Mypy static type checking
-    if run_command([sys.executable, "-m", "mypy"], "Mypy Type Checker", repo_root) != 0:
-        return 1
-
-    # 8. Pytest test suite
-    test_cmd = [sys.executable, "-m", "pytest", "-q"]
-    if run_command(test_cmd, "Pytest Test Suite", repo_root) != 0:
-        return 1
+    tool_gates: list[tuple[list[str], str]] = [
+        ([sys.executable, "-m", "ruff", "check", "src/"], "Ruff Linter"),
+        ([sys.executable, "-m", "mypy"], "Mypy Type Checker"),
+        ([sys.executable, "-m", "pytest", "-q"], "Pytest Test Suite"),
+    ]
+    for cmd, desc in tool_gates:
+        if run_command(cmd, desc, repo_root) != 0:
+            return 1
 
     print("\n====================================================================")
     print("[SUCCESS] All repository quality gates passed.")

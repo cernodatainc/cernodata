@@ -3,99 +3,38 @@ src/pipeline/server/artifacts.py
 
 Pipeline artifact loading, schema normalization, decision extraction,
 and visual viewer dataset compilation for server consumption.
+
+Data containers live in artifact_models.py and page image loading lives in
+page_images.py; both are re-exported here for backward compatibility.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Optional
 
 from src.pipeline.artifact_registry import default_artifact_registry
 from src.pipeline.execution_models import AttemptRecord
+from src.pipeline.server.artifact_models import RunArtifacts, ViewerDataset
+from src.pipeline.server.page_images import load_or_render_page_images
 from src.utils import safe_load_json
 
 logger = logging.getLogger("cernodata.server.artifacts")
 
-
-@dataclass
-class RunArtifacts:
-    """Strongly-typed container for loaded pipeline execution artifacts."""
-    plan_execution_result: Dict[str, Any] = field(default_factory=dict)
-    plan: Optional[Dict[str, Any]] = None
-    decision: Dict[str, Any] = field(default_factory=dict)
-    dom: Dict[str, Any] = field(default_factory=dict)
-    raw_dom: Dict[str, Any] = field(default_factory=dict)
-    diff: Dict[str, Any] = field(default_factory=dict)
-    violations: List[Dict[str, Any]] = field(default_factory=list)
-    verification_result: Dict[str, Any] = field(default_factory=dict)
-    artifacts: Dict[str, Any] = field(default_factory=dict)
-    chosen_preset: str = "N/A"
-    status: str = "ACCEPT"
-    overall_confidence: Optional[float] = None
-    document_path: str = ""
-    document_name: str = "Unknown"
-
-    def __getitem__(self, key: str) -> Any:
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            if key in self.artifacts:
-                return self.artifacts[key]
-            raise KeyError(key)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        if hasattr(self, key):
-            return getattr(self, key)
-        return self.artifacts.get(key, default)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serializes artifacts to dictionary mapping."""
-        res = {
-            "plan_execution_result": self.plan_execution_result,
-            "plan": self.plan,
-            "decision": self.decision,
-            "dom": self.dom,
-            "raw_dom": self.raw_dom,
-            "diff": self.diff,
-            "violations": self.violations,
-            "verification_result": self.verification_result,
-            "chosen_preset": self.chosen_preset,
-            "status": self.status,
-            "overall_confidence": self.overall_confidence,
-            "document_path": self.document_path,
-            "document_name": self.document_name,
-        }
-        if self.artifacts:
-            res["artifacts"] = self.artifacts
-            for k, v in self.artifacts.items():
-                res.setdefault(k, v)
-        return res
-
-
-class ViewerDataset(TypedDict, total=False):
-    """Strongly-typed dataset schema required to hydrate interactive visual viewer."""
-    dom: Dict[str, Any]
-    raw_dom: Dict[str, Any]
-    diff: Dict[str, Any]
-    violations: List[Dict[str, Any]]
-    decision: Dict[str, Any]
-    detectedLanguages: Dict[str, Any]
-    plan: Optional[Dict[str, Any]]
-    pdfSourceFile: str
-    activeLanguage: str
-    pageImages: List[str]
-    pageDimensions: List[Dict[str, float]]
-    totalPages: int
-    outputDir: str
-    verificationResult: Dict[str, Any]
-    verificationLayers: List[str]
-    layerScores: Dict[str, float]
-    activeStep: Optional[int]
+__all__ = [
+    "RunArtifacts",
+    "ViewerDataset",
+    "build_viewer_dataset",
+    "calculate_progress_step",
+    "create_preset_attempt_record",
+    "extract_decision_from_html",
+    "load_or_render_page_images",
+    "load_run_artifacts",
+    "normalize_violations",
+]
 
 
 def normalize_violations(raw_violations: Any) -> List[Dict[str, Any]]:
@@ -142,6 +81,77 @@ def extract_decision_from_html(html_path: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _resolve_decision(
+    run_dir: str,
+    plan_res_path: str,
+    plan_res_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Resolves the decision payload from saved JSON, plan result, or embedded viewer HTML."""
+    saved_dec = safe_load_json(os.path.join(run_dir, "decision_tree.json"), {})
+    decision_data: Dict[str, Any] = saved_dec if saved_dec else (
+        plan_res_data.get("decision") or {}
+    )
+
+    html_path = os.path.join(run_dir, "interactive_viewer.html")
+    html_decision = extract_decision_from_html(html_path)
+    if html_decision and not saved_dec:
+        plan_mtime = os.path.getmtime(plan_res_path) if os.path.exists(plan_res_path) else 0.0
+        html_mtime = os.path.getmtime(html_path)
+        dec_page_count = len(decision_data.get("per_page_confidence", {})) if decision_data else 0
+        html_page_count = len(html_decision.get("per_page_confidence", {}))
+
+        # Favor HTML decision if plan_execution_result was missing, HTML is newer, or HTML has more page scores
+        if not decision_data or html_mtime > plan_mtime or html_page_count > dec_page_count:
+            decision_data = html_decision
+    return decision_data
+
+
+def _backfill_page_confidence(
+    decision_data: Dict[str, Any],
+    dom_data: Dict[str, Any],
+    violations: List[Dict[str, Any]],
+) -> None:
+    """Computes confidence for pages missing from the decision, mutating decision_data in place."""
+    total_pages = int(dom_data.get("total_pages", 1) or 1)
+    per_page_conf = dict(decision_data.get("per_page_confidence", {}))
+    missing_pages = [p for p in range(1, total_pages + 1) if str(p) not in per_page_conf and p not in per_page_conf]
+
+    if not (missing_pages and dom_data.get("nodes")):
+        return
+    try:
+        from src.dom import DocumentDOM
+        from src.quality import evaluate_document_confidence
+        temp_dom = DocumentDOM.from_dict(dom_data)
+        metrics = evaluate_document_confidence(temp_dom, language=decision_data.get("language") or "en")
+        for p, sc in metrics.get("per_page_confidence", {}).items():
+            if str(p) not in per_page_conf and p not in per_page_conf:
+                per_page_conf[str(p)] = sc
+        decision_data["per_page_confidence"] = per_page_conf
+        if (decision_data.get("overall_confidence") == 1.0 or not decision_data.get("overall_confidence")) and violations:
+            decision_data["overall_confidence"] = metrics.get("overall_confidence", 1.0)
+    except Exception as e:
+        logger.debug("Could not compute fallback per-page confidence: %s", e)
+
+
+def _resolve_document_identity(
+    plan_data: Optional[Dict[str, Any]],
+    dom_data: Dict[str, Any],
+    chosen_preset: str,
+) -> tuple[str, str, str]:
+    """Returns (document_path, document_name, chosen_preset) using plan and DOM fallbacks."""
+    doc_path = ""
+    if plan_data:
+        doc_path = plan_data.get("document_path", "")
+        if chosen_preset == "N/A":
+            chosen_preset = plan_data.get("primary_preset", "N/A")
+
+    if not doc_path and dom_data.get("source_filename"):
+        doc_path = dom_data["source_filename"]
+
+    doc_name = os.path.basename(doc_path) if doc_path else "Unknown"
+    return doc_path, doc_name, chosen_preset
+
+
 def load_run_artifacts(run_dir: str) -> RunArtifacts:
     """
     Loads and coalesces pipeline execution artifacts from an output directory.
@@ -158,68 +168,22 @@ def load_run_artifacts(run_dir: str) -> RunArtifacts:
     plan_res_path = os.path.join(run_dir, "plan_execution_result.json")
     plan_res_data: Dict[str, Any] = safe_load_json(plan_res_path, {})
     plan_data: Optional[Dict[str, Any]] = plan_res_data.get("plan") or safe_load_json(os.path.join(run_dir, "plan.json"))
-    dec_tree_path = os.path.join(run_dir, "decision_tree.json")
-    saved_dec = safe_load_json(dec_tree_path, {})
-    decision_data: Dict[str, Any] = saved_dec if saved_dec else (
-        plan_res_data.get("decision") or {}
-    )
     dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "document_dom.json"), {})
     raw_dom_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "raw_document_dom.json"), {}) or dom_data
     diff_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "run_diff.json"), {})
+    verif_res_data: Dict[str, Any] = safe_load_json(os.path.join(run_dir, "verification_result.json"), {})
 
-    verif_res_path = os.path.join(run_dir, "verification_result.json")
-    verif_res_data: Dict[str, Any] = safe_load_json(verif_res_path, {})
-
-    q_viols_path = os.path.join(run_dir, "quality_violations.json")
-    saved_viols = safe_load_json(q_viols_path, None)
+    saved_viols = safe_load_json(os.path.join(run_dir, "quality_violations.json"), None)
     raw_viols = saved_viols if saved_viols is not None else plan_res_data.get("violations", [])
     violations = normalize_violations(raw_viols)
 
-    html_path = os.path.join(run_dir, "interactive_viewer.html")
-    html_decision = extract_decision_from_html(html_path)
-    if html_decision and not saved_dec:
-        plan_mtime = os.path.getmtime(plan_res_path) if os.path.exists(plan_res_path) else 0.0
-        html_mtime = os.path.getmtime(html_path)
-        dec_page_count = len(decision_data.get("per_page_confidence", {})) if decision_data else 0
-        html_page_count = len(html_decision.get("per_page_confidence", {}))
-
-        # Favor HTML decision if plan_execution_result was missing, HTML is newer, or HTML has more page scores
-        if not decision_data or html_mtime > plan_mtime or html_page_count > dec_page_count:
-            decision_data = html_decision
-
-    total_pages = int(dom_data.get("total_pages", 1) or 1)
-    per_page_conf = dict(decision_data.get("per_page_confidence", {}))
-    missing_pages = [p for p in range(1, total_pages + 1) if str(p) not in per_page_conf and p not in per_page_conf]
-
-    if missing_pages and dom_data.get("nodes"):
-        try:
-            from src.dom import DocumentDOM
-            from src.quality import evaluate_document_confidence
-            temp_dom = DocumentDOM.from_dict(dom_data)
-            metrics = evaluate_document_confidence(temp_dom, language=decision_data.get("language") or "en")
-            for p, sc in metrics.get("per_page_confidence", {}).items():
-                if str(p) not in per_page_conf and p not in per_page_conf:
-                    per_page_conf[str(p)] = sc
-            decision_data["per_page_confidence"] = per_page_conf
-            if (decision_data.get("overall_confidence") == 1.0 or not decision_data.get("overall_confidence")) and violations:
-                decision_data["overall_confidence"] = metrics.get("overall_confidence", 1.0)
-        except Exception as e:
-            logger.debug("Could not compute fallback per-page confidence: %s", e)
+    decision_data = _resolve_decision(run_dir, plan_res_path, plan_res_data)
+    _backfill_page_confidence(decision_data, dom_data, violations)
 
     chosen_preset = decision_data.get("chosen_preset") or plan_res_data.get("chosen_preset", "N/A")
     status = decision_data.get("status") or plan_res_data.get("status", "ACCEPT")
     overall_confidence = decision_data.get("overall_confidence")
-
-    doc_path = ""
-    if plan_data:
-        doc_path = plan_data.get("document_path", "")
-        if chosen_preset == "N/A":
-            chosen_preset = plan_data.get("primary_preset", "N/A")
-
-    if not doc_path and dom_data.get("source_filename"):
-        doc_path = dom_data["source_filename"]
-
-    doc_name = os.path.basename(doc_path) if doc_path else "Unknown"
+    doc_path, doc_name, chosen_preset = _resolve_document_identity(plan_data, dom_data, chosen_preset)
 
     return RunArtifacts(
         plan_execution_result=plan_res_data,
@@ -329,83 +293,6 @@ def build_viewer_dataset(
         "layerScores": dict(layer_scores),
     }
     return dataset
-
-
-def load_or_render_page_images(
-    pdf_path: str,
-    target_dir: str,
-    total_pages: int,
-) -> Tuple[List[str], List[Dict[str, float]]]:
-    """
-    Renders PDF pages to base64 images and gets dimensions, falling back
-    to pre-rendered overlay image files if direct rendering fails or is unavailable.
-
-    Args:
-        pdf_path: Path to source PDF document.
-        target_dir: Output directory containing cached overlay images.
-        total_pages: Expected page count.
-
-    Returns:
-        Tuple of (page_images_base64_list, page_dimensions_list).
-    """
-    page_images: List[str] = []
-    page_dimensions: List[Dict[str, float]] = []
-
-    # 1. Direct rendering from PDF if it exists on disk
-    if pdf_path and os.path.exists(pdf_path):
-        try:
-            from src.visualization.viewer.pdf_renderer import (
-                get_pdf_page_dimensions,
-                render_all_pages_to_base64,
-            )
-
-            page_images = render_all_pages_to_base64(pdf_path, total_pages=total_pages)
-            page_dimensions = get_pdf_page_dimensions(pdf_path)
-        except Exception as e:
-            logger.warning("Could not render page images for %s: %s", pdf_path, e)
-
-    # 2. If page dimensions still missing, inspect interactive_viewer.html in target_dir
-    if not page_dimensions:
-        viewer_html_path = os.path.join(target_dir, "interactive_viewer.html")
-        if os.path.exists(viewer_html_path):
-            try:
-                with open(viewer_html_path, "r", encoding="utf-8") as f:
-                    html_content = f.read()
-                dim_match = re.search(r"pageDimensions:\s*(\[[^\]]*\])", html_content)
-                if dim_match:
-                    parsed_dims = json.loads(dim_match.group(1))
-                    if isinstance(parsed_dims, list) and len(parsed_dims) > 0:
-                        page_dimensions = parsed_dims
-            except Exception as e:
-                logger.debug("Could not parse pageDimensions from interactive_viewer.html: %s", e)
-
-    # 3. Fall back to pre-rendered overlay images
-    if not page_images:
-        from PIL import Image
-
-        for p in range(1, total_pages + 1):
-            img_candidate = os.path.join(target_dir, f"overlay_page_{p}.png")
-            if os.path.exists(img_candidate):
-                try:
-                    with open(img_candidate, "rb") as img_f:
-                        b64 = base64.b64encode(img_f.read()).decode("ascii")
-                        page_images.append(f"data:image/png;base64,{b64}")
-
-                    if len(page_dimensions) < p:
-                        with Image.open(img_candidate) as pil_img:
-                            w_px, h_px = pil_img.size
-                            # Default PageVisualizer scale is 150 DPI / 72.0 points
-                            pt_w = round(w_px * 72.0 / 150.0, 2)
-                            pt_h = round(h_px * 72.0 / 150.0, 2)
-                            page_dimensions.append({"width": pt_w, "height": pt_h})
-                except Exception as e:
-                    logger.warning("Could not load overlay image %s: %s", img_candidate, e)
-
-    # 4. Final safety fallback to standard A4 (595.28 x 841.89)
-    while len(page_dimensions) < len(page_images):
-        page_dimensions.append({"width": 595.28, "height": 841.89})
-
-    return page_images, page_dimensions
 
 
 def calculate_progress_step(pct: int) -> int:

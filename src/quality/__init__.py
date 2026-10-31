@@ -2,17 +2,15 @@
 src/quality package re-exports
 """
 from src.quality.garbage import compute_garbage_ratio, compute_garbage_details
-from src.quality.language_config import (
+from src.quality.languages import (
     LanguageConfig,
     get_language_config,
-    register_language_config
-)
-from src.quality.language import (
-    compute_language_score,
+    register_language_config,
     detect_text_language,
     detect_page_language,
-    detect_document_languages
+    detect_document_languages,
 )
+from src.quality.language import compute_language_score
 from src.quality.evaluator import (
     DocumentConfidenceMetrics,
     evaluate_page_confidence,
