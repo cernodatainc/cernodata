@@ -10,7 +10,7 @@
  * Tints (*Bg / *Border) are light variants of the accent colours used for badges and notices.
  */
 const VIOLATIONS_PALETTE = {
-    bgCard: '#F7F6F3',
+    bgCard: '#FDFCFC',
     white: '#FFFFFF',
     border: '#D0CDC6',
     textPrimary: '#1F1D1A',

@@ -1,8 +1,8 @@
 :root {
-    --bg-dark: #E4E2DD;
-    --bg-card: #F7F6F3;
-    --bg-card-hover: #E9E7E1;
-    --bg-input: #E9E7E1;
+    --bg-dark: #EFF1F2;
+    --bg-card: #FDFCFC;
+    --bg-card-hover: #F5F7F8;
+    --bg-input: #F5F7F8;
     --border-color: #D0CDC6;
     --border-active: #1E4B8A;
     --text-primary: #1F1D1A;
@@ -39,7 +39,7 @@ body {
 }
 
 header {
-    background: #F7F6F3;
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border-color);
     padding: 12px 24px;
     display: flex;
@@ -82,12 +82,12 @@ header {
 
 .header-link-btn:hover {
     color: #1F1D1A;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
 }
 
 .header-link-btn.active {
     color: #1F1D1A;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
 }
 
 .header-link-btn:focus-visible {
@@ -98,7 +98,7 @@ header {
 /* Navigation Bar */
 
 .hub-nav-bar {
-    background: #F7F6F3;
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border-color);
     padding: 0 11px;
     display: flex;
@@ -362,11 +362,11 @@ header {
 }
 
 .form-select option:hover {
-    background: #F7F6F3;
+    background: #F5F7F8
 }
 
 .form-select option:checked {
-    background: #F7F6F3;
+    background: #F5F7F8;
     font-weight: 500;
 }
 
@@ -381,7 +381,7 @@ header {
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 4px;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     cursor: pointer;
@@ -415,7 +415,7 @@ header {
 
 .btn-primary {
     background: var(--text-primary);
-    color: #F7F6F3;
+    color: var(--bg-card);
 }
 
 .btn-primary:hover {
@@ -439,7 +439,7 @@ header {
 }
 
 .btn-secondary:hover {
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
 }
 
 .action-row {
@@ -453,7 +453,7 @@ header {
 
 /* Progress Bar */
 .progress-track {
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     border-radius: 999px;
     height: 6px;
     overflow: hidden;
@@ -522,7 +522,7 @@ header {
     padding: 10px 12px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 12px;
-    color: #E9E7E1;
+    color: var(--bg-card-hover);
     height: 200px;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -658,7 +658,7 @@ body.viewer-open-fullscreen {
 .run-selector-card {
     padding: 12px 18px;
     margin-bottom: 16px;
-    background: #F7F6F3;
+    background: var(--bg-card);
     border-color: #1E3A8A;
 }
 
@@ -771,7 +771,7 @@ body.viewer-open-fullscreen {
 }
 
 .explorer-active-bar {
-    background: #EFECE6;
+    background: var(--bg-card-hover);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 8px 12px;
@@ -838,7 +838,7 @@ body.viewer-open-fullscreen {
 }
 
 .explorer-pane-header {
-    background: #F7F6F3;
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border-color);
     padding: 8px 12px;
     font-size: 12px;
@@ -853,7 +853,7 @@ body.viewer-open-fullscreen {
     font-size: 11px;
     font-weight: 500;
     color: var(--text-muted);
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     padding: 2px 6px;
     border-radius: 10px;
 }
@@ -876,7 +876,7 @@ body.viewer-open-fullscreen {
 
 .btn-text-toggle:hover {
     color: var(--text-primary);
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
 }
 
 .btn-text-toggle.active {
@@ -911,7 +911,7 @@ body.viewer-open-fullscreen {
 }
 
 .tree-row:hover {
-    background: #F7F6F3;
+    background: var(--bg-card);
 }
 
 .tree-row.selected {
@@ -1041,7 +1041,7 @@ body.viewer-open-fullscreen {
 .explorer-runs-table th {
     position: sticky;
     top: 0;
-    background: #F7F6F3;
+    background: var(--bg-card);
     z-index: 2;
     padding: 8px 10px;
 }
@@ -1121,7 +1121,7 @@ body.viewer-open-fullscreen {
 }
 
 .btn-subtle:hover {
-    background: #F7F6F3;
+    background: var(--bg-card);
     color: var(--text-primary);
 }
 
@@ -1162,7 +1162,7 @@ body.viewer-open-fullscreen {
 .previous-runs-box {
     margin-top: 10px;
     padding: 10px;
-    background: #E4E2DD;
+    background: var(--bg-dark);
     border: 1px solid var(--border-color);
     border-radius: 6px;
 }
@@ -1220,7 +1220,7 @@ body.viewer-open-fullscreen {
 .plan-loaded-notice {
     display: none;
     margin-top: 12px;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 8px 12px;
@@ -1328,7 +1328,7 @@ body.viewer-open-fullscreen {
     gap: 8px;
     flex-wrap: wrap;
     margin-bottom: 14px;
-    background: #F7F6F3;
+    background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 10px 14px;
@@ -1381,7 +1381,7 @@ body.viewer-open-fullscreen {
 /* Previous Runs Table Grid */
 .runs-grid-card {
     margin-top: 24px;
-    background: #F7F6F3;
+    background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 16px;
@@ -1824,7 +1824,7 @@ body.viewer-open-fullscreen {
 
 /* Explorer Add Preset Line Element */
 .explorer-add-preset-row td {
-    background: #FAF9F6;
+    background: var(--bg-card-hover);
     padding: 8px 12px;
     border-top: 1px dashed var(--border-color);
 }

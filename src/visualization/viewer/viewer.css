@@ -1,7 +1,7 @@
 :root {
-    --ui-bg-page: #E4E2DD;
-    --ui-bg-card: #F7F6F3;
-    --ui-bg-hover: #E9E7E1;
+    --ui-bg-page: #EFF1F2;
+    --ui-bg-card: #FDFCFC;
+    --ui-bg-hover: #F5F7F8;
     --ui-bg-input: #FFFFFF;
     --ui-border: #D0CDC6;
     --ui-border-hover: #B9B5AD;
@@ -21,9 +21,9 @@
     --font-mono: 'Consolas', 'Monaco', monospace;
  
     
-    --bg-main: #F7F6F3;
-    --bg-card: #F7F6F3;
-    --bg-card-hover: #E9E7E1;
+    --bg-main: var(--ui-bg-card);
+    --bg-card: var(--ui-bg-card);
+    --bg-card-hover: var(--ui-bg-hover);
     --border-color: #D0CDC6;
     --accent-green: #00E676;
     --accent-red: #FF1744;
@@ -58,7 +58,7 @@ body {
 /*  Header  */
  
 header {
-    background: #F7F6F3;
+    background: var(--ui-bg-card);
     border-bottom: 1px solid var(--ui-border);
     padding: 12px 24px;
     display: flex;
@@ -99,7 +99,7 @@ header {
 .header-link-btn:hover,
 .header-link-btn.active {
     color: #1F1D1A;
-    background: #E9E7E1;
+    background: var(--ui-bg-hover);
 }
  
 .header-link-btn:focus-visible {
@@ -175,7 +175,7 @@ header {
  
 .step-btn.active {
     background: var(--ui-text);
-    color: #F7F6F3;
+    color: var(--ui-bg-card);
 }
  
 .step-btn.fallback {
@@ -387,7 +387,7 @@ select.type-filter option {
  
 select.type-filter option:hover,
 select.type-filter option:checked {
-    background: #F7F6F3;
+    background: #F5F7F8;
 }
  
 select.type-filter option:checked {
@@ -461,7 +461,7 @@ select.type-filter option:checked {
 .action-btn.secondary {
     background: var(--ui-text);
     border-color: transparent;
-    color: #F7F6F3;
+    color: var(--ui-bg-card);
 }
  
 .action-btn.secondary:hover {
@@ -873,7 +873,7 @@ select.type-filter option:checked {
     border-radius: 4px;
     font-size: 11px;
     font-weight: 500;
-    background: #F7F6F3;
+    background: var(--ui-bg-card);
     border: 1px solid var(--ui-border);
     color: var(--ui-text-muted);
 }
@@ -1042,7 +1042,7 @@ select.type-filter option:checked {
 /* Comparison of two boxes */
  
 .pair-node-item {
-    background: #F7F6F3;
+    background: var(--ui-bg-card);
     border: 1px solid var(--ui-border);
     border-radius: 6px;
     padding: 8px 10px;
@@ -1105,7 +1105,7 @@ select.type-filter option:checked {
     height: 32px;
     padding: 0 12px;
     background: var(--ui-text);
-    color: #F7F6F3;
+    color: var(--ui-bg-card);
     font-size: 13px;
     font-weight: 500;
     border: none;
@@ -1127,7 +1127,7 @@ select.type-filter option:checked {
 }
  
 .cutout-display-box {
-    background: #F7F6F3;
+    background: var(--ui-bg-card);
     border: 1px solid var(--ui-border);
     border-radius: 4px;
     padding: 6px;
@@ -1225,7 +1225,7 @@ select.type-filter option:checked {
  
 .btn-merge.textual {
     background: var(--ui-text);
-    color: #F7F6F3;
+    color: var(--ui-bg-card);
 }
  
 .btn-merge.textual:hover {
@@ -1309,7 +1309,7 @@ select.type-filter option:checked {
  
 .apply-fix-btn {
     background: var(--ui-text);
-    color: #F7F6F3;
+    color: var(--ui-bg-card);
     border: none;
     padding: 4px 10px;
     border-radius: 6px;
@@ -1394,7 +1394,7 @@ select.type-filter option:checked {
  
 .btn-accept-bundle {
     background: var(--ui-text);
-    color: #F7F6F3;
+    color: var(--ui-bg-card);
     border: 1px solid transparent;
 }
  
@@ -1422,7 +1422,7 @@ select.type-filter option:checked {
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.5;
-    color: #E9E7E1;
+    color: var(--ui-bg-hover);
     overflow: auto;
 }
  
@@ -1434,7 +1434,7 @@ select.type-filter option:checked {
 }
  
 .log-box-plan {
-    color: #E9E7E1;
+    color: var(--ui-bg-hover);
 }
  
 /* Runs grid */
