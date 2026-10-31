@@ -10,9 +10,9 @@
  * Tints (*Bg / *Border) are light variants of the accent colours used for badges and notices.
  */
 const INSPECTOR_PALETTE = {
-    bgDark: '#E4E2DD',
-    bgCard: '#F7F6F3',
-    bgCardHover: '#E9E7E1',
+    bgDark: '#EFF1F2',
+    bgCard: '#FDFCFC',
+    bgCardHover: '#F5F7F8;',
     white: '#FFFFFF',
     border: '#D0CDC6',
     textPrimary: '#1F1D1A',

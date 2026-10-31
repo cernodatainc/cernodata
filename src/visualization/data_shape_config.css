@@ -1,8 +1,8 @@
 :root {
     /* Paleta i typografia z landing.css */
-    --bg-page: #E4E2DD;
-    --bg-card: #F7F6F3;
-    --bg-card-hover: #E9E7E1;
+    --bg-page: #EFF1F2;
+    --bg-card: #FDFCFC;
+    --bg-card-hover: #F5F7F8;
     --bg-input: #FFFFFF;
     --border-color: #D0CDC6;
     --border-hover: #B9B5AD;
@@ -49,7 +49,7 @@ body {
 /* Header */
  
 header {
-    background: #F7F6F3;
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border-color);
     padding: 12px 24px;
     display: flex;
@@ -89,7 +89,7 @@ header {
 .header-link-btn:hover,
 .header-link-btn.active {
     color: #1F1D1A;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
 }
  
 .header-link-btn:focus-visible {
@@ -157,7 +157,7 @@ header {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
     font-size: 11px;
@@ -186,7 +186,7 @@ header {
     display: none;
     position: absolute;
     background: #1F1D1A;
-    color: #F7F6F3;
+    color: var(--bg-card);
     font-size: 11px;
     line-height: 1.4;
     padding: 6px 10px;
@@ -316,11 +316,11 @@ header {
 }
  
 .override-select option:hover {
-    background: #F7F6F3;
+    background: #F5F7F8;
 }
  
 .override-select option:checked {
-    background: #F7F6F3;
+    background: #F5F7F8;
     font-weight: 500;
 }
  
@@ -451,7 +451,7 @@ input[type="range"] {
  
 .btn-primary {
     background: var(--text-primary);
-    color: #F7F6F3;
+    color: var(--bg-card);
 }
  
 .btn-primary:hover {
@@ -465,7 +465,7 @@ input[type="range"] {
 }
  
 .btn-secondary:hover {
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
 }
  
 .submit-btn {
@@ -473,7 +473,7 @@ input[type="range"] {
     height: 36px;
     margin-top: 16px;
     background: var(--text-primary);
-    color: #F7F6F3;
+    color: var(--bg-card);
     border: 1px solid transparent;
     border-radius: 6px;
     font-size: 13px;
@@ -574,13 +574,13 @@ input[type="range"] {
 }
  
 .fallback-tag {
-    background: #F7F6F3;
+    background: var(--bg-card);
     border-color: var(--border-color);
     color: var(--text-muted);
 }
  
 .score-bar-bg {
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     border-radius: 999px;
     height: 6px;
     overflow: hidden;
@@ -661,7 +661,7 @@ input[type="range"] {
     display: none;
     margin-top: 12px;
     padding: 8px 12px;
-    background: #E9E7E1;
+    background: var(--bg-card-hover);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 13px;
