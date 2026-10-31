@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
- 
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,9 +12,9 @@
         rel="stylesheet">
     <link rel="stylesheet" href="/data_shape_config.css">
 </head>
- 
+
 <body>
- 
+
     <header>
         <div class="brand">
             <svg class="brand-logo-img" viewBox="0 0 3952 1000" fill="none" xmlns="http://www.w3.org/2000/svg"
@@ -68,23 +68,23 @@
             <a href="/planner" class="header-link-btn active">Planner Wizard</a>
         </div>
     </header>
- 
+
     <div class="main-container">
         <!-- Form Section -->
         <div>
             <div class="status-banner" id="statusBanner"></div>
- 
+
             <!-- 0. Browse Previous Results & Completed Outputs -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">0</div>
                     <div class="section-title">Previous results</div>
-                    <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Select an existing run to inspect or reuse its parameters">
+                    <div class="help-btn" tabindex="0"
+                        title="Select an existing run to inspect or reuse its parameters">
                         <span class="help-icon">?</span>
-                        <div class="section-desc">Select an existing run to inspect or reuse its parameters</div>
                     </div>
                 </div>
- 
+
                 <div class="input-group">
                     <label class="input-label" for="prevRunSelect">Completed run output</label>
                     <div class="prev-run-row">
@@ -96,7 +96,8 @@
                             onclick="loadSelectedPreviousRunIntoWizard()">
                             Load parameters
                         </button>
-                        <a id="btnInspectViewer" href="/viewer.html" target="_blank" class="btn btn-secondary btn-view-params">
+                        <a id="btnInspectViewer" href="/viewer.html" target="_blank"
+                            class="btn btn-secondary btn-view-params">
                             Open in viewer
                         </a>
                     </div>
@@ -104,23 +105,22 @@
                     </div>
                 </div>
             </div>
- 
+
             <!-- 1. Document & Ingestion Parameters -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">1</div>
                     <div class="section-title">Quality targets</div>
-                    <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="File source, language hint and confidence goal">
+                    <div class="help-btn" tabindex="0" title="File source, language hint and confidence goal">
                         <span class="help-icon">?</span>
-                        <div class="section-desc">File source, language hint and confidence goal</div>
                     </div>
                 </div>
- 
+
                 <div class="input-group">
                     <label class="input-label" for="docPath">Document file path</label>
                     <input type="text" id="docPath" class="input-text" placeholder="e.g. src/e2e/Dokument 5.pdf" />
                 </div>
- 
+
                 <div class="inline-inputs">
                     <div class="input-group">
                         <div class="lang-hint-header">
@@ -140,7 +140,7 @@
                             <option value="es">Spanish (es)</option>
                         </select>
                     </div>
- 
+
                     <div class="input-group">
                         <label class="input-label" for="thresholdSlider">Target confidence threshold</label>
                         <div class="slider-wrapper">
@@ -151,45 +151,42 @@
                     </div>
                 </div>
             </div>
- 
+
             <!-- 2. Document Taxonomy -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">2</div>
                     <div class="section-title">Document taxonomy</div>
-                    <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Primary structural layout shape">
+                    <div class="help-btn" tabindex="0" title="Primary structural layout shape">
                         <span class="help-icon">?</span>
-                        <div class="section-desc">Primary structural layout shape</div>
                     </div>
                 </div>
                 <div class="options-grid" id="taxonomyGrid">
                     <!-- Populated by JS -->
                 </div>
             </div>
- 
+
             <!-- 3. Quality vs Speed Target -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">3</div>
                     <div class="section-title">Processing priority</div>
-                    <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Throughput priority versus layout fidelity">
+                    <div class="help-btn" tabindex="0" title="Throughput priority versus layout fidelity">
                         <span class="help-icon">?</span>
-                        <div class="section-desc">Throughput priority versus layout fidelity</div>
                     </div>
                 </div>
                 <div class="options-grid" id="targetGrid">
                     <!-- Populated by JS -->
                 </div>
             </div>
- 
+
             <!-- 4. Security Constraints -->
             <div class="form-section">
                 <div class="section-header">
                     <div class="section-num">4</div>
                     <div class="section-title">Security</div>
-                    <div class="help-btn" tabindex="0" onclick="event.stopPropagation(); this.classList.toggle('active');" title="Cloud API allowance vs. air-gapped local model">
+                    <div class="help-btn" tabindex="0" title="Cloud API allowance vs. air-gapped local model">
                         <span class="help-icon">?</span>
-                        <div class="section-desc">Cloud API allowance vs. air-gapped local model</div>
                     </div>
                 </div>
                 <div class="options-grid" id="securityGrid">
@@ -197,17 +194,17 @@
                 </div>
             </div>
         </div>
- 
+
         <!-- Sidebar / Ranking Preview -->
         <div class="sidebar">
             <div class="ranking-card">
                 <div class="ranking-header">Suitability ranking</div>
                 <div class="ranking-sub">Confidence scores update as you answer</div>
- 
+
                 <div id="presetsList">
                     <!-- Populated by JS -->
                 </div>
- 
+
                 <div class="override-box">
                     <label class="override-title" for="overrideSelect">Primary preset override</label>
                     <select id="overrideSelect" class="override-select" onchange="onOverrideChanged()">
@@ -218,7 +215,7 @@
                         <option value="vision_llm_direct">vision_llm_direct</option>
                     </select>
                 </div>
- 
+
                 <button class="submit-btn" id="submitBtn" onclick="submitPlan()"
                     data-submit-endpoint="/api/submit_plan">
                     Start pipeline
@@ -226,8 +223,8 @@
             </div>
         </div>
     </div>
- 
+
     <script src="/data_shape_config.js" data-submit-endpoint="/api/submit_plan"></script>
 </body>
- 
+
 </html>
