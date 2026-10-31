@@ -81,6 +81,9 @@ def resolve_and_validate_pdf_path(path: str) -> str:
     return resolved
 
 
+_LOOPBACK_HOST = "127.0.0.1"
+
+
 def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
     """
     Finds an available TCP port starting from start_port by testing bind availability.
@@ -91,13 +94,13 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
-                s.bind(("127.0.0.1", port))
+                s.bind((_LOOPBACK_HOST, port))
                 return port
             except OSError:
                 continue
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
+        s.bind((_LOOPBACK_HOST, 0))
         return int(s.getsockname()[1])
 
 

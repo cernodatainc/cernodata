@@ -342,12 +342,12 @@ header {
     background: #FFFFFF;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 12px 14px;
+    padding: 6px 10px;
+    min-width: 0;
     cursor: pointer;
     user-select: none;
     display: flex;
     flex-direction: column;
-    gap: 4px;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
  
@@ -367,10 +367,17 @@ header {
     gap: 10px;
 }
  
+.card-header .card-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .card-title {
     font-size: 13px;
     font-weight: 500;
     color: var(--text-primary);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
  
 .radio-indicator {

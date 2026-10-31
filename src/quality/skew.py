@@ -14,7 +14,6 @@ import numpy as np
 
 logger = logging.getLogger("cernodata.quality.skew")
 
-HAS_CV2 = False
 try:
     import cv2
     HAS_CV2 = True
@@ -24,17 +23,27 @@ except ImportError:
 from src.dom import DocumentDOM
 from src.parsers.pdf_utils import open_pdf, HAS_PYPDFIUM
 
+_BINARIZE_THRESHOLD = 200
+_MIN_CONTOUR_AREA = 30
+_MAX_ABS_ANGLE_DEG = 30.0
+_SKEW_DEAD_ZONE_DEG = 0.4
+_MIN_CROP_SIDE_PX = 10
+_MIN_NODE_WIDTH_PX = 15
+_MIN_NODE_HEIGHT_PX = 10
+_DEFAULT_RENDER_DPI = 150
+_PDF_POINTS_PER_INCH = 72.0
+
 
 def _extract_contour_angles(crop_np: np.ndarray) -> List[float]:
     """Extracts text line contour minimum area rectangle angles from image crop."""
     gray = cv2.cvtColor(crop_np, cv2.COLOR_RGB2GRAY)
-    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+    _, thresh = cv2.threshold(gray, _BINARIZE_THRESHOLD, 255, cv2.THRESH_BINARY_INV)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     angles = []
     for c in contours:
-        if cv2.contourArea(c) > 30:
+        if cv2.contourArea(c) > _MIN_CONTOUR_AREA:
             angle = (cv2.minAreaRect(c)[-1] + 45) % 90 - 45
-            if -30.0 <= angle <= 30.0:
+            if -_MAX_ABS_ANGLE_DEG <= angle <= _MAX_ABS_ANGLE_DEG:
                 angles.append(angle)
     return angles
 
@@ -44,14 +53,14 @@ def _compute_median_skew_angle(angles: List[float]) -> float:
     if not angles:
         return 0.0
     median_angle = float(np.median(angles))
-    if abs(median_angle) < 0.4:
+    if abs(median_angle) < _SKEW_DEAD_ZONE_DEG:
         return 0.0
     return round(median_angle, 2)
 
 
 def detect_node_text_skew(crop_np: np.ndarray) -> float:
     """Analyzes a numpy RGB crop of a text node to determine its local text line orientation angle."""
-    if not HAS_CV2 or crop_np is None or crop_np.size == 0 or crop_np.shape[0] < 10 or crop_np.shape[1] < 10:
+    if not HAS_CV2 or crop_np is None or crop_np.size == 0 or crop_np.shape[0] < _MIN_CROP_SIDE_PX or crop_np.shape[1] < _MIN_CROP_SIDE_PX:
         return 0.0
     return _compute_median_skew_angle(_extract_contour_angles(crop_np))
 
@@ -78,7 +87,7 @@ def _render_page_images(pdf_path: str, scale: float) -> Dict[int, tuple]:
     return page_images
 
 
-def apply_text_skew_alignment(dom: DocumentDOM, pdf_path: str, scale: float = 150/72.0) -> DocumentDOM:
+def apply_text_skew_alignment(dom: DocumentDOM, pdf_path: str, scale: float = _DEFAULT_RENDER_DPI / _PDF_POINTS_PER_INCH) -> DocumentDOM:
     """Scans PDF page images for each node in DocumentDOM and calculates local text skew angles."""
     if not HAS_CV2 or not HAS_PYPDFIUM or not os.path.exists(pdf_path):
         return dom
@@ -94,7 +103,7 @@ def apply_text_skew_alignment(dom: DocumentDOM, pdf_path: str, scale: float = 15
             bbox = node.bounding_box
             x0, y0 = int(max(0, bbox.x0 * sx)), int(max(0, bbox.y0 * sy))
             x1, y1 = int(min(img_np.shape[1], bbox.x1 * sx)), int(min(img_np.shape[0], bbox.y1 * sy))
-            if (x1 - x0) > 15 and (y1 - y0) > 10:
+            if (x1 - x0) > _MIN_NODE_WIDTH_PX and (y1 - y0) > _MIN_NODE_HEIGHT_PX:
                 skew_angle = detect_node_text_skew(img_np[y0:y1, x0:x1])
                 if skew_angle != 0.0:
                     node.bounding_box.angle = skew_angle
