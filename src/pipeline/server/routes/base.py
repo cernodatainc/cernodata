@@ -59,5 +59,10 @@ class BaseApiRoutesMixin:
                 raise ValueError("No document path provided in request payload or active session.")
 
         pdf_path = resolve_pdf_path(raw_pdf)
-        language = payload.get("language") or self.session.language or "en"
-        return pdf_path, language
+        raw_lang = payload.get("language")
+        if isinstance(raw_lang, str) and raw_lang.strip().lower() in ("auto", "none", ""):
+            raw_lang = None
+        language = raw_lang or self.session.language or "en"
+        if isinstance(language, str) and language.strip().lower() in ("auto", "none", ""):
+            language = "en"
+        return pdf_path, str(language)

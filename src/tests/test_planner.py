@@ -282,6 +282,104 @@ class TestPlanner(unittest.TestCase):
             self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
             self.assertTrue(res["decision"]["is_accepted"])
 
+    def test_apply_preset_override_updates_fallback_queue(self):
+        plan = self.planner.create_plan(
+            document_path="test.pdf",
+            taxonomy="general_text",
+            target="rapid_approximate",
+            security="air_gapped_local",
+            language="pl",
+        )
+        self.assertEqual(plan.primary_preset, "docling_fast")
+        plan.apply_preset_override("docling_deep")
+        self.assertEqual(plan.primary_preset, "docling_deep")
+        self.assertEqual(plan.preset_order[0], "docling_deep")
+        fallback_names = [f["preset"] for f in plan.fallback_queue]
+        self.assertNotIn("docling_deep", fallback_names)
+        self.assertIn("docling_fast", fallback_names)
+
+    def test_run_pipeline_explicit_preset_not_overridden_by_stored_plan(self):
+        mock_dom = make_test_dom(
+            "Sprawozdanie finansowe za rok obrotowy 2024. Zysk netto wynosi sto tysiecy zlotych.",
+            document_id="d1",
+            source_filename="test.pdf",
+            node_type="text",
+        )
+        plan = self.planner.create_plan(
+            document_path="test.pdf",
+            taxonomy="general_text",
+            target="rapid_approximate",
+            security="air_gapped_local",
+            language="pl",
+            target_threshold=0.82,
+        )
+        self.assertEqual(plan.primary_preset, "docling_fast")
+        with patch_pipeline_io(parse_return=mock_dom):
+            res = run_pipeline(
+                pdf_path="test.pdf",
+                target_threshold=0.82,
+                language="pl",
+                preset="docling_deep",
+                align_skew=True,
+                visualize=False,
+                output_dir="test_output",
+                plan=plan,
+            )
+            self.assertEqual(res["decision"]["chosen_preset"], "docling_deep")
+            self.assertEqual(res["decision"]["preset_id"], "docling_deep")
+            self.assertEqual(res["plan"]["primary_preset"], "docling_deep")
+
+    def test_server_run_with_explicit_preset_overrides_session_submitted_plan(self):
+        from src.pipeline.server.preset_cache import PresetCache
+        from src.tests.conftest import http_post_json, running_test_server
+
+        # Verify PresetCache document isolation and dict decision handling
+        cache = PresetCache()
+        cache.put(
+            "src/e2e/Dokument 5.pdf",
+            "docling_fast",
+            {"decision": {"chosen_preset": "docling_fast"}, "dom": {"total_pages": 1}},
+            language="pl",
+        )
+        self.assertIsNone(cache.get("src/e2e/Document 8.pdf", "docling_fast", "pl"))
+        self.assertIsNone(cache.get("src/e2e/Dokument 5.pdf", "docling_deep", "pl"))
+        self.assertIsNotNone(cache.get("src/e2e/Dokument 5.pdf", "docling_fast", "pl"))
+
+        mock_dom = make_test_dom(
+            "Sprawozdanie finansowe za rok obrotowy 2024.",
+            document_id="d8",
+            source_filename="Document 8.pdf",
+            node_type="text",
+        )
+        with running_test_server() as (srv, base_url):
+            # Simulate a previously loaded or submitted plan with docling_fast
+            srv.session_context.submitted_plan = DocumentPlan(
+                document_path="src/e2e/Document 8.pdf",
+                primary_preset="docling_fast",
+                preset_order=["docling_fast", "docling_deep"],
+                language="pl",
+                target_threshold=0.82,
+            )
+            with patch_pipeline_io(parse_return=mock_dom):
+                status, data = http_post_json(
+                    f"{base_url}/api/run",
+                    {
+                        "pdf_path": "src/e2e/Document 8.pdf",
+                        "preset": "docling_deep",
+                        "language": "pl",
+                        "target_threshold": 0.85,
+                        "with_plan": False,
+                        "force_rerun": True,
+                    },
+                )
+                self.assertEqual(status, 200)
+                self.assertTrue(data.get("success"))
+                self.assertEqual(data.get("preset"), "docling_deep")
+                self.assertEqual(data["decision"]["chosen_preset"], "docling_deep")
+                logs_joined = "\n".join(srv.session_context.get_progress()["logs"])
+                self.assertIn("Preset: docling_deep", logs_joined)
+                self.assertNotIn("Preset: docling_fast", logs_joined)
+
 
 if __name__ == "__main__":
     unittest.main()

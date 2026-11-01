@@ -49,7 +49,8 @@ class PresetCache:
             keys.append(f"{doc_base}:{preset_clean}")
             if language:
                 keys.insert(0, f"{doc_base}:{preset_clean}:{language.strip().lower()}")
-        keys.append(preset_clean)
+        else:
+            keys.append(preset_clean)
         return keys
 
     def get(self, pdf_path: str, preset: str, language: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -69,7 +70,12 @@ class PresetCache:
                 if k in self.preset_results:
                     cached = self.preset_results[k]
                     decision = cached.get("decision")
-                    chosen = str(getattr(decision, "chosen_preset", "") or "").strip().lower()
+                    raw_chosen = (
+                        decision.get("chosen_preset")
+                        if isinstance(decision, dict)
+                        else getattr(decision, "chosen_preset", "")
+                    )
+                    chosen = str(raw_chosen or "").strip().lower()
                     wanted = preset.strip().lower() if preset else "docling_fast"
                     if chosen and chosen != wanted:
                         continue

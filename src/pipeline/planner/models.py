@@ -168,11 +168,15 @@ class DocumentPlan(ExtensibleOptionsMixin):
             self.suggested_order = [self.primary_preset]
 
     def apply_preset_override(self, preset: str) -> None:
-        """Applies a primary preset override and updates preset_order accordingly."""
+        """Applies a primary preset override and updates preset_order and fallback_queue accordingly."""
         if preset:
             self.primary_preset = preset
             self.overridden = True
             self.preset_order = [preset] + [p for p in self.preset_order if p != preset]
+            self.fallback_queue = [
+                {"preset": p, "score": self.scores.get(p, 0.50)}
+                for p in self.preset_order[1:]
+            ]
 
     @property
     def taxonomy(self) -> str:

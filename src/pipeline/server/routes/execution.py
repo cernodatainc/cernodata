@@ -82,9 +82,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         """Submits an execution callable to the thread pool and sends the formatted HTTP response."""
         try:
             result = self.executor.submit(task_fn).result()
+            dec = result.get("decision") or {}
+            executed_preset = str(dec.get("chosen_preset") or preset)
             response_body: Dict[str, Any] = {
                 "success": True,
-                "preset": preset,
+                "preset": executed_preset,
                 "language": language,
                 "dom": result["dom"],
                 "violations": result["violations"],
@@ -112,24 +114,17 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         timestamp = datetime.now().strftime("%H:%M:%S")
         pdf_path, language = self._extract_document_and_language(payload)
         threshold = float(payload.get("target_threshold", 0.85))
-        preset = payload.get("preset", "docling_fast")
+        explicit_preset = payload.get("preset")
+        preset = str(explicit_preset).strip() if explicit_preset else "docling_fast"
         align_skew = bool(payload.get("align_skew", True))
         visualize = bool(payload.get("visualize", True))
         with_plan = bool(payload.get("with_plan", False))
         plan_config = payload.get("plan_config")
-
         force = bool(payload.get("force", payload.get("force_rerun", False)))
-        if not force and self._try_serve_cached_preset(pdf_path, preset, language):
-            return
-
-        self.session.reset_progress(
-            initial_step="Step 1: Document Validation & Subdivision",
-            log=f"[{timestamp}] [START] Ingestion initiated for '{pdf_path}' (Preset: {preset}, Lang: {language}).",
-        )
-        self.session.add_log(f"[{timestamp}] [STEP 1] Validating document structure and parameters...")
 
         from src.pipeline.orchestrator import run_pipeline
         from src.pipeline.planner import PresetPlanner
+        from src.utils import resolve_pdf_path
 
         plan_obj: Optional[DocumentPlan] = None
         if with_plan and plan_config:
@@ -143,12 +138,15 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             }
             resolved_tax = tax_map.get(raw_tax, raw_tax)
 
-            raw_target = str(plan_config.get("target_use_case", "rag_vector_search"))
-            lat = str(plan_config.get("latency", "balanced"))
-            if lat == "maximum_accuracy" or raw_target in ("audit_compliance", "slm_fine_tuning"):
-                resolved_target = "high_precision_structure"
+            if plan_config.get("target"):
+                resolved_target = str(plan_config["target"])
             else:
-                resolved_target = "rapid_approximate"
+                raw_target = str(plan_config.get("target_use_case", "rag_vector_search"))
+                lat = str(plan_config.get("latency", "balanced"))
+                if lat == "maximum_accuracy" or raw_target in ("audit_compliance", "slm_fine_tuning"):
+                    resolved_target = "high_precision_structure"
+                else:
+                    resolved_target = "rapid_approximate"
 
             criteria = PlannerCriteria(
                 taxonomy=resolved_tax,
@@ -156,10 +154,13 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 security=plan_config.get("security", "air_gapped_local"),
             )
 
-            primary_override = plan_config.get("primary_preset")
+            primary_override = plan_config.get("override_primary") or plan_config.get("primary_preset")
             fallback_override = plan_config.get("fallback_preset")
+            raw_override_order = plan_config.get("override_order")
             override_order: Optional[List[str]] = None
-            if primary_override and fallback_override:
+            if isinstance(raw_override_order, list) and raw_override_order:
+                override_order = [str(p) for p in raw_override_order]
+            elif primary_override and fallback_override:
                 all_known = ["docling_fast", "docling_deep", "pypdfium_rapidocr", "vision_llm_direct"]
                 rest = [p for p in all_known if p not in (primary_override, fallback_override)]
                 override_order = [str(primary_override), str(fallback_override)] + rest
@@ -167,26 +168,51 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 override_order = [str(primary_override)]
 
             raw_verif_layers = plan_config.get("verification_layers") or payload.get("verification_layers")
-            resolved_verif_layers = [str(x) for x in raw_verif_layers] if isinstance(raw_verif_layers, (list, tuple)) else None
+            resolved_verif_layers = (
+                [str(x) for x in raw_verif_layers] if isinstance(raw_verif_layers, (list, tuple)) else None
+            )
 
             plan_obj = planner.create_plan(
                 document_path=pdf_path,
                 criteria=criteria,
                 language=language,
                 target_threshold=threshold,
+                override_primary=str(primary_override) if primary_override else None,
                 override_order=override_order,
                 verification_layers=resolved_verif_layers,
             )
             if plan_obj and plan_obj.primary_preset:
                 preset = plan_obj.primary_preset
         elif not with_plan and self.session.submitted_plan:
-            plan_obj = self.session.submitted_plan
-            # An explicitly requested preset must never be overridden by the stored plan.
-            if plan_obj and plan_obj.primary_preset and not payload.get("preset"):
-                preset = plan_obj.primary_preset
+            stored_plan = self.session.submitted_plan
+            stored_doc = (
+                resolve_pdf_path(stored_plan.document_path)
+                if stored_plan.document_path
+                else ""
+            )
+            if not stored_doc or stored_doc == pdf_path:
+                plan_obj = stored_plan.evolve(
+                    document_path=pdf_path,
+                    language=language,
+                    target_threshold=threshold,
+                    preset_order=list(stored_plan.preset_order),
+                    fallback_queue=list(stored_plan.fallback_queue),
+                )
+                # An explicitly requested preset must never be overridden by the stored plan.
+                if explicit_preset:
+                    if plan_obj.primary_preset != preset:
+                        plan_obj.apply_preset_override(preset)
+                elif plan_obj.primary_preset:
+                    preset = plan_obj.primary_preset
 
         if not force and self._try_serve_cached_preset(pdf_path, preset, language):
             return
+
+        self.session.reset_progress(
+            initial_step="Step 1: Document Validation & Subdivision",
+            log=f"[{timestamp}] [START] Ingestion initiated for '{pdf_path}' (Preset: {preset}, Lang: {language}).",
+        )
+        self.session.add_log(f"[{timestamp}] [STEP 1] Validating document structure and parameters...")
 
         session = self.session
         on_progress = session.make_progress_callback()
@@ -212,6 +238,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             )
             session.update_result_state(res, pdf_path=pdf_path, language=language)
             dec = res.get("decision", {})
+            chosen_preset = str(dec.get("chosen_preset") or preset)
             raw_score = dec.get("overall_confidence")
             score = float(raw_score) if raw_score is not None else 0.0
 
@@ -228,7 +255,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 document_path=pdf_path,
                 run_id=session.output_dir or "output",
                 output_dir=session.output_dir or "output",
-                preset=preset,
+                preset=chosen_preset,
                 status=status,
                 confidence=score,
                 violations_count=viols_count,
@@ -272,6 +299,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             return
 
         logger.info("Triggering live pipeline rerun for preset: '%s' (PDF: %s, Lang: %s)", preset, pdf_path, language)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.session.reset_progress(
+            initial_step="Step 1: Document Validation & Subdivision",
+            log=f"[{timestamp}] [START] Rerun initiated for '{pdf_path}' (Preset: {preset}, Lang: {language}).",
+        )
         from src.pipeline.orchestrator import run_pipeline
 
         session = self.session
@@ -289,6 +321,39 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 progress_callback=on_progress,
             )
             session.update_result_state(res, pdf_path=pdf_path, language=language)
+            dec = res.get("decision", {})
+            chosen_preset = str(dec.get("chosen_preset") or preset)
+            raw_score = dec.get("overall_confidence")
+            score = float(raw_score) if raw_score is not None else 0.0
+            raw_status = dec.get("status")
+            status = str(raw_status) if raw_status is not None else "UNKNOWN"
+            viols = res.get("violations", [])
+            viols_count = len(viols)
+            t_end = datetime.now().strftime("%H:%M:%S")
+            from src.pipeline.server.run_mappings import record_run_mapping
+
+            record_run_mapping(
+                document_path=pdf_path,
+                run_id=session.output_dir or "output",
+                output_dir=session.output_dir or "output",
+                preset=chosen_preset,
+                status=status,
+                confidence=score,
+                violations_count=viols_count,
+                total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
+                per_page_confidence=dec.get("per_page_confidence", {}),
+                timestamp=t_end,
+                repo_root=session.repo_root,
+            )
+            session.set_completed(
+                status=status,
+                confidence=score,
+                violations_count=viols_count,
+                log=(
+                    f"[{t_end}] [SUCCESS] Rerun complete: Status '{status}', "
+                    f"Confidence: {score:.4f}, Violations: {viols_count}."
+                ),
+            )
             return res
 
         self._submit_and_send_run_result(
@@ -296,7 +361,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             preset=preset,
             language=language,
             include_plan=False,
-            record_session_error=False,
+            record_session_error=True,
         )
 
     def _handle_post_remove_run(self, payload: Dict[str, Any]) -> None:

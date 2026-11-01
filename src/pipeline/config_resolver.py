@@ -47,11 +47,19 @@ class PipelineConfigResolver:
                 config.options[k] = v
             return config
         if plan_obj is not None:
+            if preset and preset != "docling_fast" and preset != plan_obj.primary_preset:
+                plan_obj = plan_obj.evolve(
+                    preset_order=list(plan_obj.preset_order),
+                    fallback_queue=list(plan_obj.fallback_queue),
+                )
+                plan_obj.apply_preset_override(preset)
             cfg = plan_obj.to_ingestion_config(
                 align_skew=align_skew,
                 visualize=visualize,
                 output_dir=output_dir,
             )
+            if cfg.language is None and language is not None:
+                cfg.language = language
             if verification_layers is not None:
                 cfg.verification_layers = list(verification_layers)
             for k, v in extra_options.items():
@@ -86,6 +94,12 @@ class PipelineConfigResolver:
     ) -> Tuple[str, IngestionConfig, Optional[DocumentPlan]]:
         """Resolves target PDF path, IngestionConfig, and DocumentPlan."""
         plan_obj = cls.resolve_plan(plan)
+        if plan_obj is not None and preset and preset != "docling_fast" and preset != plan_obj.primary_preset:
+            plan_obj = plan_obj.evolve(
+                preset_order=list(plan_obj.preset_order),
+                fallback_queue=list(plan_obj.fallback_queue),
+            )
+            plan_obj.apply_preset_override(preset)
         cfg = cls.resolve_config(
             config=config,
             plan_obj=plan_obj,

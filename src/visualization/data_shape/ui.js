@@ -80,10 +80,11 @@ function onOverrideChanged() {
     overridePrimary = (val === "auto") ? null : val;
 
     const inpPreset = document.getElementById("inpPreset");
-    if (inpPreset && val !== "auto") {
+    const targetPreset = overridePrimary || (suggestedOrder && suggestedOrder.length > 0 ? suggestedOrder[0] : "docling_fast");
+    if (inpPreset && targetPreset) {
         for (let opt of inpPreset.options) {
-            if (opt.value === val) {
-                inpPreset.value = val;
+            if (opt.value === targetPreset) {
+                inpPreset.value = targetPreset;
                 break;
             }
         }
@@ -98,11 +99,11 @@ function onInpPresetChanged() {
     const inpPreset = document.getElementById("inpPreset");
     if (!inpPreset) return;
     const val = inpPreset.value;
+    overridePrimary = (val === "auto") ? null : val;
 
     const overrideSel = document.getElementById("overrideSelect");
     if (overrideSel) {
-        overrideSel.value = val;
-        overridePrimary = (val === "auto") ? null : val;
+        overrideSel.value = overridePrimary || "auto";
     }
     renderPresetsList();
 }
@@ -127,6 +128,20 @@ function renderPresetsList() {
     }
     if (fbBadge && displayOrder.length > 1) {
         fbBadge.textContent = displayOrder[1];
+    }
+
+    const inpPreset = document.getElementById("inpPreset");
+    if (inpPreset && displayOrder.length > 0) {
+        for (let opt of inpPreset.options) {
+            if (opt.value === displayOrder[0]) {
+                inpPreset.value = displayOrder[0];
+                break;
+            }
+        }
+    }
+    const overrideSel = document.getElementById("overrideSelect");
+    if (overrideSel) {
+        overrideSel.value = overridePrimary || "auto";
     }
 
     displayOrder.forEach((preset, idx) => {

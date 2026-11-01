@@ -67,12 +67,25 @@ async function triggerRunPipeline(withPlan = false) {
     if (withPlan) {
         const primBadge = document.getElementById('planPrimaryBadge');
         const fbBadge = document.getElementById('planFallbackBadge');
+        const hasWizardState = typeof selectedTaxonomy !== 'undefined';
+        let effectiveOrder = (typeof suggestedOrder !== 'undefined' && Array.isArray(suggestedOrder))
+            ? [...suggestedOrder]
+            : [];
+        if (typeof overridePrimary !== 'undefined' && overridePrimary && effectiveOrder[0] !== overridePrimary) {
+            effectiveOrder = [overridePrimary, ...effectiveOrder.filter(p => p !== overridePrimary)];
+        }
         payload.plan_config = {
-            taxonomy: document.getElementById('planTaxonomy').value,
-            target_use_case: document.getElementById('planTarget').value,
-            latency: document.getElementById('planLatency').value,
-            hardware: document.getElementById('planHardware').value,
-            primary_preset: primBadge ? primBadge.textContent.trim() : null,
+            taxonomy: hasWizardState
+                ? selectedTaxonomy
+                : (document.getElementById('planTaxonomy') ? document.getElementById('planTaxonomy').value : 'general_text'),
+            target: (typeof selectedTarget !== 'undefined') ? selectedTarget : undefined,
+            security: (typeof selectedSecurity !== 'undefined') ? selectedSecurity : 'air_gapped_local',
+            target_use_case: document.getElementById('planTarget') ? document.getElementById('planTarget').value : 'rag_vector_search',
+            latency: document.getElementById('planLatency') ? document.getElementById('planLatency').value : 'balanced',
+            hardware: document.getElementById('planHardware') ? document.getElementById('planHardware').value : 'cpu',
+            override_primary: (typeof overridePrimary !== 'undefined') ? overridePrimary : null,
+            override_order: effectiveOrder.length > 0 ? effectiveOrder : null,
+            primary_preset: primBadge ? primBadge.textContent.trim() : preset,
             fallback_preset: fbBadge ? fbBadge.textContent.trim() : null
         };
     }

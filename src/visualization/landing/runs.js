@@ -172,7 +172,42 @@ async function choosePreviousRun(outputDir, targetPage = 1, shouldReloadViewer =
         if (plan && plan.hardware && document.getElementById('planHardware')) {
             document.getElementById('planHardware').value = plan.hardware;
         }
+        if (typeof TAXONOMY_OPTIONS !== 'undefined' && plan && plan.taxonomy && TAXONOMY_OPTIONS.some(([k]) => k === plan.taxonomy)) {
+            selectedTaxonomy = plan.taxonomy;
+            if (typeof renderOptionGrid === 'function') {
+                renderOptionGrid('taxonomyGrid', TAXONOMY_OPTIONS, selectedTaxonomy, val => selectedTaxonomy = val);
+            }
+        }
+        if (typeof TARGET_OPTIONS !== 'undefined' && plan && plan.target && TARGET_OPTIONS.some(([k]) => k === plan.target)) {
+            selectedTarget = plan.target;
+            if (typeof renderOptionGrid === 'function') {
+                renderOptionGrid('targetGrid', TARGET_OPTIONS, selectedTarget, val => selectedTarget = val);
+            }
+        }
+        if (typeof SECURITY_OPTIONS !== 'undefined' && plan && plan.security && SECURITY_OPTIONS.some(([k]) => k === plan.security)) {
+            selectedSecurity = plan.security;
+            if (typeof renderOptionGrid === 'function') {
+                renderOptionGrid('securityGrid', SECURITY_OPTIONS, selectedSecurity, val => selectedSecurity = val);
+            }
+        }
+        const activePreset = decision.chosen_preset || (plan && plan.primary_preset) || null;
+        if (typeof overridePrimary !== 'undefined') {
+            overridePrimary = activePreset || null;
+            const overrideSel = document.getElementById('overrideSelect');
+            if (overrideSel) overrideSel.value = overridePrimary || 'auto';
+        }
         if (typeof updateSuggestedPlan === 'function') updateSuggestedPlan();
+        if (activePreset) {
+            const presetSel = document.getElementById('inpPreset');
+            if (presetSel) {
+                for (let opt of presetSel.options) {
+                    if (opt.value === activePreset) {
+                        presetSel.value = activePreset;
+                        break;
+                    }
+                }
+            }
+        }
 
         const prevRunSel = document.getElementById('prevRunSelect');
         if (prevRunSel && prevRunSel.value !== outputDir) {

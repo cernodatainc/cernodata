@@ -121,6 +121,10 @@ function selectDocPath(path) {
  * selections and updates UI badges.
  */
 function updateSuggestedPlan() {
+    if (typeof recalculate === 'function' && typeof selectedTaxonomy !== 'undefined') {
+        recalculate();
+        return;
+    }
     const taxEl = document.getElementById('planTaxonomy');
     const latEl = document.getElementById('planLatency');
     if (!taxEl || !latEl) return;

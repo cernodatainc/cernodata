@@ -27,12 +27,14 @@ class DecisionTreeEngine:
         next_preset_score: float = NEXT_PRESET_SCORE,
         language: Optional[str] = "en",
         verification_layers: Optional[Sequence[str]] = None,
+        preset_id: str = PRESET_ID,
     ) -> None:
         self.target_threshold = target_threshold
         self.current_preset_score = current_preset_score
         self.next_preset_score = next_preset_score
         self.language = language
         self.verification_layers = list(verification_layers) if verification_layers is not None else None
+        self.preset_id = preset_id
 
     def evaluate(self, dom: DocumentDOM) -> Dict[str, Any]:
         metrics = evaluate_document_confidence(
@@ -46,7 +48,7 @@ class DecisionTreeEngine:
         delta = round(self.current_preset_score - self.next_preset_score, 4)
 
         result: Dict[str, Any] = {
-            "preset_id": PRESET_ID,
+            "preset_id": self.preset_id,
             "language": self.language,
             "detected_languages": metrics.get("detected_languages", {}),
             "detected_language_confidences": metrics.get("detected_language_confidences", {}),

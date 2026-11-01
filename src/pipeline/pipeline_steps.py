@@ -64,6 +64,7 @@ def evaluate_quality_and_decision_tree(
         next_preset_score=next_preset_score,
         language=language,
         verification_layers=layers,
+        preset_id=preset,
     )
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset

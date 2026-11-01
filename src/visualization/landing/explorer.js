@@ -338,7 +338,7 @@ async function startSelectedPresetFromExplorer(docPath) {
     const docPathEl = document.getElementById('docPath');
     if (docPathEl) docPathEl.value = docPath;
     const presetEl = document.getElementById('inpPreset');
-    if (presetEl) presetEl.value = chosenPreset;
+    if (presetEl) { presetEl.value = chosenPreset; if (typeof onInpPresetChanged === 'function') onInpPresetChanged(); }
 
     if (typeof triggerRunPipeline === 'function') {
         await triggerRunPipeline(false);
