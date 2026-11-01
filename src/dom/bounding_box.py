@@ -100,7 +100,15 @@ class BoundingBox:
         raw_quad = data.get("quad")
         quad: Optional[List[List[float]]] = None
         if raw_quad is not None and isinstance(raw_quad, list):
-            quad = [[float(pt[0]), float(pt[1])] for pt in raw_quad if len(pt) >= 2]
+            quad_pts: List[List[float]] = []
+            for pt in raw_quad:
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                    p0 = pt[0]
+                    p1 = pt[1]
+                    if isinstance(p0, (int, float)) and isinstance(p1, (int, float)):
+                        quad_pts.append([float(p0), float(p1)])
+            if quad_pts:
+                quad = quad_pts
         return cls(x0=x0, y0=y0, x1=x1, y1=y1, angle=angle, quad=quad)
 
     def to_polygon(self, sx: float = 1.0, sy: float = 1.0) -> List[Tuple[float, float]]:

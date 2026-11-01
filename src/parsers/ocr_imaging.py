@@ -111,19 +111,18 @@ def crop_pdf_region(
         if pdf is None:
             raise RuntimeError(f"Failed to open PDF: {pdf_path}")
 
-        page_idx = max(0, page_number - 1)
-        if page_idx >= len(pdf):
+        if page_number < 1 or (page_number - 1) >= len(pdf):
             raise IndexError(f"Page index {page_number} out of range (total pages: {len(pdf)}).")
 
-        page = pdf[page_idx]
+        page = pdf[page_number - 1]
         page_w, page_h = page.get_size()
         try:
             full_pil = page.render(scale=scale).to_pil().convert("RGB")
         except Exception as ex:
             raise RuntimeError(f"Failed to render page: {ex}") from ex
 
-    scale_x = full_pil.width / page_w
-    scale_y = full_pil.height / page_h
+    scale_x = full_pil.width / page_w if page_w > 0 else scale
+    scale_y = full_pil.height / page_h if page_h > 0 else scale
 
     crop_x0 = max(0, int(round(x0 * scale_x)))
     crop_y0 = max(0, int(round(y0 * scale_y)))

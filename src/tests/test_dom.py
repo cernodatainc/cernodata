@@ -381,6 +381,25 @@ class TestDOMPrimitives(unittest.TestCase):
         self.assertEqual(ratio_res[0].bounding_box.y1, 50.0)
         self.assertEqual(ratio_res[1].bounding_box.y0, 50.0)
 
+    def test_bounding_box_from_dict_malformed_quad(self) -> None:
+        """Verifies from_dict gracefully ignores malformed or non-numeric quad coordinates."""
+        data = {
+            "x0": 5.0,
+            "y0": 10.0,
+            "x1": 50.0,
+            "y1": 60.0,
+            "quad": [None, 123, "invalid", [10.0], ["bad", "values"], [10.0, 20.0]],
+        }
+        bbox = BoundingBox.from_dict(data)
+        self.assertEqual(bbox.quad, [[10.0, 20.0]])
+
+    def test_detect_node_text_skew_1d_array_does_not_crash(self) -> None:
+        """Verifies detect_node_text_skew handles 1D flattened arrays safely."""
+        import numpy as np
+        from src.quality.skew import detect_node_text_skew
+        arr = np.zeros((100,), dtype=np.uint8)
+        self.assertEqual(detect_node_text_skew(arr), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

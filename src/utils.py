@@ -106,7 +106,10 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 50) -> int:
     attempts = max(0, max_attempts)
     for port in range(start_port, start_port + attempts):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            else:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 s.bind((_LOOPBACK_HOST, port))
                 return port

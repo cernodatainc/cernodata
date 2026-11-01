@@ -229,7 +229,7 @@ class SectionOCRParser:
 
         engine = self._get_engine()
         if engine is None:
-            return create_ocr_result(success=True, error="OCR engine not available.")
+            return create_ocr_result(success=False, error="OCR engine not available.")
 
         try:
             result = self._run_engine(engine, pil_img)

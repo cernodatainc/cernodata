@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import numpy as np
 
 logger = logging.getLogger("cernodata.quality.skew")
@@ -60,12 +60,19 @@ def _compute_median_skew_angle(angles: List[float]) -> float:
 
 def detect_node_text_skew(crop_np: np.ndarray) -> float:
     """Analyzes a numpy RGB crop of a text node to determine its local text line orientation angle."""
-    if not HAS_CV2 or crop_np is None or crop_np.size == 0 or crop_np.shape[0] < _MIN_CROP_SIDE_PX or crop_np.shape[1] < _MIN_CROP_SIDE_PX:
+    if (
+        not HAS_CV2
+        or crop_np is None
+        or crop_np.size == 0
+        or crop_np.ndim < 2
+        or crop_np.shape[0] < _MIN_CROP_SIDE_PX
+        or crop_np.shape[1] < _MIN_CROP_SIDE_PX
+    ):
         return 0.0
     return _compute_median_skew_angle(_extract_contour_angles(crop_np))
 
 
-def _render_page_images(pdf_path: str, scale: float) -> Dict[int, tuple]:
+def _render_page_images(pdf_path: str, scale: float) -> Dict[int, Tuple[np.ndarray, float, float]]:
     """Renders all PDF pages to RGB numpy arrays and scaling factors."""
     page_images: Dict[int, tuple] = {}
     with open_pdf(pdf_path) as pdf:

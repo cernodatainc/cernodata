@@ -252,6 +252,24 @@ class TestSectionOCRParser(unittest.TestCase):
         finally:
             set_default_section_parser(orig)
 
+    def test_parse_image_when_engine_unavailable(self) -> None:
+        """Verifies parse_image returns success=False when OCR engine is None."""
+        parser = SectionOCRParser(engine=None, engine_factory=lambda: None)
+        dummy_img = Image.new("RGB", (30, 30), color="white")
+        result = parser.parse_image(dummy_img)
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error"], "OCR engine not available.")
+
+    def test_crop_pdf_region_invalid_page_number_raises(self) -> None:
+        """Verifies crop_pdf_region raises IndexError when page_number < 1."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pdf_path = os.path.join(base_dir, "e2e", "Dokument 5.pdf")
+        if not os.path.exists(pdf_path):
+            self.skipTest("Sample PDF not found.")
+        from src.parsers.ocr_imaging import crop_pdf_region
+        with self.assertRaises(IndexError):
+            crop_pdf_region(pdf_path, page_number=0, bbox=(10.0, 10.0, 50.0, 50.0))
+
 
 if __name__ == "__main__":
     unittest.main()
