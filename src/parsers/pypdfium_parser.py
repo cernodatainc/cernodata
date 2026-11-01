@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import List, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.utils import generate_document_id, resolve_and_validate_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
@@ -66,6 +66,20 @@ def _classify_digital_node_type(text: str, is_first_on_page: bool) -> str:
 def _classify_ocr_node_type(text: str, is_first_line: bool) -> str:
     """Classifies OCR line text as heading or paragraph."""
     return DOMNodeType.HEADING.value if (is_first_line and _is_short_line(text)) else DOMNodeType.PARAGRAPH.value
+
+
+def _make_page_node(
+    page_no: int, node_counter: int, node_type: str, bbox: BoundingBox, content: Dict[str, Any]
+) -> DOMNode:
+    """Constructs a standardized page DOMNode."""
+    return DOMNode(
+        node_id=f"node_p{page_no}_n{node_counter}",
+        type=node_type,
+        global_page_index=page_no,
+        temp_slice_index=page_no,
+        bounding_box=bbox,
+        content=content,
+    )
 
 
 class PyPdfiumParser:
@@ -183,21 +197,11 @@ class PyPdfiumParser:
             if not bounded_text:
                 continue
 
-            node_type = _classify_digital_node_type(
-                bounded_text,
-                is_first_on_page=(len(nodes) == 0)
-            )
+            node_type = _classify_digital_node_type(bounded_text, is_first_on_page=(len(nodes) == 0))
             bbox = _convert_pdf_rect_to_bbox(rect, page_w, page_h)
-
-            node = DOMNode(
-                node_id=f"node_p{page_no}_n{node_counter}",
-                type=node_type,
-                global_page_index=page_no,
-                temp_slice_index=page_no,
-                bounding_box=bbox,
-                content={"raw_text": bounded_text, "source": "native_digital"}
+            nodes.append(
+                _make_page_node(page_no, node_counter, node_type, bbox, {"raw_text": bounded_text, "source": "native_digital"})
             )
-            nodes.append(node)
             node_counter += 1
 
         if not nodes:
@@ -227,13 +231,12 @@ class PyPdfiumParser:
         if not full_text:
             return None
 
-        return DOMNode(
-            node_id=f"node_p{page_no}_n{node_counter}",
-            type="paragraph",
-            global_page_index=page_no,
-            temp_slice_index=page_no,
-            bounding_box=BoundingBox(x0=36.0, y0=36.0, x1=page_w - 36.0, y1=page_h - 36.0, angle=0.0),
-            content={"raw_text": full_text, "source": "native_digital"}
+        return _make_page_node(
+            page_no,
+            node_counter,
+            "paragraph",
+            BoundingBox(x0=36.0, y0=36.0, x1=page_w - 36.0, y1=page_h - 36.0, angle=0.0),
+            {"raw_text": full_text, "source": "native_digital"},
         )
 
     def _extract_scanned_page_nodes(
@@ -277,20 +280,15 @@ class PyPdfiumParser:
                 page_h=page_h
             )
             node_type = _classify_ocr_node_type(line_text, is_first_line=(line_idx == 0))
-
-            node = DOMNode(
-                node_id=f"node_p{page_no}_n{node_counter}",
-                type=node_type,
-                global_page_index=page_no,
-                temp_slice_index=page_no,
-                bounding_box=bbox,
-                content={
-                    "raw_text": line_text,
-                    "confidence": line.get("confidence", 1.0),
-                    "source": "rapidocr_scanned"
-                }
+            nodes.append(
+                _make_page_node(
+                    page_no,
+                    node_counter,
+                    node_type,
+                    bbox,
+                    {"raw_text": line_text, "confidence": line.get("confidence", 1.0), "source": "rapidocr_scanned"},
+                )
             )
-            nodes.append(node)
             node_counter += 1
 
         return nodes, node_counter

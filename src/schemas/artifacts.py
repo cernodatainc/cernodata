@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from src.schemas.decision import DecisionTreeSchema
@@ -19,6 +19,19 @@ from src.schemas.violations import QualityViolationSchema, parse_violations_payl
 from src.utils import safe_load_json as _read_json_file
 
 logger = logging.getLogger("cernodata.schemas.artifacts")
+
+_ModelT = TypeVar("_ModelT", bound=BaseModel)
+
+
+def _validate_optional_dict(schema_cls: Type[_ModelT], raw: Any, label: str, run_dir: str) -> Optional[_ModelT]:
+    """Validates a dictionary against schema_cls, logging and returning None on failure."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return schema_cls.model_validate(raw)
+    except ValidationError as e:
+        logger.debug("Ignoring invalid %s in %s: %s", label, run_dir, e)
+        return None
 
 
 class ValidatedRunArtifacts(BaseModel):
@@ -73,46 +86,32 @@ def load_validated_run_artifacts(run_dir: str) -> Optional[ValidatedRunArtifacts
         return None
 
     # Load decision tree or execution result
-    dec_path = os.path.join(run_dir, "decision_tree.json")
-    dec_raw = _read_json_file(dec_path)
-
-    plan_res_path = os.path.join(run_dir, "plan_execution_result.json")
-    plan_res_raw = _read_json_file(plan_res_path)
-    exec_result: Optional[PipelineExecutionResultSchema] = None
-    if isinstance(plan_res_raw, dict):
-        try:
-            exec_result = PipelineExecutionResultSchema.model_validate(plan_res_raw)
-        except ValidationError as e:
-            logger.debug("Ignoring invalid plan_execution_result.json in %s: %s", run_dir, e)
+    dec_raw = _read_json_file(os.path.join(run_dir, "decision_tree.json"))
+    exec_result = _validate_optional_dict(
+        PipelineExecutionResultSchema,
+        _read_json_file(os.path.join(run_dir, "plan_execution_result.json")),
+        "plan_execution_result.json",
+        run_dir,
+    )
 
     if dec_raw is None and exec_result and exec_result.decision:
         dec_schema = exec_result.decision
-    elif isinstance(dec_raw, dict):
-        try:
-            dec_schema = DecisionTreeSchema.model_validate(dec_raw)
-        except ValidationError as e:
-            logger.debug("Dropping run %s: DecisionTree validation failed: %s", run_dir, e)
-            return None
     else:
-        logger.debug("Dropping run %s: missing decision_tree.json and valid plan_execution_result.json", run_dir)
-        return None
+        dec_opt = _validate_optional_dict(DecisionTreeSchema, dec_raw, "decision_tree.json", run_dir)
+        if dec_opt is None:
+            logger.debug("Dropping run %s: missing or invalid decision_tree.json and plan_execution_result.json", run_dir)
+            return None
+        dec_schema = dec_opt
 
     # Load plan if present
-    plan_schema: Optional[DocumentPlanSchema] = None
-    if exec_result and exec_result.plan:
-        plan_schema = exec_result.plan
-    else:
-        plan_path = os.path.join(run_dir, "plan.json")
-        plan_raw = _read_json_file(plan_path)
-        if isinstance(plan_raw, dict):
-            try:
-                plan_schema = DocumentPlanSchema.model_validate(plan_raw)
-            except ValidationError as e:
-                logger.debug("Ignoring invalid plan.json in %s: %s", run_dir, e)
+    plan_schema = (
+        exec_result.plan
+        if exec_result and exec_result.plan
+        else _validate_optional_dict(DocumentPlanSchema, _read_json_file(os.path.join(run_dir, "plan.json")), "plan.json", run_dir)
+    )
 
     # Load violations
-    q_viols_path = os.path.join(run_dir, "quality_violations.json")
-    viols_raw = _read_json_file(q_viols_path)
+    viols_raw = _read_json_file(os.path.join(run_dir, "quality_violations.json"))
     if viols_raw is None and exec_result and exec_result.violations:
         violations = exec_result.violations
     else:
@@ -122,17 +121,13 @@ def load_validated_run_artifacts(run_dir: str) -> Optional[ValidatedRunArtifacts
             violations = []
 
     # Optional raw DOM and diff
-    raw_dom_path = os.path.join(run_dir, "raw_document_dom.json")
-    raw_dom_data = _read_json_file(raw_dom_path)
-    raw_dom_schema: Optional[DocumentDOMSchema] = None
-    if isinstance(raw_dom_data, dict):
-        try:
-            raw_dom_schema = DocumentDOMSchema.model_validate(raw_dom_data)
-        except ValidationError as e:
-            logger.debug("Ignoring invalid raw_document_dom.json in %s: %s", run_dir, e)
-
-    diff_path = os.path.join(run_dir, "run_diff.json")
-    diff_data = _read_json_file(diff_path) or {}
+    raw_dom_schema = _validate_optional_dict(
+        DocumentDOMSchema,
+        _read_json_file(os.path.join(run_dir, "raw_document_dom.json")),
+        "raw_document_dom.json",
+        run_dir,
+    )
+    diff_data = _read_json_file(os.path.join(run_dir, "run_diff.json")) or {}
 
     chosen_preset = (
         dec_schema.chosen_preset

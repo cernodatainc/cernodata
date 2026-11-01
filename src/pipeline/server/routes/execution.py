@@ -71,6 +71,50 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         })
         return True
 
+    def _finalize_pipeline_run(
+        self,
+        res: PipelineExecutionResult,
+        pdf_path: str,
+        language: str,
+        default_preset: str,
+        label: str,
+    ) -> PipelineExecutionResult:
+        """Updates session state, persists run mapping, and marks progress complete."""
+        from src.pipeline.server.run_mappings import record_run_mapping
+
+        session = self.session
+        session.update_result_state(res, pdf_path=pdf_path, language=language)
+        dec = res.get("decision", {})
+        chosen_preset = str(dec.get("chosen_preset") or default_preset)
+        raw_score = dec.get("overall_confidence")
+        score = float(raw_score) if raw_score is not None else 0.0
+        raw_status = dec.get("status")
+        status = str(raw_status) if raw_status is not None else "UNKNOWN"
+        viols_count = len(res.get("violations", []))
+        t_end = datetime.now().strftime("%H:%M:%S")
+        out_dir = session.output_dir or "output"
+
+        record_run_mapping(
+            document_path=pdf_path,
+            run_id=out_dir,
+            output_dir=out_dir,
+            preset=chosen_preset,
+            status=status,
+            confidence=score,
+            violations_count=viols_count,
+            total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
+            per_page_confidence=dec.get("per_page_confidence", {}),
+            timestamp=t_end,
+            repo_root=session.repo_root,
+        )
+        session.set_completed(
+            status=status,
+            confidence=score,
+            violations_count=viols_count,
+            log=f"[{t_end}] [SUCCESS] {label} complete: Status '{status}', Confidence: {score:.4f}, Violations: {viols_count}.",
+        )
+        return res
+
     def _submit_and_send_run_result(
         self,
         task_fn: Callable[[], PipelineExecutionResult],
@@ -236,45 +280,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 verification_layers=resolved_run_layers,
                 progress_callback=on_progress,
             )
-            session.update_result_state(res, pdf_path=pdf_path, language=language)
-            dec = res.get("decision", {})
-            chosen_preset = str(dec.get("chosen_preset") or preset)
-            raw_score = dec.get("overall_confidence")
-            score = float(raw_score) if raw_score is not None else 0.0
-
-            raw_status = dec.get("status")
-            status = str(raw_status) if raw_status is not None else "UNKNOWN"
-
-            viols = res.get("violations", [])
-            viols_count = len(viols)
-
-            t_end = datetime.now().strftime("%H:%M:%S")
-            from src.pipeline.server.run_mappings import record_run_mapping
-
-            record_run_mapping(
-                document_path=pdf_path,
-                run_id=session.output_dir or "output",
-                output_dir=session.output_dir or "output",
-                preset=chosen_preset,
-                status=status,
-                confidence=score,
-                violations_count=viols_count,
-                total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
-                per_page_confidence=dec.get("per_page_confidence", {}),
-                timestamp=t_end,
-                repo_root=session.repo_root,
-            )
-
-            session.set_completed(
-                status=status,
-                confidence=score,
-                violations_count=viols_count,
-                log=(
-                    f"[{t_end}] [SUCCESS] Run complete: Status '{status}', "
-                    f"Confidence: {score:.4f}, Violations: {viols_count}."
-                ),
-            )
-            return res
+            return self._finalize_pipeline_run(res, pdf_path, language, preset, "Run")
 
         self._submit_and_send_run_result(
             task_fn=_execute_run,
@@ -306,8 +312,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         )
         from src.pipeline.orchestrator import run_pipeline
 
-        session = self.session
-        on_progress = session.make_progress_callback()
+        on_progress = self.session.make_progress_callback()
 
         def _execute_rerun() -> PipelineExecutionResult:
             res = run_pipeline(
@@ -320,41 +325,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 output_dir=RUN_OUTPUT_DIR,
                 progress_callback=on_progress,
             )
-            session.update_result_state(res, pdf_path=pdf_path, language=language)
-            dec = res.get("decision", {})
-            chosen_preset = str(dec.get("chosen_preset") or preset)
-            raw_score = dec.get("overall_confidence")
-            score = float(raw_score) if raw_score is not None else 0.0
-            raw_status = dec.get("status")
-            status = str(raw_status) if raw_status is not None else "UNKNOWN"
-            viols = res.get("violations", [])
-            viols_count = len(viols)
-            t_end = datetime.now().strftime("%H:%M:%S")
-            from src.pipeline.server.run_mappings import record_run_mapping
-
-            record_run_mapping(
-                document_path=pdf_path,
-                run_id=session.output_dir or "output",
-                output_dir=session.output_dir or "output",
-                preset=chosen_preset,
-                status=status,
-                confidence=score,
-                violations_count=viols_count,
-                total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
-                per_page_confidence=dec.get("per_page_confidence", {}),
-                timestamp=t_end,
-                repo_root=session.repo_root,
-            )
-            session.set_completed(
-                status=status,
-                confidence=score,
-                violations_count=viols_count,
-                log=(
-                    f"[{t_end}] [SUCCESS] Rerun complete: Status '{status}', "
-                    f"Confidence: {score:.4f}, Violations: {viols_count}."
-                ),
-            )
-            return res
+            return self._finalize_pipeline_run(res, pdf_path, language, preset, "Rerun")
 
         self._submit_and_send_run_result(
             task_fn=_execute_rerun,

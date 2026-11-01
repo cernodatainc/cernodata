@@ -10,10 +10,10 @@ from __future__ import annotations
 import glob
 import logging
 import os
+from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
-from typing import Any, Dict, Iterable, List, Optional, Set, Union
+from typing import Any, Dict, Iterable, List, Optional, Set
 
-from src.pipeline.server.artifacts import RunArtifacts
 from src.pipeline.server.http_utils import REPO_ROOT
 from src.schemas import ValidatedRunArtifacts, load_validated_run_artifacts
 
@@ -60,37 +60,13 @@ class RunMetadata:
         cls,
         norm_rel: str,
         match: str,
-        artifacts: Union[ValidatedRunArtifacts, RunArtifacts],
+        artifacts: ValidatedRunArtifacts,
     ) -> RunMetadata:
         """Constructs canonical RunMetadata directly from validated artifacts."""
-        if isinstance(artifacts, ValidatedRunArtifacts):
-            active_viols_pages = [str(v.global_page_index) for v in artifacts.active_violations]
-            node_pages = [str(n.global_page_index) for n in artifacts.dom.nodes]
-            raw_conf: Optional[float] = artifacts.overall_confidence
-            timestamp = artifacts.plan.created_at if artifacts.plan else ""
-            has_dom = True
-            has_plan = artifacts.plan is not None
-            total_pages = artifacts.dom.total_pages
-            per_page_conf = artifacts.decision.per_page_confidence
-        else:
-            active_viols = [
-                item for item in artifacts.violations
-                if str(item.get("suppressed", "false")).lower() not in ("true", "1")
-                and not item.get("accepted")
-                and not item.get("is_fixed")
-            ]
-            active_viols_pages = [str(v.get("global_page_index") or v.get("page") or 1) for v in active_viols]
-            node_pages = [
-                str(n.get("global_page_index") or n.get("temp_slice_index") or 1)
-                for n in artifacts.dom.get("nodes", [])
-            ]
-            raw_conf = artifacts.overall_confidence
-            timestamp = str(artifacts.plan.get("created_at") or "") if artifacts.plan else ""
-            has_dom = bool(artifacts.dom)
-            has_plan = artifacts.plan is not None
-            total_pages = int(artifacts.dom.get("total_pages", 1) or 1)
-            per_page_conf = artifacts.decision.get("per_page_confidence") or {}
-
+        active_viols_pages = [str(v.global_page_index) for v in artifacts.active_violations]
+        node_pages = [str(n.global_page_index) for n in artifacts.dom.nodes]
+        raw_conf: Optional[float] = artifacts.overall_confidence
+        timestamp = artifacts.plan.created_at if artifacts.plan else ""
         status = artifacts.status
         diff_scoring = (artifacts.diff or {}).get("scoring") or {}
         if diff_scoring:
@@ -105,14 +81,6 @@ class RunMetadata:
         violations_count = len(active_viols_pages)
         label = f"{doc_name} [{chosen_preset} | {status} {conf_val:.4f} | {violations_count} viols] ({norm_rel})"
 
-        per_page_viols: Dict[str, int] = {}
-        for p_num in active_viols_pages:
-            per_page_viols[p_num] = per_page_viols.get(p_num, 0) + 1
-
-        per_page_nodes: Dict[str, int] = {}
-        for p_num in node_pages:
-            per_page_nodes[p_num] = per_page_nodes.get(p_num, 0) + 1
-
         return cls(
             id=norm_rel,
             dir_path=norm_rel,
@@ -124,12 +92,12 @@ class RunMetadata:
             violations_count=violations_count,
             timestamp=timestamp,
             has_viewer=os.path.exists(os.path.join(match, "interactive_viewer.html")),
-            has_dom=has_dom,
-            has_plan=has_plan,
-            total_pages=total_pages,
-            per_page_confidence=per_page_conf,
-            per_page_violations=per_page_viols,
-            per_page_nodes=per_page_nodes,
+            has_dom=True,
+            has_plan=artifacts.plan is not None,
+            total_pages=artifacts.dom.total_pages,
+            per_page_confidence=artifacts.decision.per_page_confidence,
+            per_page_violations=dict(Counter(active_viols_pages)),
+            per_page_nodes=dict(Counter(node_pages)),
             label=label,
         )
 

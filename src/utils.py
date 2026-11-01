@@ -17,6 +17,7 @@ __all__ = [
     "resolve_and_validate_pdf_path",
     "generate_document_id",
     "safe_load_json",
+    "save_json",
 ]
 
 
@@ -30,6 +31,19 @@ def safe_load_json(file_path: Union[str, os.PathLike[str]], default: Any = None)
             return json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return default
+
+
+def save_json(
+    file_path: Union[str, os.PathLike[str]],
+    data: Any,
+    indent: Optional[int] = 2,
+) -> str:
+    """Serializes data to a UTF-8 JSON file, creating parent directories if needed."""
+    fpath = os.fspath(file_path)
+    mkdirs(os.path.dirname(fpath))
+    with open(fpath, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=indent)
+    return fpath
 
 
 _DOC_ID_MODULUS = 1_000_000

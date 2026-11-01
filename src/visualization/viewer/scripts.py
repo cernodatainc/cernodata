@@ -38,9 +38,7 @@ def bundle_viewer_js() -> str:
     return bundle_js_modules(_JS_DIR, JS_MODULE_ORDER)
 
 
-def get_viewer_js() -> str:
-    """Returns client script content assembled from subdivided modular JS sources."""
-    return bundle_viewer_js()
+get_viewer_js = bundle_viewer_js
 
 
 def build_viewer_script(

@@ -154,15 +154,16 @@ class SymbolsLayerHandler(VerificationLayerHandler):
         if gb_ratio <= threshold:
             return []
 
-        reasons = []
-        if details.get("unicode_ratio", 0) > 0:
-            reasons.append("unicode corruption")
-        if details.get("rep_ratio", 0) > 0:
-            reasons.append("character repetition")
-        if details.get("soup_ratio", 0) > 0:
-            reasons.append("punctuation soup / fragmented OCR tokens")
-        if details.get("low_alnum_penalty", 0) > 0:
-            reasons.append("low alphanumeric ratio")
+        reasons = [
+            label
+            for key, label in (
+                ("unicode_ratio", "unicode corruption"),
+                ("rep_ratio", "character repetition"),
+                ("soup_ratio", "punctuation soup / fragmented OCR tokens"),
+                ("low_alnum_penalty", "low alphanumeric ratio"),
+            )
+            if details.get(key, 0) > 0
+        ]
 
         desc_detail = f" ({', '.join(reasons)})" if reasons else ""
         return [
@@ -223,37 +224,34 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
             return []
 
         violations: List[Dict[str, Any]] = []
-        for anom_char, match_snippet, suggested in config.find_anomalous_substitutions(raw_text):
-            rewrite = raw_text.replace(match_snippet, suggested, 1) if match_snippet else raw_text
-            violations.append(
-                make_node_violation(
-                    node=node,
-                    counter=counter + len(violations),
-                    v_type="diacritic",
-                    rule_type="ocr_character_substitution",
-                    severity="WARNING",
-                    detected_snippet=match_snippet,
-                    suggestion=rewrite,
-                    suggested_correction=suggested,
-                    description=f"OCR '{anom_char}' character substitution anomaly detected ('{match_snippet}' -> '{suggested}')",
+        checks = (
+            (
+                "ocr_character_substitution",
+                config.find_anomalous_substitutions(raw_text),
+                lambda c, m, s: f"OCR '{c}' character substitution anomaly detected ('{m}' -> '{s}')",
+            ),
+            (
+                "diacritic_conflict",
+                config.find_diacritic_conflicts(raw_text),
+                lambda c, m, s: f"Diacritic conflict detected: '{c}' is not valid in {config.name} ('{m}' -> '{s}')",
+            ),
+        )
+        for rule_type, items, fmt_desc in checks:
+            for char_val, match_snippet, suggested in items:
+                rewrite = raw_text.replace(match_snippet, suggested, 1) if match_snippet else raw_text
+                violations.append(
+                    make_node_violation(
+                        node=node,
+                        counter=counter + len(violations),
+                        v_type="diacritic",
+                        rule_type=rule_type,
+                        severity="WARNING",
+                        detected_snippet=match_snippet,
+                        suggestion=rewrite,
+                        suggested_correction=suggested,
+                        description=fmt_desc(char_val, match_snippet, suggested),
+                    )
                 )
-            )
-
-        for conf_char, match_snippet, suggested in config.find_diacritic_conflicts(raw_text):
-            rewrite = raw_text.replace(match_snippet, suggested, 1) if match_snippet else raw_text
-            violations.append(
-                make_node_violation(
-                    node=node,
-                    counter=counter + len(violations),
-                    v_type="diacritic",
-                    rule_type="diacritic_conflict",
-                    severity="WARNING",
-                    detected_snippet=match_snippet,
-                    suggestion=rewrite,
-                    suggested_correction=suggested,
-                    description=f"Diacritic conflict detected: '{conf_char}' is not valid in {config.name} ('{match_snippet}' -> '{suggested}')",
-                )
-            )
         return violations
 
     def detect_violations(

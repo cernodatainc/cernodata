@@ -41,22 +41,14 @@ class DOMNode:
             "content": self.content,
             "violations": self.violations,
         }
-        if self.template_hint_applied:
-            res["template_hint_applied"] = self.template_hint_applied
-        if self.is_merged:
-            res["is_merged"] = self.is_merged
-        if self.merged_from:
-            res["merged_from"] = self.merged_from
-        if self.merged_at:
-            res["merged_at"] = self.merged_at
-        if self.user_correction_note:
-            res["user_correction_note"] = self.user_correction_note
-        if self.is_incorrect_text is not None:
-            res["is_incorrect_text"] = self.is_incorrect_text
-        if self.ocr_confidence is not None:
-            res["ocr_confidence"] = self.ocr_confidence
-        if self.is_custom:
-            res["is_custom"] = self.is_custom
+        for key in ("template_hint_applied", "is_merged", "merged_from", "merged_at", "user_correction_note", "is_custom"):
+            val = getattr(self, key)
+            if val:
+                res[key] = val
+        for key in ("is_incorrect_text", "ocr_confidence"):
+            val = getattr(self, key)
+            if val is not None:
+                res[key] = val
         return res
 
     @classmethod
@@ -119,48 +111,21 @@ class DOMNode:
             ratio = max(0.05, min(0.95, len(text1) / total_len)) if total_len > 0 else 0.5
 
         y_mid = round(self.bounding_box.y0 + (self.bounding_box.y1 - self.bounding_box.y0) * ratio, 2)
-
-        bbox1 = BoundingBox(
-            x0=self.bounding_box.x0,
-            y0=self.bounding_box.y0,
-            x1=self.bounding_box.x1,
-            y1=y_mid,
-            angle=self.bounding_box.angle,
-        )
-        bbox2 = BoundingBox(
-            x0=self.bounding_box.x0,
-            y0=y_mid,
-            x1=self.bounding_box.x1,
-            y1=self.bounding_box.y1,
-            angle=self.bounding_box.angle,
-        )
-
-        content1 = dict(self.content)
-        content1["raw_text"] = text1
-        content2 = dict(self.content)
-        content2["raw_text"] = text2
-
-        node1 = DOMNode(
-            node_id=f"{self.node_id}_s1",
-            type=self.type,
-            global_page_index=self.global_page_index,
-            temp_slice_index=self.temp_slice_index,
-            bounding_box=bbox1,
-            content=content1,
-            violations=[],
-            user_correction_note=text1,
-            is_custom=True,
-        )
-        node2 = DOMNode(
-            node_id=f"{self.node_id}_s2",
-            type=self.type,
-            global_page_index=self.global_page_index,
-            temp_slice_index=self.temp_slice_index,
-            bounding_box=bbox2,
-            content=content2,
-            violations=[],
-            user_correction_note=text2,
-            is_custom=True,
-        )
-        return [node1, node2]
+        parts = ((1, self.bounding_box.y0, y_mid, text1), (2, y_mid, self.bounding_box.y1, text2))
+        return [
+            DOMNode(
+                node_id=f"{self.node_id}_s{idx}",
+                type=self.type,
+                global_page_index=self.global_page_index,
+                temp_slice_index=self.temp_slice_index,
+                bounding_box=BoundingBox(
+                    x0=self.bounding_box.x0, y0=y0, x1=self.bounding_box.x1, y1=y1, angle=self.bounding_box.angle
+                ),
+                content={**self.content, "raw_text": txt},
+                violations=[],
+                user_correction_note=txt,
+                is_custom=True,
+            )
+            for idx, y0, y1, txt in parts
+        ]
 

@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Set
 
-from src.utils import mkdirs
+from src.utils import save_json
 
 DEFAULT_PLANNER_LAYERS: List[str] = ["symbols", "diacritics", "structure", "tables", "geometry"]
 
@@ -37,13 +37,8 @@ class ExtensibleOptionsMixin:
         else:
             self.options[key] = value
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieves an attribute or option value safely."""
-        return self.get_option(key, default)
-
-    def set(self, key: str, value: Any) -> None:
-        """Sets an arbitrary option or attribute value."""
-        self.set_option(key, value)
+    get = get_option
+    set = set_option
 
     def __getitem__(self, key: str) -> Any:
         val = self.get_option(key)
@@ -191,24 +186,13 @@ class DocumentPlan(ExtensibleOptionsMixin):
         return self.criteria.security
 
     def to_dict(self) -> Dict[str, Any]:
-        res = {
-            "document_path": self.document_path,
+        res = asdict(self)
+        res.update({
             "criteria": self.criteria.to_dict(),
-            "taxonomy": self.criteria.taxonomy,
-            "target": self.criteria.target,
-            "security": self.criteria.security,
-            "language": self.language,
-            "target_threshold": self.target_threshold,
-            "primary_preset": self.primary_preset,
-            "fallback_queue": self.fallback_queue,
-            "preset_order": self.preset_order,
-            "suggested_order": self.suggested_order,
-            "overridden": self.overridden,
-            "scores": self.scores,
-            "verification_layers": self.verification_layers,
-            "options": self.options,
-            "created_at": self.created_at,
-        }
+            "taxonomy": self.taxonomy,
+            "target": self.target,
+            "security": self.security,
+        })
         return self._merge_options(res)
 
     def to_ingestion_config(
@@ -234,11 +218,7 @@ class DocumentPlan(ExtensibleOptionsMixin):
         return replace(self, **changes)
 
     def save(self, output_path: str = os.path.join("output", "plan.json")) -> str:
-        dir_path = os.path.dirname(output_path)
-        mkdirs(dir_path)
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2)
-        return output_path
+        return save_json(output_path, self.to_dict())
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> DocumentPlan:

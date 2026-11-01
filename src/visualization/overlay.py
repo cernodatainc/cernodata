@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont
 from src.utils import mkdirs
 from src.dom import DocumentDOM, DOMNode
@@ -162,9 +162,15 @@ class PageVisualizer:
         page_nodes, page_violations = _group_by_page(dom, violations)
         per_page: Dict[Union[int, str], Any] = decision.get("per_page_confidence", {}) if decision else {}
 
-        rendered_pages: Set[int] = set()
-        for page_no, pil_img, page_w, page_h in self._iter_pdf_page_backgrounds(pdf_path):
-            rendered_pages.add(page_no)
+        pages_to_render = list(self._iter_pdf_page_backgrounds(pdf_path))
+        if not pages_to_render:
+            canvas_w, canvas_h = int(612 * self.scale), int(792 * self.scale)
+            pages_to_render = [
+                (page_no, Image.new("RGBA", (canvas_w, canvas_h), (245, 247, 250, 255)), 612.0, 792.0)
+                for page_no in page_nodes
+            ]
+
+        for page_no, pil_img, page_w, page_h in pages_to_render:
             nodes_for_page = page_nodes.get(page_no, [])
             viols_for_page = page_violations.get(page_no, [])
             p_conf = per_page.get(page_no)
@@ -183,26 +189,6 @@ class PageVisualizer:
             output_paths.append(out_path)
             pil_img.close()
             overlay_img.close()
-
-        if not rendered_pages:
-            for page_no, nodes_for_page in page_nodes.items():
-                canvas_w, canvas_h = int(612 * self.scale), int(792 * self.scale)
-                pil_img = Image.new("RGBA", (canvas_w, canvas_h), (245, 247, 250, 255))
-                viols_for_page = page_violations.get(page_no, [])
-                p_conf = per_page.get(page_no)
-                if p_conf is None:
-                    p_conf = per_page.get(str(page_no))
-                if p_conf is None and decision:
-                    p_conf = decision.get("overall_confidence")
-                overlay_img = self._draw_nodes_on_image(
-                    pil_img, page_no, 612.0, 792.0, nodes_for_page, viols_for_page,
-                    confidence_score=p_conf, draw_bounding_boxes=should_draw_bbox,
-                )
-                out_path = os.path.join(output_dir, f"overlay_page_{page_no}.png")
-                overlay_img.save(out_path)
-                output_paths.append(out_path)
-                pil_img.close()
-                overlay_img.close()
 
         return output_paths
 

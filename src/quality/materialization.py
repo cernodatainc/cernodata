@@ -8,7 +8,6 @@ materializes the results onto DOM nodes, and persists updated artifacts to disk.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import asdict, dataclass, field
@@ -19,7 +18,7 @@ from src.dom import DocumentDOM
 from src.quality.evaluator import evaluate_document_confidence
 from src.quality.layers import normalize_layer_name, normalize_layers
 from src.quality.violations import detect_quality_violations
-from src.utils import mkdirs
+from src.utils import mkdirs, safe_load_json, save_json
 
 logger = logging.getLogger("cernodata.quality.materialization")
 
@@ -143,11 +142,7 @@ class MaterializedVerificationResult:
     def save(self, target_dir: Optional[str] = None) -> str:
         """Saves materialized verification report to disk and returns file path."""
         out_dir = target_dir or self.output_dir or "output"
-        mkdirs(out_dir)
-        report_path = os.path.join(out_dir, "verification_result.json")
-        with open(report_path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2)
-        return report_path
+        return save_json(os.path.join(out_dir, "verification_result.json"), self.to_dict())
 
 
 def materialize_document_verification(
@@ -213,43 +208,35 @@ def materialize_document_verification(
         mkdirs(output_dir)
         result.save(output_dir)
 
-        viol_data = {
-            "document_id": dom.document_id,
-            "source_filename": dom.source_filename,
-            "language": language or "en",
-            "detected_languages": metrics.get("detected_languages", {}),
-            "primary_detected_language": metrics.get("primary_detected_language", "en"),
-            "selected_layers": active_layers,
-            "layer_scores": layer_scores,
-            "total_violations": len(violations),
-            "violations": violations,
-            "materialized_at": materialized_time,
-        }
-        with open(os.path.join(output_dir, "quality_violations.json"), "w", encoding="utf-8") as f:
-            json.dump(viol_data, f, indent=2)
-
+        save_json(
+            os.path.join(output_dir, "quality_violations.json"),
+            {
+                "document_id": dom.document_id,
+                "source_filename": dom.source_filename,
+                "language": language or "en",
+                "detected_languages": metrics.get("detected_languages", {}),
+                "primary_detected_language": metrics.get("primary_detected_language", "en"),
+                "selected_layers": active_layers,
+                "layer_scores": layer_scores,
+                "total_violations": len(violations),
+                "violations": violations,
+                "materialized_at": materialized_time,
+            },
+        )
         decision_record.pop("per_page_layer_scores", None)
-        with open(os.path.join(output_dir, "decision_tree.json"), "w", encoding="utf-8") as f:
-            json.dump(decision_record, f, indent=2)
-
-        with open(os.path.join(output_dir, "document_dom.json"), "w", encoding="utf-8") as f:
-            json.dump(dom.to_dict(), f, indent=2)
+        save_json(os.path.join(output_dir, "decision_tree.json"), decision_record)
+        save_json(os.path.join(output_dir, "document_dom.json"), dom.to_dict())
 
         plan_res_file = os.path.join(output_dir, "plan_execution_result.json")
-        if os.path.exists(plan_res_file):
-            try:
-                with open(plan_res_file, "r", encoding="utf-8") as f:
-                    plan_data = json.load(f)
-                plan_data.update({
-                    "decision": decision_record,
-                    "total_violations": len(violations),
-                    "status": status,
-                    "selected_layers": active_layers,
-                    "materialized_at": materialized_time,
-                })
-                with open(plan_res_file, "w", encoding="utf-8") as f:
-                    json.dump(plan_data, f, indent=2)
-            except Exception as ex:
-                logger.debug("Could not update plan_execution_result.json: %s", ex)
+        plan_data = safe_load_json(plan_res_file)
+        if isinstance(plan_data, dict):
+            plan_data.update({
+                "decision": decision_record,
+                "total_violations": len(violations),
+                "status": status,
+                "selected_layers": active_layers,
+                "materialized_at": materialized_time,
+            })
+            save_json(plan_res_file, plan_data)
 
     return result

@@ -62,9 +62,7 @@ def bundle_landing_js() -> str:
     )
 
 
-def get_landing_js() -> str:
-    """Retrieves dynamically assembled landing dashboard JavaScript content."""
-    return bundle_landing_js()
+get_landing_js = bundle_landing_js
 
 
 def bundle_data_shape_config_js() -> str:
@@ -76,9 +74,7 @@ def bundle_data_shape_config_js() -> str:
     )
 
 
-def get_data_shape_config_js() -> str:
-    """Retrieves dynamically assembled data shape planner JavaScript content."""
-    return bundle_data_shape_config_js()
+get_data_shape_config_js = bundle_data_shape_config_js
 
 
 def get_viewer_js() -> str:

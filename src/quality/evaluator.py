@@ -148,17 +148,15 @@ def evaluate_page_confidence_details(
     final_score = max(0.0, float(base_score - page_penalty))
 
     layer_breakdown: Dict[str, float] = {}
-    if active_layers.symbols and char_scores:
-        layer_breakdown[VerificationLayer.SYMBOLS.value] = round(float(sum(char_scores) / len(char_scores)), 4)
-    if active_layers.diacritics and lang_scores:
-        d_avg = float(sum(lang_scores) / len(lang_scores))
-        layer_breakdown[VerificationLayer.DIACRITICS.value] = round(max(0.0, float(d_avg - page_penalty)), 4)
-    if active_layers.structure and struct_scores:
-        layer_breakdown[VerificationLayer.STRUCTURE.value] = round(float(sum(struct_scores) / len(struct_scores)), 4)
-    if active_layers.tables and table_scores:
-        layer_breakdown[VerificationLayer.TABLES.value] = round(float(sum(table_scores) / len(table_scores)), 4)
-    if active_layers.geometry and geom_scores:
-        layer_breakdown[VerificationLayer.GEOMETRY.value] = round(float(sum(geom_scores) / len(geom_scores)), 4)
+    for is_enabled, layer_key, scores, penalty in (
+        (active_layers.symbols, VerificationLayer.SYMBOLS.value, char_scores, 0.0),
+        (active_layers.diacritics, VerificationLayer.DIACRITICS.value, lang_scores, page_penalty),
+        (active_layers.structure, VerificationLayer.STRUCTURE.value, struct_scores, 0.0),
+        (active_layers.tables, VerificationLayer.TABLES.value, table_scores, 0.0),
+        (active_layers.geometry, VerificationLayer.GEOMETRY.value, geom_scores, 0.0),
+    ):
+        if is_enabled and scores:
+            layer_breakdown[layer_key] = round(max(0.0, float(sum(scores) / len(scores) - penalty)), 4)
 
     return final_score, layer_breakdown
 

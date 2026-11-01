@@ -99,14 +99,7 @@ def normalize_bbox_coords(
         return float(bbox.x0), float(bbox.y0), float(bbox.x1), float(bbox.y1)
 
     if isinstance(bbox, dict):
-        if "x0" in bbox and "x1" in bbox:
-            return (
-                float(bbox.get("x0", 0.0)),
-                float(bbox.get("y0", 0.0)),
-                float(bbox.get("x1", 0.0)),
-                float(bbox.get("y1", 0.0)),
-            )
-        if "left" in bbox and "right" in bbox:
+        if "left" in bbox and "right" in bbox and "x0" not in bbox:
             return (
                 float(bbox.get("left", 0.0)),
                 float(bbox.get("top", 0.0)),

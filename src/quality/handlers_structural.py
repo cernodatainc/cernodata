@@ -159,41 +159,24 @@ class GeometryLayerHandler(VerificationLayerHandler):
         violations: List[Dict[str, Any]] = []
         for node in dom.nodes:
             bbox = node.bounding_box
-            snippet = str(node.content.get("raw_text", ""))[:60]
+            issue: Optional[ tuple[str, str, str] ] = None
             if bbox.x1 < bbox.x0 or bbox.y1 < bbox.y0:
-                violations.append(
-                    make_node_violation(
-                        node=node,
-                        counter=counter + len(violations),
-                        v_type=VerificationLayer.GEOMETRY.value,
-                        rule_type="inverted_bounding_box",
-                        severity="HIGH",
-                        detected_snippet=snippet,
-                        description=f"Inverted bounding box coordinates ({bbox.x0}, {bbox.y0}) -> ({bbox.x1}, {bbox.y1})",
-                    )
-                )
+                issue = ("inverted_bounding_box", "HIGH", f"Inverted bounding box coordinates ({bbox.x0}, {bbox.y0}) -> ({bbox.x1}, {bbox.y1})")
             elif bbox.x0 < 0.0 or bbox.y0 < 0.0:
-                violations.append(
-                    make_node_violation(
-                        node=node,
-                        counter=counter + len(violations),
-                        v_type=VerificationLayer.GEOMETRY.value,
-                        rule_type="out_of_bounds_bounding_box",
-                        severity="WARNING",
-                        detected_snippet=snippet,
-                        description=f"Negative coordinate out-of-bounds bounding box ({bbox.x0}, {bbox.y0})",
-                    )
-                )
+                issue = ("out_of_bounds_bounding_box", "WARNING", f"Negative coordinate out-of-bounds bounding box ({bbox.x0}, {bbox.y0})")
             elif bbox.width <= 0.0 or bbox.height <= 0.0:
+                issue = ("zero_area_bounding_box", "WARNING", f"Degenerate zero-area bounding box ({bbox.width}x{bbox.height})")
+            if issue is not None:
+                rule_type, severity, desc = issue
                 violations.append(
                     make_node_violation(
                         node=node,
                         counter=counter + len(violations),
                         v_type=VerificationLayer.GEOMETRY.value,
-                        rule_type="zero_area_bounding_box",
-                        severity="WARNING",
-                        detected_snippet=snippet,
-                        description=f"Degenerate zero-area bounding box ({bbox.width}x{bbox.height})",
+                        rule_type=rule_type,
+                        severity=severity,
+                        detected_snippet=str(node.content.get("raw_text", ""))[:60],
+                        description=desc,
                     )
                 )
         return violations

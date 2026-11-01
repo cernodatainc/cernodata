@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 from src.pipeline.server.http_utils import parse_run_dir_and_step, send_json_response
 from src.pipeline.server.router import api_router
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
-from src.utils import mkdirs
+from src.utils import mkdirs, save_json
 
 
 class PersistenceRoutesMixin(BaseApiRoutesMixin):
@@ -48,33 +48,18 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
             return
 
         mkdirs(output_dir)
-        dom_file = os.path.join(output_dir, "document_dom.json")
-        with open(dom_file, "w", encoding="utf-8") as f:
-            json.dump(dom_data, f, indent=2)
-
-        raw_dom = payload.get("raw_dom")
-        if raw_dom is not None:
-            raw_file = os.path.join(output_dir, "raw_document_dom.json")
-            with open(raw_file, "w", encoding="utf-8") as f:
-                json.dump(raw_dom, f, indent=2)
-
+        dom_file = save_json(os.path.join(output_dir, "document_dom.json"), dom_data)
         diff_data = payload.get("diff")
-        if diff_data is not None:
-            diff_file = os.path.join(output_dir, "run_diff.json")
-            with open(diff_file, "w", encoding="utf-8") as f:
-                json.dump(diff_data, f, indent=2)
-
         violations_data = payload.get("violations")
-        if violations_data is not None:
-            viol_file = os.path.join(output_dir, "quality_violations.json")
-            with open(viol_file, "w", encoding="utf-8") as f:
-                json.dump(violations_data, f, indent=2)
-
         decision_data = payload.get("decision")
-        if decision_data is not None:
-            dec_file = os.path.join(output_dir, "decision_tree.json")
-            with open(dec_file, "w", encoding="utf-8") as f:
-                json.dump(decision_data, f, indent=2)
+        for filename, item in (
+            ("raw_document_dom.json", payload.get("raw_dom")),
+            ("run_diff.json", diff_data),
+            ("quality_violations.json", violations_data),
+            ("decision_tree.json", decision_data),
+        ):
+            if item is not None:
+                save_json(os.path.join(output_dir, filename), item)
 
         self.session.viewer_data = None
         if self.session.current_result:

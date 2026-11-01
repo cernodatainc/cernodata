@@ -9,11 +9,19 @@ from __future__ import annotations
 import base64
 import io
 import logging
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional
 
 from src.parsers.pdf_utils import open_pdf
 
 logger = logging.getLogger("cernodata.visualization.pdf_renderer")
+
+
+def _render_pdf_page_uri(pdf_page: Any, scale: float) -> str:
+    """Renders a pypdfium2 page to an RGB PNG base64 data URI."""
+    pil_img = pdf_page.render(scale=scale).to_pil().convert("RGB")
+    buf = io.BytesIO()
+    pil_img.save(buf, format="PNG")
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 
 def page_to_base64(pdf_path: str, page_index: int = 0, scale: float = 150 / 72.0) -> str:
@@ -21,10 +29,7 @@ def page_to_base64(pdf_path: str, page_index: int = 0, scale: float = 150 / 72.0
     with open_pdf(pdf_path) as pdf:
         if pdf is not None and 0 <= page_index < len(pdf):
             try:
-                pil_img = pdf[page_index].render(scale=scale).to_pil().convert("RGB")
-                buf = io.BytesIO()
-                pil_img.save(buf, format="PNG")
-                return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+                return _render_pdf_page_uri(pdf[page_index], scale)
             except Exception as e:
                 logger.warning("Base64 page render error: %s", e)
 
@@ -54,10 +59,7 @@ def render_all_pages_to_base64(pdf_path: str, total_pages: Optional[int] = None,
             count = len(pdf) if total_pages is None else min(len(pdf), total_pages)
             for i in range(count):
                 try:
-                    pil_img = pdf[i].render(scale=scale).to_pil().convert("RGB")
-                    buf = io.BytesIO()
-                    pil_img.save(buf, format="PNG")
-                    images.append(f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}")
+                    images.append(_render_pdf_page_uri(pdf[i], scale))
                 except Exception as e:
                     logger.warning("Base64 all pages render error on page %d: %s", i, e)
             if images:

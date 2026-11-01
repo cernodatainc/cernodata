@@ -4,12 +4,12 @@ src/dom/document.py
 DocumentDOM tree container primitive.
 """
 
-import os
 import json
 import datetime
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from src.dom.node import DOMNode
+from src.utils import save_json
 
 
 @dataclass
@@ -32,14 +32,11 @@ class DocumentDOM:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DocumentDOM":
         """Reconstructs DocumentDOM from serialized dictionary representation."""
-        raw_nodes = data.get("nodes", [])
-        nodes: List[DOMNode] = []
-        for n in raw_nodes:
-            if isinstance(n, dict):
-                nodes.append(DOMNode.from_dict(n))
-            elif isinstance(n, DOMNode):
-                nodes.append(n)
-
+        nodes = [
+            DOMNode.from_dict(n) if isinstance(n, dict) else n
+            for n in data.get("nodes", [])
+            if isinstance(n, (dict, DOMNode))
+        ]
         total_pages = data.get("total_pages")
         if total_pages is None:
             total_pages = max((n.global_page_index for n in nodes), default=1)
@@ -68,12 +65,7 @@ class DocumentDOM:
 
     def save(self, filepath: str, indent: int = 2) -> None:
         """Serializes and saves DocumentDOM to a target JSON file path."""
-        from src.utils import mkdirs
-        dir_name = os.path.dirname(filepath)
-        if dir_name:
-            mkdirs(dir_name)
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=indent)
+        save_json(filepath, self.to_dict(), indent=indent)
 
     def merge_nodes(
         self,
@@ -140,15 +132,11 @@ class DocumentDOM:
             merged_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
 
-        new_nodes: List[DOMNode] = []
-        for n in self.nodes:
-            if n.node_id == upper.node_id:
-                new_nodes.append(merged_node)
-            elif n.node_id == lower.node_id:
-                continue
-            else:
-                new_nodes.append(n)
-        self.nodes = new_nodes
+        self.nodes = [
+            merged_node if n.node_id == upper.node_id else n
+            for n in self.nodes
+            if n.node_id != lower.node_id
+        ]
         return merged_node
 
     def merge_sliced_dom(
