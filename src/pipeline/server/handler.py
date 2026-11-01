@@ -181,6 +181,11 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             "/api/save_dom": self._handle_post_save_dom,
             "/api/parse_section_ocr": self._handle_post_parse_ocr,
             "/api/ocr_section": self._handle_post_parse_ocr,
+            "/api/documents": self._handle_post_add_document,
+            "/api/add_file": self._handle_post_add_document,
+            "/api/upload": self._handle_post_add_document,
+            "/api/open_file_dialog": self._handle_post_open_file_dialog,
+            "/api/browse_files": self._handle_post_open_file_dialog,
         }
         handler_fn = post_handlers.get(raw_path)
         if handler_fn is not None:

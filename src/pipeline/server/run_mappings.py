@@ -46,6 +46,7 @@ __all__ = [
     "load_persistent_mappings",
     "normalize_path",
     "record_run_mapping",
+    "register_document_path",
     "remove_run_mapping",
     "save_persistent_mappings",
 ]
@@ -139,6 +140,17 @@ def record_run_mapping(
 
         doc_entry["runs"] = existing_runs
         save_persistent_mappings(mappings, repo_root)
+
+
+def register_document_path(document_path: str, repo_root: Optional[str] = None) -> None:
+    """Records a document path in persistent mappings without executing a run or copying files."""
+    root = repo_root or REPO_ROOT
+    norm = normalize_path(document_path)
+    with _LOCK:
+        mappings = load_persistent_mappings(root)
+        if norm not in mappings:
+            mappings[norm] = {"runs": []}
+            save_persistent_mappings(mappings, root)
 
 
 def _record_removal_keys(

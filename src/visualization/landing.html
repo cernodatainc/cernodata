@@ -105,9 +105,13 @@
                                     oninput="onExplorerSearchChanged(this.value)">
                                 <button class="btn btn-secondary btn-sm" onclick="refreshExplorerData()"
                                     title="Rescan files and runs">Rescan</button>
+                                <button class="btn btn-primary btn-sm btn-icon-plus" id="btnExplorerAddFile"
+                                    onclick="triggerAddFileDiscovery()" title="Add new files">+</button>
                                 <button class="btn btn-subtle btn-sm hint-toggle-btn" id="btnToggleHints"
                                     onclick="toggleHintsFromToolbar()" title="Toggle next-step guidance hints">Hints:
                                     On</button>
+                                <input type="file" id="explorerFileInput" class="hidden-compat" accept=".pdf" multiple
+                                    onchange="handleExplorerFileInputChange(event)">
                             </div>
                         </div>
 
@@ -132,7 +136,10 @@
                             <!-- Left Pane: Quasi File Explorer Tree -->
                             <div class="explorer-tree-pane">
                                 <div class="explorer-pane-header">
-                                    <span>Explorer</span>
+                                    <div class="explorer-pane-title-group">
+                                        <span>Explorer</span>
+                                        <button class="btn-pane-add" id="btnTreeAddFile" onclick="triggerAddFileDiscovery()" title="Add new files">+</button>
+                                    </div>
                                     <span class="explorer-badge" id="explorerDocCount">Loading...</span>
                                 </div>
                                 <div class="explorer-tree-content" id="explorerTreeContainer">

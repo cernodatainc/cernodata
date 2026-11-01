@@ -24,9 +24,7 @@ async function loadFileRunMappings() {
         const allMappings = data.all_mappings || [];
         const fileSets = data.file_sets || [];
 
-        if (currentExplorerDoc && !allMappings.some(m => m.file_path === currentExplorerDoc)) {
-            currentExplorerDoc = data.active_file || (allMappings[0] ? allMappings[0].file_path : '');
-        } else if (!currentExplorerDoc) {
+        if (!currentExplorerDoc || !allMappings.some(m => m.file_path === currentExplorerDoc)) {
             currentExplorerDoc = data.active_file || (allMappings[0] ? allMappings[0].file_path : '');
         }
 
@@ -116,7 +114,7 @@ function renderExplorerTree() {
     const query = explorerSearchQuery.toLowerCase().trim();
     const fileSets = window.explorerData.file_sets || [];
     if (fileSets.length === 0) {
-        container.innerHTML = '<div class="explorer-empty-msg">No documents discovered.</div>';
+        container.innerHTML = '<div class="explorer-empty-msg">No documents discovered. <button class="btn btn-primary btn-xs" onclick="triggerAddFileDiscovery()">+ Add files</button></div>';
         return;
     }
 
@@ -193,6 +191,8 @@ function renderExplorerTree() {
         html += '</div>';
     });
 
+    html += '<div class="tree-node tree-add-doc-node"><div class="tree-row tree-add-doc-row" onclick="triggerAddFileDiscovery()" title="Open file explorer to add new documents">'
+        + '<span class="tree-prompt-plus">+</span><span class="tree-label add-label">Add documents...</span></div></div>';
     html += '</div>';
     container.innerHTML = html;
 }
@@ -415,14 +415,12 @@ function selectExplorerDoc(docPath) {
     const docEntry = allMappings.find(m => m.file_path === docPath);
     if (docEntry) {
         currentExplorerFolder = docEntry.file_set;
-        if (docEntry.runs && docEntry.runs.length > 0) {
-            const hasCurrentRun = docEntry.runs.some(r => r.run_id === currentExplorerRun);
-            if (!hasCurrentRun) {
-                currentExplorerRun = docEntry.latest_run
-                    ? (docEntry.latest_run.run_id || docEntry.latest_run.output_dir)
-                    : (docEntry.runs[0].run_id || docEntry.runs[0].output_dir);
-            }
-        } else {
+        const runs = docEntry.runs || [];
+        if (runs.length > 0 && !runs.some(r => r.run_id === currentExplorerRun)) {
+            currentExplorerRun = docEntry.latest_run
+                ? (docEntry.latest_run.run_id || docEntry.latest_run.output_dir)
+                : (runs[0].run_id || runs[0].output_dir);
+        } else if (runs.length === 0) {
             currentExplorerRun = '';
         }
     } else {

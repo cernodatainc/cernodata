@@ -12,7 +12,7 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from src.pipeline.server.discovery import build_runs_grid, find_previous_runs
-from src.pipeline.server.run_mappings import get_file_run_mappings
+from src.pipeline.server.run_mappings import get_file_run_mappings, register_document_path
 
 
 class DocumentsMixin:
@@ -40,9 +40,38 @@ class DocumentsMixin:
                 if rel not in docs:
                     docs.append(rel)
         with self._lock:
+            for reg in getattr(self, "_registered_documents", []):
+                if reg not in docs:
+                    docs.append(reg)
             if not docs and self.pdf_path:
                 docs.append(self.pdf_path)
+            elif self.pdf_path and self.pdf_path not in docs:
+                docs.append(self.pdf_path)
         return docs
+
+    def register_document(self, path: str) -> str:
+        """
+        Registers a document path with the session without uploading or copying the file.
+        Makes the path known to discovery, active session, and persistent mappings.
+        """
+        norm = path.strip().replace("\\", "/")
+        try:
+            if os.path.isabs(norm) and os.path.commonpath([self.repo_root, norm]) == self.repo_root:
+                rel = os.path.relpath(norm, self.repo_root).replace("\\", "/")
+            else:
+                rel = norm
+        except ValueError:
+            rel = norm
+
+        with self._lock:
+            if not hasattr(self, "_registered_documents"):
+                self._registered_documents: List[str] = []
+            if rel not in self._registered_documents:
+                self._registered_documents.append(rel)
+            self.pdf_path = rel
+
+        register_document_path(rel, repo_root=self.repo_root)
+        return rel
 
     def get_previous_runs(self) -> List[Dict[str, Any]]:
         """Finds completed output runs available in repository."""

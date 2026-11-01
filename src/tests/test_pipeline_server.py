@@ -104,6 +104,8 @@ class TestPipelineServer(unittest.TestCase):
         # Verify section titles, subtabs, and contents
         for item in ("Input selection", "Planning", "Parsing progress", "Preset results", 'id="progressSpinner"'):
             self.assertIn(item, content)
+        for discovery_elem in ("btnExplorerAddFile", "explorerFileInput", "btnTreeAddFile"):
+            self.assertIn(discovery_elem, content)
         for old_btn in (">Planner Wizard</a>", ">Visual Flow Viewer</a>", ">Dashboard</a>", "resultsTableContainer"):
             self.assertNotIn(old_btn, content)
         for expected in ("plannerWizardComponent", "btnToggleViewerFull"):
@@ -156,6 +158,8 @@ class TestPipelineServer(unittest.TestCase):
         self.assertEqual(status_l_js, 200)
         self.assertIn("application/javascript", headers_l_js.get("Content-Type", ""))
         self.assertIn("switchNavTab", content_l_js)
+        self.assertIn("triggerAddFileDiscovery", content_l_js)
+        self.assertIn("addDocumentByPath", content_l_js)
 
         # Test data shape config CSS and JS
         status_ds_css, content_ds_css, headers_ds_css = self._get("/data_shape_config.css")
@@ -214,6 +218,27 @@ class TestPipelineServer(unittest.TestCase):
         status_m, content_m, _ = self._get("/api/file_run_mappings")
         self.assertEqual(status_m, 200)
         self.assertIn("file_sets", json.loads(content_m))
+
+        # Register document path without uploading
+        p_status, p_resp = self._post_json("/api/documents", {"file_path": "data/external_sample.pdf"})
+        self.assertEqual(p_status, 200)
+        self.assertTrue(p_resp.get("success"))
+        self.assertIn("data/external_sample.pdf", p_resp.get("paths", []))
+        self.assertIn("data/external_sample.pdf", p_resp.get("documents", []))
+
+        # Test open file dialog endpoint with mock paths
+        PipelineViewerHandler._mock_dialog_paths = ["data/dialog_sample.pdf"]
+        try:
+            d_status, d_resp = self._post_json("/api/open_file_dialog", {})
+            self.assertEqual(d_status, 200)
+            self.assertTrue(d_resp.get("success"))
+            self.assertIn("data/dialog_sample.pdf", d_resp.get("paths", []))
+        finally:
+            PipelineViewerHandler._mock_dialog_paths = None
+
+        bad_status, bad_resp = self._post_json("/api/documents", {})
+        self.assertEqual(bad_status, 400)
+        self.assertFalse(bad_resp.get("success"))
 
     def test_api_config_endpoint(self) -> None:
         status, content, headers = self._get("/api/config")
