@@ -10,6 +10,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
+from src.pipeline.server.http_utils import send_json_response
 from src.utils import resolve_pdf_path
 
 if TYPE_CHECKING:
@@ -36,6 +37,33 @@ class BaseApiRoutesMixin:
     def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:
         """HTTP error sender stub satisfied by SimpleHTTPRequestHandler."""
         ...
+
+    def send_ok(self, data: Optional[Dict[str, Any]] = None, **extra: Any) -> None:
+        """Sends a 200 OK JSON response with success: True."""
+        body: Dict[str, Any] = {"success": True}
+        if data:
+            body.update(data)
+        if extra:
+            body.update(extra)
+        send_json_response(self, 200, body)  # type: ignore[arg-type]
+
+    def send_bad_request(self, message: str, **extra: Any) -> None:
+        """Sends a 400 Bad Request JSON response with success: False."""
+        body: Dict[str, Any] = {"success": False, "error": message}
+        if extra:
+            body.update(extra)
+        send_json_response(self, 400, body)  # type: ignore[arg-type]
+
+    def send_server_error(self, message: str, **extra: Any) -> None:
+        """Sends a 500 Internal Server Error JSON response with success: False."""
+        body: Dict[str, Any] = {"success": False, "error": message}
+        if extra:
+            body.update(extra)
+        send_json_response(self, 500, body)  # type: ignore[arg-type]
+
+    def send_json(self, status_code: int, data: Dict[str, Any]) -> None:
+        """Sends a JSON response with the specified HTTP status code."""
+        send_json_response(self, status_code, data)  # type: ignore[arg-type]
 
     def _extract_document_and_language(self, payload: Dict[str, Any]) -> Tuple[str, str]:
         """

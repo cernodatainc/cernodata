@@ -10,36 +10,22 @@ from __future__ import annotations
 import json
 import os
 import re
-import threading
-import time
-import unittest
 import urllib.parse
-from http.server import HTTPServer
 from typing import Any, Dict
 
 from src.pipeline.server import (
     PipelineViewerHandler,
-    find_available_port,
     find_previous_runs,
 )
-from src.tests.conftest import http_get, http_post_json
+from src.tests.conftest import EphemeralServerTestCase, http_get, http_post_json
 
 
-class TestPipelineServer(unittest.TestCase):
-    server: HTTPServer
-    server_thread: threading.Thread
-    port: int
-    base_url: str
+class TestPipelineServer(EphemeralServerTestCase):
     _created_output_mock: bool = False
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.port = find_available_port(start_port=8900, max_attempts=50)
-        cls.server = HTTPServer(("127.0.0.1", cls.port), PipelineViewerHandler)
-        cls.server_thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
-        cls.server_thread.start()
-        cls.base_url = f"http://127.0.0.1:{cls.port}"
-        time.sleep(0.3)
+        super().setUpClass()
 
         # Ensure output mock exists for discovery tests
         out_dir = os.path.join(os.getcwd(), "output")
@@ -68,9 +54,7 @@ class TestPipelineServer(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        if hasattr(cls, "server"):
-            cls.server.shutdown()
-            cls.server.server_close()
+        super().tearDownClass()
         if cls._created_output_mock:
             import shutil
             shutil.rmtree(os.path.join(os.getcwd(), "output"), ignore_errors=True)

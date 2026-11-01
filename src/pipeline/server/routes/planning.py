@@ -11,7 +11,6 @@ import threading
 from typing import Any, Dict
 
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
-from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
 from src.utils import mkdirs
 
@@ -46,8 +45,7 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
         scores = planner.calculate_scores(criteria=criteria)
         suggested = planner.suggest_preset_order(scores)
 
-        send_json_response(self, 200, {  # type: ignore[arg-type]
-            "success": True,
+        self.send_ok({
             "scores": scores,
             "suggested_order": suggested,
             "corpus_balance": self._evaluate_corpus_topic_balance(payload),
@@ -110,8 +108,7 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
         else:
             plan_file = ""
 
-        resp_data: Dict[str, Any] = {
-            "success": True,
+        self.send_ok({
             "plan_path": plan_file,
             "plan": plan.to_dict(),
             "message": (
@@ -119,8 +116,7 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
                 if plan_file
                 else "Plan successfully configured but not saved (no output directory)."
             ),
-        }
-        send_json_response(self, 200, resp_data)  # type: ignore[arg-type]
+        })
 
         if getattr(self.server, "shutdown_on_submit", False):
             threading.Thread(target=self.server.shutdown, daemon=True).start()

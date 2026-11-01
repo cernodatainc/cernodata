@@ -41,13 +41,21 @@ class DOMNode:
             "content": self.content,
             "violations": self.violations,
         }
-        for key in ("template_hint_applied", "is_merged", "merged_from", "merged_at", "user_correction_note", "is_custom"):
+        for key in (
+            "template_hint_applied",
+            "is_merged",
+            "merged_from",
+            "merged_at",
+            "user_correction_note",
+            "is_custom",
+            "is_incorrect_text",
+            "ocr_confidence",
+        ):
             val = getattr(self, key)
-            if val:
-                res[key] = val
-        for key in ("is_incorrect_text", "ocr_confidence"):
-            val = getattr(self, key)
-            if val is not None:
+            if key in ("is_incorrect_text", "ocr_confidence"):
+                if val is not None:
+                    res[key] = val
+            elif val:
                 res[key] = val
         return res
 
@@ -65,6 +73,20 @@ class DOMNode:
         raw_type = data.get("type", "paragraph")
         node_type = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
 
+        optional_fields = {
+            k: data[k]
+            for k in (
+                "template_hint_applied",
+                "merged_from",
+                "merged_at",
+                "user_correction_note",
+                "is_incorrect_text",
+                "ocr_confidence",
+                "is_custom",
+            )
+            if k in data
+        }
+
         return cls(
             node_id=str(data.get("node_id", "")),
             type=node_type,
@@ -72,15 +94,9 @@ class DOMNode:
             temp_slice_index=int(data.get("temp_slice_index", 1)),
             bounding_box=bbox,
             content=dict(data.get("content", {})),
-            template_hint_applied=data.get("template_hint_applied"),
             violations=list(data.get("violations", [])),
             is_merged=bool(data.get("is_merged", False)),
-            merged_from=data.get("merged_from"),
-            merged_at=data.get("merged_at"),
-            user_correction_note=data.get("user_correction_note"),
-            is_incorrect_text=data.get("is_incorrect_text"),
-            ocr_confidence=data.get("ocr_confidence"),
-            is_custom=data.get("is_custom"),
+            **optional_fields,
         )
 
     def split_at_offset(

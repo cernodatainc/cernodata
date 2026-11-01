@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.parsers.section_ocr import parse_image_ocr, parse_section_from_pdf
-from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 
 
@@ -41,10 +40,7 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
         elif pdf_path and bbox:
             ocr_result = parse_section_from_pdf(pdf_path, page, bbox, language=language)
         else:
-            send_json_response(self, 400, {  # type: ignore[arg-type]
-                "success": False,
-                "error": "Either image_base64 or (pdf_path and bbox) must be provided.",
-            })
+            self.send_bad_request("Either image_base64 or (pdf_path and bbox) must be provided.")
             return
 
         if not isinstance(ocr_result, dict):
@@ -58,4 +54,4 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             "lines": ocr_result.get("lines", []),
             "error": ocr_result.get("error"),
         }
-        send_json_response(self, 200 if response_data["success"] else 422, response_data)  # type: ignore[arg-type]
+        self.send_json(200 if response_data["success"] else 422, response_data)

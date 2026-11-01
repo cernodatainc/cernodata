@@ -13,13 +13,8 @@ import time
 import unittest
 from typing import Dict, Any, List
 
-from src.utils import find_available_port
-from src.pipeline.server import (
-    ServerSessionContext,
-    PipelineViewerServer,
-    PipelineViewerHandler,
-)
-from src.tests.conftest import http_get
+from src.pipeline.server import ServerSessionContext
+from src.tests.conftest import EphemeralServerTestCase, http_get
 
 
 class TestServerSessionContext(unittest.TestCase):
@@ -98,29 +93,13 @@ class TestServerSessionContext(unittest.TestCase):
         self.assertEqual(len(errors), 0, f"Thread errors occurred: {errors}")
 
 
-class TestPipelineViewerServerConcurrency(unittest.TestCase):
+class TestPipelineViewerServerConcurrency(EphemeralServerTestCase):
     """Verifies that the multi-threaded server handles concurrent requests without blocking."""
-
-    server: PipelineViewerServer
-    server_thread: threading.Thread
-    port: int
-    base_url: str
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.port = find_available_port(start_port=9300, max_attempts=50)
-        session = ServerSessionContext(pdf_path="sample.pdf", language="en")
-        cls.server = PipelineViewerServer(("127.0.0.1", cls.port), PipelineViewerHandler, session_context=session)
-        cls.server_thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
-        cls.server_thread.start()
-        cls.base_url = f"http://127.0.0.1:{cls.port}"
-        time.sleep(0.3)
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        if hasattr(cls, "server"):
-            cls.server.shutdown()
-            cls.server.server_close()
+        cls.session_context = ServerSessionContext(pdf_path="sample.pdf", language="en")
+        super().setUpClass()
 
     def _get_json(self, path: str) -> Dict[str, Any]:
         _, content, _ = http_get(f"{self.base_url}{path}")

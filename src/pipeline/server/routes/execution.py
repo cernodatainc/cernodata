@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
-from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 
 if TYPE_CHECKING:
@@ -59,8 +58,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         plan_dict = cached.get("plan")
         if not plan_dict and self.session.submitted_plan:
             plan_dict = self.session.submitted_plan.to_dict()
-        send_json_response(self, 200, {  # type: ignore[arg-type]
-            "success": True,
+        self.send_ok({
             "preset": preset,
             "language": language,
             "dom": cached["dom"],
@@ -129,7 +127,6 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             dec = result.get("decision") or {}
             executed_preset = str(dec.get("chosen_preset") or preset)
             response_body: Dict[str, Any] = {
-                "success": True,
                 "preset": executed_preset,
                 "language": language,
                 "dom": result["dom"],
@@ -138,7 +135,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             }
             if include_plan:
                 response_body["plan"] = result.get("plan")
-            send_json_response(self, 200, response_body)  # type: ignore[arg-type]
+            self.send_ok(response_body)
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             logger.info("Client disconnected before pipeline result could be returned.")
         except Exception as e:
@@ -146,7 +143,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             if record_session_error:
                 t_err = datetime.now().strftime("%H:%M:%S")
                 self.session.set_error(str(e), log=f"[{t_err}] [ERROR] Pipeline failure: {e}")
-            send_json_response(self, 500, {"success": False, "error": str(e)})  # type: ignore[arg-type]
+            self.send_server_error(str(e))
 
     def _handle_post_run(self, payload: Dict[str, Any]) -> None:
         """
@@ -346,7 +343,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         output_dir = payload.get("output_dir")
         document_path = payload.get("document_path")
         if not run_id and not output_dir:
-            send_json_response(self, 400, {"success": False, "error": "Missing run_id or output_dir"})  # type: ignore[arg-type]
+            self.send_bad_request("Missing run_id or output_dir")
             return
 
         from src.pipeline.server.run_mappings import remove_run_mapping
@@ -356,4 +353,4 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             document_path=document_path,
             repo_root=self.session.repo_root,
         )
-        send_json_response(self, 200, {"success": success, "run_id": run_id})  # type: ignore[arg-type]
+        self.send_ok({"run_id": run_id, "success": success})

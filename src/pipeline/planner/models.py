@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping, Optional, Set
+from typing import Any, Dict, List, Mapping, Optional, Set, cast
 
 from src.utils import save_json
 
@@ -46,6 +46,10 @@ class ExtensibleOptionsMixin:
             raise KeyError(key)
         return val
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializes dataclass fields to dictionary merged with dynamic options."""
+        return self._merge_options(asdict(cast(Any, self)))
+
     def _merge_options(self, base: Dict[str, Any]) -> Dict[str, Any]:
         if self.options:
             for k, v in self.options.items():
@@ -60,6 +64,16 @@ class ExtensibleOptionsMixin:
                 extra_opts.setdefault(k, v)
         return extra_opts
 
+    @classmethod
+    def _extract_unknown_options(
+        cls, data: Mapping[str, Any], extra_known: Optional[Set[str]] = None
+    ) -> Dict[str, Any]:
+        """Extracts dynamic options not declared as dataclass fields or known aliases."""
+        known = {f.name for f in fields(cast(Any, cls))}
+        if extra_known:
+            known.update(extra_known)
+        return cls._extract_extra_options(data, known)
+
 
 @dataclass
 class PlannerCriteria(ExtensibleOptionsMixin):
@@ -70,12 +84,8 @@ class PlannerCriteria(ExtensibleOptionsMixin):
     verification_layers: List[str] = field(default_factory=lambda: list(DEFAULT_PLANNER_LAYERS))
     options: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
-        return self._merge_options(asdict(self))
-
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> PlannerCriteria:
-        known = {"taxonomy", "target", "security", "verification_layers", "options"}
         raw_layers = data.get("verification_layers")
         layers = (
             [str(x) for x in raw_layers]
@@ -87,7 +97,7 @@ class PlannerCriteria(ExtensibleOptionsMixin):
             target=str(data.get("target", "high_precision_structure")),
             security=str(data.get("security", "air_gapped_local")),
             verification_layers=layers,
-            options=cls._extract_extra_options(data, known),
+            options=cls._extract_unknown_options(data),
         )
 
     def values(self) -> List[str]:
@@ -112,16 +122,8 @@ class IngestionConfig(ExtensibleOptionsMixin):
     # TODO(stride): Extend `IngestionConfig` with optional paths/flags for `test_suite_path` (TASK-107),
     # `custom_presets_path` (TASK-204), `postprocess_steps` (TASK-506), and `template_hint_path` (TASK-903).
 
-    def to_dict(self) -> Dict[str, Any]:
-        return self._merge_options(asdict(self))
-
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> IngestionConfig:
-        known = {
-            "target_threshold", "language", "preset", "align_skew", "visualize",
-            "output_dir", "ocr_scale", "force_full_page_ocr", "do_table_structure",
-            "verification_layers", "options",
-        }
         raw_scale = data.get("ocr_scale")
         raw_layers = data.get("verification_layers")
         return cls(
@@ -135,7 +137,7 @@ class IngestionConfig(ExtensibleOptionsMixin):
             force_full_page_ocr=bool(data.get("force_full_page_ocr", False)),
             do_table_structure=bool(data.get("do_table_structure", True)),
             verification_layers=[str(x) for x in raw_layers] if raw_layers is not None else None,
-            options=cls._extract_extra_options(data, known),
+            options=cls._extract_unknown_options(data),
         )
 
 
@@ -228,11 +230,6 @@ class DocumentPlan(ExtensibleOptionsMixin):
         verification_layers = (
             [str(x) for x in raw_layers] if raw_layers is not None else list(DEFAULT_PLANNER_LAYERS)
         )
-        known = {
-            "criteria", "document_path", "language", "target_threshold", "primary_preset",
-            "fallback_queue", "preset_order", "suggested_order", "overridden", "scores",
-            "verification_layers", "options", "created_at", "taxonomy", "target", "security",
-        }
         return cls(
             document_path=str(data.get("document_path", "")),
             criteria=criteria,
@@ -245,7 +242,7 @@ class DocumentPlan(ExtensibleOptionsMixin):
             overridden=bool(data.get("overridden", False)),
             scores=dict(data.get("scores", {})),
             verification_layers=verification_layers,
-            options=cls._extract_extra_options(data, known),
+            options=cls._extract_unknown_options(data, extra_known={"taxonomy", "target", "security"}),
             created_at=str(data.get("created_at", datetime.now(timezone.utc).isoformat())),
         )
 

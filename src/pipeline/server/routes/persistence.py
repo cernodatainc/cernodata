@@ -10,7 +10,7 @@ import json
 import os
 from typing import Any, Dict, Optional
 
-from src.pipeline.server.http_utils import parse_run_dir_and_step, send_json_response
+from src.pipeline.server.http_utils import parse_run_dir_and_step
 from src.pipeline.server.router import api_router
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 from src.utils import mkdirs, save_json
@@ -44,7 +44,7 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
         output_dir, _ = parse_run_dir_and_step(payload.get("output_dir", "output"))
 
         if not dom_data:
-            send_json_response(self, 400, {"error": "Missing dom payload"})  # type: ignore[arg-type]
+            self.send_bad_request("Missing dom payload")
             return
 
         mkdirs(output_dir)
@@ -115,7 +115,7 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
 
         nodes_len = len(dom_data.get("nodes", [])) if isinstance(dom_data, dict) else 0
         logger.info("Saved updated DocumentDOM to '%s' (%d nodes).", dom_file, nodes_len)
-        send_json_response(self, 200, {"success": True, "path": dom_file})  # type: ignore[arg-type]
+        self.send_ok({"path": dom_file})
 
     @api_router.post("/api/verify_layers", "/api/reverify", "/api/verify")
     def _handle_post_verify_layers(self, payload: Dict[str, Any]) -> None:
@@ -156,14 +156,8 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
                     dec["layer_scores"] = result.layer_scores
                     dec["status"] = result.status
 
-            send_json_response(self, 200, {  # type: ignore[arg-type]
-                "success": True,
-                "result": result.to_dict(),
-            })
+            self.send_ok({"result": result.to_dict()})
         except Exception as e:
             logger.exception("Layer re-verification failed for '%s'", target_dir)
-            send_json_response(self, 500, {  # type: ignore[arg-type]
-                "success": False,
-                "error": str(e),
-            })
+            self.send_server_error(str(e))
 

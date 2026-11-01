@@ -18,7 +18,6 @@ from src.pipeline.planner.options import (
     WIZARD_DIMENSIONS,
 )
 from src.quality.layers import ALL_VERIFICATION_LAYERS, DEFAULT_VERIFICATION_LAYERS, LAYER_METADATA
-from src.pipeline.server.http_utils import send_json_response
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 
 
@@ -74,11 +73,10 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             target_dir: Target output directory path to load into session.
         """
         if not target_dir:
-            send_json_response(self, 400, {"success": False, "error": "Missing output_dir parameter"})  # type: ignore[arg-type]
+            self.send_bad_request("Missing output_dir parameter")
             return
         loaded = self.session.load_previous_run(target_dir)
-        send_json_response(self, 200, {  # type: ignore[arg-type]
-            "success": True,
+        self.send_ok({
             "output_dir": self.session.output_dir,
             "run": loaded,
             "results": self.session.get_results(),
@@ -91,8 +89,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         """
         paths = open_system_file_dialog(self._mock_dialog_paths)
         if not paths:
-            send_json_response(self, 200, {  # type: ignore[arg-type]
-                "success": True,
+            self.send_ok({
                 "cancelled": True,
                 "paths": [],
                 "documents": self.session.get_available_documents(),
@@ -101,8 +98,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             return
 
         registered = [self.session.register_document(p) for p in paths]
-        send_json_response(self, 200, {  # type: ignore[arg-type]
-            "success": True,
+        self.send_ok({
             "cancelled": False,
             "paths": registered,
             "active_file": self.session.pdf_path,
@@ -124,15 +120,11 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
                 raw_paths.append(str(val))
 
         if not raw_paths:
-            send_json_response(self, 400, {  # type: ignore[arg-type]
-                "success": False,
-                "error": "Missing 'file_path', 'path', or 'paths' in request payload.",
-            })
+            self.send_bad_request("Missing 'file_path', 'path', or 'paths' in request payload.")
             return
 
         registered = [self.session.register_document(p) for p in raw_paths]
-        send_json_response(self, 200, {  # type: ignore[arg-type]
-            "success": True,
+        self.send_ok({
             "paths": registered,
             "file_path": registered[0] if registered else "",
             "active_file": self.session.pdf_path,
@@ -168,7 +160,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         default_lang = getattr(self.server, "default_lang", None) or self.session.language or "en"
         default_thresh = getattr(self.server, "default_threshold", 0.85)
 
-        send_json_response(self, 200, {  # type: ignore[arg-type]
+        self.send_json(200, {
             "default_doc": default_doc,
             "default_lang": default_lang,
             "default_threshold": default_thresh,

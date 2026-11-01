@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 import threading
+import unittest
 import urllib.error
 import urllib.request
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
 from unittest.mock import patch
 
 from src.dom import BoundingBox, DOMNode, DocumentDOM
@@ -58,6 +59,47 @@ def make_test_dom(
         source_filename=source_filename,
         total_pages=total_pages,
         nodes=resolved_nodes,
+    )
+
+
+def make_test_page_nodes(
+    page: int,
+    texts: Sequence[str],
+    prefix: str = "node",
+    node_type: str = "paragraph",
+) -> List[DOMNode]:
+    """Generates a list of DOMNode elements for a specific page with sequential IDs and distinct bboxes."""
+    nodes: List[DOMNode] = []
+    for i, txt in enumerate(texts, 1):
+        y_pos = float(i * 30.0)
+        bbox = BoundingBox(10.0, y_pos, 200.0, y_pos + 20.0)
+        nodes.append(
+            make_test_node(
+                raw_text=txt,
+                node_id=f"{prefix}_p{page}_{i}",
+                node_type=node_type,
+                page=page,
+                bbox=bbox,
+            )
+        )
+    return nodes
+
+
+def make_multipage_dom(
+    page_texts: Mapping[int, Sequence[str]],
+    document_id: str = "doc_multi",
+    source_filename: str = "sample.pdf",
+) -> DocumentDOM:
+    """Constructs a multi-page DocumentDOM from a mapping of page index to text strings."""
+    nodes: List[DOMNode] = []
+    for page, texts in sorted(page_texts.items()):
+        nodes.extend(make_test_page_nodes(page=page, texts=texts))
+    total_pages = max(page_texts.keys(), default=1)
+    return DocumentDOM(
+        document_id=document_id,
+        source_filename=source_filename,
+        total_pages=total_pages,
+        nodes=nodes,
     )
 
 
@@ -134,3 +176,30 @@ def running_test_server(
     finally:
         server.shutdown()
         server.server_close()
+
+
+class EphemeralServerTestCase(unittest.TestCase):
+    """Base test case managing an ephemeral PipelineViewerServer lifecycle on a daemon thread."""
+
+    server: PipelineViewerServer
+    server_thread: threading.Thread
+    port: int
+    base_url: str
+    session_context: Optional[Any] = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.server = PipelineViewerServer(
+            ("127.0.0.1", 0), PipelineViewerHandler, session_context=cls.session_context
+        )
+        cls.port = cls.server.server_port
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+        cls.server_thread = threading.Thread(
+            target=lambda: cls.server.serve_forever(poll_interval=0.05), daemon=True
+        )
+        cls.server_thread.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.server.shutdown()
+        cls.server.server_close()
