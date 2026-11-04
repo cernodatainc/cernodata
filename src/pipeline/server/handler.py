@@ -150,6 +150,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             except Exception as e:
                 logger.error("Unexpected error retrieving viewer data: %s", e)
                 send_json_response(self, 500, {"error": str(e)})
+        elif raw_path in ("/api/ocr_engines", "/api/engines"):
+            self._handle_get_ocr_engines()
         elif raw_path == "/api/runs_grid":
             target_doc: Optional[str] = (
                 query_params.get("document", [""])[0]

@@ -14,13 +14,17 @@ import pytest
 from PIL import Image, ImageDraw
 
 from src.dom.bounding_box import BoundingBox
+from src.dom.node import DOMNode
 from src.parsers.section_ocr import (
     SectionOCRParser,
+    get_available_ocr_engines,
     get_default_section_parser,
     normalize_bbox_coords,
     normalize_to_pil,
     parse_image_ocr,
+    parse_image_ocr_multi,
     parse_section_from_pdf,
+    parse_section_from_pdf_multi,
     set_default_section_parser,
 )
 
@@ -259,6 +263,126 @@ class TestSectionOCRParser(unittest.TestCase):
         result = parser.parse_image(dummy_img)
         self.assertFalse(result["success"])
         self.assertEqual(result["error"], "OCR engine not available.")
+
+    def test_multi_engine_parsing_and_registration(self) -> None:
+        """Verifies parsing across multiple selected OCR engines."""
+        parser = SectionOCRParser()
+        parser.register_engine("alpha_engine", lambda: (lambda arr: {"text": "Alpha Output", "confidence": 0.88}))
+        parser.register_engine("beta_engine", lambda: (lambda arr: {"text": "Beta Output", "confidence": 0.94}))
+
+        engines = parser.get_available_engines()
+        self.assertIn("alpha_engine", engines)
+        self.assertIn("beta_engine", engines)
+
+        all_avail = get_available_ocr_engines()
+        self.assertIn("rapidocr", all_avail)
+
+        dummy_img = Image.new("RGB", (80, 40), color="white")
+        results = parser.parse_image_multi(dummy_img, engines=["alpha_engine", "beta_engine"])
+        self.assertIn("alpha_engine", results)
+        self.assertIn("beta_engine", results)
+        self.assertTrue(results["alpha_engine"]["success"])
+        self.assertEqual(results["alpha_engine"]["text"], "Alpha Output")
+        self.assertEqual(results["beta_engine"]["text"], "Beta Output")
+
+        # Verify module-level wrappers
+        mod_results = parse_image_ocr_multi(dummy_img, engines=["rapidocr"])
+        self.assertIn("rapidocr", mod_results)
+        self.assertTrue(mod_results["rapidocr"]["success"])
+
+        pdf_crop_multi = parse_section_from_pdf_multi("non_existent.pdf", 1, (0, 0, 10, 10), engines=["rapidocr"])
+        self.assertIn("rapidocr", pdf_crop_multi)
+        self.assertFalse(pdf_crop_multi["rapidocr"]["success"])
+
+    def test_process_dom_node_prompt_accept(self) -> None:
+        """Verifies prompting user to accept OCR output updates node content when accepted."""
+        parser = SectionOCRParser()
+        parser.register_engine("eng1", lambda: (lambda arr: {"text": "Parsed First", "confidence": 0.70}))
+        parser.register_engine("eng2", lambda: (lambda arr: {"text": "Parsed Second", "confidence": 0.95}))
+
+        node = DOMNode(
+            node_id="test_node_1",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 10.0, 100.0, 40.0),
+            content={"raw_text": "Original Text"},
+        )
+        dummy_img = Image.new("RGB", (90, 30), color="white")
+
+        # Accept only eng2
+        outcome = parser.process_dom_node(
+            node,
+            image_input=dummy_img,
+            engines=["eng1", "eng2"],
+            prompt_accept=lambda engine, text, conf: engine == "eng2",
+        )
+
+        self.assertTrue(outcome["accepted"])
+        self.assertEqual(outcome["accepted_engine"], "eng2")
+        self.assertEqual(node.content["raw_text"], "Parsed Second")
+        self.assertEqual(node.ocr_confidence, 0.95)
+
+    def test_process_dom_node_prompt_reject(self) -> None:
+        """Verifies rejecting OCR output in acceptance prompt preserves original node content."""
+        parser = SectionOCRParser()
+        parser.register_engine("eng1", lambda: (lambda arr: {"text": "Should Not Apply", "confidence": 0.99}))
+
+        node = DOMNode(
+            node_id="test_node_2",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 10.0, 100.0, 40.0),
+            content={"raw_text": "Keep Me Unchanged"},
+        )
+        dummy_img = Image.new("RGB", (90, 30), color="white")
+
+        outcome = parser.process_dom_node(
+            node,
+            image_input=dummy_img,
+            engines=["eng1"],
+            prompt_accept=lambda engine, text, conf: False,
+        )
+
+        self.assertFalse(outcome["accepted"])
+        self.assertIsNone(outcome["accepted_engine"])
+        self.assertEqual(node.content["raw_text"], "Keep Me Unchanged")
+
+    @pytest.mark.slow
+    def test_server_ocr_endpoint_multi_engine(self) -> None:
+        """Verifies /api/parse_section_ocr and /api/ocr_engines server endpoints with multiple engines."""
+        from src.tests.conftest import http_post_json, running_test_server
+        import urllib.request
+        import json
+
+        with running_test_server() as (_, base_url):
+            # 1. GET /api/ocr_engines
+            req = urllib.request.Request(f"{base_url}/api/ocr_engines")
+            with urllib.request.urlopen(req) as resp:
+                self.assertEqual(resp.status, 200)
+                body = json.loads(resp.read().decode("utf-8"))
+                self.assertIn("engines", body)
+                self.assertIn("rapidocr", body["engines"])
+
+            # 2. POST /api/parse_section_ocr with engines parameter
+            test_img = _create_test_image_with_text("Invoice: INV-9901")
+            data_uri = _image_to_base64_data_uri(test_img)
+
+            status, post_body = http_post_json(
+                f"{base_url}/api/parse_section_ocr",
+                {
+                    "node_id": "node_test_multi",
+                    "image_base64": data_uri,
+                    "engines": ["rapidocr"],
+                    "language": "en",
+                },
+            )
+            self.assertEqual(status, 200)
+            self.assertTrue(post_body["success"])
+            self.assertIn("results", post_body)
+            self.assertIn("rapidocr", post_body["results"])
+            self.assertIn("INV-9901", post_body["text"])
 
     def test_crop_pdf_region_invalid_page_number_raises(self) -> None:
         """Verifies crop_pdf_region raises IndexError when page_number < 1."""

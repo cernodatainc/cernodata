@@ -153,86 +153,6 @@ function getNodeSkewCorners(nodeId, bbox) {
  * @param {string} targetImgId - DOM element ID of the target preview image.
  * @param {boolean} [unskew=isCutoutUnskewed] - Whether to apply perspective rectification.
  */
-function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewed) {
-    const pageImg = document.getElementById('pageImg');
-    const targetImg = document.getElementById(targetImgId);
-    if (!pageImg || !targetImg) return;
- 
-    function doDraw() {
-        if (!pageImg.naturalWidth || !pageImg.naturalHeight) return;
-        const svg = document.getElementById('svgOverlay');
-        const vbW = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width) ? svg.viewBox.baseVal.width : 595.28;
-        const vbH = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.height) ? svg.viewBox.baseVal.height : 841.89;
- 
-        const scaleX = pageImg.naturalWidth / vbW;
-        const scaleY = pageImg.naturalHeight / vbH;
- 
-        const corners = getNodeSkewCorners(nodeId, bbox);
-        const s0 = { x: corners[0].x * scaleX, y: corners[0].y * scaleY };
-        const s1 = { x: corners[1].x * scaleX, y: corners[1].y * scaleY };
-        const s2 = { x: corners[2].x * scaleX, y: corners[2].y * scaleY };
-        const s3 = { x: corners[3].x * scaleX, y: corners[3].y * scaleY };
- 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
- 
-        if (unskew) {
-            const wTop = Math.hypot(s1.x - s0.x, s1.y - s0.y);
-            const wBot = Math.hypot(s2.x - s3.x, s2.y - s3.y);
-            const hLeft = Math.hypot(s3.x - s0.x, s3.y - s0.y);
-            const hRight = Math.hypot(s2.x - s1.x, s2.y - s1.y);
- 
-            const dstW = Math.max(10, Math.round((wTop + wBot) / 2));
-            const dstH = Math.max(8, Math.round((hLeft + hRight) / 2));
- 
-            canvas.width = dstW;
-            canvas.height = dstH;
- 
-            const d0 = { x: 0, y: 0 };
-            const d1 = { x: dstW, y: 0 };
-            const d2 = { x: dstW, y: dstH };
-            const d3 = { x: 0, y: dstH };
- 
-            renderTriangleWarp(ctx, pageImg, s0, s1, s2, d0, d1, d2);
-            renderTriangleWarp(ctx, pageImg, s0, s2, s3, d0, d2, d3);
- 
-            targetImg.src = canvas.toDataURL('image/png');
-        } else {
-            const minX = Math.floor(Math.min(s0.x, s1.x, s2.x, s3.x));
-            const maxX = Math.ceil(Math.max(s0.x, s1.x, s2.x, s3.x));
-            const minY = Math.floor(Math.min(s0.y, s1.y, s2.y, s3.y));
-            const maxY = Math.ceil(Math.max(s0.y, s1.y, s2.y, s3.y));
- 
-            const cropW = Math.max(1, maxX - minX);
-            const cropH = Math.max(1, maxY - minY);
- 
-            canvas.width = cropW;
-            canvas.height = cropH;
- 
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(s0.x - minX, s0.y - minY);
-            ctx.lineTo(s1.x - minX, s1.y - minY);
-            ctx.lineTo(s2.x - minX, s2.y - minY);
-            ctx.lineTo(s3.x - minX, s3.y - minY);
-            ctx.closePath();
-            ctx.clip();
- 
-            ctx.drawImage(pageImg, -minX, -minY);
-            ctx.restore();
- 
-            targetImg.src = canvas.toDataURL('image/png');
-        }
-    }
- 
-    if (pageImg.complete && pageImg.naturalWidth > 0) {
-        doDraw();
-    } else {
-        pageImg.addEventListener('load', doDraw, { once: true });
-    }
-}
- 
 /**
  * Extracts base64 encoded PNG data URI of a node's cropped canvas.
  *
@@ -245,41 +165,37 @@ function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
     if (!node) return null;
     const pageImg = document.getElementById('pageImg');
     if (!pageImg || !pageImg.naturalWidth || !pageImg.naturalHeight) return null;
- 
+
     const svg = document.getElementById('svgOverlay');
     const vbW = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width) ? svg.viewBox.baseVal.width : 595.28;
     const vbH = (svg && svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.height) ? svg.viewBox.baseVal.height : 841.89;
- 
+
     const scaleX = pageImg.naturalWidth / vbW;
     const scaleY = pageImg.naturalHeight / vbH;
- 
+
     const corners = getNodeSkewCorners(nodeId, node.bounding_box);
     const s0 = { x: corners[0].x * scaleX, y: corners[0].y * scaleY };
     const s1 = { x: corners[1].x * scaleX, y: corners[1].y * scaleY };
     const s2 = { x: corners[2].x * scaleX, y: corners[2].y * scaleY };
     const s3 = { x: corners[3].x * scaleX, y: corners[3].y * scaleY };
- 
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
- 
+
     if (unskew) {
         const wTop = Math.hypot(s1.x - s0.x, s1.y - s0.y);
         const wBot = Math.hypot(s2.x - s3.x, s2.y - s3.y);
         const hLeft = Math.hypot(s3.x - s0.x, s3.y - s0.y);
         const hRight = Math.hypot(s2.x - s1.x, s2.y - s1.y);
- 
+
         const dstW = Math.max(10, Math.round((wTop + wBot) / 2));
         const dstH = Math.max(8, Math.round((hLeft + hRight) / 2));
- 
+
         canvas.width = dstW;
         canvas.height = dstH;
- 
-        const d0 = { x: 0, y: 0 };
-        const d1 = { x: dstW, y: 0 };
-        const d2 = { x: dstW, y: dstH };
-        const d3 = { x: 0, y: dstH };
- 
+
+        const d0 = { x: 0, y: 0 }, d1 = { x: dstW, y: 0 }, d2 = { x: dstW, y: dstH }, d3 = { x: 0, y: dstH };
         renderTriangleWarp(ctx, pageImg, s0, s1, s2, d0, d1, d2);
         renderTriangleWarp(ctx, pageImg, s0, s2, s3, d0, d2, d3);
         return canvas.toDataURL('image/png');
@@ -288,13 +204,13 @@ function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
         const maxX = Math.ceil(Math.max(s0.x, s1.x, s2.x, s3.x));
         const minY = Math.floor(Math.min(s0.y, s1.y, s2.y, s3.y));
         const maxY = Math.ceil(Math.max(s0.y, s1.y, s2.y, s3.y));
- 
+
         const cropW = Math.max(1, maxX - minX);
         const cropH = Math.max(1, maxY - minY);
- 
+
         canvas.width = cropW;
         canvas.height = cropH;
- 
+
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(s0.x - minX, s0.y - minY);
@@ -303,11 +219,36 @@ function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
         ctx.lineTo(s3.x - minX, s3.y - minY);
         ctx.closePath();
         ctx.clip();
- 
         ctx.drawImage(pageImg, -minX, -minY);
         ctx.restore();
- 
+
         return canvas.toDataURL('image/png');
+    }
+}
+
+/**
+ * Extracts and renders a high-resolution image crop of a bounding box into target <img> element.
+ *
+ * @param {string} nodeId - Node identifier.
+ * @param {Object} bbox - Bounding box definition.
+ * @param {string} targetImgId - DOM element ID of the target preview image.
+ * @param {boolean} [unskew=isCutoutUnskewed] - Whether to apply perspective rectification.
+ */
+function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewed) {
+    const pageImg = document.getElementById('pageImg');
+    const targetImg = document.getElementById(targetImgId);
+    if (!pageImg || !targetImg) return;
+
+    function doDraw() {
+        if (!pageImg.naturalWidth || !pageImg.naturalHeight) return;
+        const b64 = getCutoutBase64(nodeId, unskew);
+        if (b64) targetImg.src = b64;
+    }
+
+    if (pageImg.complete && pageImg.naturalWidth > 0) {
+        doDraw();
+    } else {
+        pageImg.addEventListener('load', doDraw, { once: true });
     }
 }
  
@@ -316,23 +257,52 @@ function getCutoutBase64(nodeId, unskew = isCutoutUnskewed) {
  *
  * @param {string} nodeId - Target DOM node identifier.
  */
+window.selectedOcrEnginesMap = window.selectedOcrEnginesMap || {};
+window.pendingOcrResultsMap = window.pendingOcrResultsMap || {};
+
+/**
+ * Updates selected OCR engines list for a given node.
+ *
+ * @param {string} nodeId - Target node ID.
+ * @param {string} engine - Engine name.
+ * @param {boolean} checked - Whether checked.
+ */
+function onOcrEngineToggle(nodeId, engine, checked) {
+    const curr = window.selectedOcrEnginesMap[nodeId] ? [...window.selectedOcrEnginesMap[nodeId]] : ['rapidocr'];
+    if (checked && !curr.includes(engine)) curr.push(engine);
+    else if (!checked) {
+        const idx = curr.indexOf(engine);
+        if (idx !== -1) curr.splice(idx, 1);
+    }
+    window.selectedOcrEnginesMap[nodeId] = curr.length > 0 ? curr : ['rapidocr'];
+}
+
+/**
+ * Triggers backend targeted OCR re-extraction pass with selected engines.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
 async function triggerCutoutSecondPass(nodeId) {
     const node = domData.nodes.find(n => n.node_id === nodeId);
     if (!node) return;
- 
+
     const banner = document.getElementById('statusBanner');
     const ocrBtn = document.getElementById(`btnCutoutOcr_${nodeId}`);
     if (ocrBtn) {
         ocrBtn.disabled = true;
         ocrBtn.textContent = 'Parsing…';
     }
- 
+
+    const engines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[nodeId] && window.selectedOcrEnginesMap[nodeId].length > 0)
+        ? window.selectedOcrEnginesMap[nodeId]
+        : ['rapidocr'];
+
     if (banner) {
         banner.style.display = 'block';
         banner.className = 'status-banner';
-        banner.textContent = `Parsing section '${nodeId}' with OCR…`;
+        banner.textContent = `Parsing section '${nodeId}' with [${engines.join(', ')}]…`;
     }
- 
+
     let b64 = getCutoutBase64(nodeId, isCutoutUnskewed);
     if (!b64) {
         const previewImg = document.getElementById(`cutoutPreviewImg_${nodeId}`);
@@ -340,50 +310,32 @@ async function triggerCutoutSecondPass(nodeId) {
             b64 = previewImg.src;
         }
     }
- 
+
     const payload = {
         node_id: nodeId,
         image_base64: b64,
         bbox: node.bounding_box,
         page: node.global_page_index || 1,
         pdf_path: pdfSourceFile || '',
-        language: activeLanguage || 'en'
+        language: activeLanguage || 'en',
+        engines: engines
     };
- 
+
     try {
         const resp = await fetch('/api/parse_section_ocr', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
- 
+
         if (!resp.ok) {
             const errData = await resp.json().catch(() => ({}));
             throw new Error(errData.error || `Server returned ${resp.status}`);
         }
- 
+
         const data = await resp.json();
-        const extractedText = data.text || '';
-        const confPercent = Math.round((data.confidence || 0) * 100);
- 
-        if (!node.content) node.content = {};
-        node.content.raw_text = extractedText;
-        node.user_correction_note = extractedText;
-        node.ocr_confidence = data.confidence;
-        node.is_incorrect_text = false;
- 
-        renderDOMTree();
-        renderSelectedEditor();
-        renderSVGOverlays();
-        await saveAnnotations(true);
- 
-        if (banner) {
-            banner.className = 'status-banner';
-            banner.style.display = 'block';
-            const previewSnippet = extractedText.length > 50 ? extractedText.slice(0, 50) + '...' : extractedText;
-            banner.textContent = `Section '${nodeId}' parsed with OCR (${confPercent}% confidence): "${previewSnippet || 'no text detected'}"`;
-            setTimeout(() => { banner.style.display = 'none'; }, 6000);
-        }
+        window.pendingOcrResultsMap[nodeId] = data;
+        promptAcceptOcrOutput(nodeId, data);
     } catch (err) {
         console.error('Section OCR parse error:', err);
         if (banner) {
@@ -397,5 +349,140 @@ async function triggerCutoutSecondPass(nodeId) {
             ocrBtn.disabled = false;
             ocrBtn.textContent = 'Parse section with OCR';
         }
+    }
+}
+
+/**
+ * Prompts user to review and accept or discard OCR engine output.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {Object} data - OCR response payload.
+ */
+function promptAcceptOcrOutput(nodeId, data) {
+    const container = document.getElementById(`ocrPromptContainer_${nodeId}`);
+    const banner = document.getElementById('statusBanner');
+    if (!container) {
+        const primaryText = data.text || '';
+        if (window.confirm(`Accept OCR output for node '${nodeId}'?\n\n"${primaryText}"`)) {
+            acceptOcrOutput(nodeId, data.engine || 'rapidocr');
+        } else {
+            dismissOcrPrompt(nodeId);
+        }
+        return;
+    }
+
+    const p = (typeof INSPECTOR_PALETTE !== 'undefined') ? INSPECTOR_PALETTE : {
+        border: '#D0CDC6', textPrimary: '#1F1D1A', textMuted: '#625E57', blue: '#1E4B8A',
+        green: '#2E6E52', red: '#B42318', bgCard: '#FDFCFC', bgDark: '#EFF1F2'
+    };
+
+    const results = data.results || { [data.engine || 'rapidocr']: data };
+    const entries = Object.entries(results);
+
+    const itemsHtml = entries.map(([eng, res]) => {
+        const success = res && res.success;
+        const textVal = (res && res.text) || '';
+        const confPct = Math.round(((res && res.confidence) || 0) * 100);
+        const errVal = (res && res.error) || 'Engine failed';
+
+        if (!success) {
+            return `
+                <div style="background:${p.bgCard}; border:1px solid ${p.border}; border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:11px; font-weight:600; text-transform:uppercase; color:${p.textMuted};">${escapeHtml(eng)}</span>
+                        <span style="font-size:11px; color:${p.red};">Failed</span>
+                    </div>
+                    <div style="font-size:11px; color:${p.textMuted}; margin-top:2px;">${escapeHtml(errVal)}</div>
+                </div>
+            `;
+        }
+
+        return `
+            <div style="background:${p.bgCard}; border:1px solid ${p.border}; border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:600; text-transform:uppercase; color:${p.blue};">${escapeHtml(eng)}</span>
+                    <span style="font-size:11px; font-weight:500; color:${p.green};">${confPct}% confidence</span>
+                </div>
+                <textarea id="ocrCandidateText_${nodeId}_${escapeHtml(eng)}" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:11px; padding:4px 6px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgDark}; color:${p.textPrimary}; resize:vertical; min-height:45px;">${escapeHtml(textVal)}</textarea>
+                <div style="display:flex; justify-content:flex-end; margin-top:4px;">
+                    <button class="action-btn action-btn-decollide-sm" style="background:${p.green}; color:#FFFFFF; border-color:${p.green}; cursor:pointer;" onclick="acceptOcrOutput('${nodeId}', '${escapeHtml(eng)}')">Accept ${escapeHtml(eng)}</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div style="background:#FFFFFF; border:1px solid ${p.blue}; border-left:4px solid ${p.blue}; border-radius:4px; padding:8px 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:12px; font-weight:600; color:${p.blue};">Accept OCR output for '${escapeHtml(nodeId)}'?</span>
+                <button class="action-btn action-btn-decollide-sm" style="color:${p.red}; border-color:${p.border};" onclick="dismissOcrPrompt('${nodeId}')">Discard all</button>
+            </div>
+            ${itemsHtml}
+        </div>
+    `;
+    container.style.display = 'block';
+
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = `OCR completed for '${nodeId}'. Please accept or discard the extracted text.`;
+    }
+}
+
+/**
+ * Accepts output of a specific OCR engine and updates the DOM node.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {string} engineName - Chosen OCR engine identifier.
+ */
+async function acceptOcrOutput(nodeId, engineName) {
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return;
+
+    const data = window.pendingOcrResultsMap && window.pendingOcrResultsMap[nodeId];
+    const engRes = (data && data.results && data.results[engineName]) ? data.results[engineName] : (data || {});
+    const chosenText = txtElem ? txtElem.value : (engRes.text || '');
+    const chosenConf = engRes.confidence || 0.0;
+
+    if (!node.content) node.content = {};
+    node.content.raw_text = chosenText;
+    node.user_correction_note = chosenText;
+    node.ocr_confidence = chosenConf;
+    node.is_incorrect_text = false;
+
+    dismissOcrPrompt(nodeId);
+
+    renderDOMTree();
+    renderSelectedEditor();
+    renderSVGOverlays();
+    await saveAnnotations(true);
+
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.className = 'status-banner';
+        banner.style.display = 'block';
+        banner.textContent = `Accepted '${engineName}' OCR output for section '${nodeId}'.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 5000);
+    }
+}
+
+/**
+ * Dismisses OCR review prompt without modifying node text.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ */
+function dismissOcrPrompt(nodeId) {
+    if (window.pendingOcrResultsMap) {
+        delete window.pendingOcrResultsMap[nodeId];
+    }
+    const container = document.getElementById(`ocrPromptContainer_${nodeId}`);
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+    const banner = document.getElementById('statusBanner');
+    if (banner) {
+        banner.textContent = `OCR output dismissed for section '${nodeId}'.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
     }
 }

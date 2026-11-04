@@ -193,6 +193,19 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
     const p = INSPECTOR_PALETTE;
     const w = Math.round(bbox.x1 - bbox.x0);
     const h = Math.round(bbox.y1 - bbox.y0);
+    const selectedEngines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[node.node_id]) || ['rapidocr'];
+    const availableEngines = ['rapidocr', 'tesseract', 'easyocr'];
+    const engineCheckboxesHtml = availableEngines.map(eng => {
+        const checked = selectedEngines.includes(eng) ? 'checked' : '';
+        const labelText = eng === 'rapidocr' ? 'RapidOCR' : (eng === 'tesseract' ? 'Tesseract' : 'EasyOCR');
+        return `
+            <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:${p.textPrimary}; cursor:pointer;">
+                <input type="checkbox" value="${eng}" class="ocr-engine-cb-${node.node_id}" ${checked} onchange="onOcrEngineToggle('${node.node_id}', '${eng}', this.checked)" />
+                ${labelText}
+            </label>
+        `;
+    }).join('');
+
     return `
         <div class="cutout-preview-card">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
@@ -211,10 +224,17 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
                     ${isCutoutUnskewed ? 'Show skewed' : 'Unskew'}
                 </button>
             </div>
+            <div style="margin-top:8px; border-top:1px solid ${p.border}; padding-top:6px;">
+                <div style="font-size:11px; font-weight:600; color:${p.textPrimary}; margin-bottom:4px;">OCR Engines (select 1 or more):</div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                    ${engineCheckboxesHtml}
+                </div>
+            </div>
             <div class="cutout-action-row" style="margin-top:8px; border-top:1px solid ${p.border}; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
                 <span style="font-size:11px; color:${p.textMuted};">Refined extraction pass</span>
                 <button class="action-btn action-btn-decollide-sm" id="btnCutoutOcr_${node.node_id}" style="background:${p.textPrimary}; color:${p.bgCard}; border-color:${p.textPrimary};" onclick="triggerCutoutSecondPass('${node.node_id}')" title="Send selected section cutout to backend OCR for targeted transcription">Parse section with OCR</button>
             </div>
+            <div id="ocrPromptContainer_${node.node_id}" style="display:none; margin-top:10px;"></div>
         </div>
     `;
 }
