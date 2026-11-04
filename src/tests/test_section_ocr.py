@@ -71,7 +71,7 @@ class TestSectionOCRParser(unittest.TestCase):
         img = _create_test_image_with_text(test_text)
 
         parser = SectionOCRParser()
-        result = parser.parse_image(img)
+        result = parser.parse_image(img, engine_name="rapidocr")
 
         self.assertTrue(result["success"])
         self.assertIsNone(result["error"])
@@ -87,7 +87,7 @@ class TestSectionOCRParser(unittest.TestCase):
         img = _create_test_image_with_text(test_text)
         data_uri = _image_to_base64_data_uri(img)
 
-        result = parse_image_ocr(data_uri)
+        result = parse_image_ocr(data_uri, engine_name="rapidocr")
 
         self.assertTrue(result["success"])
         self.assertIn("Invoice", result["text"])
@@ -102,14 +102,14 @@ class TestSectionOCRParser(unittest.TestCase):
         img.save(buf, format="PNG")
         raw_bytes = buf.getvalue()
 
-        result = parse_image_ocr(raw_bytes)
+        result = parse_image_ocr(raw_bytes, engine_name="rapidocr")
         self.assertTrue(result["success"])
         self.assertIn("Subtotal", result["text"])
 
     def test_parse_blank_image(self):
         """Verifies OCR handles blank white image gracefully without errors."""
         blank_img = Image.new("RGB", (200, 100), color="white")
-        result = parse_image_ocr(blank_img)
+        result = parse_image_ocr(blank_img, engine_name="rapidocr")
 
         self.assertTrue(result["success"])
         self.assertEqual(result["text"], "")
@@ -118,7 +118,7 @@ class TestSectionOCRParser(unittest.TestCase):
     def test_parse_invalid_input(self):
         """Verifies unsupported input types return a structured failure dictionary."""
         parser = SectionOCRParser()
-        result = parser.parse_image(12345)  # type: ignore
+        result = parser.parse_image(12345, engine_name="rapidocr")  # type: ignore
 
         self.assertFalse(result["success"])
         self.assertIn("Unsupported image input type", result["error"])
@@ -137,7 +137,7 @@ class TestSectionOCRParser(unittest.TestCase):
 
         # Crop a section from page 1
         bbox = {"x0": 40.0, "y0": 30.0, "x1": 550.0, "y1": 120.0}
-        result = parse_section_from_pdf(pdf_path, page_number=1, bbox=bbox)
+        result = parse_section_from_pdf(pdf_path, page_number=1, bbox=bbox, engine_name="rapidocr")
 
         self.assertTrue(result["success"])
         self.assertIsInstance(result["text"], str)
@@ -153,7 +153,7 @@ class TestSectionOCRParser(unittest.TestCase):
 
             status, body = http_post_json(
                 f"{base_url}/api/parse_section_ocr",
-                {"node_id": "node_p1_n3", "image_base64": data_uri, "language": "en"},
+                {"node_id": "node_p1_n3", "image_base64": data_uri, "language": "en", "engine": "rapidocr"},
             )
             self.assertEqual(status, 200)
             self.assertTrue(body["success"])
@@ -182,7 +182,7 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertIs(parser.engine, mock_engine)
 
         dummy_img = Image.new("RGB", (120, 80), color="white")
-        result = parser.parse_image(dummy_img)
+        result = parser.parse_image(dummy_img, engine_name="rapidocr")
 
         self.assertTrue(result["success"])
         self.assertIn("Custom Extracted Header", result["text"])
@@ -202,7 +202,7 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertEqual(len(calls), 0)
 
         dummy_img = Image.new("RGB", (50, 50), color="white")
-        result = parser.parse_image(dummy_img)
+        result = parser.parse_image(dummy_img, engine_name="rapidocr")
         self.assertEqual(len(calls), 1)
         self.assertTrue(result["success"])
         self.assertEqual(result["text"], "Factory Text")
@@ -260,9 +260,47 @@ class TestSectionOCRParser(unittest.TestCase):
         """Verifies parse_image returns success=False when OCR engine is None."""
         parser = SectionOCRParser(engine=None, engine_factory=lambda: None)
         dummy_img = Image.new("RGB", (30, 30), color="white")
-        result = parser.parse_image(dummy_img)
+        result = parser.parse_image(dummy_img, engine_name="rapidocr")
         self.assertFalse(result["success"])
         self.assertEqual(result["error"], "OCR engine not available.")
+
+    def test_parse_image_missing_engine_raises(self) -> None:
+        """Verifies parse_image raises ValueError when engine_name is missing, empty, or unknown."""
+        parser = SectionOCRParser()
+        dummy_img = Image.new("RGB", (30, 30), color="white")
+        with self.assertRaises(ValueError):
+            parser.parse_image(dummy_img)
+        with self.assertRaises(ValueError):
+            parser.parse_image(dummy_img, engine_name="")
+        with self.assertRaises(ValueError):
+            parser.parse_image(dummy_img, engine_name="nonexistent_engine")
+
+    def test_parse_image_multi_empty_engines_raises(self) -> None:
+        """Verifies parse_image_multi raises ValueError when engines sequence is empty or invalid."""
+        parser = SectionOCRParser()
+        dummy_img = Image.new("RGB", (30, 30), color="white")
+        with self.assertRaises(ValueError):
+            parser.parse_image_multi(dummy_img)
+        with self.assertRaises(ValueError):
+            parser.parse_image_multi(dummy_img, engines=[])
+        with self.assertRaises(ValueError):
+            parser.parse_image_multi(dummy_img, engines=["unknown_eng"])
+
+    def test_server_ocr_endpoint_missing_engine_rejected(self) -> None:
+        """Verifies POST /api/parse_section_ocr rejects requests without an explicit engine."""
+        from src.tests.conftest import http_post_json, running_test_server
+
+        with running_test_server() as (_, base_url):
+            test_img = _create_test_image_with_text("Explicit Required")
+            data_uri = _image_to_base64_data_uri(test_img)
+
+            status, body = http_post_json(
+                f"{base_url}/api/parse_section_ocr",
+                {"node_id": "test_node", "image_base64": data_uri},
+            )
+            self.assertEqual(status, 400)
+            self.assertFalse(body["success"])
+            self.assertIn("engine", body["error"].lower())
 
     def test_multi_engine_parsing_and_registration(self) -> None:
         """Verifies parsing across multiple selected OCR engines."""

@@ -147,6 +147,11 @@ DEFAULT_MUTED_CASES: List[MutedCase] = [
         violation_type="file_length",
         justification="Pairwise bounding box decollision, multi-node overlap inspection, and element merge editor.",
     ),
+    MutedCase(
+        file_pattern="src/parsers/section_ocr.py",
+        violation_type="file_length",
+        justification="Multi-engine section OCR parser supporting RapidOCR, Tesseract, and EasyOCR adapters.",
+    ),
 ]
 
 

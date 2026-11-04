@@ -2,82 +2,22 @@
 src/cli.py
 
 CLI Argument Parser & Console Output Summary Formatter.
-Supports direct pipeline runs, interactive plan generation, and plan-driven execution.
+Re-exports parser utilities from src.main and provides terminal summary formatting.
 """
 
 from __future__ import annotations
 
-import argparse
 import logging
 import sys
 from typing import Any, Mapping
-from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 
+from src.main import create_parser, parse_args
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="cernodata: Layout-Aware Ingestion, Plan Wizard, Text Skew Alignment & Visual Overlay Renderer."
-    )
-    parser.add_argument(
-        "--input", "-i", type=str, default=None,
-        help="Path to input PDF file"
-    )
-    parser.add_argument(
-        "--plan", "-p", type=str, default=None,
-        help="Path to execution plan JSON file (e.g. output/plan.json)"
-    )
-    parser.add_argument(
-        "--create-plan", action="store_true",
-        help="Launch interactive planner questionnaire to configure preset ranking and execution plan."
-    )
-    parser.add_argument(
-        "--plan-only", action="store_true",
-        help="Generate and save execution plan without immediately running the pipeline."
-    )
-    parser.add_argument(
-        "--cli", "--terminal", action="store_true", dest="cli",
-        help="Force terminal-based CLI questionnaire instead of browser-based data shape configuration."
-    )
-    parser.add_argument(
-        "--no-browser", action="store_true",
-        help="Do not automatically launch web browser when serving interactive questionnaire."
-    )
-    parser.add_argument(
-        "--browser-port", type=int, default=8000,
-        help="Port to serve interactive browser data shape configuration wizard (default: 8000)."
-    )
-    parser.add_argument(
-        "--override-preset", type=str, default=None,
-        help="Explicitly override primary preset (e.g. 'docling_deep', 'docling_fast', 'vision_llm_direct')"
-    )
-    parser.add_argument(
-        "--target-threshold", "-t", type=float, default=DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-        help=f"Target confidence threshold (default: {DEFAULT_TARGET_CONFIDENCE_THRESHOLD})"
-    )
-    parser.add_argument(
-        "--language", "-l", type=str, default="en",
-        help="Language hint code for OCR and quality verification (e.g. 'pl' for Polish, 'de' for German, 'en' for English)"
-    )
-    parser.add_argument(
-        "--no-align-skew", action="store_true",
-        help="Disable automatic local text alignment skew detection."
-    )
-    parser.add_argument(
-        "--output-dir", "-o", type=str, default="output",
-        help="Directory to store JSON DOM, violations report, and rendered overlay images (default: output)"
-    )
-    parser.add_argument(
-        "--no-visuals", action="store_true", help="Disable visual bounding box overlay rendering."
-    )
-    parser.add_argument(
-        "--serve", "-s", action="store_true",
-        help="Start live HTTP server listening at http://localhost:8000 for backend pipeline rerun requests."
-    )
-    parser.add_argument(
-        "--view", "-v", action="store_true",
-        help="Automatically open the interactive HTML web viewer in the default browser."
-    )
-    return parser.parse_args()
+__all__ = [
+    "create_parser",
+    "parse_args",
+    "print_summary",
+]
 
 
 def print_summary(result: Mapping[str, Any]) -> None:

@@ -22,7 +22,7 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
     def _handle_get_ocr_engines(self) -> None:
         """Returns list of available and registered OCR engines."""
         engines = get_available_ocr_engines()
-        self.send_json(200, {"engines": engines, "default": "rapidocr"})
+        self.send_json(200, {"engines": engines})
 
     def _handle_post_parse_ocr(self, payload: Dict[str, Any]) -> None:
         """
@@ -50,7 +50,18 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             selected_engines = [raw_engine.strip().lower()]
 
         if not selected_engines:
-            selected_engines = ["rapidocr"]
+            self.send_bad_request(
+                "Missing or empty 'engines' / 'engine' parameter. An OCR engine must be explicitly specified."
+            )
+            return
+
+        available = get_available_ocr_engines()
+        invalid = [e for e in selected_engines if e not in available]
+        if invalid:
+            self.send_bad_request(
+                f"Unknown OCR engine(s): {', '.join(invalid)}. Available engines: {', '.join(available)}"
+            )
+            return
 
         logger.info(
             "Parsing section '%s' using OCR engines: %s (Lang: %s)",

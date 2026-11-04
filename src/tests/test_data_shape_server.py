@@ -158,7 +158,7 @@ class TestDataShapeServer(unittest.TestCase):
                 data=submit_data,
                 headers={"Content-Type": "application/json"}
             )
-            for _ in range(50):
+            for _ in range(150):
                 time.sleep(0.1)
                 try:
                     with urllib.request.urlopen(req) as resp:

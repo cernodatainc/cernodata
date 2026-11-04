@@ -193,7 +193,7 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
     const p = INSPECTOR_PALETTE;
     const w = Math.round(bbox.x1 - bbox.x0);
     const h = Math.round(bbox.y1 - bbox.y0);
-    const selectedEngines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[node.node_id]) || ['rapidocr'];
+    const selectedEngines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[node.node_id]) || [];
     const availableEngines = ['rapidocr', 'tesseract', 'easyocr'];
     const engineCheckboxesHtml = availableEngines.map(eng => {
         const checked = selectedEngines.includes(eng) ? 'checked' : '';

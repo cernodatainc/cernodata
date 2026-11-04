@@ -137,12 +137,6 @@ class SectionOCRParser:
                 logger.warning("RapidOCR default engine initialization failed: %s", fallback_ex, exc_info=True)
                 return None
 
-    def _create_cli_subprocess_engine(self) -> Optional[Any]:
-        return None
-
-    def _create_http_endpoint_engine(self) -> Optional[Any]:
-        return None
-
     def _create_engine(self) -> Optional[Any]:
         """Creates engine using registered engine_factory or fallback default."""
         if self._engine_factory is not None:
@@ -151,9 +145,6 @@ class SectionOCRParser:
             except Exception as ex:
                 logger.warning("Custom OCR engine factory failed: %s", ex, exc_info=True)
                 return None
-        custom_engine = self._create_cli_subprocess_engine() or self._create_http_endpoint_engine()
-        if custom_engine is not None:
-            return custom_engine
         return self._create_default_engine()
 
     def _get_engine(self) -> Optional[Any]:
@@ -168,19 +159,13 @@ class SectionOCRParser:
         return engine(np.array(pil_image))
 
     def _parse_engine_result(self, result: Any) -> Tuple[str, float, List[OCRLine]]:
-        """
-        Extracts and standardizes raw OCR engine output into joined text,
-        average confidence score, and structured line records.
-        """
+        """Standardizes raw OCR output into joined text, average confidence, and structured line records."""
         if result is None:
             return "", 0.0, []
 
         if isinstance(result, str):
             clean = result.strip()
-            str_lines: List[OCRLine] = [
-                {"text": ln, "confidence": 1.0, "bbox": None}
-                for ln in clean.splitlines() if ln.strip()
-            ]
+            str_lines: List[OCRLine] = [{"text": ln, "confidence": 1.0, "bbox": None} for ln in clean.splitlines() if ln.strip()]
             return clean, 1.0, str_lines
 
         if isinstance(result, dict) and "text" in result and "txts" not in result:
@@ -199,16 +184,12 @@ class SectionOCRParser:
         boxes = getattr(result, "boxes", None)
 
         if txts is None and isinstance(result, dict):
-            txts = result.get("txts")
-            scores = result.get("scores")
-            boxes = result.get("boxes")
+            txts, scores, boxes = result.get("txts"), result.get("scores"), result.get("boxes")
 
         if txts is None and isinstance(result, (list, tuple)) and len(result) > 0:
             first = result[0]
             if isinstance(first, (list, tuple)):
-                parsed_txts: List[Any] = []
-                parsed_scores: List[Any] = []
-                parsed_boxes: List[Any] = []
+                parsed_txts, parsed_scores, parsed_boxes = [], [], []
                 for entry in first:
                     if isinstance(entry, (list, tuple)) and len(entry) >= 2:
                         parsed_boxes.append(entry[0])
@@ -218,9 +199,7 @@ class SectionOCRParser:
                         elif len(entry) >= 3:
                             parsed_txts.append(entry[1])
                             parsed_scores.append(entry[2])
-                txts = parsed_txts
-                scores = parsed_scores
-                boxes = parsed_boxes
+                txts, scores, boxes = parsed_txts, parsed_scores, parsed_boxes
 
         if not txts:
             return "", 0.0, []
@@ -249,11 +228,7 @@ class SectionOCRParser:
                     logger.debug("Skipping malformed OCR box for line %d: %s", i, ex)
                     box_coords = None
 
-            lines.append({
-                "text": clean_text,
-                "confidence": round(sc, 4),
-                "bbox": box_coords,
-            })
+            lines.append({"text": clean_text, "confidence": round(sc, 4), "bbox": box_coords})
 
         joined_text = "\n".join([line["text"] for line in lines])
         avg_confidence = round(sum(valid_scores) / len(valid_scores), 4) if valid_scores else 0.0
@@ -267,6 +242,13 @@ class SectionOCRParser:
         engine_name: Optional[str] = None,
     ) -> OCRResult:
         """Parses an image containing a document section using a targeted OCR engine."""
+        if not engine_name or not str(engine_name).strip():
+            raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
+        target_engine_name = str(engine_name).lower().strip()
+        available = self.get_available_engines()
+        if target_engine_name not in available:
+            raise ValueError(f"Unknown OCR engine '{target_engine_name}'. Available: {', '.join(available)}")
+
         try:
             pil_img = normalize_to_pil(image_input)
         except TypeError as ex:
@@ -278,7 +260,6 @@ class SectionOCRParser:
         if pil_img.width <= 0 or pil_img.height <= 0:
             return create_ocr_result(success=False, error="Image is empty or has invalid dimensions.")
 
-        target_engine_name = (engine_name or "rapidocr").lower().strip()
         engine = self._get_engine_by_name(target_engine_name)
         if engine is None:
             err_msg = "OCR engine not available." if target_engine_name == "rapidocr" else f"OCR engine '{target_engine_name}' not available."
@@ -300,7 +281,11 @@ class SectionOCRParser:
         language: Optional[str] = None,
     ) -> Dict[str, OCRResult]:
         """Executes multiple OCR engines against an image and returns results mapped by engine name."""
-        engine_list = [str(e).strip().lower() for e in engines] if engines else ["rapidocr"]
+        if not engines:
+            raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
+        engine_list = [str(e).strip().lower() for e in engines if str(e).strip()]
+        if not engine_list:
+            raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
         return {eng: self.parse_image(image_input, language=language, engine_name=eng) for eng in engine_list}
 
     def crop_section_image(
@@ -323,6 +308,8 @@ class SectionOCRParser:
         engine_name: Optional[str] = None,
     ) -> OCRResult:
         """Extracts and crops a specific section bounding box from a PDF page and runs OCR."""
+        if not engine_name or not str(engine_name).strip():
+            raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
         try:
             cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=scale)
         except (FileNotFoundError, ValueError, IndexError, RuntimeError) as ex:
@@ -343,19 +330,22 @@ class SectionOCRParser:
         scale: float = 2.0,
     ) -> Dict[str, OCRResult]:
         """Crops a section from a PDF page once and processes it with multiple OCR engines."""
+        if not engines:
+            raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
+        engine_list = [str(e).strip().lower() for e in engines if str(e).strip()]
+        if not engine_list:
+            raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
         try:
             cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=scale)
         except (FileNotFoundError, ValueError, IndexError, RuntimeError) as ex:
             err_res = create_ocr_result(success=False, error=str(ex))
-            engine_list = [str(e).strip().lower() for e in engines] if engines else ["rapidocr"]
             return {eng: err_res for eng in engine_list}
         except Exception as ex:
             logger.warning("Failed to crop PDF section: %s", ex, exc_info=True)
             err_res = create_ocr_result(success=False, error=f"Failed to crop PDF section: {str(ex)}")
-            engine_list = [str(e).strip().lower() for e in engines] if engines else ["rapidocr"]
             return {eng: err_res for eng in engine_list}
 
-        return self.parse_image_multi(cropped_img, engines=engines, language=language)
+        return self.parse_image_multi(cropped_img, engines=engine_list, language=language)
 
     def process_dom_node(
         self,
@@ -368,6 +358,8 @@ class SectionOCRParser:
         interactive: bool = False,
     ) -> Dict[str, Any]:
         """Processes a DOM node bounding box across one or more OCR engines and prompts for acceptance."""
+        if not engines:
+            raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
         if image_input is not None:
             results = self.parse_image_multi(image_input, engines=engines, language=language)
         elif pdf_path:
@@ -435,8 +427,9 @@ def parse_image_ocr(
     engine_name: Optional[str] = None,
 ) -> OCRResult:
     """Module-level convenience function for targeted image OCR."""
-    parser = get_default_section_parser()
-    return parser.parse_image(image_input, language=language, engine_name=engine_name)
+    if not engine_name or not str(engine_name).strip():
+        raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
+    return get_default_section_parser().parse_image(image_input, language=language, engine_name=engine_name)
 
 
 def parse_image_ocr_multi(
@@ -445,6 +438,8 @@ def parse_image_ocr_multi(
     language: str = "en",
 ) -> Dict[str, OCRResult]:
     """Module-level convenience function for targeted multi-engine image OCR."""
+    if not engines:
+        raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
     return get_default_section_parser().parse_image_multi(image_input, engines=engines, language=language)
 
 
@@ -457,6 +452,8 @@ def parse_section_from_pdf(
     engine_name: Optional[str] = None,
 ) -> OCRResult:
     """Module-level convenience function for cropping a section from a PDF and running OCR."""
+    if not engine_name or not str(engine_name).strip():
+        raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
     return get_default_section_parser().parse_section_from_pdf(
         pdf_path, page_number, bbox, language=language, scale=scale, engine_name=engine_name
     )
@@ -471,6 +468,8 @@ def parse_section_from_pdf_multi(
     scale: float = 2.0,
 ) -> Dict[str, OCRResult]:
     """Module-level convenience function for cropping a section from a PDF and running multiple OCR engines."""
+    if not engines:
+        raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
     return get_default_section_parser().parse_section_from_pdf_multi(
         pdf_path, page_number, bbox, engines=engines, language=language, scale=scale
     )

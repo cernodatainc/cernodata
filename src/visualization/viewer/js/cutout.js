@@ -268,13 +268,13 @@ window.pendingOcrResultsMap = window.pendingOcrResultsMap || {};
  * @param {boolean} checked - Whether checked.
  */
 function onOcrEngineToggle(nodeId, engine, checked) {
-    const curr = window.selectedOcrEnginesMap[nodeId] ? [...window.selectedOcrEnginesMap[nodeId]] : ['rapidocr'];
+    const curr = window.selectedOcrEnginesMap[nodeId] ? [...window.selectedOcrEnginesMap[nodeId]] : [];
     if (checked && !curr.includes(engine)) curr.push(engine);
     else if (!checked) {
         const idx = curr.indexOf(engine);
         if (idx !== -1) curr.splice(idx, 1);
     }
-    window.selectedOcrEnginesMap[nodeId] = curr.length > 0 ? curr : ['rapidocr'];
+    window.selectedOcrEnginesMap[nodeId] = curr;
 }
 
 /**
@@ -288,14 +288,21 @@ async function triggerCutoutSecondPass(nodeId) {
 
     const banner = document.getElementById('statusBanner');
     const ocrBtn = document.getElementById(`btnCutoutOcr_${nodeId}`);
+
+    const engines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[nodeId]) || [];
+    if (!engines || engines.length === 0) {
+        if (banner) {
+            banner.style.display = 'block';
+            banner.className = 'status-banner';
+            banner.textContent = `Please select at least one OCR engine for section '${nodeId}' before parsing.`;
+        }
+        return;
+    }
+
     if (ocrBtn) {
         ocrBtn.disabled = true;
         ocrBtn.textContent = 'Parsing…';
     }
-
-    const engines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[nodeId] && window.selectedOcrEnginesMap[nodeId].length > 0)
-        ? window.selectedOcrEnginesMap[nodeId]
-        : ['rapidocr'];
 
     if (banner) {
         banner.style.display = 'block';

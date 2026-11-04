@@ -252,7 +252,7 @@ class PyPdfiumParser:
         rendered_pil = None
         try:
             rendered_pil = page.render(scale=self.scale).to_pil().convert("RGB")
-            ocr_res = ocr_parser.parse_image(rendered_pil, language=self.language)
+            ocr_res = ocr_parser.parse_image(rendered_pil, language=self.language, engine_name="rapidocr")
         except Exception as ex:
             logger.warning("OCR failed on page %d: %s", page_no, ex, exc_info=True)
             ocr_res = {"lines": []}
