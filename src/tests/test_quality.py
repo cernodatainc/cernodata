@@ -228,6 +228,16 @@ class TestQualityMetrics(unittest.TestCase):
         fresh_cfg = load_quality_config()
         self.assertEqual(fresh_cfg["diacritic_hit"], 0.20)
 
+    def test_detect_node_text_skew_grayscale_and_multichannel(self) -> None:
+        arr_2d = np.zeros((50, 50), dtype=np.uint8)
+        self.assertEqual(detect_node_text_skew(arr_2d), 0.0)
+
+        arr_1ch = np.zeros((50, 50, 1), dtype=np.uint8)
+        self.assertEqual(detect_node_text_skew(arr_1ch), 0.0)
+
+        arr_4ch = np.zeros((50, 50, 4), dtype=np.uint8)
+        self.assertEqual(detect_node_text_skew(arr_4ch), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

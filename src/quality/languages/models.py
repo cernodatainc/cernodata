@@ -106,10 +106,14 @@ class LanguageConfig:
         conflicts: List[Tuple[str, str, str]] = []
         tokens = re.findall(r"\b\w+\b", text)
         for token in tokens:
+            seen_chars: Set[str] = set()
             for char in token:
-                if char in self.conflicting_diacritics:
+                if char in self.conflicting_diacritics and char not in seen_chars:
+                    seen_chars.add(char)
                     replacement_char = self.conflicting_diacritic_replacements.get(char, "")
-                    suggested = token.replace(char, replacement_char) if replacement_char else token
+                    suggested = token.replace(char, replacement_char) if replacement_char else ""
+                    if suggested == token:
+                        suggested = ""
                     conflicts.append((char, token, suggested))
         return conflicts
 

@@ -233,12 +233,21 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
             (
                 "diacritic_conflict",
                 config.find_diacritic_conflicts(raw_text),
-                lambda c, m, s: f"Diacritic conflict detected: '{c}' is not valid in {config.name} ('{m}' -> '{s}')",
+                lambda c, m, s: (
+                    f"Diacritic conflict detected: '{c}' is not valid in {config.name} ('{m}' -> '{s}')"
+                    if s and s != m
+                    else f"Diacritic conflict detected: '{c}' is not valid in {config.name} in '{m}'"
+                ),
             ),
         )
         for rule_type, items, fmt_desc in checks:
             for char_val, match_snippet, suggested in items:
-                rewrite = raw_text.replace(match_snippet, suggested, 1) if match_snippet else raw_text
+                has_replacement = bool(suggested and suggested != match_snippet)
+                rewrite = (
+                    raw_text.replace(match_snippet, suggested, 1)
+                    if (match_snippet and has_replacement)
+                    else None
+                )
                 violations.append(
                     make_node_violation(
                         node=node,
@@ -248,7 +257,7 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
                         severity="WARNING",
                         detected_snippet=match_snippet,
                         suggestion=rewrite,
-                        suggested_correction=suggested,
+                        suggested_correction=suggested if has_replacement else "",
                         description=fmt_desc(char_val, match_snippet, suggested),
                     )
                 )

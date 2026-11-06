@@ -357,6 +357,29 @@ class TestDOMManipulation(unittest.TestCase):
         assert top_updated is not None and bot_updated is not None
         self.assertLessEqual(top_updated.bounding_box.y1, bot_updated.bounding_box.y0)
 
+    def test_overlapping_pairs_respects_iou_threshold(self) -> None:
+        n1 = DOMNode(
+            node_id="b1",
+            type=DOMNodeType.PARAGRAPH,
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 10.0, 100.0, 60.0),
+        )
+        n2 = DOMNode(
+            node_id="b2",
+            type=DOMNodeType.PARAGRAPH,
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 50.0, 100.0, 110.0),
+        )
+        dom = DocumentDOM(document_id="doc_iou", source_filename="test.pdf", total_pages=1, nodes=[n1, n2])
+
+        strict_overlaps = dom.find_overlapping_pairs(page_index=1, iou_threshold=0.50)
+        self.assertEqual(len(strict_overlaps), 0)
+
+        permissive_overlaps = dom.find_overlapping_pairs(page_index=1, iou_threshold=0.05)
+        self.assertEqual(len(permissive_overlaps), 1)
+
     def test_metadata_round_trip(self) -> None:
         dom = self._create_sample_dom()
         dom.metadata["audit_trail"] = ["parsed_docling_fast", "verified"]

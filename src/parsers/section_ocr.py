@@ -262,7 +262,12 @@ class SectionOCRParser:
 
         engine = self._get_engine_by_name(target_engine_name)
         if engine is None:
-            err_msg = "OCR engine not available." if target_engine_name == "rapidocr" else f"OCR engine '{target_engine_name}' not available."
+            if target_engine_name == "rapidocr":
+                err_msg = "OCR engine not available."
+            elif target_engine_name == "tesseract":
+                err_msg = "OCR engine 'tesseract' not available (pytesseract or system binary missing). Use RapidOCR."
+            else:
+                err_msg = f"OCR engine '{target_engine_name}' not available."
             return create_ocr_result(success=False, error=err_msg)
 
         try:

@@ -21,7 +21,7 @@ def draw_violation_callout(
     snippet = violation.get("detected_snippet", "")
     suggested = violation.get("suggested_correction", "")
     viol_label = f"[!] VIOLATION: '{snippet}'"
-    if suggested:
+    if suggested and suggested != snippet:
         viol_label += f" -> '{suggested}'"
 
     v_left, v_top, v_right, v_bottom = font.getbbox(viol_label)

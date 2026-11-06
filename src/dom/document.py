@@ -373,7 +373,7 @@ class DocumentDOM:
                 n1, n2 = target_nodes[i], target_nodes[j]
                 if n1.global_page_index == n2.global_page_index:
                     score = n1.iou(n2)
-                    if score >= iou_threshold or n1.intersects(n2):
+                    if n1.intersects(n2) and score >= iou_threshold:
                         overlaps.append((n1, n2, score))
         return overlaps
 

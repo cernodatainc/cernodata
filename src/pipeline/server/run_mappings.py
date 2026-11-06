@@ -22,6 +22,7 @@ from src.pipeline.server.discovery import find_previous_runs
 from src.pipeline.server.http_utils import REPO_ROOT
 from src.pipeline.server.run_mapping_helpers import (
     derive_file_set,
+    is_excluded_path,
     make_doc_entry as _make_doc_entry,
     make_run_record as _make_run_record,
     normalize_path,
