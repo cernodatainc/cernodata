@@ -338,3 +338,44 @@ class TestRunMappings(unittest.TestCase):
         self.assertNotIn("src/e2e/active_doc.pdf", session.get_available_documents())
         self.assertEqual(session.pdf_path, "")
 
+    def test_unforget_when_discovering_file_from_scratch(self) -> None:
+        from src.pipeline.server.session import ServerSessionContext
+
+        # Create mock file and run
+        e2e_dir = os.path.join(self.test_dir, "src", "e2e")
+        os.makedirs(e2e_dir, exist_ok=True)
+        doc_file = os.path.join(e2e_dir, "discover_again.pdf")
+        with open(doc_file, "wb") as f:
+            f.write(b"%PDF-1.4 mock")
+
+        record_run_mapping(
+            document_path="src/e2e/discover_again.pdf",
+            run_id="run_past_1",
+            output_dir="output/run_past_1",
+            preset="docling_fast",
+            status="ACCEPT",
+            confidence=0.97,
+            violations_count=0,
+            repo_root=self.test_dir,
+        )
+
+        session = ServerSessionContext(repo_root=self.test_dir)
+        before = session.get_file_run_mappings()
+        self.assertTrue(any(d["file_name"] == "discover_again.pdf" for d in before["all_mappings"]))
+
+        # Forget the file
+        session.forget_document("src/e2e/discover_again.pdf")
+        after_forget = session.get_file_run_mappings()
+        self.assertFalse(any(d["file_name"] == "discover_again.pdf" for d in after_forget["all_mappings"]))
+
+        # User attempts to discover the file from scratch
+        session.register_document("src/e2e/discover_again.pdf")
+        after_discovery = session.get_file_run_mappings()
+
+        # Document is restored along with its historical runs
+        doc_entry = next((d for d in after_discovery["all_mappings"] if d["file_name"] == "discover_again.pdf"), None)
+        self.assertIsNotNone(doc_entry, "Discovered file should be unforgotten and visible in explorer")
+        self.assertEqual(len(doc_entry["runs"]), 1, "Past runs should be intact and restored in explorer")
+        self.assertEqual(doc_entry["runs"][0]["run_id"], "run_past_1")
+
+

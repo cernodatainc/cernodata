@@ -147,17 +147,16 @@ def unforget_document(document_path: str, repo_root: Optional[str] = None) -> bo
     with _LOCK:
         mappings = load_persistent_mappings(root)
         forgotten_set = set(_read_forgotten_files(mappings))
-        changed = False
-        if norm_doc in forgotten_set:
-            forgotten_set.discard(norm_doc)
-            changed = True
-        if doc_base and doc_base in forgotten_set:
-            forgotten_set.discard(doc_base)
-            changed = True
-        if changed:
+        to_remove = {
+            x for x in forgotten_set
+            if x == norm_doc or os.path.basename(x) == doc_base or x == doc_base
+        }
+        if to_remove:
+            forgotten_set.difference_update(to_remove)
             mappings["_forgotten_files"] = sorted(forgotten_set)
             save_persistent_mappings(mappings, root)
-        return changed
+            return True
+        return False
 
 
 def record_run_mapping(
@@ -204,13 +203,8 @@ def register_document_path(document_path: str, repo_root: Optional[str] = None) 
     root = repo_root or REPO_ROOT
     norm = normalize_path(document_path)
     with _LOCK:
+        unforget_document(norm, repo_root=root)
         mappings = load_persistent_mappings(root)
-        forgotten_set = set(_read_forgotten_files(mappings))
-        doc_base = os.path.basename(norm)
-        if norm in forgotten_set or doc_base in forgotten_set:
-            forgotten_set.discard(norm)
-            forgotten_set.discard(doc_base)
-            mappings["_forgotten_files"] = sorted(forgotten_set)
         if norm not in mappings:
             mappings[norm] = {"runs": []}
         save_persistent_mappings(mappings, root)
