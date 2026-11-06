@@ -139,7 +139,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = create_parser()
     args = parser.parse_args(argv)
     if not hasattr(args, "browser_port") or getattr(args, "browser_port", None) is None:
-        setattr(args, "browser_port", args.port)
+        args.browser_port = args.port
     return args
 
 

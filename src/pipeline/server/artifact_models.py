@@ -34,7 +34,7 @@ class RunArtifacts:
         except AttributeError:
             if key in self.artifacts:
                 return self.artifacts[key]
-            raise KeyError(key)
+            raise KeyError(key) from None
 
     def get(self, key: str, default: Any = None) -> Any:
         if hasattr(self, key):

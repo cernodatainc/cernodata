@@ -288,6 +288,15 @@ def _extract_comment_mutes(content: str) -> List[Tuple[int, str, str]]:
     return directives
 
 
+def _get_line_no(lines: Sequence[str], char_idx: int) -> int:
+    curr = 0
+    for idx, line_s in enumerate(lines, start=1):
+        curr += len(line_s)
+        if curr > char_idx:
+            return idx
+    return len(lines)
+
+
 def scan_inline_css_and_js(
     target_dir: str,
     extensions: Optional[Sequence[str]] = (".html", ".htm", ".svg"),
@@ -321,17 +330,9 @@ def scan_inline_css_and_js(
 
             lines = content.splitlines(keepends=True)
 
-            def get_line_no(char_idx: int) -> int:
-                curr = 0
-                for idx, line_s in enumerate(lines, start=1):
-                    curr += len(line_s)
-                    if curr > char_idx:
-                        return idx
-                return len(lines)
-
             for m in style_tag_re.finditer(content):
                 if m.group(1).strip():
-                    lno = get_line_no(m.start())
+                    lno = _get_line_no(lines, m.start())
                     violations.append(InlineViolation(
                         full_path, rel_path, lno, "inline_style_tag",
                         m.group(1).strip()[:60].replace("\n", " "),
@@ -340,7 +341,7 @@ def scan_inline_css_and_js(
 
             for m in script_tag_re.finditer(content):
                 if m.group(1).strip():
-                    lno = get_line_no(m.start())
+                    lno = _get_line_no(lines, m.start())
                     violations.append(InlineViolation(
                         full_path, rel_path, lno, "inline_script_tag",
                         m.group(1).strip()[:60].replace("\n", " "),

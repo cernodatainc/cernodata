@@ -109,11 +109,11 @@ class DoclingParser:
 
         if hasattr(pipeline_options, "ocr_options") and pipeline_options.ocr_options:
             if hasattr(pipeline_options.ocr_options, "lang"):
-                setattr(pipeline_options.ocr_options, "lang", ocr_langs)
+                pipeline_options.ocr_options.lang = ocr_langs
             if hasattr(pipeline_options.ocr_options, "scale"):
-                setattr(pipeline_options.ocr_options, "scale", self.ocr_scale)
+                pipeline_options.ocr_options.scale = self.ocr_scale
             if hasattr(pipeline_options.ocr_options, "mode"):
-                setattr(pipeline_options.ocr_options, "mode", ocr_mode)
+                pipeline_options.ocr_options.mode = ocr_mode
 
         return pipeline_options
 
