@@ -41,14 +41,17 @@ logger = logging.getLogger("cernodata.server.run_mappings")
 __all__ = [
     "MAPPINGS_FILENAME",
     "derive_file_set",
+    "forget_document",
     "get_file_run_mappings",
     "get_mappings_file_path",
+    "is_file_forgotten",
     "load_persistent_mappings",
     "normalize_path",
     "record_run_mapping",
     "register_document_path",
     "remove_run_mapping",
     "save_persistent_mappings",
+    "unforget_document",
 ]
 
 _LOCK = threading.RLock()
@@ -103,6 +106,60 @@ def _read_removed_keys(mappings: Dict[str, Any]) -> List[str]:
     return raw if isinstance(raw, list) else []
 
 
+def _read_forgotten_files(mappings: Dict[str, Any]) -> List[str]:
+    """Returns recorded forgotten document paths, tolerating malformed payloads."""
+    raw = mappings.get("_forgotten_files", [])
+    return raw if isinstance(raw, list) else []
+
+
+def is_file_forgotten(path_or_name: str, forgotten_files: Set[str]) -> bool:
+    """Checks if a document path or base filename matches any forgotten file."""
+    if not path_or_name or not forgotten_files:
+        return False
+    norm = normalize_path(path_or_name)
+    base = os.path.basename(norm)
+    return norm in forgotten_files or base in forgotten_files
+
+
+def forget_document(document_path: str, repo_root: Optional[str] = None) -> bool:
+    """
+    Marks a document as forgotten so it disappears from the explorer without deleting past runs.
+    """
+    root = repo_root or REPO_ROOT
+    norm_doc = normalize_path(document_path)
+    doc_base = os.path.basename(norm_doc)
+    with _LOCK:
+        mappings = load_persistent_mappings(root)
+        forgotten_set = set(_read_forgotten_files(mappings))
+        forgotten_set.add(norm_doc)
+        if doc_base:
+            forgotten_set.add(doc_base)
+        mappings["_forgotten_files"] = sorted(forgotten_set)
+        save_persistent_mappings(mappings, root)
+        return True
+
+
+def unforget_document(document_path: str, repo_root: Optional[str] = None) -> bool:
+    """Removes a document from the forgotten files set."""
+    root = repo_root or REPO_ROOT
+    norm_doc = normalize_path(document_path)
+    doc_base = os.path.basename(norm_doc)
+    with _LOCK:
+        mappings = load_persistent_mappings(root)
+        forgotten_set = set(_read_forgotten_files(mappings))
+        changed = False
+        if norm_doc in forgotten_set:
+            forgotten_set.discard(norm_doc)
+            changed = True
+        if doc_base and doc_base in forgotten_set:
+            forgotten_set.discard(doc_base)
+            changed = True
+        if changed:
+            mappings["_forgotten_files"] = sorted(forgotten_set)
+            save_persistent_mappings(mappings, root)
+        return changed
+
+
 def record_run_mapping(
     document_path: str,
     run_id: str,
@@ -148,9 +205,15 @@ def register_document_path(document_path: str, repo_root: Optional[str] = None) 
     norm = normalize_path(document_path)
     with _LOCK:
         mappings = load_persistent_mappings(root)
+        forgotten_set = set(_read_forgotten_files(mappings))
+        doc_base = os.path.basename(norm)
+        if norm in forgotten_set or doc_base in forgotten_set:
+            forgotten_set.discard(norm)
+            forgotten_set.discard(doc_base)
+            mappings["_forgotten_files"] = sorted(forgotten_set)
         if norm not in mappings:
             mappings[norm] = {"runs": []}
-            save_persistent_mappings(mappings, root)
+        save_persistent_mappings(mappings, root)
 
 
 def _record_removal_keys(
@@ -289,16 +352,21 @@ def get_file_run_mappings(
         removed_runs: Set[str] = {
             normalize_path(str(x)) for x in _read_removed_keys(persistent_data) if x
         }
+        forgotten_files: Set[str] = {
+            normalize_path(str(x)) for x in _read_forgotten_files(persistent_data) if x
+        }
 
         discovered_runs = [r for r in find_previous_runs(root) if not _is_run_removed(r, removed_runs)]
 
-        doc_paths = discover_document_paths(root, available_docs, persistent_data, discovered_runs)
+        doc_paths = discover_document_paths(
+            root, available_docs, persistent_data, discovered_runs, forgotten_files=forgotten_files
+        )
         doc_mappings: Dict[str, Dict[str, Any]] = {
             d_path: _make_doc_entry(d_path, with_summary=True)
             for d_path in sorted(doc_paths)
         }
 
-        associate_discovered_runs(doc_mappings, discovered_runs)
+        associate_discovered_runs(doc_mappings, discovered_runs, forgotten_files=forgotten_files)
         merge_persistent_runs(doc_mappings, persistent_data, removed_runs)
 
         file_sets_list, all_mappings_list = group_into_file_sets(doc_mappings)

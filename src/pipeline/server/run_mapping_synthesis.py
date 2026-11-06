@@ -47,11 +47,21 @@ def discover_document_paths(
     available_docs: Optional[List[str]],
     persistent_data: Dict[str, Any],
     discovered_runs: List[Dict[str, Any]],
+    forgotten_files: Optional[Set[str]] = None,
 ) -> Set[str]:
     """Collects candidate document paths from disk, persisted mappings, and discovered runs."""
+    ignored = forgotten_files or set()
+
+    def _is_forgotten(path_str: str) -> bool:
+        if not path_str or not ignored:
+            return False
+        norm = normalize_path(path_str)
+        base = os.path.basename(norm)
+        return norm in ignored or base in ignored
+
     doc_paths: Set[str] = set()
     if available_docs:
-        doc_paths.update(normalize_path(d) for d in available_docs)
+        doc_paths.update(normalize_path(d) for d in available_docs if not _is_forgotten(d))
 
     for pat in (
         os.path.join(root, "src", "e2e", "*.pdf"),
@@ -60,18 +70,20 @@ def discover_document_paths(
     ):
         for match in glob.glob(pat):
             try:
-                doc_paths.add(normalize_path(os.path.relpath(match, root)))
+                rel = normalize_path(os.path.relpath(match, root))
             except ValueError:
-                doc_paths.add(normalize_path(match))
+                rel = normalize_path(match)
+            if not _is_forgotten(rel):
+                doc_paths.add(rel)
 
     for p_key, p_val in persistent_data.items():
-        if p_key.startswith("_") or not isinstance(p_val, dict):
+        if p_key.startswith("_") or not isinstance(p_val, dict) or _is_forgotten(p_key):
             continue
         _add_unique_doc_path(doc_paths, normalize_path(p_key))
 
     for r in discovered_runs:
         d_path = r.get("document_path")
-        if d_path and not d_path.startswith("_"):
+        if d_path and not d_path.startswith("_") and not _is_forgotten(d_path):
             _add_unique_doc_path(doc_paths, normalize_path(d_path))
     return doc_paths
 
@@ -114,11 +126,24 @@ def _match_doc_key(doc_mappings: Dict[str, Dict[str, Any]], target: str) -> Opti
 def associate_discovered_runs(
     doc_mappings: Dict[str, Dict[str, Any]],
     discovered_runs: List[Dict[str, Any]],
+    forgotten_files: Optional[Set[str]] = None,
 ) -> None:
     """Attaches discovered runs to their documents, creating entries for unknown documents."""
+    ignored = forgotten_files or set()
+
+    def _is_forgotten(path_str: str) -> bool:
+        if not path_str or not ignored:
+            return False
+        norm = normalize_path(path_str)
+        base = os.path.basename(norm)
+        return norm in ignored or base in ignored
+
     for r in discovered_runs:
         r_doc_path = normalize_path(r.get("document_path") or "")
         r_doc_name = r.get("document_name") or os.path.basename(r_doc_path)
+        if _is_forgotten(r_doc_path) or _is_forgotten(r_doc_name):
+            continue
+
         run_id = r.get("id") or r.get("dir_path") or "output"
         output_dir = r.get("dir_path") or "output"
         run_entry = _build_discovered_run_entry(r, run_id, output_dir)

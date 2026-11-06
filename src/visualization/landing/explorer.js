@@ -142,7 +142,7 @@ function renderExplorerTree() {
                 const docClass = (currentExplorerScope === 'file' && doc.file_path === currentExplorerDoc) ? ' selected' : '';
                 const runCount = doc.runs_count || 0;
 
-                html += `<div class="tree-node tree-file-node"><div class="tree-row file-row${docClass}" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">`
+                html += `<div class="tree-node tree-file-node"><div class="tree-row file-row${docClass}" data-doc-path="${escapeHtml(doc.file_path)}" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')" oncontextmenu="handleExplorerFileContextMenu(event, '${escapeHtml(doc.file_path)}')">`
                     + `<span class="tree-icon file-icon">[PDF]</span><span class="tree-label file-label" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span>`
                     + `<span class="tree-runs-count-badge" title="${runCount} past runs">${runCount} runs</span></div>`;
 
@@ -250,7 +250,7 @@ function renderDirectoryFilesView(titleEl, tableHead, tbody) {
             ? `<span class="badge ${latest.status === 'ACCEPT' ? 'badge-accept' : 'badge-warn'}">${escapeHtml(latest.status)}</span>`
             : '<span class="table-muted-cell">Unparsed</span>';
 
-        rowsHtml += `<tr onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">`
+        rowsHtml += `<tr data-doc-path="${escapeHtml(doc.file_path)}" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')" oncontextmenu="handleExplorerFileContextMenu(event, '${escapeHtml(doc.file_path)}')">`
             + `<td><span class="file-name-cell" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span></td>`
             + `<td><span class="file-path-sub">${escapeHtml(doc.file_path)}</span></td><td><span class="tree-runs-count-badge">${runCount} runs</span></td>`
             + `<td>${presetBadge}</td><td>${scoreBadge}</td><td>${statusBadge}</td>`
@@ -267,7 +267,11 @@ function renderFileRunsView(titleEl, tableHead, tbody) {
     const docPath = doc ? doc.file_path : currentExplorerDoc;
     const query = explorerSearchQuery.toLowerCase().trim();
 
-    if (titleEl) titleEl.textContent = `File runs: ${docName}`;
+    if (titleEl) {
+        titleEl.textContent = `File runs: ${docName}`;
+        titleEl.setAttribute('data-doc-path', docPath || '');
+        titleEl.oncontextmenu = (e) => handleExplorerFileContextMenu(e, docPath);
+    }
     if (tableHead) tableHead.innerHTML = '<tr><th>Run ID</th><th>Preset</th><th>Score</th><th>Viols</th><th>Status</th><th>Time</th><th>Action</th></tr>';
     if (!tbody) return;
 

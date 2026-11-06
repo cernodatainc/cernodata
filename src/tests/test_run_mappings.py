@@ -14,10 +14,13 @@ import unittest
 
 from src.pipeline.server.run_mappings import (
     derive_file_set,
+    forget_document,
     get_file_run_mappings,
     load_persistent_mappings,
     normalize_path,
     record_run_mapping,
+    register_document_path,
+    unforget_document,
 )
 
 
@@ -260,3 +263,77 @@ class TestRunMappings(unittest.TestCase):
         # Document 8 run must be PRESERVED
         self.assertEqual(len(d8_entry["runs"]), 1)
         self.assertEqual(d8_entry["runs"][0]["run_id"], "output")
+
+    def test_forget_document_removes_from_explorer_and_preserves_runs(self) -> None:
+        # Create mock input file
+        e2e_dir = os.path.join(self.test_dir, "src", "e2e")
+        os.makedirs(e2e_dir, exist_ok=True)
+        pdf_path = os.path.join(e2e_dir, "to_forget.pdf")
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-1.4 mock")
+
+        # Record run and create physical run artifact
+        run_dir = os.path.join(self.test_dir, "output", "run_forget_test")
+        os.makedirs(run_dir, exist_ok=True)
+        dom_file = os.path.join(run_dir, "document_dom.json")
+        with open(dom_file, "w", encoding="utf-8") as f:
+            json.dump({"document_id": "d_forget", "source_filename": "to_forget.pdf"}, f)
+
+        record_run_mapping(
+            document_path="src/e2e/to_forget.pdf",
+            run_id="run_forget_test",
+            output_dir="output/run_forget_test",
+            preset="docling_fast",
+            status="ACCEPT",
+            confidence=0.96,
+            violations_count=0,
+            repo_root=self.test_dir,
+        )
+
+        before = get_file_run_mappings(self.test_dir)
+        doc_names_before = [d["file_name"] for d in before["all_mappings"]]
+        self.assertIn("to_forget.pdf", doc_names_before)
+
+        # Forget the document
+        ok = forget_document("src/e2e/to_forget.pdf", repo_root=self.test_dir)
+        self.assertTrue(ok)
+
+        after = get_file_run_mappings(self.test_dir)
+        doc_names_after = [d["file_name"] for d in after["all_mappings"]]
+        self.assertNotIn("to_forget.pdf", doc_names_after)
+        self.assertNotIn("_forgotten_files", doc_names_after)
+
+        # Past runs MUST NOT be deleted
+        self.assertTrue(os.path.exists(dom_file), "Past run artifacts on disk must not be deleted when forgetting a file")
+
+    def test_unforget_document_on_register(self) -> None:
+        forget_document("src/e2e/temp_doc.pdf", repo_root=self.test_dir)
+        mappings = load_persistent_mappings(self.test_dir)
+        self.assertIn("src/e2e/temp_doc.pdf", mappings.get("_forgotten_files", []))
+
+        # Test explicit unforget_document
+        unforgotten = unforget_document("src/e2e/temp_doc.pdf", repo_root=self.test_dir)
+        self.assertTrue(unforgotten)
+        mappings_unforgot = load_persistent_mappings(self.test_dir)
+        self.assertNotIn("src/e2e/temp_doc.pdf", mappings_unforgot.get("_forgotten_files", []))
+
+        # Re-register document
+        forget_document("src/e2e/temp_doc.pdf", repo_root=self.test_dir)
+        register_document_path("src/e2e/temp_doc.pdf", repo_root=self.test_dir)
+        mappings_after = load_persistent_mappings(self.test_dir)
+        self.assertNotIn("src/e2e/temp_doc.pdf", mappings_after.get("_forgotten_files", []))
+
+    def test_session_forget_document(self) -> None:
+        from src.pipeline.server.session import ServerSessionContext
+
+        session = ServerSessionContext(repo_root=self.test_dir)
+        session.pdf_path = "src/e2e/active_doc.pdf"
+        session.register_document("src/e2e/active_doc.pdf")
+
+        self.assertIn("src/e2e/active_doc.pdf", session.get_available_documents())
+
+        ok = session.forget_document("src/e2e/active_doc.pdf")
+        self.assertTrue(ok)
+        self.assertNotIn("src/e2e/active_doc.pdf", session.get_available_documents())
+        self.assertEqual(session.pdf_path, "")
+

@@ -2014,3 +2014,58 @@ body.viewer-open-fullscreen {
 .tree-add-doc-row:hover {
     background: #EBF3FB;
 }
+
+/* Explorer Context Menu */
+
+.explorer-context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    padding: 4px 0;
+    min-width: 160px;
+    display: none;
+}
+
+.explorer-context-menu.visible {
+    display: block;
+}
+
+.explorer-context-menu-header {
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid #EFF1F2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 240px;
+}
+
+.explorer-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.explorer-context-menu-item:hover,
+.explorer-context-menu-item:focus {
+    background: #F8E6E4;
+    color: var(--accent-red);
+    outline: none;
+}
+

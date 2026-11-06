@@ -12,7 +12,14 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from src.pipeline.server.discovery import build_runs_grid, find_previous_runs
-from src.pipeline.server.run_mappings import get_file_run_mappings, register_document_path
+from src.pipeline.server.run_mappings import (
+    _read_forgotten_files,
+    forget_document as _forget_doc,
+    get_file_run_mappings,
+    load_persistent_mappings,
+    normalize_path,
+    register_document_path,
+)
 
 
 class DocumentsMixin:
@@ -22,9 +29,19 @@ class DocumentsMixin:
     pdf_path: str
     repo_root: str
     src_dir: str
+    _registered_documents: List[str]
 
     def get_available_documents(self) -> List[str]:
         """Finds candidate PDF documents in repository workspace."""
+        persistent_data = load_persistent_mappings(self.repo_root)
+        forgotten_set = {normalize_path(str(x)) for x in _read_forgotten_files(persistent_data) if x}
+
+        def _is_forgotten(path_str: str) -> bool:
+            if not path_str or not forgotten_set:
+                return False
+            norm = normalize_path(path_str)
+            return norm in forgotten_set or os.path.basename(norm) in forgotten_set
+
         docs: List[str] = []
         for pat in [
             os.path.join(self.repo_root, "src", "e2e", "*.pdf"),
@@ -37,17 +54,34 @@ class DocumentsMixin:
                     rel = os.path.relpath(match, self.repo_root).replace("\\", "/")
                 except ValueError:
                     rel = match.replace("\\", "/")
-                if rel not in docs:
+                if rel not in docs and not _is_forgotten(rel):
                     docs.append(rel)
         with self._lock:
             for reg in getattr(self, "_registered_documents", []):
-                if reg not in docs:
+                if reg not in docs and not _is_forgotten(reg):
                     docs.append(reg)
-            if not docs and self.pdf_path:
+            if self.pdf_path and _is_forgotten(self.pdf_path):
+                self.pdf_path = docs[0] if docs else ""
+            elif not docs and self.pdf_path and not _is_forgotten(self.pdf_path):
                 docs.append(self.pdf_path)
-            elif self.pdf_path and self.pdf_path not in docs:
+            elif self.pdf_path and self.pdf_path not in docs and not _is_forgotten(self.pdf_path):
                 docs.append(self.pdf_path)
         return docs
+
+    def forget_document(self, path: str) -> bool:
+        """
+        Marks a document as forgotten so it disappears from the explorer without deleting past runs.
+        """
+        norm = normalize_path(path)
+        with self._lock:
+            if hasattr(self, "_registered_documents"):
+                self._registered_documents = [
+                    d for d in self._registered_documents
+                    if normalize_path(d) != norm and os.path.basename(d) != os.path.basename(norm)
+                ]
+            if normalize_path(self.pdf_path) == norm or os.path.basename(self.pdf_path) == os.path.basename(norm):
+                self.pdf_path = ""
+        return _forget_doc(norm, repo_root=self.repo_root)
 
     def register_document(self, path: str) -> str:
         """

@@ -176,6 +176,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
 
         post_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {
             "/api/remove_run": self._handle_post_remove_run,
+            "/api/forget_file": self._handle_post_forget_file,
+            "/api/forget_document": self._handle_post_forget_file,
             "/api/run": self._handle_post_run,
             "/api/rerun": self._handle_post_rerun,
             "/api/calculate_scores": self._handle_post_calculate_scores,

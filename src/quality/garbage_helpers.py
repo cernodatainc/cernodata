@@ -4,6 +4,8 @@ src/quality/garbage_helpers.py
 Helper functions and character dictionaries for OCR garbage detection and anomaly scoring.
 """
 
+from __future__ import annotations
+
 import re
 import unicodedata
 from typing import List, Set, Tuple
@@ -22,11 +24,11 @@ VALID_SHORT_WORDS: Set[str] = {
     'ci', 'co', 'mu', 'go', 'ma', 'im', 'ja', 'ty', 'on', 'my', 'wy', 'iż',
     'aż', 'bo', 'że', 'ni', 'no', 'ba', 'or', 'al', 'np', 'zł', 'gr', 'nr',
     'ul', 'je', 'ją', 'tę', 'sa', 'sp', 'pl', 'eu',
-    # English
-    'in', 'on', 'at', 'by', 'for', 'of', 'to', 'is', 'it', 'as', 'an', 'be',
-    'he', 'we', 'me', 'us', 'my', 'so', 'no', 'if', 'up', 'am', 'or', 'ok',
-    # German
-    'er', 'es', 'im', 'in', 'am', 'an', 'um', 'zu', 'ab', 'ob', 'ja', 'da', 'wo', 'so', 'du'
+    # English (additional distinct)
+    'in', 'at', 'by', 'for', 'of', 'is', 'it', 'as', 'an', 'be',
+    'he', 'me', 'us', 'so', 'if', 'up', 'am', 'ok',
+    # German (additional distinct)
+    'er', 'es', 'um', 'zu', 'ab', 'ob', 'da', 'wo', 'du',
 }
 
 

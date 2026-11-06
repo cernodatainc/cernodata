@@ -21,6 +21,7 @@ LANDING_MODULE_ORDER: List[str] = [
     "matrix_grid.js",
     "hints.js",
     "explorer.js",
+    "context_menu.js",
     "discovery.js",
     "app.js",
 ]

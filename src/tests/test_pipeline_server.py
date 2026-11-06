@@ -479,3 +479,14 @@ class TestPipelineServer(EphemeralServerTestCase):
         status, data = self._post_json("/api/remove_run", {"run_id": "test_del", "output_dir": "test_output"})
         self.assertEqual(status, 200)
         self.assertTrue(data.get("success"))
+
+    def test_api_forget_file_endpoint(self) -> None:
+        status, data = self._post_json("/api/forget_file", {"file_path": "src/e2e/test_forget_server.pdf"})
+        self.assertEqual(status, 200)
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("forgotten_file"), "src/e2e/test_forget_server.pdf")
+        self.assertIn("file_run_mappings", data)
+        # Verify it disappears from mappings
+        doc_names = [d["file_name"] for d in data["file_run_mappings"]["all_mappings"]]
+        self.assertNotIn("test_forget_server.pdf", doc_names)
+

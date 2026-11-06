@@ -132,6 +132,29 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             "file_run_mappings": self.session.get_file_run_mappings(),
         })
 
+    def _handle_post_forget_file(self, payload: Dict[str, Any]) -> None:
+        """
+        Marks a document as forgotten, removing it from explorer listings
+        without deleting historical execution runs or output artifacts.
+        """
+        raw_path = payload.get("file_path") or payload.get("document_path") or payload.get("path")
+        if not raw_path:
+            self.send_bad_request("Missing 'file_path' or 'document_path' in request payload.")
+            return
+
+        target_file = str(raw_path).strip()
+        from src.pipeline.server.run_mappings import forget_document
+        forget_document(target_file, repo_root=self.session.repo_root)
+        if hasattr(self.session, "forget_document"):
+            self.session.forget_document(target_file)
+
+        self.send_ok({
+            "forgotten_file": target_file,
+            "active_file": self.session.pdf_path,
+            "documents": self.session.get_available_documents(),
+            "file_run_mappings": self.session.get_file_run_mappings(),
+        })
+
     def _get_custom_presets_catalog(self) -> List[Dict[str, Any]]:
         """No-op hook returning custom OCR presets and community recipes for the Web Hub UI."""
         # TODO(TASK-207): Return user-saved CustomPresetConfig entries and community OCR recipes (TASK-208)
