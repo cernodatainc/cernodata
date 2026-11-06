@@ -2,14 +2,23 @@
 src/visualization/viewer/templates.py
 
 HTML template hydration and asset injection for the interactive visual flow explorer.
-Loads HTML, CSS, and JS assets from disk and hydrates them with DocumentDOM runtime data.
+Loads HTML, CSS, and JS assets and hydrates them with DocumentDOM runtime data.
 """
 
-import os
+from __future__ import annotations
+
 import json
-from typing import Dict, Any, List, Optional
+import os
+from typing import Any, Dict, List, Optional, Union
+
 from src.dom import DocumentDOM
+from src.visualization.viewer.pdf_renderer import (
+    get_pdf_page_dimensions,
+    page_to_base64,
+    render_all_pages_to_base64,
+)
 from src.visualization.viewer.scripts import get_viewer_js
+from src.visualization.viewer.styles import get_viewer_css
 
 _VIEWER_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,6 +28,19 @@ def load_viewer_asset(filename: str) -> str:
     path = os.path.join(_VIEWER_DIR, filename)
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
+
+def get_viewer_template() -> str:
+    """Loads template.html and composes modular HTML partials."""
+    template = load_viewer_asset("template.html")
+    html_dir = os.path.join(_VIEWER_DIR, "html")
+    if os.path.exists(html_dir):
+        for part in ["header", "toolbar", "canvas", "inspector"]:
+            part_path = os.path.join(html_dir, f"{part}.html")
+            if os.path.exists(part_path):
+                with open(part_path, "r", encoding="utf-8") as f:
+                    template = template.replace(f"<!-- __{part.upper()}_HTML__ -->", f.read())
+    return template
 
 
 def build_timeline_buttons(decision: Dict[str, Any], plan: Optional[Dict[str, Any]] = None) -> str:
@@ -70,30 +92,69 @@ def build_timeline_buttons(decision: Dict[str, Any], plan: Optional[Dict[str, An
 def build_viewer_html(
     dom: DocumentDOM,
     decision: Dict[str, Any],
-    violations: List[Dict[str, Any]],
-    img_data_uri: str,
-    dom_json: str,
-    violations_json: str,
-    decision_json: str,
-    detected_langs_json: str,
-    plan_json: str,
+    violations: Union[List[Dict[str, Any]], Dict[str, Any]],
+    img_data_uri: Optional[str] = None,
+    dom_json: Optional[str] = None,
+    violations_json: Optional[str] = None,
+    decision_json: Optional[str] = None,
+    detected_langs_json: Optional[str] = None,
+    plan_json: Optional[str] = None,
     plan: Optional[Dict[str, Any]] = None,
     page_images: Optional[List[str]] = None,
     page_dimensions: Optional[List[Dict[str, float]]] = None,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    pdf_path: Optional[str] = None,
 ) -> str:
     """Assembles the interactive HTML application from template.html, viewer.css, and viewer.js."""
-    template = load_viewer_asset("template.html")
-    html_dir = os.path.join(_VIEWER_DIR, "html")
-    if os.path.exists(html_dir):
-        for part in ["header", "toolbar", "canvas", "inspector"]:
-            part_path = os.path.join(html_dir, f"{part}.html")
-            if os.path.exists(part_path):
-                with open(part_path, "r", encoding="utf-8") as f:
-                    template = template.replace(f"<!-- __{part.upper()}_HTML__ -->", f.read())
-
-    css_content = load_viewer_asset("viewer.css")
+    template = get_viewer_template()
+    css_content = get_viewer_css()
     js_content = get_viewer_js()
+
+    if isinstance(violations, dict):
+        violations_list = violations.get("violations", [])
+    elif isinstance(violations, list):
+        violations_list = violations
+    else:
+        violations_list = []
+
+    if dom_json is None:
+        dom_json = json.dumps(dom.to_dict())
+    if violations_json is None:
+        violations_json = json.dumps(violations_list)
+    if decision_json is None:
+        decision_json = json.dumps(decision)
+    if plan_json is None:
+        plan_json = json.dumps(plan) if plan else "null"
+
+    if detected_langs_json is None:
+        detected_langs = decision.get("detected_languages", {})
+        if not detected_langs and dom.total_pages:
+            from src.quality.language import detect_document_languages
+            detected_langs = detect_document_languages(dom)
+        detected_langs_json = json.dumps(detected_langs)
+
+    if page_images is None:
+        if pdf_path:
+            total = dom.total_pages if dom.total_pages and dom.total_pages > 0 else 1
+            page_images = render_all_pages_to_base64(pdf_path, total_pages=total)
+        elif img_data_uri:
+            page_images = [img_data_uri]
+        else:
+            page_images = []
+
+    if img_data_uri is None:
+        if page_images:
+            img_data_uri = page_images[0]
+        elif pdf_path:
+            img_data_uri = page_to_base64(pdf_path, page_index=0)
+        else:
+            img_data_uri = ""
+
+    if page_dimensions is None:
+        if pdf_path:
+            page_dimensions = get_pdf_page_dimensions(pdf_path)
+        else:
+            page_dimensions = []
 
     is_acc = decision.get("is_accepted", True)
     primary_detected = decision.get("primary_detected_language", "en")
@@ -116,9 +177,6 @@ def build_viewer_html(
     overall_conf = f"{float(decision.get('overall_confidence', 1.0)):.4f}"
     status_text = decision.get("status", "ACCEPT")
 
-    if not page_images:
-        page_images = [img_data_uri] if img_data_uri else []
-
     total_pages = dom.total_pages or len(page_images) or 1
     page_images_json = json.dumps(page_images)
     page_dimensions_json = json.dumps(page_dimensions or [])
@@ -139,7 +197,7 @@ def build_viewer_html(
         "{{ overall_confidence }}": overall_conf,
         "{{ score_sub_color }}": "var(--accent-green)" if is_acc else "var(--accent-red)",
         "{{ decision_status }}": status_text,
-        "{{ violations_count }}": str(len(violations)),
+        "{{ violations_count }}": str(len(violations_list)),
         "{{ dom_node_count }}": str(len(dom.nodes)),
         "{{ primary_detected }}": primary_detected,
         **{f"{{{{ {lg}_selected }}}}": "selected" if active_lang == lg else "" for lg in ("pl", "en", "de", "fr", "es")},
@@ -161,3 +219,29 @@ def build_viewer_html(
         result = result.replace(placeholder, val)
 
     return result
+
+
+def generate_interactive_html(
+    pdf_path: str,
+    dom: DocumentDOM,
+    decision: Dict[str, Any],
+    violations: Union[List[Dict[str, Any]], Dict[str, Any]],
+    output_path: str = os.path.join("output", "interactive_viewer.html"),
+    plan: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Generates a standalone, interactive HTML visual flow explorer file."""
+    from src.utils import mkdirs
+
+    mkdirs(os.path.dirname(output_path))
+    html_content = build_viewer_html(
+        dom=dom,
+        decision=decision,
+        violations=violations,
+        plan=plan,
+        pdf_path=pdf_path,
+        output_dir=os.path.dirname(output_path) or "output",
+    )
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    return output_path

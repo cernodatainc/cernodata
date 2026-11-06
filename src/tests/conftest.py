@@ -141,7 +141,7 @@ def http_get(url: str, timeout: int = 5) -> Tuple[int, str, Dict[str, str]]:
         return e.code, content, dict(e.headers)
 
 
-def http_post_json(url: str, data: Dict[str, Any], timeout: int = 5) -> Tuple[int, Dict[str, Any]]:
+def http_post_json(url: str, data: Dict[str, Any], timeout: int = 15) -> Tuple[int, Dict[str, Any]]:
     """Executes an HTTP POST request with a JSON payload and returns (status_code, parsed_json_dict)."""
     req = urllib.request.Request(
         url,

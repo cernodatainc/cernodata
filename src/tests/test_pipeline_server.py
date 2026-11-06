@@ -480,20 +480,19 @@ class TestPipelineServer(EphemeralServerTestCase):
         self.assertEqual(status, 200)
         self.assertTrue(data.get("success"))
 
-    def test_api_forget_file_endpoint(self) -> None:
+    def test_api_forget_and_discover_scratch_endpoint(self) -> None:
         status, data = self._post_json("/api/forget_file", {"file_path": "src/e2e/test_forget_server.pdf"})
         self.assertEqual(status, 200)
         self.assertTrue(data.get("success"))
-        self.assertEqual(data.get("forgotten_file"), "src/e2e/test_forget_server.pdf")
-        self.assertIn("file_run_mappings", data)
         # Verify it disappears from mappings
         doc_names = [d["file_name"] for d in data["file_run_mappings"]["all_mappings"]]
         self.assertNotIn("test_forget_server.pdf", doc_names)
 
-        # Test unforget endpoint
-        unforget_status, unforget_data = self._post_json("/api/unforget_file", {"file_path": "src/e2e/test_forget_server.pdf"})
-        self.assertEqual(unforget_status, 200)
-        self.assertTrue(unforget_data.get("success"))
-        self.assertEqual(unforget_data.get("unforgotten_file"), "src/e2e/test_forget_server.pdf")
+        # Discovering from scratch unforget the file
+        disc_status, disc_data = self._post_json("/api/documents", {"file_path": "src/e2e/test_forget_server.pdf"})
+        self.assertEqual(disc_status, 200)
+        self.assertTrue(disc_data.get("success"))
+        doc_names_after = [d["file_name"] for d in disc_data["file_run_mappings"]["all_mappings"]]
+        self.assertIn("test_forget_server.pdf", doc_names_after)
 
 

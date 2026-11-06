@@ -87,15 +87,28 @@ class DocumentsMixin:
         """
         Registers a document path with the session without uploading or copying the file.
         Makes the path known to discovery, active session, and persistent mappings.
+        Automatically unforget the document if it was previously forgotten.
         """
-        norm = path.strip().replace("\\", "/")
-        try:
-            if os.path.isabs(norm) and os.path.commonpath([self.repo_root, norm]) == self.repo_root:
-                rel = os.path.relpath(norm, self.repo_root).replace("\\", "/")
-            else:
+        from src.utils import resolve_pdf_path
+
+        resolved = resolve_pdf_path(path)
+        if os.path.exists(resolved):
+            try:
+                if os.path.commonpath([self.repo_root, resolved]) == self.repo_root:
+                    rel = os.path.relpath(resolved, self.repo_root).replace("\\", "/")
+                else:
+                    rel = resolved.replace("\\", "/")
+            except ValueError:
+                rel = resolved.replace("\\", "/")
+        else:
+            norm = path.strip().replace("\\", "/")
+            try:
+                if os.path.isabs(norm) and os.path.commonpath([self.repo_root, norm]) == self.repo_root:
+                    rel = os.path.relpath(norm, self.repo_root).replace("\\", "/")
+                else:
+                    rel = norm
+            except ValueError:
                 rel = norm
-        except ValueError:
-            rel = norm
 
         with self._lock:
             if not hasattr(self, "_registered_documents"):
