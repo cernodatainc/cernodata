@@ -2064,8 +2064,20 @@ body.viewer-open-fullscreen {
 
 .explorer-context-menu-item:hover,
 .explorer-context-menu-item:focus {
+    background: var(--bg-card-hover);
+    color: var(--accent-blue);
+    outline: none;
+}
+
+.explorer-context-menu-item.danger-item:hover,
+.explorer-context-menu-item.danger-item:focus {
     background: #F8E6E4;
     color: var(--accent-red);
-    outline: none;
+}
+
+.explorer-context-menu-divider {
+    height: 1px;
+    background: #EFF1F2;
+    margin: 4px 0;
 }
 

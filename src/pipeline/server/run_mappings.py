@@ -371,6 +371,7 @@ def get_file_run_mappings(
 
         file_sets_list, all_mappings_list = group_into_file_sets(doc_mappings)
         active_doc, active_run = pick_active_selection(all_mappings_list)
+        unique_forgotten = {os.path.basename(x) for x in forgotten_files if x}
 
         return {
             "file_sets": file_sets_list,
@@ -379,4 +380,5 @@ def get_file_run_mappings(
             "total_runs": len(discovered_runs),
             "active_file": active_doc,
             "active_run": active_run,
+            "forgotten_count": len(unique_forgotten),
         }

@@ -12,7 +12,12 @@ from typing import Any, Dict, Optional
 
 def normalize_path(path: str) -> str:
     """Normalizes path separators to standard forward slashes."""
-    return path.replace("\\", "/").strip()
+    norm = path.replace("\\", "/").strip()
+    while "//" in norm:
+        norm = norm.replace("//", "/")
+    if norm.startswith("./"):
+        norm = norm[2:]
+    return norm
 
 
 def derive_file_set(rel_path: str) -> str:

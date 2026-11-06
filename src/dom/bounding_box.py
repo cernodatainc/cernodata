@@ -4,6 +4,8 @@ src/dom/bounding_box.py
 BoundingBox data primitive for geometric coordinates and text alignment rotation angles.
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional, Any
@@ -75,6 +77,50 @@ class BoundingBox:
         inter_area = inter.area
         union_area = self.area + other.area - inter_area
         return inter_area / union_area if union_area > 0.0 else 0.0
+
+    def contains_point(self, x: float, y: float) -> bool:
+        """Returns True if the point (x, y) is located inside or on the boundaries of this bounding box."""
+        return self.x0 <= x <= self.x1 and self.y0 <= y <= self.y1
+
+    def contains_box(self, other: "BoundingBox") -> bool:
+        """Returns True if this bounding box completely encloses the other bounding box."""
+        return self.x0 <= other.x0 and self.y0 <= other.y0 and self.x1 >= other.x1 and self.y1 >= other.y1
+
+    def translate(self, dx: float, dy: float) -> "BoundingBox":
+        """Returns a new BoundingBox translated by (dx, dy)."""
+        new_quad = [[p[0] + dx, p[1] + dy] for p in self.quad] if self.quad else None
+        return BoundingBox(
+            x0=self.x0 + dx,
+            y0=self.y0 + dy,
+            x1=self.x1 + dx,
+            y1=self.y1 + dy,
+            angle=self.angle,
+            quad=new_quad,
+        )
+
+    def scale(self, sx: float, sy: float) -> "BoundingBox":
+        """Returns a new BoundingBox scaled by (sx, sy)."""
+        new_quad = [[p[0] * sx, p[1] * sy] for p in self.quad] if self.quad else None
+        return BoundingBox(
+            x0=self.x0 * sx,
+            y0=self.y0 * sy,
+            x1=self.x1 * sx,
+            y1=self.y1 * sy,
+            angle=self.angle,
+            quad=new_quad,
+        )
+
+    def clone(self) -> "BoundingBox":
+        """Returns a copy of this BoundingBox."""
+        new_quad = [list(p) for p in self.quad] if self.quad else None
+        return BoundingBox(
+            x0=self.x0,
+            y0=self.y0,
+            x1=self.x1,
+            y1=self.y1,
+            angle=self.angle,
+            quad=new_quad,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         res: Dict[str, Any] = {

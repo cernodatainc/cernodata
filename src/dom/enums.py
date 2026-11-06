@@ -4,6 +4,8 @@ src/dom/enums.py
 Enumerations for DOM element types, extraction presets, and pipeline actions.
 """
 
+from __future__ import annotations
+
 from enum import Enum
 
 
@@ -14,10 +16,13 @@ class DOMNodeType(str, Enum):
     TABLE_GRID = "table_grid"
     FIGURE = "figure"
     HEADER_FOOTER = "header_footer"
+    PAGE_HEADER = "page_header"
+    FOOTER = "footer"
+    LIST_ITEM = "list_item"
+    CAPTION = "caption"
+    CODE_BLOCK = "code_block"
     MULTI_COLUMN_GROUP = "multi_column_group"
     TEXT = "text"
-    # TODO(stride): Add LIST_ITEM = "list_item", PAGE_HEADER = "page_header", and FOOTER = "footer"
-    # so CompanyHeaderFooterStripper (TASK-502) and Markdown exporters (TASK-303) can distinguish them cleanly.
 
     def __str__(self) -> str:
         return str(self.value)

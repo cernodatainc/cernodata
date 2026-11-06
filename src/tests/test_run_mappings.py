@@ -302,6 +302,7 @@ class TestRunMappings(unittest.TestCase):
         doc_names_after = [d["file_name"] for d in after["all_mappings"]]
         self.assertNotIn("to_forget.pdf", doc_names_after)
         self.assertNotIn("_forgotten_files", doc_names_after)
+        self.assertEqual(after.get("forgotten_count"), 1)
 
         # Past runs MUST NOT be deleted
         self.assertTrue(os.path.exists(dom_file), "Past run artifacts on disk must not be deleted when forgetting a file")

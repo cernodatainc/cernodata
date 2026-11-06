@@ -1,12 +1,11 @@
 /**
  * src/visualization/landing/context_menu.js
  *
- * Context menu handler for workspace explorer items.
- * Allows forgetting a document by right-clicking on it in the file explorer,
- * causing it to disappear from the explorer without deleting historical parsing runs.
+ * Context menu controller for workspace explorer files and parsing runs.
+ * Supports file forgetting, run inspection, run removal, and quick navigation.
  */
 
-let activeContextMenuDoc = '';
+let activeContextMenuTarget = null;
 
 /**
  * Ensures the explorer context menu element exists in the DOM.
@@ -18,39 +17,75 @@ function getOrCreateExplorerContextMenu() {
         menu = document.createElement('div');
         menu.id = 'explorerContextMenu';
         menu.className = 'explorer-context-menu';
-        menu.innerHTML = '<div class="explorer-context-menu-header" id="explorerContextMenuHeader">Document</div>'
-            + '<button type="button" class="explorer-context-menu-item" id="btnForgetFile" onclick="onContextForgetClicked()">'
-            + '<span class="menu-action-label">Forget file</span>'
-            + '</button>';
+        menu.setAttribute('role', 'menu');
         document.body.appendChild(menu);
     }
     return menu;
 }
 
 /**
- * Displays the context menu at specified viewport coordinates for a document path.
+ * Displays context menu for a document file.
  * @param {number} x - Client X coordinate.
  * @param {number} y - Client Y coordinate.
  * @param {string} docPath - Path to target document.
  */
-function showExplorerContextMenu(x, y, docPath) {
+function showExplorerFileContextMenu(x, y, docPath) {
     if (!docPath) return;
-    activeContextMenuDoc = docPath;
+    activeContextMenuTarget = { type: 'file', docPath };
     const menu = getOrCreateExplorerContextMenu();
-    const header = document.getElementById('explorerContextMenuHeader');
-    if (header) {
-        const parts = docPath.replace(/\\/g, '/').split('/');
-        const fileName = parts[parts.length - 1] || docPath;
-        header.textContent = fileName;
-        header.title = docPath;
-    }
+    const parts = docPath.replace(/\\/g, '/').split('/');
+    const fileName = parts[parts.length - 1] || docPath;
 
+    menu.innerHTML = `<div class="explorer-context-menu-header" title="${escapeHtml(docPath)}">${escapeHtml(fileName)}</div>`
+        + `<button type="button" class="explorer-context-menu-item" onclick="onContextAction('explore')">`
+        + `<span class="menu-action-label">Explore runs</span></button>`
+        + `<button type="button" class="explorer-context-menu-item" onclick="onContextAction('plan')">`
+        + `<span class="menu-action-label">Open planning</span></button>`
+        + `<div class="explorer-context-menu-divider"></div>`
+        + `<button type="button" class="explorer-context-menu-item danger-item" onclick="onContextAction('forget')">`
+        + `<span class="menu-action-label">Forget file</span></button>`;
+
+    positionContextMenu(menu, x, y);
+}
+
+/**
+ * Displays context menu for a parsing run.
+ * @param {number} x - Client X coordinate.
+ * @param {number} y - Client Y coordinate.
+ * @param {string} runId - Identifier of run.
+ * @param {string} outputDir - Directory of run artifacts.
+ * @param {string} docPath - Document path associated with run.
+ */
+function showExplorerRunContextMenu(x, y, runId, outputDir, docPath) {
+    if (!runId && !outputDir) return;
+    activeContextMenuTarget = { type: 'run', runId, outputDir, docPath };
+    const menu = getOrCreateExplorerContextMenu();
+
+    menu.innerHTML = `<div class="explorer-context-menu-header" title="${escapeHtml(runId || outputDir)}">Run: ${escapeHtml(runId || outputDir)}</div>`
+        + `<button type="button" class="explorer-context-menu-item" onclick="onContextAction('inspect_run')">`
+        + `<span class="menu-action-label">Inspect pages</span></button>`
+        + `<button type="button" class="explorer-context-menu-item" onclick="onContextAction('copy_run_id')">`
+        + `<span class="menu-action-label">Copy run ID</span></button>`
+        + `<div class="explorer-context-menu-divider"></div>`
+        + `<button type="button" class="explorer-context-menu-item danger-item" onclick="onContextAction('remove_run')">`
+        + `<span class="menu-action-label">Remove run</span></button>`;
+
+    positionContextMenu(menu, x, y);
+}
+
+/**
+ * Positions menu within viewport boundaries.
+ * @param {HTMLElement} menu - Context menu element.
+ * @param {number} x - Target X coordinate.
+ * @param {number} y - Target Y coordinate.
+ */
+function positionContextMenu(menu, x, y) {
     menu.classList.add('visible');
     menu.style.display = 'block';
 
     const menuRect = menu.getBoundingClientRect();
-    const maxX = window.innerWidth - (menuRect.width || 160) - 8;
-    const maxY = window.innerHeight - (menuRect.height || 80) - 8;
+    const maxX = window.innerWidth - (menuRect.width || 170) - 8;
+    const maxY = window.innerHeight - (menuRect.height || 120) - 8;
 
     const posX = Math.max(8, Math.min(x, maxX));
     const posY = Math.max(8, Math.min(y, maxY));
@@ -59,26 +94,41 @@ function showExplorerContextMenu(x, y, docPath) {
     menu.style.top = `${posY}px`;
 }
 
-/**
- * Hides the active explorer context menu.
- */
+/** Hides the active explorer context menu. */
 function hideExplorerContextMenu() {
     const menu = document.getElementById('explorerContextMenu');
     if (menu) {
         menu.classList.remove('visible');
         menu.style.display = 'none';
     }
-    activeContextMenuDoc = '';
+    activeContextMenuTarget = null;
 }
 
 /**
- * Invoked when user clicks "Forget file" from the context menu.
+ * Dispatches context action and closes menu.
+ * @param {string} action - Action identifier.
  */
-async function onContextForgetClicked() {
-    const docPath = activeContextMenuDoc;
+async function onContextAction(action) {
+    const target = activeContextMenuTarget;
     hideExplorerContextMenu();
-    if (docPath) {
-        await forgetExplorerFile(docPath);
+    if (!target) return;
+
+    if (action === 'explore' && target.docPath) {
+        selectExplorerDoc(target.docPath);
+    } else if (action === 'plan' && target.docPath) {
+        selectDocAndOpenPlanning(target.docPath);
+    } else if (action === 'forget' && target.docPath) {
+        await forgetExplorerFile(target.docPath);
+    } else if (action === 'inspect_run' && target.runId) {
+        selectExplorerRun(target.runId, target.outputDir, target.docPath);
+    } else if (action === 'remove_run' && target.runId) {
+        if (typeof removeExplorerRun === 'function') {
+            await removeExplorerRun(target.runId, target.outputDir, target.docPath);
+        }
+    } else if (action === 'copy_run_id' && (target.runId || target.outputDir)) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(target.runId || target.outputDir);
+        }
     }
 }
 
@@ -109,41 +159,53 @@ async function forgetExplorerFile(docPath) {
     }
 }
 
-/**
- * Handles contextmenu event on explorer file rows.
- * @param {MouseEvent} event - Native mouse event.
- * @param {string} docPath - Path to target document.
- */
+/** Handles contextmenu on file elements. */
 function handleExplorerFileContextMenu(event, docPath) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
-        showExplorerContextMenu(event.clientX, event.clientY, docPath);
+        showExplorerFileContextMenu(event.clientX, event.clientY, docPath);
+    }
+}
+
+/** Handles contextmenu on run elements. */
+function handleExplorerRunContextMenu(event, runId, outputDir, docPath) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        showExplorerRunContextMenu(event.clientX, event.clientY, runId, outputDir, docPath);
     }
 }
 
 // Global dismiss listeners
 document.addEventListener('click', function(e) {
     const menu = document.getElementById('explorerContextMenu');
-    if (menu && menu.classList.contains('visible')) {
-        if (!menu.contains(e.target)) {
-            hideExplorerContextMenu();
-        }
+    if (menu && menu.classList.contains('visible') && !menu.contains(e.target)) {
+        hideExplorerContextMenu();
     }
 });
 
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        hideExplorerContextMenu();
-    }
+    if (e.key === 'Escape') hideExplorerContextMenu();
 });
 
 window.addEventListener('scroll', function() {
     hideExplorerContextMenu();
 }, true);
 
-// Delegated contextmenu listener across explorer container
+// Delegated contextmenu listener
 document.addEventListener('contextmenu', function(e) {
+    const runRow = e.target.closest('[data-run-id], .run-row');
+    if (runRow) {
+        const runId = runRow.getAttribute('data-run-id');
+        const docPath = runRow.getAttribute('data-doc-path');
+        if (runId) {
+            e.preventDefault();
+            e.stopPropagation();
+            showExplorerRunContextMenu(e.clientX, e.clientY, runId, runId, docPath);
+            return;
+        }
+    }
     const fileRow = e.target.closest('[data-doc-path], .file-row, .tree-file-node');
     if (fileRow) {
         const docPath = fileRow.getAttribute('data-doc-path')
@@ -151,7 +213,7 @@ document.addEventListener('contextmenu', function(e) {
         if (docPath) {
             e.preventDefault();
             e.stopPropagation();
-            showExplorerContextMenu(e.clientX, e.clientY, docPath);
+            showExplorerFileContextMenu(e.clientX, e.clientY, docPath);
         }
     }
 });
