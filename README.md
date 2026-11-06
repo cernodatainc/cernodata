@@ -49,3 +49,53 @@
 <hr> 
 
 Cernodata is an open-source framework that serves as a control layer over PDF parsing methods. It decides which method to use, evaluates the quality of the output, and falls back to an alternative method when needed. Instead of running a single parser and hoping the output is usable, Cernodata starts with a short setup wizard, available in the browser or the terminal. The wizard asks about your document type, hardware, whether you prioritize speed or precision, and any security constraints, then builds a ranked execution plan from parsing presets that you can extend freely. Every result goes through tiered quality checks, and you can add your own checks on top of the built-in ones. When confidence drops below the target threshold, Cernodata automatically switches to a fallback path. It either moves on to the next preset or retries with adjusted parameters. Problematic pages can be reprocessed on their own, without reprocessing the entire document. The extracted structure is exposed as a document DOM with bounding boxes, which you can explore in an interactive HTML viewer with visual overlays and markers for quality violations. This shows exactly where the data came from and why it was accepted.
+
+## Quickstart Guide
+
+### 1. Prerequisites
+
+- Python 3.10 or newer
+- Virtual environment (recommended)
+
+### 2. Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/cernodatainc/cernodata.git
+cd cernodata
+python -m venv .venv
+# Activate on Windows:
+.venv\Scripts\activate
+# Activate on Linux/macOS:
+source .venv/bin/activate
+
+pip install -e .
+# Or install with development dependencies:
+pip install -e ".[dev]"
+```
+
+### 3. Launching the Interactive Prototype Server
+
+Run `main.py` without arguments to start the live web server hub and interactive visual viewer:
+
+```bash
+python main.py
+```
+
+This starts the server on `http://127.0.0.1:8000` and automatically opens the interface in your default browser.
+
+### 4. Inspecting Artifacts
+
+Parsing outputs are saved to the `--output-dir` (default: `output/`):
+- `dom.json`: Full document DOM with layout nodes, hierarchy, and bounding boxes.
+- `violations.json`: Tiered quality check results and threshold violation reports.
+- `viewer.html`: Interactive visualization with visual bounding box overlays, skew adjustments, and inspection controls.
+
+### 5. Running Quality Gates and Tests
+
+Verify code hygiene, static typing, and test suites:
+
+```bash
+python src/meta_checks/check_all.py
+```
