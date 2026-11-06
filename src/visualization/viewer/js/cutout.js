@@ -146,14 +146,6 @@ function getNodeSkewCorners(nodeId, bbox) {
 }
  
 /**
- * Extracts and renders a high-resolution image crop of a bounding box into target <img> element.
- *
- * @param {string} nodeId - Node identifier.
- * @param {Object} bbox - Bounding box definition.
- * @param {string} targetImgId - DOM element ID of the target preview image.
- * @param {boolean} [unskew=isCutoutUnskewed] - Whether to apply perspective rectification.
- */
-/**
  * Extracts base64 encoded PNG data URI of a node's cropped canvas.
  *
  * @param {string} nodeId - Target DOM node identifier.
@@ -289,15 +281,9 @@ async function triggerCutoutSecondPass(nodeId) {
     const banner = document.getElementById('statusBanner');
     const ocrBtn = document.getElementById(`btnCutoutOcr_${nodeId}`);
 
-    const engines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[nodeId]) || [];
-    if (!engines || engines.length === 0) {
-        if (banner) {
-            banner.style.display = 'block';
-            banner.className = 'status-banner';
-            banner.textContent = `Please select at least one OCR engine for section '${nodeId}' before parsing.`;
-        }
-        return;
-    }
+    const engines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[nodeId] && window.selectedOcrEnginesMap[nodeId].length > 0)
+        ? window.selectedOcrEnginesMap[nodeId]
+        : ['rapidocr'];
 
     if (ocrBtn) {
         ocrBtn.disabled = true;
@@ -448,6 +434,7 @@ async function acceptOcrOutput(nodeId, engineName) {
 
     const data = window.pendingOcrResultsMap && window.pendingOcrResultsMap[nodeId];
     const engRes = (data && data.results && data.results[engineName]) ? data.results[engineName] : (data || {});
+    const txtElem = document.getElementById(`ocrCandidateText_${nodeId}_${engineName}`);
     const chosenText = txtElem ? txtElem.value : (engRes.text || '');
     const chosenConf = engRes.confidence || 0.0;
 
@@ -456,8 +443,9 @@ async function acceptOcrOutput(nodeId, engineName) {
     node.user_correction_note = chosenText;
     node.ocr_confidence = chosenConf;
     node.is_incorrect_text = false;
+    node.is_fixed = true;
 
-    dismissOcrPrompt(nodeId);
+    dismissOcrPrompt(nodeId, true);
 
     renderDOMTree();
     renderSelectedEditor();
@@ -477,8 +465,9 @@ async function acceptOcrOutput(nodeId, engineName) {
  * Dismisses OCR review prompt without modifying node text.
  *
  * @param {string} nodeId - Target DOM node identifier.
+ * @param {boolean} [quiet=false] - Whether to suppress status banner message.
  */
-function dismissOcrPrompt(nodeId) {
+function dismissOcrPrompt(nodeId, quiet = false) {
     if (window.pendingOcrResultsMap) {
         delete window.pendingOcrResultsMap[nodeId];
     }
@@ -487,9 +476,11 @@ function dismissOcrPrompt(nodeId) {
         container.style.display = 'none';
         container.innerHTML = '';
     }
-    const banner = document.getElementById('statusBanner');
-    if (banner) {
-        banner.textContent = `OCR output dismissed for section '${nodeId}'.`;
-        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    if (!quiet) {
+        const banner = document.getElementById('statusBanner');
+        if (banner) {
+            banner.textContent = `OCR output dismissed for section '${nodeId}'.`;
+            setTimeout(() => { banner.style.display = 'none'; }, 4000);
+        }
     }
 }

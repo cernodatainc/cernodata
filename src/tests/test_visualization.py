@@ -35,6 +35,22 @@ class TestVisualization(unittest.TestCase):
         self.assertEqual(len(backgrounds), 0)
         self.assertIsNone(visualizer._render_pdf_page_backgrounds("non_existent.pdf"))
 
+    def test_viewer_rotation_handle_assets(self):
+        """Verifies viewer bundle includes PowerPoint-style rotation handle assets and event logic."""
+        from src.visualization.bundler import get_viewer_js
+        viewer_js = get_viewer_js()
+        self.assertIn("rotate-handle", viewer_js)
+        self.assertIn("rotate-stem", viewer_js)
+        self.assertIn("onRotateHandleMouseDown", viewer_js)
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        css_path = os.path.join(base_dir, "visualization", "viewer", "viewer.css")
+        self.assertTrue(os.path.exists(css_path))
+        with open(css_path, "r", encoding="utf-8") as f:
+            css_content = f.read()
+        self.assertIn(".resize-handle.rotate-handle", css_content)
+        self.assertIn(".rotate-stem", css_content)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -303,7 +303,38 @@ function renderResizeHandles(svg, node, corners) {
  */
 function renderQuadResizeHandles(svg, node, corners) {
     const hs = 9;
- 
+
+    // PowerPoint-style rotation handle above top edge
+    const topMidX = (corners[0].x + corners[1].x) / 2;
+    const topMidY = (corners[0].y + corners[1].y) / 2;
+    const cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
+    const cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
+    const vx = topMidX - cx;
+    const vy = topMidY - cy;
+    const dist = Math.hypot(vx, vy);
+    const stemLen = 22;
+    const ux = dist > 0 ? (vx / dist) : 0;
+    const uy = dist > 0 ? (vy / dist) : -1;
+    const rotX = roundCoord(topMidX + ux * stemLen);
+    const rotY = roundCoord(topMidY + uy * stemLen);
+
+    const stemLine = createSvgElem('line', {
+        x1: roundCoord(topMidX), y1: roundCoord(topMidY),
+        x2: rotX, y2: rotY,
+        class: 'rotate-stem'
+    });
+    svg.appendChild(stemLine);
+
+    const rotHandle = createSvgElem('circle', {
+        cx: rotX, cy: rotY, r: 5.5,
+        class: 'resize-handle rotate-handle',
+        title: 'Drag to rotate section (Hold Shift to snap to 15 degrees)',
+        'data-node-id': node.node_id,
+        'data-handle-action': 'rotate'
+    });
+    rotHandle.onmousedown = (e) => onRotateHandleMouseDown(e, node.node_id);
+    svg.appendChild(rotHandle);
+
     const cornerDefs = [
         { cornerIndex: 0, pt: corners[0], cursor: 'crosshair', title: 'Top-Left Corner' },
         { cornerIndex: 1, pt: corners[1], cursor: 'crosshair', title: 'Top-Right Corner' },
@@ -347,6 +378,37 @@ function renderQuadResizeHandles(svg, node, corners) {
     });
 }
  
+/**
+ * Initiates dragging interaction on the PowerPoint-style rotation handle.
+ *
+ * @param {MouseEvent} evt - MouseDown event.
+ * @param {string} nodeId - Identifier of target DOM node.
+ */
+function onRotateHandleMouseDown(evt, nodeId) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return;
+
+    const corners = getBoxCorners(node.bounding_box);
+    const cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
+    const cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
+    const svgPt = getSvgCoordinates(evt);
+    const initialAngle = node.bounding_box.angle || 0;
+    const pointerAngle = Math.atan2(svgPt.y - cy, svgPt.x - cx) * 180 / Math.PI;
+
+    activeDrag = {
+        action: 'rotate',
+        nodeId: nodeId,
+        cx: cx,
+        cy: cy,
+        initialAngle: initialAngle,
+        startAngleOffset: pointerAngle - initialAngle,
+        origNode: JSON.parse(JSON.stringify(node)),
+        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
+    };
+}
+
 /**
  * Initiates dragging interaction on a specific corner handle.
  *

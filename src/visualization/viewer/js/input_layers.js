@@ -50,6 +50,9 @@ class SelectInputLayer extends BaseInputLayer {
                 const edgeIndex = parseInt(handleEl.getAttribute('data-edge-index') || '0', 10);
                 onEdgeHandleMouseDown(evt, edgeIndex, nodeId);
                 return true;
+            } else if (handleAction === 'rotate') {
+                onRotateHandleMouseDown(evt, nodeId);
+                return true;
             }
         }
         const polyEl = target.closest ? target.closest('.node-bbox') : null;
@@ -88,6 +91,19 @@ class SelectInputLayer extends BaseInputLayer {
         } else if (activeDrag.action === 'move') {
             const newCorners = initCorners.map(p => ({ x: p.x + dx, y: p.y + dy }));
             updateBboxFromCorners(node, newCorners);
+        } else if (activeDrag.action === 'rotate') {
+            const curPointerAngle = Math.atan2(pt.y - activeDrag.cy, pt.x - activeDrag.cx) * 180 / Math.PI;
+            let deg = curPointerAngle - activeDrag.startAngleOffset;
+            if (evt && evt.shiftKey) deg = Math.round(deg / 15) * 15;
+            while (deg > 180) deg -= 360;
+            while (deg < -180) deg += 360;
+            node.bounding_box.angle = roundCoord(deg);
+            node.bounding_box.quad = null;
+            const inpAngle = document.getElementById('inpAngle');
+            if (inpAngle) inpAngle.value = node.bounding_box.angle;
+            if (typeof renderCutoutPreview === 'function') {
+                renderCutoutPreview(node.node_id, node.bounding_box, 'cutoutPreviewImg_' + node.node_id, isCutoutUnskewed);
+            }
         }
 
         const inpX0 = document.getElementById('inpX0');
@@ -110,16 +126,24 @@ class SelectInputLayer extends BaseInputLayer {
             activeDrag = null;
             if (drag.origNode && typeof recordRunDiff === 'function') {
                 const node = domData.nodes.find(n => n.node_id === drag.nodeId);
-                if (node && JSON.stringify(node.bounding_box) !== JSON.stringify(drag.origNode.bounding_box)) {
+                const hasChanged = node && (
+                    JSON.stringify(node.bounding_box) !== JSON.stringify(drag.origNode.bounding_box) ||
+                    (node.bounding_box.angle || 0) !== (drag.origNode.bounding_box.angle || 0)
+                );
+                if (hasChanged) {
+                    const isRot = drag.action === 'rotate';
+                    const desc = isRot
+                        ? `Rotate '${node.node_id}' to ${node.bounding_box.angle} deg`
+                        : `Adjust bounds of '${node.node_id}'`;
                     recordRunDiff({
-                        action: 'modify_node',
-                        description: `Adjust bounds of '${node.node_id}'`,
+                        action: isRot ? 'rotate_node' : 'modify_node',
+                        description: desc,
                         page: getNodePage(node),
                         removed: [{ index: drag.origIdx, node: drag.origNode }],
                         inserted: [{ index: drag.origIdx, node: JSON.parse(JSON.stringify(node)) }],
                         beforeSelection: { selectedNodeId: drag.nodeId, selectedNodeIds: [drag.nodeId] },
                         afterSelection: { selectedNodeId: drag.nodeId, selectedNodeIds: [drag.nodeId] },
-                        meta: { node_id: drag.nodeId }
+                        meta: { node_id: drag.nodeId, angle: node.bounding_box.angle }
                     });
                 }
             }
@@ -330,37 +354,16 @@ class ViewerInputManager {
     }
 
     getSvgCoordinates(evt) {
+        if (typeof getSvgCoordinates === 'function') return getSvgCoordinates(evt);
         const svg = document.getElementById('svgOverlay');
         if (!svg) return { x: 0, y: 0 };
-
-        try {
-            const ctm = svg.getScreenCTM();
-            if (ctm) {
-                const pt = svg.createSVGPoint();
-                pt.x = evt.clientX;
-                pt.y = evt.clientY;
-                const inv = ctm.inverse();
-                if (inv) {
-                    const transformed = pt.matrixTransform(inv);
-                    if (!isNaN(transformed.x) && !isNaN(transformed.y)) {
-                        return { x: roundCoord(transformed.x), y: roundCoord(transformed.y) };
-                    }
-                }
-            }
-        } catch (e) {
-            // Fallback using bounding client rectangle
-        }
-
         const rect = svg.getBoundingClientRect();
         const vb = svg.viewBox && svg.viewBox.baseVal;
         const vbW = (vb && vb.width > 0) ? vb.width : (rect.width || 595.28);
         const vbH = (vb && vb.height > 0) ? vb.height : (rect.height || 841.89);
-        const scaleX = rect.width > 0 ? vbW / rect.width : 1.0;
-        const scaleY = rect.height > 0 ? vbH / rect.height : 1.0;
-
         return {
-            x: roundCoord((evt.clientX - rect.left) * scaleX),
-            y: roundCoord((evt.clientY - rect.top) * scaleY)
+            x: roundCoord((evt.clientX - rect.left) * (rect.width > 0 ? vbW / rect.width : 1.0)),
+            y: roundCoord((evt.clientY - rect.top) * (rect.height > 0 ? vbH / rect.height : 1.0))
         };
     }
 

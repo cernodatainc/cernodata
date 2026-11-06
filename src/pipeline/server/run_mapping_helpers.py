@@ -7,7 +7,49 @@ Pure helpers for normalizing paths and constructing run mapping records.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
+
+EXCLUDED_DIR_NAMES: Set[str] = {
+    "test_output",
+    "test_output_server",
+    "test_output_save",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+}
+
+
+def is_excluded_path(path: str, repo_root: Optional[str] = None) -> bool:
+    """
+    Returns True if path points to test_output, build/cache directories,
+    is a directory instead of a document file, or is not a valid PDF document.
+    """
+    if not path or not path.strip():
+        return True
+    norm = normalize_path(path)
+    parts = [p.lower() for p in norm.split("/") if p and p != "."]
+    if not parts:
+        return True
+
+    if any(p in EXCLUDED_DIR_NAMES for p in parts):
+        return True
+
+    # Check filesystem status if root is provided or path is accessible
+    check_path = os.path.join(repo_root, norm) if (repo_root and not os.path.isabs(norm)) else norm
+    if os.path.exists(check_path) and os.path.isdir(check_path):
+        return True
+
+    if not norm.lower().endswith(".pdf"):
+        return True
+
+    return False
 
 
 def normalize_path(path: str) -> str:

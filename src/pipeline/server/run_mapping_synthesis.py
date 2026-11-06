@@ -12,6 +12,7 @@ import os
 from typing import Any, Dict, List, Optional, Set
 
 from src.pipeline.server.run_mapping_helpers import (
+    is_excluded_path,
     make_doc_entry,
     make_run_record,
     normalize_path,
@@ -61,7 +62,11 @@ def discover_document_paths(
 
     doc_paths: Set[str] = set()
     if available_docs:
-        doc_paths.update(normalize_path(d) for d in available_docs if not _is_forgotten(d))
+        doc_paths.update(
+            normalize_path(d)
+            for d in available_docs
+            if not _is_forgotten(d) and not is_excluded_path(d, repo_root=root)
+        )
 
     for pat in (
         os.path.join(root, "src", "e2e", "*.pdf"),
@@ -73,17 +78,18 @@ def discover_document_paths(
                 rel = normalize_path(os.path.relpath(match, root))
             except ValueError:
                 rel = normalize_path(match)
-            if not _is_forgotten(rel):
+            if not _is_forgotten(rel) and not is_excluded_path(rel, repo_root=root):
                 doc_paths.add(rel)
 
     for p_key, p_val in persistent_data.items():
         if p_key.startswith("_") or not isinstance(p_val, dict) or _is_forgotten(p_key):
             continue
-        _add_unique_doc_path(doc_paths, normalize_path(p_key))
+        if not is_excluded_path(p_key, repo_root=root):
+            _add_unique_doc_path(doc_paths, normalize_path(p_key))
 
     for r in discovered_runs:
         d_path = r.get("document_path")
-        if d_path and not d_path.startswith("_") and not _is_forgotten(d_path):
+        if d_path and not d_path.startswith("_") and not _is_forgotten(d_path) and not is_excluded_path(d_path, repo_root=root):
             _add_unique_doc_path(doc_paths, normalize_path(d_path))
     return doc_paths
 
@@ -143,9 +149,13 @@ def associate_discovered_runs(
         r_doc_name = r.get("document_name") or os.path.basename(r_doc_path)
         if _is_forgotten(r_doc_path) or _is_forgotten(r_doc_name):
             continue
+        if is_excluded_path(r_doc_path) or is_excluded_path(r_doc_name):
+            continue
 
         run_id = r.get("id") or r.get("dir_path") or "output"
         output_dir = r.get("dir_path") or "output"
+        if is_excluded_path(run_id) or is_excluded_path(output_dir):
+            continue
         run_entry = _build_discovered_run_entry(r, run_id, output_dir)
 
         matched_key = _match_doc_key(doc_mappings, r_doc_path) or _match_doc_key(doc_mappings, r_doc_name)
@@ -195,6 +205,10 @@ def group_into_file_sets(
     all_mappings_list: List[Dict[str, Any]] = []
 
     for entry in doc_mappings.values():
+        if is_excluded_path(str(entry.get("file_path", ""))):
+            continue
+        if str(entry.get("file_set", "")) == "test_output":
+            continue
         runs_list = entry["runs"]
         # Sort runs: output first, then by run_id
         runs_list.sort(key=lambda x: (x["output_dir"] != "output", x["run_id"]))

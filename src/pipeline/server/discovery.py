@@ -141,6 +141,9 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
             norm_rel = os.path.relpath(match, root).replace("\\", "/")
             if norm_rel in seen_dirs:
                 continue
+            parts = [p.lower() for p in norm_rel.split("/") if p and p != "."]
+            if any(p in ("test_output", "test_output_server", "test_output_save", "__pycache__", ".pytest_cache") for p in parts):
+                continue
 
             try:
                 files = os.listdir(match)

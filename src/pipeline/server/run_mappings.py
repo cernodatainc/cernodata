@@ -86,9 +86,18 @@ def get_mappings_file_path(repo_root: Optional[str] = None) -> str:
 
 
 def load_persistent_mappings(repo_root: Optional[str] = None) -> Dict[str, Any]:
-    """Loads recorded file-to-run mappings from disk if present."""
-    data = safe_load_json(get_mappings_file_path(repo_root), {})
-    return data if isinstance(data, dict) else {}
+    """Loads recorded file-to-run mappings from disk if present, excluding invalid paths."""
+    root = repo_root or REPO_ROOT
+    data = safe_load_json(get_mappings_file_path(root), {})
+    if not isinstance(data, dict):
+        return {}
+    filtered: Dict[str, Any] = {}
+    for k, v in data.items():
+        if k.startswith("_"):
+            filtered[k] = v
+        elif not is_excluded_path(k, repo_root=root):
+            filtered[k] = v
+    return filtered
 
 
 def save_persistent_mappings(mappings: Dict[str, Any], repo_root: Optional[str] = None) -> None:
@@ -177,9 +186,13 @@ def record_run_mapping(
     """
     Records an execution run mapping for an input document and persists it to disk.
     """
+    if is_excluded_path(document_path, repo_root=repo_root):
+        return
     with _LOCK:
         mappings = load_persistent_mappings(repo_root)
         norm_path = normalize_path(document_path)
+        if is_excluded_path(norm_path, repo_root=repo_root):
+            return
         doc_entry = mappings.setdefault(norm_path, _make_doc_entry(norm_path))
 
         run_record = _make_run_record(
@@ -202,7 +215,11 @@ def record_run_mapping(
 def register_document_path(document_path: str, repo_root: Optional[str] = None) -> None:
     """Records a document path in persistent mappings without executing a run or copying files."""
     root = repo_root or REPO_ROOT
+    if is_excluded_path(document_path, repo_root=root):
+        return
     norm = normalize_path(document_path)
+    if is_excluded_path(norm, repo_root=root):
+        return
     with _LOCK:
         unforget_document(norm, repo_root=root)
         mappings = load_persistent_mappings(root)

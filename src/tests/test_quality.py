@@ -136,6 +136,18 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(v["suggested_correction"], "Móbel")
         self.assertIn("not valid in Polish", v["description"])
 
+    def test_diacritic_conflict_without_replacement_has_no_identity_substitution(self):
+        dom = make_test_dom("Wystawa prac malarza Légera w muzeum.", document_id="doc_legera", node_id="n_legera")
+        violations = detect_quality_violations(dom, language="pl")
+
+        conflict_viols = [v for v in violations if v["rule_type"] == "diacritic_conflict"]
+        self.assertEqual(len(conflict_viols), 1)
+        v = conflict_viols[0]
+        self.assertEqual(v["detected_snippet"], "Légera")
+        self.assertEqual(v["suggested_correction"], "")
+        self.assertIsNone(v["suggestion"])
+        self.assertEqual(v["description"], "Diacritic conflict detected: 'é' is not valid in Polish in 'Légera'")
+
     def test_custom_language_config_registration(self):
         custom_config = LanguageConfig(
             code="custom_lang",

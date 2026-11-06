@@ -676,6 +676,32 @@ select.type-filter option:checked {
 .resize-handle.corner:hover {
     fill: #FEF08A;
 }
+
+.rotate-stem {
+    stroke: #1E4B8A;
+    stroke-width: 1.5px;
+    stroke-dasharray: 2 2;
+    pointer-events: none;
+}
+
+.resize-handle.rotate-handle {
+    fill: #FFFFFF;
+    stroke: #1E4B8A;
+    stroke-width: 2px;
+    cursor: grab;
+    transition: transform 0.1s ease, fill 0.15s ease;
+}
+
+.resize-handle.rotate-handle:hover {
+    fill: #E8EEF6;
+    stroke: #1E4B8A;
+    stroke-width: 2.5px;
+}
+
+.resize-handle.rotate-handle:active {
+    cursor: grabbing;
+    fill: #1E4B8A;
+}
  
 .viol-callout {
     fill: #D50000;

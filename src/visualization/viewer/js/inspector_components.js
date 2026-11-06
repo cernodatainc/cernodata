@@ -94,7 +94,8 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
             ${nodeViols.map((v, vIdx) => {
         const isFixed = !!v.is_fixed || !!node.is_fixed || activePresetIndex === 1;
         const isSupp = isSuppressed(v);
-        const canFix = !!(v.suggested_correction || v.suggestion);
+        const hasCorrection = !!(v.suggested_correction && v.suggested_correction !== v.detected_snippet);
+        const canFix = hasCorrection || !!(v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || ''));
         const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         let statusHtml = `<span style="font-size:11px; font-weight:500; color:${p.red};">${escapeHtml(v.severity || 'WARNING')}</span>`;
         if (isFixed) {
@@ -115,10 +116,10 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
                         <div style="font-size:12px; color:${p.textMuted}; margin-top:4px; line-height:1.45;">${escapeHtml(v.description || '')}</div>
                         ${v.detected_snippet ? `
                             <div style="font-size:12px; font-family:monospace; margin-top:6px; padding:4px 8px; background:${p.bgCard}; border:1px solid ${p.border}; border-radius:4px; color:${p.textPrimary}; word-break:break-word;">
-                                <span style="color:${p.textMuted};">Snippet:</span> '${escapeHtml(v.detected_snippet)}'${v.suggested_correction ? ` <span style="color:${p.textMuted};">→</span> '${escapeHtml(v.suggested_correction)}'` : ''}
+                                <span style="color:${p.textMuted};">Snippet:</span> '${escapeHtml(v.detected_snippet)}'${hasCorrection ? ` <span style="color:${p.textMuted};">→</span> '${escapeHtml(v.suggested_correction)}'` : ''}
                             </div>
                         ` : ''}
-                        ${v.suggestion && v.suggestion !== v.suggested_correction ? `
+                        ${hasCorrection && v.suggestion && v.suggestion !== v.suggested_correction ? `
                             <div style="font-size:12px; font-family:monospace; margin-top:4px; color:${p.green}; word-break:break-word;">
                                 <span style="color:${p.textMuted};">Rewrite:</span> '${escapeHtml(v.suggestion)}'
                             </div>
@@ -193,13 +194,22 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
     const p = INSPECTOR_PALETTE;
     const w = Math.round(bbox.x1 - bbox.x0);
     const h = Math.round(bbox.y1 - bbox.y0);
-    const selectedEngines = (window.selectedOcrEnginesMap && window.selectedOcrEnginesMap[node.node_id]) || [];
+    if (!window.selectedOcrEnginesMap) {
+        window.selectedOcrEnginesMap = {};
+    }
+    if (!window.selectedOcrEnginesMap[node.node_id] || window.selectedOcrEnginesMap[node.node_id].length === 0) {
+        window.selectedOcrEnginesMap[node.node_id] = ['rapidocr'];
+    }
+    const selectedEngines = window.selectedOcrEnginesMap[node.node_id] || ['rapidocr'];
     const availableEngines = ['rapidocr', 'tesseract', 'easyocr'];
     const engineCheckboxesHtml = availableEngines.map(eng => {
         const checked = selectedEngines.includes(eng) ? 'checked' : '';
-        const labelText = eng === 'rapidocr' ? 'RapidOCR' : (eng === 'tesseract' ? 'Tesseract' : 'EasyOCR');
+        const labelText = eng === 'rapidocr' ? 'RapidOCR (default)' : (eng === 'tesseract' ? 'Tesseract' : 'EasyOCR');
+        const titleText = eng === 'rapidocr'
+            ? 'RapidOCR: Built-in default OCR engine'
+            : (eng === 'tesseract' ? 'Tesseract: Requires pytesseract and system tesseract binary' : 'EasyOCR: Requires easyocr package');
         return `
-            <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:${p.textPrimary}; cursor:pointer;">
+            <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:${p.textPrimary}; cursor:pointer;" title="${titleText}">
                 <input type="checkbox" value="${eng}" class="ocr-engine-cb-${node.node_id}" ${checked} onchange="onOcrEngineToggle('${node.node_id}', '${eng}', this.checked)" />
                 ${labelText}
             </label>

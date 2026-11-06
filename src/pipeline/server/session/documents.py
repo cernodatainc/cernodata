@@ -12,6 +12,7 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from src.pipeline.server.discovery import build_runs_grid, find_previous_runs
+from src.pipeline.server.run_mapping_helpers import is_excluded_path
 from src.pipeline.server.run_mappings import (
     _read_forgotten_files,
     forget_document as _forget_doc,
@@ -54,17 +55,17 @@ class DocumentsMixin:
                     rel = os.path.relpath(match, self.repo_root).replace("\\", "/")
                 except ValueError:
                     rel = match.replace("\\", "/")
-                if rel not in docs and not _is_forgotten(rel):
+                if rel not in docs and not _is_forgotten(rel) and not is_excluded_path(rel, repo_root=self.repo_root):
                     docs.append(rel)
         with self._lock:
             for reg in getattr(self, "_registered_documents", []):
-                if reg not in docs and not _is_forgotten(reg):
+                if reg not in docs and not _is_forgotten(reg) and not is_excluded_path(reg, repo_root=self.repo_root):
                     docs.append(reg)
             if self.pdf_path and _is_forgotten(self.pdf_path):
                 self.pdf_path = docs[0] if docs else ""
-            elif not docs and self.pdf_path and not _is_forgotten(self.pdf_path):
+            elif not docs and self.pdf_path and not _is_forgotten(self.pdf_path) and not is_excluded_path(self.pdf_path, repo_root=self.repo_root):
                 docs.append(self.pdf_path)
-            elif self.pdf_path and self.pdf_path not in docs and not _is_forgotten(self.pdf_path):
+            elif self.pdf_path and self.pdf_path not in docs and not _is_forgotten(self.pdf_path) and not is_excluded_path(self.pdf_path, repo_root=self.repo_root):
                 docs.append(self.pdf_path)
         return docs
 
@@ -89,9 +90,15 @@ class DocumentsMixin:
         Makes the path known to discovery, active session, and persistent mappings.
         Automatically unforget the document if it was previously forgotten.
         """
+        if not path or not path.strip() or is_excluded_path(path, repo_root=self.repo_root):
+            return ""
+
         from src.utils import resolve_pdf_path
 
         resolved = resolve_pdf_path(path)
+        if os.path.isdir(resolved):
+            return ""
+
         if os.path.exists(resolved):
             try:
                 if os.path.commonpath([self.repo_root, resolved]) == self.repo_root:
@@ -110,9 +117,12 @@ class DocumentsMixin:
             except ValueError:
                 rel = norm
 
+        if is_excluded_path(rel, repo_root=self.repo_root):
+            return ""
+
         with self._lock:
             if not hasattr(self, "_registered_documents"):
-                self._registered_documents: List[str] = []
+                self._registered_documents = []
             if rel not in self._registered_documents:
                 self._registered_documents.append(rel)
             self.pdf_path = rel

@@ -77,7 +77,7 @@ function renderViolationsList() {
         const catActiveCount = catViols.filter(v => !v.is_fixed && !isSuppressed(v)).length;
         const catSuppressedCount = catViols.filter(v => isSuppressed(v)).length;
         const catFixedCount = catViols.filter(v => !!v.is_fixed).length;
-        const hasFixable = catViols.some(v => !v.is_fixed && (v.suggested_correction || v.suggestion));
+        const hasFixable = catViols.some(v => !v.is_fixed && ((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || ''))));
  
         const bundleEl = document.createElement('div');
         bundleEl.className = 'viol-bundle';
@@ -98,7 +98,7 @@ function renderViolationsList() {
             card.className = `viol-card ${isFixed ? 'fixed' : ''} ${isSupp ? 'suppressed' : ''}`;
             const vPage = getViolationPage(v);
             card.onclick = () => selectNode(v.node_id, vPage);
-            const canFix = !!(v.suggested_correction || v.suggestion);
+            const canFix = !!((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || '')));
  
             card.innerHTML = renderViolationCardComponent(v, {
                 cat,
@@ -264,7 +264,7 @@ function applyAllFixesForCategory(category, targetPage = null) {
     const targets = viols.filter(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
-        return vCat === category && (page === null || vPage === page) && !v.is_fixed && (v.suggested_correction || v.suggestion);
+        return vCat === category && (page === null || vPage === page) && !v.is_fixed && ((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || '')));
     });
  
     targets.forEach(v => {
