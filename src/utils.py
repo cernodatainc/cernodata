@@ -63,7 +63,7 @@ def resolve_pdf_path(path: str) -> str:
     """
     if not path:
         return path
-    if os.path.exists(path):
+    if os.path.isfile(path) and not os.path.isdir(path):
         return path
 
     norm = path.replace("\\", "/")
@@ -78,7 +78,7 @@ def resolve_pdf_path(path: str) -> str:
         os.path.join(repo_root, basename),
     ]
     for cand in candidates:
-        if os.path.exists(cand):
+        if os.path.isfile(cand) and not os.path.isdir(cand):
             return os.path.abspath(cand)
 
     return path
@@ -90,7 +90,7 @@ def resolve_and_validate_pdf_path(path: str) -> str:
     and verifies the file exists on disk, raising FileNotFoundError otherwise.
     """
     resolved = resolve_pdf_path(path)
-    if not os.path.exists(resolved):
+    if not os.path.isfile(resolved) or os.path.isdir(resolved):
         raise FileNotFoundError(f"PDF document not found: '{path}'")
     return resolved
 

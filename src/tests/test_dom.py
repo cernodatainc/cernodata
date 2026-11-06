@@ -400,6 +400,57 @@ class TestDOMPrimitives(unittest.TestCase):
         arr = np.zeros((100,), dtype=np.uint8)
         self.assertEqual(detect_node_text_skew(arr), 0.0)
 
+    def test_merge_nodes_reconnects_hyphenated_line_break(self) -> None:
+        """Verifies merging nodes with trailing hyphen re-joins broken words seamlessly."""
+        n1 = DOMNode(
+            node_id="n_upper",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 10.0, 200.0, 30.0),
+            content={"raw_text": "To z pewnością nie była wyciecz-"},
+        )
+        n2 = DOMNode(
+            node_id="n_lower",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(10.0, 32.0, 200.0, 52.0),
+            content={"raw_text": "ka, na którą się zapisywała."},
+        )
+        dom = DocumentDOM(document_id="doc_hyphen", source_filename="test.pdf", total_pages=1, nodes=[n1, n2])
+        merged = dom.merge_nodes("n_upper", "n_lower")
+        self.assertEqual(merged.content["raw_text"], "To z pewnością nie była wycieczka, na którą się zapisywała.")
+
+    def test_merge_hyphenated_continuations(self) -> None:
+        """Verifies automatic detection and merging of vertically adjacent hyphenated line break pairs."""
+        n1 = DOMNode(
+            node_id="line_1",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(300.0, 420.0, 500.0, 435.0),
+            content={"raw_text": "Chwilę później jedna z ryb znalazła się w dzio-"},
+        )
+        n2 = DOMNode(
+            node_id="line_2",
+            type="paragraph",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(300.0, 438.0, 500.0, 453.0),
+            content={"raw_text": "bie mewy śmieszki."},
+        )
+        dom = DocumentDOM(document_id="doc_cont", source_filename="test.pdf", total_pages=1, nodes=[n1, n2])
+        pairs = dom.find_hyphenated_continuation_pairs(page_index=1)
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0][0].node_id, "line_1")
+        self.assertEqual(pairs[0][1].node_id, "line_2")
+
+        merged_count = dom.merge_hyphenated_continuations(page_index=1)
+        self.assertEqual(merged_count, 1)
+        self.assertEqual(len(dom.nodes), 1)
+        self.assertEqual(dom.nodes[0].content["raw_text"], "Chwilę później jedna z ryb znalazła się w dziobie mewy śmieszki.")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,9 +10,10 @@ import re
 import unicodedata
 from typing import List, Set, Tuple
 
-# Allowed standalone symbols / bullet points
+# Allowed standalone symbols / bullet points and standard ellipses
 ALLOWED_STANDALONE: Set[str] = {
-    '*', '-', '–', '—', '•', '+', '/', '&', '%', '$', '€', '£', '§', '©', '®', ':', '='
+    '*', '-', '–', '—', '•', '+', '/', '&', '%', '$', '€', '£', '§', '©', '®', ':', '=',
+    '...', '…'
 }
 
 # Common allowed 1-2 letter words across supported languages (PL, EN, DE)
@@ -66,12 +67,13 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
 
         is_bullet_or_allowed = stripped in ALLOWED_STANDALONE
         is_pure_punct = all(unicodedata.category(c).startswith(('P', 'S')) for c in stripped)
+        clean_punct = re.sub(r'\.{2,4}$', '', stripped).rstrip('…')
 
         if is_pure_punct and not is_bullet_or_allowed:
             soup_chars += len(stripped) * 2
             noise_tokens.append(stripped)
-        elif re.search(r'([.,;:!?|\(\)\[\]{}])\1+', stripped):
-            # Repeated punctuation like ';;' or '..'
+        elif clean_punct and re.search(r'([.,;:!?|\(\)\[\]{}])\1+', clean_punct):
+            # Repeated punctuation like ';;' or ',,' (excluding legitimate trailing ellipses)
             soup_chars += len(stripped) * 2
             noise_tokens.append(stripped)
         elif len(stripped) <= 2 and any(unicodedata.category(c).startswith('P') for c in stripped) and not is_bullet_or_allowed:

@@ -107,7 +107,11 @@ def _render_page_images(pdf_path: str, scale: float) -> Dict[int, Tuple[np.ndarr
     return page_images
 
 
-def apply_text_skew_alignment(dom: DocumentDOM, pdf_path: str, scale: float = _DEFAULT_RENDER_DPI / _PDF_POINTS_PER_INCH) -> DocumentDOM:
+def apply_text_skew_alignment(
+    dom: DocumentDOM,
+    pdf_path: str,
+    scale: float = _DEFAULT_RENDER_DPI / _PDF_POINTS_PER_INCH,
+) -> DocumentDOM:
     """Scans PDF page images for each node in DocumentDOM and calculates local text skew angles."""
     if not HAS_CV2 or not HAS_PYPDFIUM or not os.path.exists(pdf_path):
         return dom

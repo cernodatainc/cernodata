@@ -26,6 +26,15 @@ EXCLUDED_DIR_NAMES: Set[str] = {
 }
 
 
+def is_test_or_cache_dir(path: str) -> bool:
+    """Returns True if any path segment matches banned test/cache directory names."""
+    if not path or not path.strip():
+        return False
+    norm = normalize_path(path)
+    parts = [p.lower() for p in norm.split("/") if p and p != "."]
+    return any(p in EXCLUDED_DIR_NAMES for p in parts)
+
+
 def is_excluded_path(path: str, repo_root: Optional[str] = None) -> bool:
     """
     Returns True if path points to test_output, build/cache directories,
@@ -34,11 +43,7 @@ def is_excluded_path(path: str, repo_root: Optional[str] = None) -> bool:
     if not path or not path.strip():
         return True
     norm = normalize_path(path)
-    parts = [p.lower() for p in norm.split("/") if p and p != "."]
-    if not parts:
-        return True
-
-    if any(p in EXCLUDED_DIR_NAMES for p in parts):
+    if is_test_or_cache_dir(norm):
         return True
 
     # Check filesystem status if root is provided or path is accessible

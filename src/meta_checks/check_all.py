@@ -5,7 +5,7 @@ Consolidated meta checker executing all repository quality gates:
 1. Strict Emoji Ban compliance
 2. File hygiene & length thresholds (< 500 lines) and inline CSS/JS rules
 3. Type annotation completeness check across non-test sources
-4. AST code hygiene (UTF-8 BOM, unused imports, bare excepts, mutable defaults)
+4. AST code hygiene (UTF-8 BOM, unused imports, bare excepts, mutable defaults, parameter line layout)
 5. Architectural silo invariant validation (Planner strictly decoupled)
 6. Ruff linting
 7. Mypy static type checking

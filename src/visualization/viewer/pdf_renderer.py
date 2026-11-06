@@ -51,7 +51,11 @@ def get_pdf_page_dimensions(pdf_path: str) -> List[Dict[str, float]]:
     return dimensions
 
 
-def render_all_pages_to_base64(pdf_path: str, total_pages: Optional[int] = None, scale: float = 150 / 72.0) -> List[str]:
+def render_all_pages_to_base64(
+    pdf_path: str,
+    total_pages: Optional[int] = None,
+    scale: float = 150 / 72.0,
+) -> List[str]:
     """Renders all PDF pages to PNG and converts them to base64 data URIs."""
     with open_pdf(pdf_path) as pdf:
         if pdf is not None:

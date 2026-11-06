@@ -3,8 +3,9 @@ src/meta_checks/check_ast.py
 
 AST-based verification tool for detecting unused imports, undefined type annotations,
 BOM markers, mutable default argument anti-patterns, bare except clauses, silent exception
-swallowing (broad handlers that neither log nor re-raise, or pass-only handlers), and print() calls
-in Python code.
+swallowing (broad handlers that neither log nor re-raise, or pass-only handlers), function
+parameter layout violations (either all on same line <= 120 chars or all on different lines),
+and print() calls in Python code.
 """
 
 from __future__ import annotations
@@ -13,6 +14,12 @@ import ast
 import builtins
 import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.meta_checks.check_function_parameters import inspect_file as inspect_parameter_lines
 
 COMMON_TYPING_SYMBOLS = {
     "List",
@@ -232,6 +239,7 @@ def run_checks(root_dir: str = "src") -> int:
     all_mutable: list[str] = []
     all_bare: list[str] = []
     all_prints: list[str] = []
+    all_params: list[str] = []
 
     for py_file in py_files:
         if "meta_checks" in py_file.parts:
@@ -241,6 +249,7 @@ def run_checks(root_dir: str = "src") -> int:
         all_unused.extend(unused)
         all_undefined.extend(undefined)
         all_mutable.extend(mutable)
+        all_params.extend(inspect_parameter_lines(py_file))
         is_test_file = "tests" in py_file.parts
         if not is_test_file:
             all_bare.extend(bare)
@@ -254,6 +263,7 @@ def run_checks(root_dir: str = "src") -> int:
         + len(all_mutable)
         + len(all_bare)
         + len(all_prints)
+        + len(all_params)
     )
 
     if all_bom:
@@ -284,6 +294,11 @@ def run_checks(root_dir: str = "src") -> int:
     if all_prints:
         print("[ISSUE] print() calls detected in library code (use logging):")
         for item in all_prints:
+            print(f"  - {item}")
+
+    if all_params:
+        print("[ISSUE] Function parameter layout violations detected (either all on same line <= 120 chars or all on different lines):")
+        for item in all_params:
             print(f"  - {item}")
 
     if total_issues == 0:

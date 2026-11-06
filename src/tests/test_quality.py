@@ -27,6 +27,16 @@ class TestQualityMetrics(unittest.TestCase):
         dirty_text = "Clean\x00\x01\x02Text"
         self.assertGreater(compute_garbage_ratio(dirty_text), 0.0)
 
+    def test_trailing_ellipsis_does_not_trip_garbage_violation(self):
+        clean_text = "Ryba w dziobie mewy śmieszki zabiera głos..."
+        self.assertEqual(compute_garbage_ratio(clean_text), 0.0)
+
+        node = make_test_node(clean_text, node_id="n_mewa")
+        dom = make_test_dom(nodes=[node], document_id="doc_mewa")
+        violations = detect_quality_violations(dom, language="pl")
+        garbage_viols = [v for v in violations if v.get("rule_type") == "garbage_character_ratio"]
+        self.assertEqual(len(garbage_viols), 0)
+
     def test_polish_language_diacritic_anomaly_detection(self):
         clean_pl_text = "Sprawdź termin wykupu swoich obligacji i zamień je na nowe w piątku."
         pl_score_clean = compute_language_score(clean_pl_text, language="pl")

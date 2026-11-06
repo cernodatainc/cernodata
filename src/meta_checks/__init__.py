@@ -5,6 +5,12 @@ Consolidated repository quality enforcement, hygiene verification,
 emoji compliance, dependency analysis, and gate runner suite.
 """
 
+from src.meta_checks.check_function_parameters import (
+    DEFAULT_MAX_LINE_LENGTH,
+    check_files as check_function_parameters,
+    inspect_file as inspect_parameter_lines,
+    inspect_source as inspect_parameter_source,
+)
 from src.meta_checks.file_hygiene import (
     DEFAULT_WARN_LINES,
     DEFAULT_MAX_LINES,
@@ -25,6 +31,10 @@ from src.meta_checks.file_hygiene import (
 )
 
 __all__ = [
+    "DEFAULT_MAX_LINE_LENGTH",
+    "check_function_parameters",
+    "inspect_parameter_lines",
+    "inspect_parameter_source",
     "DEFAULT_WARN_LINES",
     "DEFAULT_MAX_LINES",
     "MIN_JUSTIFICATION_LENGTH",

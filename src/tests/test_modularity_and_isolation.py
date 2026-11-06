@@ -126,7 +126,13 @@ class TestModularityAndIsolation(unittest.TestCase):
         """Verifies custom artifacts can be registered, exported, and loaded without modifying core exporters."""
         registry = ArtifactRegistry()
 
-        def _export_custom(dom: DocumentDOM, dec: Dict[str, Any], viols: List[Dict[str, Any]], out_dir: str, plan: Optional[Dict[str, Any]] = None) -> str:
+        def _export_custom(
+            dom: DocumentDOM,
+            dec: Dict[str, Any],
+            viols: List[Dict[str, Any]],
+            out_dir: str,
+            plan: Optional[Dict[str, Any]] = None,
+        ) -> str:
             out_path = os.path.join(out_dir, "custom_report.json")
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump({"custom_data": "ok", "total_nodes": len(dom.nodes)}, f)
@@ -178,7 +184,14 @@ class TestModularityAndIsolation(unittest.TestCase):
             def description(self) -> str:
                 return "Flags unredacted sensitive tokens."
 
-            def detect_violations(self, dom: DocumentDOM, counter: int = 1, language: Optional[str] = "en", page_configs: Optional[Dict[int, Any]] = None, fixed_config: Any = None) -> List[Dict[str, Any]]:
+            def detect_violations(
+                self,
+                dom: DocumentDOM,
+                counter: int = 1,
+                language: Optional[str] = "en",
+                page_configs: Optional[Dict[int, Any]] = None,
+                fixed_config: Any = None,
+            ) -> List[Dict[str, Any]]:
                 viols: List[Dict[str, Any]] = []
                 for n in dom.nodes:
                     text = n.content.get("raw_text", "")
@@ -193,7 +206,15 @@ class TestModularityAndIsolation(unittest.TestCase):
                         })
                 return viols
 
-            def evaluate_node(self, node: DOMNode, language: Optional[str] = "en", diacritic_hit: float = 0.20, config: Any = None, suppressed_types: Optional[Dict[str, bool]] = None, garbage_multiplier: float = 3.0) -> float:
+            def evaluate_node(
+                self,
+                node: DOMNode,
+                language: Optional[str] = "en",
+                diacritic_hit: float = 0.20,
+                config: Any = None,
+                suppressed_types: Optional[Dict[str, bool]] = None,
+                garbage_multiplier: float = 3.0,
+            ) -> float:
                 return 0.0 if "SECRET" in node.content.get("raw_text", "") else 1.0
 
         custom_handler = RegexPIILayerHandler()

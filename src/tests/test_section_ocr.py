@@ -154,6 +154,7 @@ class TestSectionOCRParser(unittest.TestCase):
             status, body = http_post_json(
                 f"{base_url}/api/parse_section_ocr",
                 {"node_id": "node_p1_n3", "image_base64": data_uri, "language": "en", "engine": "rapidocr"},
+                timeout=60,
             )
             self.assertEqual(status, 200)
             self.assertTrue(body["success"])
@@ -415,6 +416,7 @@ class TestSectionOCRParser(unittest.TestCase):
                     "engines": ["rapidocr"],
                     "language": "en",
                 },
+                timeout=60,
             )
             self.assertEqual(status, 200)
             self.assertTrue(post_body["success"])

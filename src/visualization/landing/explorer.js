@@ -20,6 +20,12 @@ async function loadFileRunMappings() {
         const resp = await fetch('/api/file_run_mappings');
         if (!resp.ok) return;
         const data = await resp.json();
+        if (data.file_sets) {
+            data.file_sets = data.file_sets.filter(fs => fs.file_set !== 'test_output');
+        }
+        if (data.all_mappings) {
+            data.all_mappings = data.all_mappings.filter(m => m.file_set !== 'test_output' && m.file_name !== 'test_output' && !m.file_path.includes('test_output'));
+        }
         window.explorerData = data;
         const allMappings = data.all_mappings || [];
         const fileSets = data.file_sets || [];
@@ -120,6 +126,7 @@ function renderExplorerTree() {
 
     let html = '<div class="explorer-tree" role="tree" tabindex="0">';
     fileSets.forEach(fs => {
+        if (fs.file_set === 'test_output') return;
         const matchingDocs = fs.documents.filter(doc => {
             if (!query) return true;
             if (doc.file_name.toLowerCase().includes(query) || doc.file_path.toLowerCase().includes(query) || fs.file_set.toLowerCase().includes(query)) return true;

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 
@@ -241,7 +242,11 @@ class DocumentDOM:
             t1 = str(upper.content.get("raw_text", "")).strip()
             t2 = str(lower.content.get("raw_text", "")).strip()
             if t1 and t2:
-                merged_content["raw_text"] = f"{t1}{text_separator}{t2}"
+                if re.search(r"\w+-$", t1):
+                    # Trailing hyphen indicates a line/word break continuation across nodes
+                    merged_content["raw_text"] = f"{t1[:-1]}{t2}"
+                else:
+                    merged_content["raw_text"] = f"{t1}{text_separator}{t2}"
             elif t1 or t2:
                 merged_content["raw_text"] = t1 or t2
 
@@ -422,3 +427,52 @@ class DocumentDOM:
             nodes=[n.clone() for n in self.nodes],
             metadata=dict(self.metadata),
         )
+
+    def find_hyphenated_continuation_pairs(
+        self, page_index: Optional[int] = None
+    ) -> List[Tuple[DOMNode, DOMNode]]:
+        """
+        Finds pairs of vertically adjacent nodes in the same column where the upper node
+        ends with a hyphenated word break and the lower node contains its continuation.
+        """
+        pages = [page_index] if page_index is not None else list(range(1, self.total_pages + 1))
+        pairs: List[Tuple[DOMNode, DOMNode]] = []
+        for p in pages:
+            p_nodes = [n for n in self.nodes if n.global_page_index == p and n.content.get("raw_text", "").strip()]
+            for n1 in p_nodes:
+                t1 = str(n1.content.get("raw_text", "")).strip()
+                if not re.search(r"\w+-$", t1):
+                    continue
+                candidates: List[Tuple[float, DOMNode]] = []
+                for n2 in p_nodes:
+                    if n1.node_id == n2.node_id:
+                        continue
+                    t2 = str(n2.content.get("raw_text", "")).strip()
+                    if not t2 or not re.search(r"^\w+", t2):
+                        continue
+                    v_gap = n2.bounding_box.y0 - n1.bounding_box.y1
+                    if not (-5.0 <= v_gap <= 28.0):
+                        continue
+                    h_overlap = min(n1.bounding_box.x1, n2.bounding_box.x1) - max(n1.bounding_box.x0, n2.bounding_box.x0)
+                    min_width = min(n1.bounding_box.width, n2.bounding_box.width)
+                    if min_width > 0 and (h_overlap / min_width) >= 0.40:
+                        candidates.append((v_gap, n2))
+                if candidates:
+                    candidates.sort(key=lambda c: c[0])
+                    pairs.append((n1, candidates[0][1]))
+        return pairs
+
+    def merge_hyphenated_continuations(self, page_index: Optional[int] = None) -> int:
+        """
+        Automatically merges vertically adjacent hyphenated line break continuation nodes.
+        Returns the number of merged node pairs.
+        """
+        merged_count = 0
+        while True:
+            pairs = self.find_hyphenated_continuation_pairs(page_index=page_index)
+            if not pairs:
+                break
+            n1, n2 = pairs[0]
+            self.merge_nodes(n1.node_id, n2.node_id)
+            merged_count += 1
+        return merged_count

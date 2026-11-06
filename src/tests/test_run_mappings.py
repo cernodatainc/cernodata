@@ -378,4 +378,41 @@ class TestRunMappings(unittest.TestCase):
         self.assertEqual(len(doc_entry["runs"]), 1, "Past runs should be intact and restored in explorer")
         self.assertEqual(doc_entry["runs"][0]["run_id"], "run_past_1")
 
+    def test_test_output_excluded_from_explorer(self) -> None:
+        from src.pipeline.server.run_mapping_helpers import is_excluded_path
+        from src.pipeline.server.session import ServerSessionContext
+
+        self.assertTrue(is_excluded_path("test_output"))
+        self.assertTrue(is_excluded_path("./test_output"))
+        self.assertTrue(is_excluded_path("test_output/Document.pdf"))
+        self.assertFalse(is_excluded_path("src/e2e/Document 8.pdf"))
+
+        test_out_dir = os.path.join(self.test_dir, "test_output")
+        os.makedirs(test_out_dir, exist_ok=True)
+        pdf_in_test_out = os.path.join(test_out_dir, "sample.pdf")
+        with open(pdf_in_test_out, "wb") as f:
+            f.write(b"%PDF-1.4 mock")
+
+        session = ServerSessionContext(repo_root=self.test_dir)
+        session.pdf_path = "./test_output"
+
+        res_reg_dir = session.register_document("test_output")
+        self.assertEqual(res_reg_dir, "")
+        res_reg_rel = session.register_document("./test_output")
+        self.assertEqual(res_reg_rel, "")
+        res_reg_pdf = session.register_document("test_output/sample.pdf")
+        self.assertEqual(res_reg_pdf, "")
+
+        mappings = session.get_file_run_mappings()
+        doc_paths = [d["file_path"] for d in mappings["all_mappings"]]
+        doc_names = [d["file_name"] for d in mappings["all_mappings"]]
+        file_sets = [fs["file_set"] for fs in mappings["file_sets"]]
+
+        self.assertNotIn("test_output", doc_paths)
+        self.assertNotIn("./test_output", doc_paths)
+        self.assertNotIn("test_output", doc_names)
+        self.assertNotIn("test_output", file_sets)
+        self.assertNotEqual(mappings.get("active_file"), "test_output")
+        self.assertNotEqual(mappings.get("active_file"), "./test_output")
+
 

@@ -44,8 +44,9 @@ function renderTwoNodeDecollideEditor(container) {
     const sameType = (upper.type === lower.type);
 
     const isSameLine = Math.abs(bUpper.y0 - bLower.y0) < 6;
+    const hasTrailingHyphen = /\w+-\s*$/.test(upperText);
     const defaultMergedText = (upperText && lowerText)
-        ? (upperText + (isSameLine ? ' ' : '\n') + lowerText)
+        ? (hasTrailingHyphen ? (upperText.replace(/-\s*$/, '') + lowerText) : (upperText + (isSameLine ? ' ' : '\n') + lowerText))
         : (upperText || lowerText);
 
     let mergeHtml = '';
@@ -157,8 +158,11 @@ async function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
         mergedText = lowerText;
     } else {
         const isSameLine = Math.abs(bUpper.y0 - bLower.y0) < 6;
+        const hasTrailingHyphen = /\w+-\s*$/.test(upperText);
         if (upperText && lowerText) {
-            mergedText = upperText + (isSameLine ? ' ' : '\n') + lowerText;
+            mergedText = hasTrailingHyphen
+                ? (upperText.replace(/-\s*$/, '') + lowerText)
+                : (upperText + (isSameLine ? ' ' : '\n') + lowerText);
         } else {
             mergedText = upperText || lowerText;
         }

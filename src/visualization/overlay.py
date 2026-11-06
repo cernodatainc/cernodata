@@ -30,7 +30,10 @@ COLOR_PALETTE = {
 }
 
 
-def _group_by_page(dom: DocumentDOM, violations: List[Dict[str, Any]]) -> Tuple[Dict[int, List[DOMNode]], Dict[int, List[Dict[str, Any]]]]:
+def _group_by_page(
+    dom: DocumentDOM,
+    violations: List[Dict[str, Any]],
+) -> Tuple[Dict[int, List[DOMNode]], Dict[int, List[Dict[str, Any]]]]:
     """Groups DOM nodes and quality violation records by page index."""
     page_nodes: Dict[int, List[DOMNode]] = {p: [] for p in range(1, dom.total_pages + 1)}
     for node in dom.nodes:
@@ -94,7 +97,12 @@ def _draw_single_node_overlay(
 
 
 def _draw_top_banner_summary(
-    draw_result: ImageDraw.ImageDraw, img_w: int, page_no: int, nodes_count: int, violations_count: int, header_font: FontType
+    draw_result: ImageDraw.ImageDraw,
+    img_w: int,
+    page_no: int,
+    nodes_count: int,
+    violations_count: int,
+    header_font: FontType,
 ) -> None:
     """Renders top banner summary bar across image width."""
     banner_h = 32

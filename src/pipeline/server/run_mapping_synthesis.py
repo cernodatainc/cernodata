@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from src.pipeline.server.run_mapping_helpers import (
     is_excluded_path,
+    is_test_or_cache_dir,
     make_doc_entry,
     make_run_record,
     normalize_path,
@@ -149,12 +150,12 @@ def associate_discovered_runs(
         r_doc_name = r.get("document_name") or os.path.basename(r_doc_path)
         if _is_forgotten(r_doc_path) or _is_forgotten(r_doc_name):
             continue
-        if is_excluded_path(r_doc_path) or is_excluded_path(r_doc_name):
+        if is_test_or_cache_dir(r_doc_path) or is_test_or_cache_dir(r_doc_name):
             continue
 
         run_id = r.get("id") or r.get("dir_path") or "output"
         output_dir = r.get("dir_path") or "output"
-        if is_excluded_path(run_id) or is_excluded_path(output_dir):
+        if is_test_or_cache_dir(run_id) or is_test_or_cache_dir(output_dir):
             continue
         run_entry = _build_discovered_run_entry(r, run_id, output_dir)
 
