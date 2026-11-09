@@ -112,6 +112,46 @@ class DOMNode:
         self.content["raw_text"] = value
         self.user_correction_note = value
 
+    @property
+    def table_rows(self) -> Optional[List[List[str]]]:
+        """Returns row-oriented list of table cells if node is a table_grid."""
+        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
+        if type_val == "table_grid":
+            rows = self.content.get("rows")
+            if isinstance(rows, list):
+                return rows
+        return None
+
+    @property
+    def table_columns(self) -> Optional[List[List[str]]]:
+        """Returns column-oriented list of table cells if node is a table_grid."""
+        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
+        if type_val == "table_grid":
+            cols = self.content.get("columns")
+            if isinstance(cols, list):
+                return cols
+        return None
+
+    @property
+    def table_headers(self) -> Optional[List[str]]:
+        """Returns header labels if node is a table_grid."""
+        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
+        if type_val == "table_grid":
+            headers = self.content.get("headers")
+            if isinstance(headers, list):
+                return headers
+        return None
+
+    @property
+    def table_grid(self) -> Optional[List[List[Dict[str, Any]]]]:
+        """Returns structured 2D cell grid if node is a table_grid."""
+        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
+        if type_val == "table_grid":
+            grid = self.content.get("grid")
+            if isinstance(grid, list):
+                return grid
+        return None
+
     def contains_point(self, x: float, y: float) -> bool:
         """Checks if point (x, y) is inside this node's bounding box."""
         return self.bounding_box.contains_point(x, y)

@@ -97,6 +97,15 @@ class TablesLayerHandler(VerificationLayerHandler):
         for node in dom.nodes:
             if node.type != "table_grid":
                 continue
+            rows = node.content.get("rows")
+            if rows is None and (node.content.get("markdown_table") or "|" in str(node.content.get("raw_text", ""))):
+                from src.parsers.table_parser import parse_table_content
+                parsed = parse_table_content(
+                    node.content.get("markdown_table") or node.content.get("raw_text", "")
+                )
+                node.content.update(parsed)
+                rows = parsed.get("rows")
+
             align_score = float(node.content.get("cell_alignment_score", 1.0))
             if align_score < 0.60:
                 violations.append(
@@ -110,7 +119,6 @@ class TablesLayerHandler(VerificationLayerHandler):
                         description=f"Table cell alignment score degraded ({round(align_score, 2)} < 0.60)",
                     )
                 )
-            rows = node.content.get("rows")
             if isinstance(rows, list) and len(rows) > 1:
                 row_lens = [len(r) for r in rows if isinstance(r, list)]
                 if len(set(row_lens)) > 1:
@@ -137,7 +145,12 @@ class TablesLayerHandler(VerificationLayerHandler):
         garbage_multiplier: float = 3.0,
     ) -> float:
         if node.type == "table_grid":
-            return float(node.content.get("cell_alignment_score", 0.95))
+            if "cell_alignment_score" in node.content:
+                return float(node.content["cell_alignment_score"])
+            if "rows" in node.content and isinstance(node.content["rows"], list):
+                from src.parsers.table_parser import compute_table_alignment_score
+                return compute_table_alignment_score(node.content["rows"])
+            return 0.95
         return 1.0
 
 

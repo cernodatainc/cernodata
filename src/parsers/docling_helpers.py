@@ -8,6 +8,7 @@ import logging
 import re
 from typing import Dict, Any, List, Tuple
 from src.dom.enums import DOMNodeType
+from src.parsers.table_parser import parse_table_content
 from src.quality.language_config import get_language_config
 
 logger = logging.getLogger("cernodata.parsers.docling_helpers")
@@ -152,12 +153,11 @@ def build_node_content(
         raw_text = re.sub(r"[\s\(\)\[\]]{2,}[a-z\(\)\s]{1,10}$", "", raw_text).strip()
 
     content_dict: Dict[str, Any] = {"raw_text": raw_text}
-    if node_type == "table_grid" and hasattr(item, "export_to_markdown"):
-        try:
-            content_dict["markdown_table"] = item.export_to_markdown()
-        except Exception as ex:
-            logger.debug("Failed exporting item to markdown table: %s", ex)
-        # TODO(TASK-103): Compute `cell_alignment_score` from actual parsed Markdown table row/column raggedness
-        # instead of hardcoding 0.98 / 0.96 by preset name.
-        content_dict["cell_alignment_score"] = 0.98 if preset == "docling_deep" else 0.96
+    if node_type == "table_grid":
+        table_payload = parse_table_content(
+            item, doc=doc, preset=preset, fallback_text=raw_text
+        )
+        content_dict.update(table_payload)
+        if not content_dict.get("raw_text") and content_dict.get("markdown_table"):
+            content_dict["raw_text"] = content_dict["markdown_table"]
     return content_dict
