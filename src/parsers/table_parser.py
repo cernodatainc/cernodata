@@ -16,6 +16,11 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("cernodata.parsers.table_parser")
 
+DEFAULT_TABLE_SCORE_DEEP: float = 0.98
+DEFAULT_TABLE_SCORE_FAST: float = 0.96
+DEFAULT_TABLE_MIN_ALIGNMENT_SCORE: float = 0.10
+DEFAULT_TABLE_RAGGED_MULTIPLIER: float = 2.0
+
 
 @dataclass
 class ParsedTableCell:
@@ -131,7 +136,7 @@ def compute_table_alignment_score(
     """Computes a table cell alignment score based on row column-count raggedness."""
     if not rows:
         return 1.0
-    base = 0.98 if preset == "docling_deep" else 0.96
+    base = DEFAULT_TABLE_SCORE_DEEP if preset == "docling_deep" else DEFAULT_TABLE_SCORE_FAST
     row_lens = [len(r) for r in rows if isinstance(r, list)]
     if not row_lens:
         return base
@@ -142,7 +147,10 @@ def compute_table_alignment_score(
 
     total_dev = sum(abs(l - target_cols) for l in row_lens)
     ragged_ratio = total_dev / max(1, target_cols * len(row_lens))
-    return round(max(0.10, min(1.0, base * (1.0 - ragged_ratio * 2.0))), 4)
+    return round(
+        max(DEFAULT_TABLE_MIN_ALIGNMENT_SCORE, min(1.0, base * (1.0 - ragged_ratio * DEFAULT_TABLE_RAGGED_MULTIPLIER))),
+        4,
+    )
 
 
 def generate_markdown_table(
@@ -199,7 +207,9 @@ def parse_markdown_table(
     lines = [ln.strip() for ln in markdown_text.strip().splitlines() if ln.strip()]
     table_lines = [ln for ln in lines if "|" in ln]
     if not table_lines:
-        return ParsedTable(cell_alignment_score=0.98 if preset == "docling_deep" else 0.96)
+        return ParsedTable(
+            cell_alignment_score=DEFAULT_TABLE_SCORE_DEEP if preset == "docling_deep" else DEFAULT_TABLE_SCORE_FAST
+        )
 
     raw_rows: List[List[str]] = []
     sep_idx: Optional[int] = None
@@ -214,7 +224,9 @@ def parse_markdown_table(
         raw_rows.append(cells)
 
     if not raw_rows:
-        return ParsedTable(cell_alignment_score=0.98 if preset == "docling_deep" else 0.96)
+        return ParsedTable(
+            cell_alignment_score=DEFAULT_TABLE_SCORE_DEEP if preset == "docling_deep" else DEFAULT_TABLE_SCORE_FAST
+        )
 
     headers: List[str] = list(raw_rows[0]) if (sep_idx and sep_idx > 0) or len(raw_rows) > 1 else []
     max_cols = max((len(r) for r in raw_rows), default=0)

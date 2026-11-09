@@ -8,7 +8,13 @@ from typing import Dict, Any, List, Tuple, Optional, Sequence
 
 from src.dom import DocumentDOM
 from src.quality import detect_quality_violations, apply_text_skew_alignment
-from src.pipeline.decision_tree import DecisionTreeEngine, DEFAULT_TARGET_CONFIDENCE_THRESHOLD
+from src.pipeline.decision_tree import (
+    DEFAULT_CURRENT_PRESET_SCORE,
+    DEFAULT_NEXT_PRESET_SCORE,
+    DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
+    PRESET_ID,
+    DecisionTreeEngine,
+)
 from src.pipeline.planner.models import IngestionConfig
 
 
@@ -43,11 +49,12 @@ def evaluate_quality_and_decision_tree(
     dom: DocumentDOM,
     target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
     language: Optional[str] = "en",
-    preset: str = "docling_fast",
-    current_preset_score: float = 0.90,
-    next_preset_score: float = 0.72,
+    preset: str = PRESET_ID,
+    current_preset_score: float = DEFAULT_CURRENT_PRESET_SCORE,
+    next_preset_score: float = DEFAULT_NEXT_PRESET_SCORE,
     config: Optional[IngestionConfig] = None,
     verification_layers: Optional[Sequence[str]] = None,
+    next_preset_id: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Extracts quality violation records and evaluates confidence scores against target threshold across verification layers."""
     layers = verification_layers
@@ -65,6 +72,7 @@ def evaluate_quality_and_decision_tree(
         language=language,
         verification_layers=layers,
         preset_id=preset,
+        next_preset_id=next_preset_id,
     )
     decision = engine.evaluate(dom)
     decision["chosen_preset"] = preset

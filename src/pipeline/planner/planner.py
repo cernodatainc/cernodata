@@ -12,7 +12,16 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
-from src.pipeline.planner.options import DEFAULT_PRESET_WEIGHTS
+from src.pipeline.planner.options import (
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PORT,
+    DEFAULT_PRESET_WEIGHTS,
+    DEFAULT_SECURITY,
+    DEFAULT_SUITABILITY_SCORE,
+    DEFAULT_TARGET,
+    DEFAULT_TARGET_THRESHOLD,
+    DEFAULT_TAXONOMY,
+)
 from src.pipeline.planner.wizard import resolve_choice, run_interactive_wizard
 
 
@@ -32,8 +41,8 @@ class PresetPlanner:
     def _resolve_criteria(
         criteria: Optional[Union[PlannerCriteria, str]] = None,
         taxonomy: Optional[Union[PlannerCriteria, str]] = None,
-        target: str = "high_precision_structure",
-        security: str = "air_gapped_local",
+        target: str = DEFAULT_TARGET,
+        security: str = DEFAULT_SECURITY,
         verification_layers: Optional[List[str]] = None,
     ) -> PlannerCriteria:
         if isinstance(criteria, PlannerCriteria):
@@ -41,7 +50,7 @@ class PresetPlanner:
         elif isinstance(taxonomy, PlannerCriteria):
             resolved = taxonomy
         else:
-            tax = str(criteria if isinstance(criteria, str) else (taxonomy or "general_text"))
+            tax = str(criteria if isinstance(criteria, str) else (taxonomy or DEFAULT_TAXONOMY))
             resolved = PlannerCriteria(taxonomy=tax, target=target, security=security)
         if verification_layers is not None:
             resolved.verification_layers = list(verification_layers)
@@ -51,15 +60,15 @@ class PresetPlanner:
         self,
         criteria: Optional[Union[PlannerCriteria, str]] = None,
         taxonomy: Optional[Union[PlannerCriteria, str]] = None,
-        target: str = "high_precision_structure",
-        security: str = "air_gapped_local",
+        target: str = DEFAULT_TARGET,
+        security: str = DEFAULT_SECURITY,
     ) -> Dict[str, float]:
         """Calculates preset suitability scores based on strongly-typed PlannerCriteria or dimension arguments."""
         resolved_criteria = self._resolve_criteria(criteria, taxonomy, target, security)
         scores: Dict[str, float] = {}
         for preset_id, weight_map in self.weights.items():
-            matched_weights = [weight_map.get(ans, 0.50) for ans in resolved_criteria.values()]
-            scores[preset_id] = round(sum(matched_weights) / len(matched_weights), 3) if matched_weights else 0.50
+            matched_weights = [weight_map.get(ans, DEFAULT_SUITABILITY_SCORE) for ans in resolved_criteria.values()]
+            scores[preset_id] = round(sum(matched_weights) / len(matched_weights), 3) if matched_weights else DEFAULT_SUITABILITY_SCORE
 
         return self._apply_hardware_calibration(scores)
 
@@ -72,10 +81,10 @@ class PresetPlanner:
         document_path: str = "",
         criteria: Optional[Union[PlannerCriteria, str]] = None,
         taxonomy: Optional[Union[PlannerCriteria, str]] = None,
-        target: str = "high_precision_structure",
-        security: str = "air_gapped_local",
+        target: str = DEFAULT_TARGET,
+        security: str = DEFAULT_SECURITY,
         language: Optional[str] = None,
-        target_threshold: float = 0.82,
+        target_threshold: float = DEFAULT_TARGET_THRESHOLD,
         override_order: Optional[List[str]] = None,
         override_primary: Optional[str] = None,
         verification_layers: Optional[List[str]] = None,
@@ -94,7 +103,7 @@ class PresetPlanner:
         else:
             order = list(suggested)
         overridden = bool(override_order or override_primary) and (order != suggested)
-        fallback_queue = [{"preset": p, "score": scores.get(p, 0.50)} for p in order[1:]]
+        fallback_queue = [{"preset": p, "score": scores.get(p, DEFAULT_SUITABILITY_SCORE)} for p in order[1:]]
 
         return DocumentPlan(
             document_path=document_path,
@@ -134,9 +143,9 @@ class PresetPlanner:
         self,
         default_doc: Optional[str] = None,
         default_lang: Optional[str] = None,
-        default_threshold: float = 0.82,
-        output_dir: str = "output",
-        port: int = 8000,
+        default_threshold: float = DEFAULT_TARGET_THRESHOLD,
+        output_dir: str = DEFAULT_OUTPUT_DIR,
+        port: int = DEFAULT_PORT,
         open_browser: bool = True,
     ) -> DocumentPlan:
         """Interactive in-browser data shape configuration wizard delegating to server launcher."""

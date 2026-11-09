@@ -65,7 +65,7 @@ class PipelineOrchestrator:
         # Step 1: Initial Parse with Primary Preset
         notifier.notify_preset_execution(config.preset)
         dom, decision, violations = self.attempt_runner.execute_attempt(
-            pdf_path, config, curr_score, next_score
+            pdf_path, config, curr_score, next_score, next_preset_id=next_candidate
         )
         attempts.append(dict(self.attempt_runner.make_attempt_record(1, config.preset, decision, violations)))
         notifier.notify_verification()

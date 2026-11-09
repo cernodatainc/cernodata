@@ -13,13 +13,17 @@ from src.dom import DocumentDOM
 from src.parsers import DoclingParser, PyPdfiumParser
 from src.pipeline.planner.models import IngestionConfig
 
+DEFAULT_PYPDFIUM_SCALE: float = 2.0
+DEFAULT_PARSER_PRESET: str = "docling_fast"
+DEFAULT_OCR_ENGINE: str = "auto"
+
 
 @dataclass(frozen=True)
 class ParserExecutionOptions:
     """Normalized options container for parser engine execution."""
     language: Optional[str] = "en"
-    preset: str = "docling_fast"
-    ocr_engine: str = "auto"
+    preset: str = DEFAULT_PARSER_PRESET
+    ocr_engine: str = DEFAULT_OCR_ENGINE
     ocr_scale: Optional[float] = None
     force_full_page_ocr: bool = False
     do_table_structure: bool = True
@@ -28,8 +32,8 @@ class ParserExecutionOptions:
     def from_inputs(
         cls,
         language: Optional[str] = "en",
-        preset: str = "docling_fast",
-        ocr_engine: str = "auto",
+        preset: str = DEFAULT_PARSER_PRESET,
+        ocr_engine: str = DEFAULT_OCR_ENGINE,
         ocr_scale: Optional[float] = None,
         force_full_page_ocr: bool = False,
         do_table_structure: bool = True,
@@ -83,7 +87,7 @@ class PyPdfiumPresetAdapter:
         return preset in self.SUPPORTED_PRESETS
 
     def parse(self, resolved_path: str, options: ParserExecutionOptions) -> DocumentDOM:
-        scale = options.ocr_scale if options.ocr_scale is not None else 2.0
+        scale = options.ocr_scale if options.ocr_scale is not None else DEFAULT_PYPDFIUM_SCALE
         return PyPdfiumParser(language=options.language, scale=scale).parse(resolved_path)
 
 

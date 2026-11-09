@@ -12,6 +12,15 @@ from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Set, cast
 
+from src.pipeline.planner.options import (
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PRIMARY_PRESET,
+    DEFAULT_SECURITY,
+    DEFAULT_SUITABILITY_SCORE,
+    DEFAULT_TARGET,
+    DEFAULT_TARGET_THRESHOLD,
+    DEFAULT_TAXONOMY,
+)
 from src.utils import save_json
 
 DEFAULT_PLANNER_LAYERS: List[str] = ["symbols", "diacritics", "structure", "tables", "geometry"]
@@ -78,9 +87,9 @@ class ExtensibleOptionsMixin:
 @dataclass
 class PlannerCriteria(ExtensibleOptionsMixin):
     """Strongly-typed criteria inputs for preset suitability ranking and verification."""
-    taxonomy: str = "general_text"
-    target: str = "high_precision_structure"
-    security: str = "air_gapped_local"
+    taxonomy: str = DEFAULT_TAXONOMY
+    target: str = DEFAULT_TARGET
+    security: str = DEFAULT_SECURITY
     verification_layers: List[str] = field(default_factory=lambda: list(DEFAULT_PLANNER_LAYERS))
     options: Dict[str, Any] = field(default_factory=dict)
 
@@ -93,9 +102,9 @@ class PlannerCriteria(ExtensibleOptionsMixin):
             else list(DEFAULT_PLANNER_LAYERS)
         )
         return cls(
-            taxonomy=str(data.get("taxonomy", "general_text")),
-            target=str(data.get("target", "high_precision_structure")),
-            security=str(data.get("security", "air_gapped_local")),
+            taxonomy=str(data.get("taxonomy", DEFAULT_TAXONOMY)),
+            target=str(data.get("target", DEFAULT_TARGET)),
+            security=str(data.get("security", DEFAULT_SECURITY)),
             verification_layers=layers,
             options=cls._extract_unknown_options(data),
         )
@@ -108,12 +117,12 @@ class PlannerCriteria(ExtensibleOptionsMixin):
 @dataclass
 class IngestionConfig(ExtensibleOptionsMixin):
     """Strongly-typed pipeline configuration for document parsing and quality evaluation."""
-    target_threshold: float = 0.82
+    target_threshold: float = DEFAULT_TARGET_THRESHOLD
     language: Optional[str] = "en"
-    preset: str = "docling_fast"
+    preset: str = DEFAULT_PRIMARY_PRESET
     align_skew: bool = True
     visualize: bool = True
-    output_dir: str = "output"
+    output_dir: str = DEFAULT_OUTPUT_DIR
     ocr_scale: Optional[float] = None
     force_full_page_ocr: bool = False
     do_table_structure: bool = True
@@ -127,12 +136,12 @@ class IngestionConfig(ExtensibleOptionsMixin):
         raw_scale = data.get("ocr_scale")
         raw_layers = data.get("verification_layers")
         return cls(
-            target_threshold=float(data.get("target_threshold", 0.82)),
+            target_threshold=float(data.get("target_threshold", DEFAULT_TARGET_THRESHOLD)),
             language=data.get("language"),
-            preset=str(data.get("preset", "docling_fast")),
+            preset=str(data.get("preset", DEFAULT_PRIMARY_PRESET)),
             align_skew=bool(data.get("align_skew", True)),
             visualize=bool(data.get("visualize", True)),
-            output_dir=str(data.get("output_dir", "output")),
+            output_dir=str(data.get("output_dir", DEFAULT_OUTPUT_DIR)),
             ocr_scale=float(raw_scale) if raw_scale is not None else None,
             force_full_page_ocr=bool(data.get("force_full_page_ocr", False)),
             do_table_structure=bool(data.get("do_table_structure", True)),
@@ -147,11 +156,11 @@ class DocumentPlan(ExtensibleOptionsMixin):
     document_path: str = ""
     criteria: PlannerCriteria = field(default_factory=PlannerCriteria)
     language: Optional[str] = None
-    target_threshold: float = 0.82
-    primary_preset: str = "docling_fast"
+    target_threshold: float = DEFAULT_TARGET_THRESHOLD
+    primary_preset: str = DEFAULT_PRIMARY_PRESET
     fallback_queue: List[Dict[str, Any]] = field(default_factory=list)
-    preset_order: List[str] = field(default_factory=lambda: ["docling_fast"])
-    suggested_order: List[str] = field(default_factory=lambda: ["docling_fast"])
+    preset_order: List[str] = field(default_factory=lambda: [DEFAULT_PRIMARY_PRESET])
+    suggested_order: List[str] = field(default_factory=lambda: [DEFAULT_PRIMARY_PRESET])
     overridden: bool = False
     scores: Dict[str, float] = field(default_factory=dict)
     verification_layers: List[str] = field(default_factory=lambda: list(DEFAULT_PLANNER_LAYERS))
@@ -171,7 +180,7 @@ class DocumentPlan(ExtensibleOptionsMixin):
             self.overridden = True
             self.preset_order = [preset] + [p for p in self.preset_order if p != preset]
             self.fallback_queue = [
-                {"preset": p, "score": self.scores.get(p, 0.50)}
+                {"preset": p, "score": self.scores.get(p, DEFAULT_SUITABILITY_SCORE)}
                 for p in self.preset_order[1:]
             ]
 
@@ -201,7 +210,7 @@ class DocumentPlan(ExtensibleOptionsMixin):
         self,
         align_skew: bool = True,
         visualize: bool = True,
-        output_dir: str = "output",
+        output_dir: str = DEFAULT_OUTPUT_DIR,
     ) -> IngestionConfig:
         """Derives a strongly-typed IngestionConfig from this execution plan."""
         return IngestionConfig(
@@ -219,7 +228,7 @@ class DocumentPlan(ExtensibleOptionsMixin):
         """Returns a copy of the plan with specified fields updated."""
         return replace(self, **changes)
 
-    def save(self, output_path: str = os.path.join("output", "plan.json")) -> str:
+    def save(self, output_path: str = os.path.join(DEFAULT_OUTPUT_DIR, "plan.json")) -> str:
         return save_json(output_path, self.to_dict())
 
     @classmethod
@@ -234,11 +243,11 @@ class DocumentPlan(ExtensibleOptionsMixin):
             document_path=str(data.get("document_path", "")),
             criteria=criteria,
             language=data.get("language"),
-            target_threshold=float(data.get("target_threshold", 0.82)),
-            primary_preset=str(data.get("primary_preset", "docling_fast")),
+            target_threshold=float(data.get("target_threshold", DEFAULT_TARGET_THRESHOLD)),
+            primary_preset=str(data.get("primary_preset", DEFAULT_PRIMARY_PRESET)),
             fallback_queue=list(data.get("fallback_queue", [])),
-            preset_order=list(data.get("preset_order", ["docling_fast"])),
-            suggested_order=list(data.get("suggested_order", ["docling_fast"])),
+            preset_order=list(data.get("preset_order", [DEFAULT_PRIMARY_PRESET])),
+            suggested_order=list(data.get("suggested_order", [DEFAULT_PRIMARY_PRESET])),
             overridden=bool(data.get("overridden", False)),
             scores=dict(data.get("scores", {})),
             verification_layers=verification_layers,

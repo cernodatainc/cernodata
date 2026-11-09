@@ -22,9 +22,13 @@ PRESET_DOCLING_DEEP = "docling_deep"
 DEFAULT_CURRENT_SCORE = 0.90
 DEFAULT_NEXT_SCORE = 0.72
 
-
 PROGRESS_PCT_WIGGLE = 72
 PROGRESS_PCT_SWITCH = 80
+
+DEFAULT_WIGGLE_SCALE_RAPIDOCR = 3.5
+DEFAULT_WIGGLE_SCALE_DEFAULT = 4.0
+NON_FALLBACK_PRESETS: frozenset[str] = frozenset({"vision_llm_direct"})
+DEFAULT_FALLBACK_SOURCE_PRESETS: frozenset[str] = frozenset({"docling_fast", "pypdfium_rapidocr"})
 
 DecisionResult = Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]
 
@@ -58,7 +62,7 @@ class FallbackLoopHandler:
         if plan and plan.fallback_queue:
             next_candidate = _normalize_fallback_name(plan.fallback_queue[0])
             part_of_plan = True
-        elif config.preset in ("docling_fast", "pypdfium_rapidocr"):
+        elif config.preset in DEFAULT_FALLBACK_SOURCE_PRESETS:
             next_candidate = PRESET_DOCLING_DEEP
 
         curr_score = self._score_for(plan, config.preset, DEFAULT_CURRENT_SCORE)
@@ -77,7 +81,13 @@ class FallbackLoopHandler:
         """Resolves OCR parameter wiggling bounds for Path B retries."""
         # TODO(TASK-206): Read custom parameter wiggling bounds (`ParameterWiggleSpec`) from `CustomPresetConfig`
         # instead of only wiggling `ocr_scale` and `force_full_page_ocr`.
-        wiggled_scale = 3.5 if config.preset == "pypdfium_rapidocr" else 4.0
+        custom_scale = config.get_option("wiggle_scale") if hasattr(config, "get_option") else None
+        if custom_scale is not None:
+            wiggled_scale = float(custom_scale)
+        elif config.preset == "pypdfium_rapidocr":
+            wiggled_scale = DEFAULT_WIGGLE_SCALE_RAPIDOCR
+        else:
+            wiggled_scale = DEFAULT_WIGGLE_SCALE_DEFAULT
         return wiggled_scale, True
 
     def _slice_failing_pages_if_needed(
@@ -95,11 +105,18 @@ class FallbackLoopHandler:
         config: IngestionConfig,
         curr_score: float,
         next_score: float,
+        next_preset_id: Optional[str] = None,
     ) -> DecisionResult:
         """Executes a fallback attempt, serving as the hook for subprocess isolation."""
         # TODO(TASK-1003): Support running heavy fallback presets inside an isolated subprocess (`IsolatedParserRunner`)
         # with timeout/OOM protection so a model crash cannot terminate the host server.
-        return self.attempt_runner.execute_attempt(pdf_path, config, curr_score, next_score)
+        return self.attempt_runner.execute_attempt(
+            pdf_path,
+            config,
+            curr_score,
+            next_score,
+            next_preset_id=next_preset_id,
+        )
 
     @staticmethod
     def _accept_decision_tree(preset: str, reason: str) -> Dict[str, Any]:
@@ -143,7 +160,11 @@ class FallbackLoopHandler:
             force_full_page_ocr=wiggled_force_ocr,
         )
         w_dom, w_decision, w_violations = self._execute_isolated_attempt(
-            target_pdf, wiggled_config, curr_score, next_score
+            target_pdf,
+            wiggled_config,
+            curr_score,
+            next_score,
+            next_preset_id=config.preset,
         )
         attempts.append(dict(self.attempt_runner.make_attempt_record(
             len(attempts) + 1, config.preset, w_decision, w_violations,
@@ -183,7 +204,7 @@ class FallbackLoopHandler:
         # Exclude presets that cannot execute or have already been attempted
         attempted_presets = {a.get("preset") for a in attempts}
         attempted_presets.add(config.preset)
-        return [c for c in candidates if c not in attempted_presets and c != "vision_llm_direct"]
+        return [c for c in candidates if c not in attempted_presets and c not in NON_FALLBACK_PRESETS]
 
     def _run_path_a(
         self,
@@ -226,7 +247,11 @@ class FallbackLoopHandler:
 
             fallback_config = replace(config, preset=candidate)
             fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
-                pdf_path, fallback_config, cand_score, cand_next_score
+                pdf_path,
+                fallback_config,
+                cand_score,
+                cand_next_score,
+                next_preset_id=following,
             )
 
             if candidate == PRESET_DOCLING_DEEP:

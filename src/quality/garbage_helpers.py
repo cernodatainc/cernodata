@@ -32,6 +32,11 @@ VALID_SHORT_WORDS: Set[str] = {
     'er', 'es', 'um', 'zu', 'ab', 'ob', 'da', 'wo', 'du',
 }
 
+MIN_ALNUM_RATIO: float = 0.40
+MIN_ALNUM_CHECK_LENGTH: int = 6
+REPEAT_CHAR_THRESHOLD: int = 4
+SOUP_PENALTY_WEIGHT: int = 2
+
 
 def evaluate_unicode_anomalies(text: str) -> int:
     """Counts Unicode replacement characters, private use codepoints, and raw control characters."""
@@ -46,7 +51,8 @@ def evaluate_unicode_anomalies(text: str) -> int:
 
 def evaluate_character_repetitions(text: str) -> int:
     """Counts characters participating in runs of 4 or more identical consecutive characters."""
-    return sum(len(m.group(0)) for m in re.finditer(r'(.)\1{3,}', text))
+    pattern = rf"(.)\1{{{REPEAT_CHAR_THRESHOLD - 1},}}"
+    return sum(len(m.group(0)) for m in re.finditer(pattern, text))
 
 
 def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[int, List[str]]:
@@ -57,7 +63,7 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
     close_brackets = text.count(']')
     unmatched_parens = abs(close_parens - open_parens) + abs(close_brackets - open_brackets)
 
-    soup_chars = unmatched_parens * 2
+    soup_chars = unmatched_parens * SOUP_PENALTY_WEIGHT
     noise_tokens: List[str] = []
 
     for t in tokens:
@@ -70,15 +76,15 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
         clean_punct = re.sub(r'\.{2,4}$', '', stripped).rstrip('…')
 
         if is_pure_punct and not is_bullet_or_allowed:
-            soup_chars += len(stripped) * 2
+            soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT
             noise_tokens.append(stripped)
         elif clean_punct and re.search(r'([.,;:!?|\(\)\[\]{}])\1+', clean_punct):
             # Repeated punctuation like ';;' or ',,' (excluding legitimate trailing ellipses)
-            soup_chars += len(stripped) * 2
+            soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT
             noise_tokens.append(stripped)
         elif len(stripped) <= 2 and any(unicodedata.category(c).startswith('P') for c in stripped) and not is_bullet_or_allowed:
             # Short fragment containing punctuation like 'h)'
-            soup_chars += len(stripped) * 2
+            soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT
             noise_tokens.append(stripped)
         elif len(stripped) <= 2 and stripped.isalnum() and not stripped.isdigit():
             # 1-2 char word not in valid list
@@ -91,10 +97,10 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
 
 def compute_low_alnum_penalty(non_space_chars: List[str]) -> float:
     """Computes penalty if alphanumeric character ratio is below 40% in passages of 6+ characters."""
-    if len(non_space_chars) < 6:
+    if len(non_space_chars) < MIN_ALNUM_CHECK_LENGTH:
         return 0.0
     alnum_count = sum(1 for c in non_space_chars if c.isalnum())
     ratio = alnum_count / len(non_space_chars)
-    if ratio < 0.40:
-        return 0.40 - ratio
+    if ratio < MIN_ALNUM_RATIO:
+        return MIN_ALNUM_RATIO - ratio
     return 0.0

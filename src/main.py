@@ -17,7 +17,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.orchestrator import run_pipeline
-from src.pipeline.planner import DocumentPlan, PresetPlanner
+from src.pipeline.planner import (
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PORT,
+    DocumentPlan,
+    PresetPlanner,
+)
+
+DEFAULT_SERVER_HOST: str = "127.0.0.1"
+DEFAULT_LANGUAGE_HINT: str = "en"
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -31,15 +39,15 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--port", "-p", "--browser-port",
         type=int,
-        default=8000,
+        default=DEFAULT_PORT,
         dest="port",
-        help="Port to serve interactive server hub and visual viewer (default: 8000).",
+        help=f"Port to serve interactive server hub and visual viewer (default: {DEFAULT_PORT}).",
     )
     parser.add_argument(
         "--host",
         type=str,
-        default="127.0.0.1",
-        help="Host network interface to bind the server (default: 127.0.0.1).",
+        default=DEFAULT_SERVER_HOST,
+        help=f"Host network interface to bind the server (default: {DEFAULT_SERVER_HOST}).",
     )
     parser.add_argument(
         "--no-browser",
@@ -64,7 +72,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--language", "-l",
         type=str,
-        default="en",
+        default=DEFAULT_LANGUAGE_HINT,
         help="Language hint code for OCR and quality verification (e.g. 'pl', 'de', 'en').",
     )
     parser.add_argument(
@@ -83,8 +91,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir", "-o",
         type=str,
-        default="output",
-        help="Directory to store JSON DOM, violations report, and rendered overlay images (default: output).",
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Directory to store JSON DOM, violations report, and rendered overlay images (default: {DEFAULT_OUTPUT_DIR}).",
     )
     parser.add_argument(
         "--no-align-skew",

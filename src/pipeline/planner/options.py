@@ -26,6 +26,18 @@ TAXONOMY_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("ta
 TARGET_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("target_options", [])]
 SECURITY_OPTIONS: List[Tuple[str, str]] = [tuple(opt) for opt in _CONFIG.get("security_options", [])]
 
+PLANNER_DEFAULTS: Dict[str, Any] = _CONFIG.get("defaults", {})
+
+DEFAULT_TARGET_THRESHOLD: float = float(PLANNER_DEFAULTS.get("target_threshold", 0.82))
+DEFAULT_PRIMARY_PRESET: str = str(PLANNER_DEFAULTS.get("primary_preset", "docling_fast"))
+DEFAULT_FALLBACK_PRESET: str = str(PLANNER_DEFAULTS.get("fallback_preset", "docling_deep"))
+DEFAULT_SUITABILITY_SCORE: float = float(PLANNER_DEFAULTS.get("default_score", 0.50))
+DEFAULT_TAXONOMY: str = str(PLANNER_DEFAULTS.get("taxonomy", "general_text"))
+DEFAULT_TARGET: str = str(PLANNER_DEFAULTS.get("target", "high_precision_structure"))
+DEFAULT_SECURITY: str = str(PLANNER_DEFAULTS.get("security", "air_gapped_local"))
+DEFAULT_OUTPUT_DIR: str = str(PLANNER_DEFAULTS.get("output_dir", "output"))
+DEFAULT_PORT: int = int(PLANNER_DEFAULTS.get("port", 8000))
+
 
 @dataclass(frozen=True)
 class WizardDimension:
@@ -47,20 +59,20 @@ WIZARD_DIMENSIONS: List[WizardDimension] = [
         title="Document Taxonomy",
         description="Select the primary structural layout shape",
         options=TAXONOMY_OPTIONS,
-        default="general_text",
+        default=DEFAULT_TAXONOMY,
     ),
     WizardDimension(
         key="target",
         title="Quality vs. Speed Target",
         description="Throughput priority versus bounding box layout fidelity",
         options=TARGET_OPTIONS,
-        default="high_precision_structure",
+        default=DEFAULT_TARGET,
     ),
     WizardDimension(
         key="security",
         title="Security / Network Constraint",
         description="External cloud API allowance vs. air-gapped local model",
         options=SECURITY_OPTIONS,
-        default="air_gapped_local",
+        default=DEFAULT_SECURITY,
     ),
 ]

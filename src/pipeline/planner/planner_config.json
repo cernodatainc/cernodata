@@ -64,5 +64,16 @@
   "security_options": [
     ["air_gapped_local", "Zero external network calls (strictly local models)"],
     ["hosted_vision_api", "External webhook / URI integration (external APIs allowed)"]
-  ]
+  ],
+  "defaults": {
+    "target_threshold": 0.82,
+    "primary_preset": "docling_fast",
+    "fallback_preset": "docling_deep",
+    "default_score": 0.50,
+    "taxonomy": "general_text",
+    "target": "high_precision_structure",
+    "security": "air_gapped_local",
+    "output_dir": "output",
+    "port": 8000
+  }
 }

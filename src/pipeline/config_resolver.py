@@ -7,6 +7,7 @@ Input resolution and normalization for pipeline execution requests.
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from src.pipeline.planner.models import DocumentPlan, IngestionConfig
+from src.pipeline.planner.options import DEFAULT_PRIMARY_PRESET
 
 
 class PipelineConfigResolver:
@@ -47,7 +48,7 @@ class PipelineConfigResolver:
                 config.options[k] = v
             return config
         if plan_obj is not None:
-            if preset and preset != "docling_fast" and preset != plan_obj.primary_preset:
+            if preset and preset != DEFAULT_PRIMARY_PRESET and preset != plan_obj.primary_preset:
                 plan_obj = plan_obj.evolve(
                     preset_order=list(plan_obj.preset_order),
                     fallback_queue=list(plan_obj.fallback_queue),
@@ -94,7 +95,7 @@ class PipelineConfigResolver:
     ) -> Tuple[str, IngestionConfig, Optional[DocumentPlan]]:
         """Resolves target PDF path, IngestionConfig, and DocumentPlan."""
         plan_obj = cls.resolve_plan(plan)
-        if plan_obj is not None and preset and preset != "docling_fast" and preset != plan_obj.primary_preset:
+        if plan_obj is not None and preset and preset != DEFAULT_PRIMARY_PRESET and preset != plan_obj.primary_preset:
             plan_obj = plan_obj.evolve(
                 preset_order=list(plan_obj.preset_order),
                 fallback_queue=list(plan_obj.fallback_queue),

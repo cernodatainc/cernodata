@@ -10,9 +10,16 @@ from src.dom.enums import PresetKind, PipelineAction
 from src.quality import evaluate_document_confidence
 
 DEFAULT_TARGET_CONFIDENCE_THRESHOLD = 0.82
+DEFAULT_CURRENT_PRESET_SCORE = 0.90
+DEFAULT_NEXT_PRESET_SCORE = 0.72
+DEFAULT_WIGGLE_DELTA_THRESHOLD = 0.20
+DEFAULT_WIGGLE_RENDERING_DPI = 200
+DEFAULT_WIGGLE_CONTRAST_ENHANCEMENT = 1.2
+DEFAULT_WIGGLE_TABLE_DETECTION_MODE = "strict_grid"
+
 PRESET_ID = PresetKind.DOCLING_FAST.value
 NEXT_PRESET_ID = PresetKind.DOCLING_DEEP.value
-NEXT_PRESET_SCORE = 0.72
+NEXT_PRESET_SCORE = DEFAULT_NEXT_PRESET_SCORE
 
 
 class DecisionTreeEngine:
@@ -23,11 +30,14 @@ class DecisionTreeEngine:
     def __init__(
         self,
         target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-        current_preset_score: float = 0.90,
-        next_preset_score: float = NEXT_PRESET_SCORE,
+        current_preset_score: float = DEFAULT_CURRENT_PRESET_SCORE,
+        next_preset_score: float = DEFAULT_NEXT_PRESET_SCORE,
         language: Optional[str] = "en",
         verification_layers: Optional[Sequence[str]] = None,
         preset_id: str = PRESET_ID,
+        next_preset_id: Optional[str] = None,
+        wiggle_delta_threshold: float = DEFAULT_WIGGLE_DELTA_THRESHOLD,
+        wiggle_parameters: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.target_threshold = target_threshold
         self.current_preset_score = current_preset_score
@@ -35,6 +45,9 @@ class DecisionTreeEngine:
         self.language = language
         self.verification_layers = list(verification_layers) if verification_layers is not None else None
         self.preset_id = preset_id
+        self.next_preset_id = next_preset_id or NEXT_PRESET_ID
+        self.wiggle_delta_threshold = wiggle_delta_threshold
+        self.wiggle_parameters = dict(wiggle_parameters) if wiggle_parameters is not None else None
 
     def evaluate(self, dom: DocumentDOM) -> Dict[str, Any]:
         metrics = evaluate_document_confidence(
@@ -73,25 +86,33 @@ class DecisionTreeEngine:
             }
         else:
             result["status"] = "TRIGGER_FALLBACK"
-            recommended_wiggles = {
-                "rendering_dpi": 200,
+            recommended_wiggles: Dict[str, Any] = {
+                "rendering_dpi": DEFAULT_WIGGLE_RENDERING_DPI,
                 "ocr_language_hint": [self.language] if self.language else [],
-                "table_detection_mode": "strict_grid",
-                "contrast_enhancement": 1.2
+                "table_detection_mode": DEFAULT_WIGGLE_TABLE_DETECTION_MODE,
+                "contrast_enhancement": DEFAULT_WIGGLE_CONTRAST_ENHANCEMENT,
             }
-            if delta >= 0.20:
+            if self.wiggle_parameters:
+                recommended_wiggles.update(self.wiggle_parameters)
+
+            thresh = self.wiggle_delta_threshold
+            target_next = self.next_preset_id
+            if delta >= thresh:
                 action = PipelineAction.PATH_B_WIGGLE_PARAMETERS.value
-                reason = f"Delta ({delta}) >= 0.20. Language/quality heuristics below threshold ({overall_conf} < {self.target_threshold}). Wiggling OCR language hint and DPI."
+                reason = (
+                    f"Delta ({delta}) >= {thresh:.2f}. Language/quality heuristics below threshold "
+                    f"({overall_conf} < {self.target_threshold}). Wiggling OCR language hint and DPI."
+                )
             else:
                 action = PipelineAction.PATH_A_SWITCH_PRESET.value
                 hint_str = f" with explicit '{self.language}' language hint." if self.language else "."
-                reason = f"Delta ({delta}) < 0.20. Switching to next preset candidate ('{NEXT_PRESET_ID}'){hint_str}"
+                reason = f"Delta ({delta}) < {thresh:.2f}. Switching to next preset candidate ('{target_next}'){hint_str}"
 
             result["decision_tree"] = {
                 "action": action,
                 "score_delta": delta,
                 "reason": reason,
-                "next_preset_candidate": NEXT_PRESET_ID,
+                "next_preset_candidate": target_next,
                 "recommended_parameter_adjustments": recommended_wiggles,
                 "page_slice_queue": slice_pages
             }

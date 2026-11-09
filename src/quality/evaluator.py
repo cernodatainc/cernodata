@@ -44,6 +44,12 @@ class DocumentConfidenceMetrics(TypedDict, total=False):
     per_page_layer_scores: Dict[int, Dict[str, float]]
 
 
+DEFAULT_DIACRITIC_HIT: float = 0.20
+DEFAULT_MAX_DIACRITIC_PENALTY: float = 0.60
+DEFAULT_GARBAGE_MULTIPLIER: float = 3.0
+DEFAULT_GARBAGE_THRESHOLD: float = 0.05
+
+
 @functools.lru_cache(maxsize=1)
 def _load_quality_config_cached() -> Dict[str, Any]:
     """Internal cached loader reading quality configuration from disk."""
@@ -54,10 +60,10 @@ def _load_quality_config_cached() -> Dict[str, Any]:
         if isinstance(cfg, dict):
             return cfg
     return {
-        "diacritic_hit": 0.20,
-        "max_diacritic_penalty": 0.60,
-        "garbage_multiplier": 3.0,
-        "garbage_threshold": 0.05,
+        "diacritic_hit": DEFAULT_DIACRITIC_HIT,
+        "max_diacritic_penalty": DEFAULT_MAX_DIACRITIC_PENALTY,
+        "garbage_multiplier": DEFAULT_GARBAGE_MULTIPLIER,
+        "garbage_threshold": DEFAULT_GARBAGE_THRESHOLD,
     }
 
 
@@ -84,10 +90,10 @@ def evaluate_page_confidence_details(
     q_cfg = load_quality_config()
     config = get_language_config(language)
     hit = diacritic_hit if diacritic_hit is not None else q_cfg.get(
-        "diacritic_hit", config.diacritic_hit if config else 0.20
+        "diacritic_hit", config.diacritic_hit if config else DEFAULT_DIACRITIC_HIT
     )
-    max_diacritic_penalty = q_cfg.get("max_diacritic_penalty", 0.60)
-    garbage_multiplier = q_cfg.get("garbage_multiplier", 3.0)
+    max_diacritic_penalty = q_cfg.get("max_diacritic_penalty", DEFAULT_MAX_DIACRITIC_PENALTY)
+    garbage_multiplier = q_cfg.get("garbage_multiplier", DEFAULT_GARBAGE_MULTIPLIER)
 
     node_scores = []
     char_scores = []

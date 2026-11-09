@@ -15,7 +15,8 @@ logger = logging.getLogger("cernodata.parsers.docling_helpers")
 
 DEFAULT_PAGE_HEIGHT_PT = 792.0  # US Letter page height in points
 
-_ALL_LANGS: List[str] = ["pl", "de", "fr", "es", "en"]
+DEFAULT_OCR_LANGUAGES: List[str] = ["pl", "de", "fr", "es", "en"]
+_ALL_LANGS: List[str] = list(DEFAULT_OCR_LANGUAGES)
 
 LANG_CODE_MAP: Dict[str, List[str]] = {
     "pl": ["pl", "pol"],
@@ -27,6 +28,8 @@ LANG_CODE_MAP: Dict[str, List[str]] = {
     "": list(_ALL_LANGS),
     "none": list(_ALL_LANGS),
 }
+
+_DEEP_OCR_TRAILING_NOISE_RE = re.compile(r"[\s\(\)\[\]]{2,}[a-z\(\)\s]{1,10}$")
 
 # Docling emits DocItemLabel values such as "section_header" and "page_header". Exact labels
 # are resolved first: a substring check would route "section_header" to header_footer (it
@@ -150,7 +153,7 @@ def build_node_content(
             for _, word, suggested in config.find_anomalous_substitutions(raw_text):
                 raw_text = raw_text.replace(word, suggested)
         # Deep OCR clean-up for trailing OCR noise/fragmented punctuation soup
-        raw_text = re.sub(r"[\s\(\)\[\]]{2,}[a-z\(\)\s]{1,10}$", "", raw_text).strip()
+        raw_text = _DEEP_OCR_TRAILING_NOISE_RE.sub("", raw_text).strip()
 
     content_dict: Dict[str, Any] = {"raw_text": raw_text}
     if node_type == "table_grid":

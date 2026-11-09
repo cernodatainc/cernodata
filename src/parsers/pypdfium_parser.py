@@ -20,6 +20,11 @@ from src.parsers.pdf_utils import open_pdf
 
 logger = logging.getLogger("cernodata.parsers.pypdfium_parser")
 
+DEFAULT_PAGE_MARGIN_PT: float = 36.0
+DEFAULT_HEADING_MAX_WORDS: int = 8
+DEFAULT_PYPDFIUM_SCALE: float = 2.0
+DEFAULT_MIN_DIGITAL_CHARS: int = 20
+
 
 def _convert_pdf_rect_to_bbox(rect: Any, page_w: float, page_h: float) -> BoundingBox:
     """
@@ -48,11 +53,14 @@ def _convert_ocr_box_to_bbox(
         bx1 = max(pt[0] for pt in box_coords) / scale_x
         by1 = max(pt[1] for pt in box_coords) / scale_y
     else:
-        bx0, by0, bx1, by1 = 36.0, 36.0, page_w - 36.0, page_h - 36.0
+        bx0 = DEFAULT_PAGE_MARGIN_PT
+        by0 = DEFAULT_PAGE_MARGIN_PT
+        bx1 = page_w - DEFAULT_PAGE_MARGIN_PT
+        by1 = page_h - DEFAULT_PAGE_MARGIN_PT
     return BoundingBox(x0=bx0, y0=by0, x1=bx1, y1=by1, angle=0.0)
 
 
-def _is_short_line(text: str, max_words: int = 8) -> bool:
+def _is_short_line(text: str, max_words: int = DEFAULT_HEADING_MAX_WORDS) -> bool:
     """Returns True if text contains fewer than max_words words."""
     return len(text.split()) < max_words
 
@@ -91,8 +99,8 @@ class PyPdfiumParser:
     def __init__(
         self,
         language: Optional[str] = "en",
-        scale: float = 2.0,
-        min_digital_chars: int = 20,
+        scale: float = DEFAULT_PYPDFIUM_SCALE,
+        min_digital_chars: int = DEFAULT_MIN_DIGITAL_CHARS,
         ocr_parser: Optional[SectionOCRParser] = None,
     ) -> None:
         self.language = language.lower().strip() if language else ""
