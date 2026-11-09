@@ -87,6 +87,46 @@ class TestPipelineEngine(unittest.TestCase):
         self.assertIn("starting docling_deep", fallback_msgs[0])
         self.assertIn("running docling_deep", step_descriptions)
 
+    def test_decision_tree_engine_custom_next_preset_id(self):
+        dom = make_test_dom("Sprawdź termin wykupu w piqtku.")
+        engine = DecisionTreeEngine(
+            target_threshold=0.90,
+            language="pl",
+            next_preset_id="custom_ocr_preset",
+        )
+        res = engine.evaluate(dom)
+        self.assertEqual(res["status"], "TRIGGER_FALLBACK")
+        self.assertEqual(res["decision_tree"]["next_preset_candidate"], "custom_ocr_preset")
+        self.assertIn("custom_ocr_preset", res["decision_tree"]["reason"])
+
+    def test_decision_tree_engine_custom_wiggle_threshold_and_parameters(self):
+        dom = make_test_dom("Sprawdź termin wykupu w piqtku.")
+        custom_wiggles = {"custom_filter": "high_pass", "contrast_enhancement": 2.5}
+        engine = DecisionTreeEngine(
+            target_threshold=0.90,
+            current_preset_score=0.95,
+            next_preset_score=0.90,
+            language="pl",
+            wiggle_delta_threshold=0.04,
+            wiggle_parameters=custom_wiggles,
+        )
+        res = engine.evaluate(dom)
+        self.assertEqual(res["status"], "TRIGGER_FALLBACK")
+        self.assertEqual(res["decision_tree"]["action"], "PATH_B_WIGGLE_PARAMETERS")
+        adjustments = res["decision_tree"]["recommended_parameter_adjustments"]
+        self.assertEqual(adjustments["custom_filter"], "high_pass")
+        self.assertEqual(adjustments["contrast_enhancement"], 2.5)
+
+    def test_fallback_handler_custom_wiggle_scale(self):
+        from src.pipeline.fallback_handler import FallbackLoopHandler
+        from src.pipeline.planner.models import IngestionConfig
+
+        handler = FallbackLoopHandler()
+        cfg = IngestionConfig(preset="docling_fast", options={"wiggle_scale": 5.0})
+        scale, force_ocr = handler._resolve_wiggle_parameters(cfg)
+        self.assertEqual(scale, 5.0)
+        self.assertTrue(force_ocr)
+
 
 if __name__ == "__main__":
     unittest.main()

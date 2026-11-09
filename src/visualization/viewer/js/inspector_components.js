@@ -263,6 +263,18 @@ function renderSingleNodeEditorComponent(node, options) {
     const cutoutCardHtml = renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, isCutoutUnskewed);
     const angleVal = (bbox.angle !== undefined && bbox.angle !== 0) ? bbox.angle : effectiveAngle;
 
+    const isTable = node.type === 'table_grid' || (node.content && (node.content.rows || node.content.markdown_table || node.content.grid));
+    let tableDimText = 'Table';
+    if (isTable && node.content) {
+        const rCount = node.content.num_rows || (Array.isArray(node.content.rows) ? node.content.rows.length : 0);
+        const cCount = node.content.num_cols || (Array.isArray(node.content.columns) ? node.content.columns.length : 0);
+        if (rCount > 0 && cCount > 0) {
+            tableDimText = `${rCount} rows x ${cCount} cols`;
+        } else if (rCount > 0) {
+            tableDimText = `${rCount} rows`;
+        }
+    }
+
     const domNodeTypes = ['paragraph', 'heading', 'table_grid', 'figure', 'header_footer', 'multi_column_group'];
     if (node.type && !domNodeTypes.includes(node.type)) {
         domNodeTypes.push(node.type);
@@ -313,6 +325,13 @@ function renderSingleNodeEditorComponent(node, options) {
             <button class="flag-btn ${isIncorrect ? 'flagged' : ''}" onclick="toggleIncorrectText('${node.node_id}')">
                 ${isIncorrect ? 'Flagged as incorrect text (click to unmark)' : 'Mark as incorrect parsed text'}
             </button>
+            ${isTable ? `
+            <div style="margin-top:10px;">
+                <button class="action-btn action-btn-view-table" id="btnOpenTableModal_${escapeHtml(node.node_id)}" onclick="openTableModal('${escapeHtml(node.node_id)}')" title="View structured table content in modal">
+                    View Table Content (${tableDimText})
+                </button>
+            </div>
+            ` : ''}
             <div style="margin-top:10px;">
                 <!-- TODO(TASK-705): When node.type === 'table_grid', mount an interactive HTML table cell/row/column editor (table_editor.js). -->
                 <label style="display:block; font-size:12px; color:${p.textPrimary}; font-weight:500; margin-bottom:2px;">Parsed text / correction note</label>

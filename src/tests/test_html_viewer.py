@@ -166,6 +166,53 @@ class TestHTMLViewer(unittest.TestCase):
         if os.path.exists(out_path):
             os.remove(out_path)
 
+    def test_generate_interactive_html_with_table_node(self):
+        table_node = DOMNode(
+            node_id="table_1",
+            type="table_grid",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(50, 100, 500, 300),
+            content={
+                "raw_text": "| Col 1 | Col 2 |\n| --- | --- |\n| Val 1 | Val 2 |",
+                "rows": [["Col 1", "Col 2"], ["Val 1", "Val 2"]],
+                "columns": [["Col 1", "Val 1"], ["Col 2", "Val 2"]],
+                "headers": ["Col 1", "Col 2"],
+                "num_rows": 2,
+                "num_cols": 2,
+                "markdown_table": "| Col 1 | Col 2 |\n| --- | --- |\n| Val 1 | Val 2 |",
+                "cell_alignment_score": 1.0,
+            },
+        )
+        dom = DocumentDOM(document_id="doc_table", source_filename="table_doc.pdf", total_pages=1, nodes=[table_node])
+        decision = {"chosen_preset": "docling_fast", "score": 92.0, "decision_log": ["Table test"]}
+        violations = []
+
+        out_path = generate_interactive_html(
+            "non_existent.pdf",
+            dom=dom,
+            decision=decision,
+            violations=violations,
+            output_path="test_output/test_table_modal.html",
+        )
+        self.assertTrue(os.path.exists(out_path))
+
+        with open(out_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn("openTableModal", content)
+            self.assertIn("closeTableModal", content)
+            self.assertIn("switchTableModalTab", content)
+            self.assertIn("renderTableModal", content)
+            self.assertIn("action-btn-view-table", content)
+            self.assertIn("View Table Content", content)
+            self.assertIn("table-modal-overlay", content)
+            self.assertIn("table-modal-dialog", content)
+            self.assertIn("table-modal-grid-table", content)
+            self.assertIn("table_1", content)
+
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
 
 if __name__ == "__main__":
     unittest.main()

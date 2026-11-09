@@ -28,6 +28,7 @@ JS_MODULE_ORDER: List[str] = [
     "decollide.js",
     "violations_components.js",
     "violations.js",
+    "table_modal.js",
     "api.js",
     "app.js",
 ]
