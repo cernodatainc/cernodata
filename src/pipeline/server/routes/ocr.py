@@ -63,11 +63,14 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             )
             return
 
+        # TODO(TASK-706): Advanced mode flags for section OCR parsing (custom engine flags, binarization, psm).
+        custom_flags = str(payload.get("custom_flags") or "").strip()
         logger.info(
-            "Parsing section '%s' using OCR engines: %s (Lang: %s)",
+            "Parsing section '%s' using OCR engines: %s (Lang: %s%s)",
             node_id,
             ", ".join(selected_engines),
             language,
+            f", Flags: {custom_flags}" if custom_flags else "",
         )
 
         multi_results: Dict[str, Any]

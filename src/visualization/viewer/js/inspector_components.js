@@ -240,6 +240,17 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
                     ${engineCheckboxesHtml}
                 </div>
             </div>
+            <div style="margin-top:8px; border-top:1px solid ${p.border}; padding-top:6px;">
+                <!-- TODO(TASK-706): Advanced mode flags for section OCR parsing (custom engine flags, binarization, psm). -->
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:${p.textPrimary}; cursor:pointer;" title="Enable custom OCR engine flags and parameter overrides">
+                    <input type="checkbox" id="chkOcrAdvanced_${node.node_id}" onchange="toggleOcrAdvancedMode('${node.node_id}', this.checked)" />
+                    <span>Advanced mode (custom OCR flags)</span>
+                </label>
+                <div id="ocrAdvancedContainer_${node.node_id}" style="display:none; margin-top:6px;">
+                    <div style="font-size:10px; color:${p.textMuted}; margin-bottom:2px;">Custom flags / parameters:</div>
+                    <input type="text" id="inpOcrCustomFlags_${node.node_id}" placeholder="e.g. --psm 6 --oem 1, binarize=1" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:11px; padding:3px 6px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgDark}; color:${p.textPrimary};" />
+                </div>
+            </div>
             <div class="cutout-action-row" style="margin-top:8px; border-top:1px solid ${p.border}; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
                 <span style="font-size:11px; color:${p.textMuted};">Refined extraction pass</span>
                 <button class="action-btn action-btn-decollide-sm" id="btnCutoutOcr_${node.node_id}" style="background:${p.textPrimary}; color:${p.bgCard}; border-color:${p.textPrimary};" onclick="triggerCutoutSecondPass('${node.node_id}')" title="Send selected section cutout to backend OCR for targeted transcription">Parse section with OCR</button>

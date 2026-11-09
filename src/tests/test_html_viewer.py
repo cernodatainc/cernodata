@@ -208,6 +208,11 @@ class TestHTMLViewer(unittest.TestCase):
             self.assertIn("table-modal-overlay", content)
             self.assertIn("table-modal-dialog", content)
             self.assertIn("table-modal-grid-table", content)
+            self.assertIn("table-modal-grid-container", content)
+            self.assertIn("chkTableModalAdvanced", content)
+            self.assertIn("reparseTableModal", content)
+            self.assertIn("chkOcrAdvanced", content)
+            self.assertIn("toggleOcrAdvancedMode", content)
             self.assertIn("table_1", content)
 
         if os.path.exists(out_path):

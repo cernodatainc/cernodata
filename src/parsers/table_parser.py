@@ -12,7 +12,7 @@ import html
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("cernodata.parsers.table_parser")
 
@@ -60,6 +60,7 @@ class ParsedTable:
     grid: List[List[Dict[str, Any]]] = field(default_factory=list)
     column_alignments: List[str] = field(default_factory=list)
     markdown_table: str = ""
+    title: str = ""
     cell_alignment_score: float = 1.0
     is_consistent: bool = True
 
@@ -75,6 +76,7 @@ class ParsedTable:
             "grid": [[dict(cell) for cell in row] for row in self.grid],
             "column_alignments": list(self.column_alignments),
             "markdown_table": self.markdown_table,
+            "title": self.title,
             "cell_alignment_score": self.cell_alignment_score,
             "is_consistent": self.is_consistent,
         }
@@ -124,6 +126,37 @@ def parse_column_alignments(separator_cells: List[str]) -> List[str]:
 def build_column_oriented_view(rows: List[List[str]], num_cols: int) -> List[List[str]]:
     """Constructs a column-oriented 2D list where columns[c] is the list of values in column c across all rows."""
     return [[r[c] if c < len(r) else "" for r in rows] for c in range(num_cols)]
+
+
+def extract_table_headers_and_title(
+    rows: List[List[str]],
+    num_cols: int,
+    grid_cells: Optional[List[List[Any]]] = None,
+) -> Tuple[List[str], List[List[str]], str]:
+    """Extracts column headers, body rows, and optional table title banner from raw row data.
+
+    Detects when row 0 is a spanning title or banner where all non-empty cells are identical
+    or col_span spans the entire table, and promotes row 1 to true column headers.
+    """
+    if not rows:
+        return [], [], ""
+    if len(rows) == 1:
+        return list(rows[0]), rows, ""
+    r0 = rows[0]
+    r0_clean = [c.strip() for c in r0 if c.strip()]
+    is_spanning = False
+    if r0_clean and len(set(r0_clean)) == 1 and (len(r0) == num_cols or len(r0_clean) == num_cols):
+        is_spanning = True
+    elif grid_cells and len(grid_cells) > 0 and len(grid_cells[0]) > 0:
+        c0 = grid_cells[0][0]
+        if getattr(c0, "col_span", 1) >= num_cols and r0_clean:
+            is_spanning = True
+    if is_spanning and len(rows) > 1:
+        title = r0_clean[0]
+        r1_clean = [c.strip() for c in rows[1] if c.strip()]
+        if len(set(r1_clean)) > 1:
+            return list(rows[1]), rows[1:], title
+    return list(rows[0]), rows, ""
 
 
 def compute_table_alignment_score(
@@ -293,7 +326,6 @@ def parse_docling_table(
     cell_confidences: List[float] = []
     cell_records: List[Dict[str, Any]] = []
     grid: List[List[Dict[str, Any]]] = []
-    header_found = False
 
     for r in range(num_rows):
         row_vals: List[str] = []
@@ -324,9 +356,6 @@ def parse_docling_table(
             else:
                 text_val, is_hdr, row_span, col_span, bbox_dict = "", False, 1, 1, None
 
-            if is_hdr and r == 0:
-                header_found = True
-
             c_dict = ParsedTableCell(r, c, text_val, row_span, col_span, is_hdr, bbox_dict).to_dict()
             cell_records.append(c_dict)
             grid_row.append(c_dict)
@@ -334,7 +363,8 @@ def parse_docling_table(
         rows.append(row_vals)
         grid.append(grid_row)
 
-    headers = list(rows[0]) if (header_found or num_rows > 0) else []
+    headers, rows, table_title = extract_table_headers_and_title(rows, num_cols, grid_cells=grid_cells)
+    num_rows = len(rows)
     columns = build_column_oriented_view(rows, num_cols)
 
     md_table = ""
@@ -357,6 +387,7 @@ def parse_docling_table(
         grid=grid,
         column_alignments=["default"] * num_cols,
         markdown_table=md_table,
+        title=table_title,
         cell_alignment_score=compute_table_alignment_score(
             rows,
             expected_cols=num_cols,
@@ -427,19 +458,8 @@ class TableParser:
     ) -> ParsedTable:
         """Parses any table representation into a ParsedTable model."""
         res = parse_table_content(table_input=table_input, doc=doc, preset=self.preset, fallback_text=fallback_text)
-        return ParsedTable(
-            headers=res.get("headers", []),
-            rows=res.get("rows", []),
-            columns=res.get("columns", []),
-            num_rows=res.get("num_rows", 0),
-            num_cols=res.get("num_cols", 0),
-            cells=res.get("cells", []),
-            grid=res.get("grid", []),
-            column_alignments=res.get("column_alignments", []),
-            markdown_table=res.get("markdown_table", ""),
-            cell_alignment_score=float(res.get("cell_alignment_score", 1.0)),
-            is_consistent=bool(res.get("is_consistent", True)),
-        )
+        flds = {k: v for k, v in res.items() if k in getattr(ParsedTable, "__dataclass_fields__", {})}
+        return ParsedTable(**flds)
 
     def parse_markdown(self, markdown_text: str) -> ParsedTable:
         """Parses a Markdown table string into a ParsedTable model."""
@@ -452,6 +472,7 @@ __all__ = [
     "TableParser",
     "build_column_oriented_view",
     "compute_table_alignment_score",
+    "extract_table_headers_and_title",
     "generate_html_table",
     "generate_markdown_table",
     "is_markdown_separator_row",

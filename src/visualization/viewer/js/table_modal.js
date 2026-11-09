@@ -11,6 +11,7 @@
 
 let activeTableModalNodeId = null;
 let activeTableModalTab = 'grid';
+let isTableModalAdvanced = false;
 
 /**
  * Parses client-side markdown table string if rows and columns were not pre-extracted.
@@ -77,6 +78,7 @@ function extractNodeTableData(node) {
     let numRows = content.num_rows || rows.length;
     let numCols = content.num_cols || (columns.length || (rows[0] ? rows[0].length : 0));
     let markdownTable = content.markdown_table || '';
+    let tableTitle = content.title || '';
     const score = (content.cell_alignment_score !== undefined) ? content.cell_alignment_score : 1.0;
     const isConsistent = (content.is_consistent !== undefined)
         ? content.is_consistent
@@ -94,11 +96,30 @@ function extractNodeTableData(node) {
         }
     }
 
+    // Detect if headers represent a repeated spanning title banner across all columns
+    const cleanHdrs = headers.map(h => (h || '').trim()).filter(Boolean);
+    if (cleanHdrs.length > 1 && new Set(cleanHdrs).size === 1 && rows.length > 1) {
+        if (!tableTitle) tableTitle = cleanHdrs[0];
+        const r0Clean = (rows[0] || []).map(c => (c || '').trim()).filter(Boolean);
+        if (r0Clean.length > 0 && new Set(r0Clean).size === 1 && r0Clean[0] === cleanHdrs[0] && rows.length > 1) {
+            const r1Clean = (rows[1] || []).map(c => (c || '').trim()).filter(Boolean);
+            if (new Set(r1Clean).size > 1) {
+                headers = [...rows[1]];
+                rows = rows.slice(1);
+                numRows = rows.length;
+                columns = [];
+                for (let c = 0; c < numCols; c++) {
+                    columns.push(rows.map(r => (c < r.length ? r[c] : '')));
+                }
+            }
+        }
+    }
+
     if (headers.length === 0 && rows.length > 0) {
         headers = rows[0].map((_, idx) => `Col ${idx + 1}`);
     }
 
-    return { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent };
+    return { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent, tableTitle };
 }
 
 /**
@@ -193,7 +214,7 @@ function renderTableModal(node) {
     if (!overlay) return;
 
     const data = extractNodeTableData(node);
-    const { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent } = data;
+    const { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent, tableTitle } = data;
 
     const tabs = [
         { id: 'grid', label: 'Grid View' },
@@ -223,6 +244,40 @@ function renderTableModal(node) {
         ? '<span class="badge-status" style="background:var(--ui-green-bg); color:var(--ui-green); border-color:var(--ui-green-border);">Consistent</span>'
         : '<span class="badge-status" style="background:var(--ui-yellow-bg); color:var(--ui-yellow); border-color:var(--ui-yellow-border);">Ragged Columns</span>';
 
+    const titleBannerHtml = tableTitle ? `
+        <div class="table-modal-title-banner">
+            <span class="table-modal-title-badge">Table Title</span>
+            <span class="table-modal-title-text">${escapeHtml(tableTitle)}</span>
+        </div>
+    ` : '';
+
+    const customFlagsVal = (node.content && node.content.table_custom_flags) ? String(node.content.table_custom_flags) : '';
+    const advancedBarHtml = isTableModalAdvanced ? `
+        <div class="table-modal-advanced-bar" id="tableModalAdvancedBar">
+            <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-weight:600; color:var(--ui-text);">Header row:</span>
+                <select id="selTableModalHeaderRow" style="font-size:11px; padding:2px 6px;">
+                    <option value="auto">Auto-detect</option>
+                    <option value="1">Row #1 (Column headers)</option>
+                    <option value="0">Row #0 (Banner/Title)</option>
+                    <option value="2">Row #2</option>
+                </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-weight:600; color:var(--ui-text);">Banner:</span>
+                <select id="selTableModalStripBanner" style="font-size:11px; padding:2px 6px;">
+                    <option value="strip">Auto-strip title banner</option>
+                    <option value="keep">Keep in data rows</option>
+                </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:160px;">
+                <span style="font-weight:600; color:var(--ui-text);">Flags:</span>
+                <input type="text" id="inpTableModalFlags" value="${escapeHtml(customFlagsVal)}" placeholder="e.g. --delimiter=| --align-score=0.85" style="flex:1; font-family:monospace; font-size:11px; padding:2px 6px; border:1px solid var(--ui-border); border-radius:3px;" />
+            </div>
+            <button class="action-btn action-btn-decollide-sm" onclick="reparseTableModal()" style="font-weight:600; background:var(--ui-text); color:#FFFFFF;">Re-parse Table</button>
+        </div>
+    ` : '';
+
     overlay.innerHTML = `
         <div class="table-modal-dialog">
             <div class="table-modal-header">
@@ -236,9 +291,18 @@ function renderTableModal(node) {
                 <button class="action-btn action-btn-decollide-sm" onclick="closeTableModal()" title="Close (Escape)">Close [X]</button>
             </div>
             <div class="table-modal-tabs">
-                ${tabsHtml}
+                <div class="table-modal-tab-group">
+                    ${tabsHtml}
+                </div>
+                <!-- TODO(TASK-707): Mirrored advanced mode table re-parsing with custom header index, delimiter, and layout flags. -->
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:var(--ui-text); cursor:pointer;">
+                    <input type="checkbox" id="chkTableModalAdvanced" ${isTableModalAdvanced ? 'checked' : ''} onchange="toggleTableModalAdvanced(this.checked)" />
+                    <span>Advanced mode (table flags)</span>
+                </label>
             </div>
+            ${advancedBarHtml}
             <div class="table-modal-body">
+                ${titleBannerHtml}
                 ${bodyHtml}
             </div>
             <div class="table-modal-footer">
@@ -247,6 +311,53 @@ function renderTableModal(node) {
             </div>
         </div>
     `;
+}
+
+/**
+ * Toggles visibility of advanced mode table parsing options.
+ */
+function toggleTableModalAdvanced(checked) {
+    isTableModalAdvanced = !!checked;
+    if (!activeTableModalNodeId || !domData || !domData.nodes) return;
+    const node = domData.nodes.find(n => n.node_id === activeTableModalNodeId);
+    if (node) renderTableModal(node);
+}
+
+/**
+ * Re-evaluates table structure using selected advanced options and custom flags.
+ */
+function reparseTableModal() {
+    if (!activeTableModalNodeId || !domData || !domData.nodes) return;
+    const node = domData.nodes.find(n => n.node_id === activeTableModalNodeId);
+    if (!node || !node.content) return;
+    const selHdr = document.getElementById('selTableModalHeaderRow');
+    const selStrip = document.getElementById('selTableModalStripBanner');
+    const inpFlags = document.getElementById('inpTableModalFlags');
+    const hdrVal = selHdr ? selHdr.value : 'auto';
+    const stripVal = selStrip ? selStrip.value : 'strip';
+    const flagsVal = inpFlags ? inpFlags.value.trim() : '';
+
+    let rows = Array.isArray(node.content.rows) ? [...node.content.rows] : [];
+    if (rows.length > 0) {
+        if (hdrVal === '1' && rows.length > 1) {
+            const r0Clean = rows[0].map(c => (c || '').trim()).filter(Boolean);
+            if (r0Clean.length > 0 && new Set(r0Clean).size === 1) {
+                node.content.title = r0Clean[0];
+            }
+            node.content.headers = [...rows[1]];
+            if (stripVal === 'strip') {
+                node.content.rows = rows.slice(1);
+                node.content.num_rows = node.content.rows.length;
+            }
+        } else if (hdrVal === '0') {
+            node.content.headers = [...rows[0]];
+        }
+        if (flagsVal) {
+            node.content.table_custom_flags = flagsVal;
+        }
+    }
+    renderTableModal(node);
+    renderSelectedEditor();
 }
 
 /**
@@ -278,7 +389,7 @@ function renderTableModalGridView(rows, headers, numCols) {
     }).join('');
 
     return `
-        <div style="overflow-x:auto;">
+        <div class="table-modal-grid-container">
             <table class="table-modal-grid-table">
                 <thead>
                     <tr>
@@ -292,6 +403,7 @@ function renderTableModalGridView(rows, headers, numCols) {
             </table>
         </div>
     `;
+}
 }
 
 /**

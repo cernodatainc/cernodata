@@ -15,6 +15,7 @@ from src.parsers.table_parser import (
     TableParser,
     build_column_oriented_view,
     compute_table_alignment_score,
+    extract_table_headers_and_title,
     generate_html_table,
     generate_markdown_table,
     is_markdown_separator_row,
@@ -328,6 +329,44 @@ class TestTableParsing(unittest.TestCase):
         self.assertEqual(score_with_conf, 0.95)
         score_ragged = compute_table_alignment_score([["a", "b"], ["c"]])
         self.assertLess(score_ragged, score_perfect)
+
+    def test_spanning_table_title_detection_and_header_promotion(self) -> None:
+        title_text = "26) ILE MOZNA ZABRAC LIMITY DOTYCZACE BAGAZU PODRECZNEGO W POLACZENIACH LOTNICZYCH"
+        row0 = [_StubTableCell(title_text, col_span=4) for _ in range(4)]
+        row1 = [
+            _StubTableCell("LINIA LOTNICZA", column_header=True),
+            _StubTableCell("DUZY BAGAZ PODRECZNY - WAGA", column_header=True),
+            _StubTableCell("DUZY BAGAZ PODRECZNY - WYMIARY", column_header=True),
+            _StubTableCell("MALY BAGAZ PODRECZNY", column_header=True),
+        ]
+        row2 = [
+            _StubTableCell("Aegean Airlines"),
+            _StubTableCell("8kg"),
+            _StubTableCell("55 x 40 x 23 cm"),
+            _StubTableCell("40 x 30 x 15 cm"),
+        ]
+        data = _StubTableData([row0, row1, row2])
+        item = _StubTableItem(data)
+
+        parsed = parse_docling_table(item)
+        self.assertEqual(parsed.title, title_text)
+        self.assertEqual(
+            parsed.headers,
+            ["LINIA LOTNICZA", "DUZY BAGAZ PODRECZNY - WAGA", "DUZY BAGAZ PODRECZNY - WYMIARY", "MALY BAGAZ PODRECZNY"],
+        )
+        self.assertEqual(
+            parsed.data_rows[0],
+            ["Aegean Airlines", "8kg", "55 x 40 x 23 cm", "40 x 30 x 15 cm"],
+        )
+
+        # Also verify extract_table_headers_and_title directly
+        hdrs, data_rows, extracted_title = extract_table_headers_and_title(
+            [[title_text] * 4, ["Col A", "Col B", "Col C", "Col D"], ["1", "2", "3", "4"]],
+            num_cols=4,
+        )
+        self.assertEqual(extracted_title, title_text)
+        self.assertEqual(hdrs, ["Col A", "Col B", "Col C", "Col D"])
+        self.assertEqual(data_rows, [["Col A", "Col B", "Col C", "Col D"], ["1", "2", "3", "4"]])
 
 
 if __name__ == "__main__":

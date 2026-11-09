@@ -13,28 +13,19 @@
  * @returns {number} Angle in degrees.
  */
 function getEffectiveNodeAngle(nodeId, bbox) {
-    if (bbox && bbox.angle !== undefined && bbox.angle !== null && bbox.angle !== 0) {
-        return bbox.angle;
-    }
+    if (bbox && bbox.angle !== undefined && bbox.angle !== null && bbox.angle !== 0) return bbox.angle;
     if (bbox && bbox.quad && bbox.quad.length === 4) {
         const dx = bbox.quad[1][0] - bbox.quad[0][0];
         const dy = bbox.quad[1][1] - bbox.quad[0][1];
-        if (dx !== 0) {
-            return roundCoord((Math.atan2(dy, dx) * 180.0) / Math.PI);
-        }
+        if (dx !== 0) return roundCoord((Math.atan2(dy, dx) * 180.0) / Math.PI);
     }
     const viols = getViolationsList();
     const v = viols.find(viol => viol.node_id === nodeId && viol.bounding_box && viol.bounding_box.angle);
-    if (v) {
-        return v.bounding_box.angle;
-    }
+    if (v) return v.bounding_box.angle;
     const node = domData.nodes.find(n => n.node_id === nodeId);
     const pageNo = node ? (node.global_page_index || 1) : 1;
     const pageSkewNode = domData.nodes.find(n => (n.global_page_index === pageNo) && n.bounding_box && n.bounding_box.angle);
-    if (pageSkewNode) {
-        return pageSkewNode.bounding_box.angle;
-    }
-    return 0.0;
+    return pageSkewNode ? pageSkewNode.bounding_box.angle : 0.0;
 }
  
 /**
@@ -270,6 +261,14 @@ function onOcrEngineToggle(nodeId, engine, checked) {
 }
 
 /**
+ * Toggles visibility of advanced OCR flags container.
+ */
+function toggleOcrAdvancedMode(nodeId, checked) {
+    const el = document.getElementById(`ocrAdvancedContainer_${nodeId}`);
+    if (el) el.style.display = checked ? 'block' : 'none';
+}
+
+/**
  * Triggers backend targeted OCR re-extraction pass with selected engines.
  *
  * @param {string} nodeId - Target DOM node identifier.
@@ -304,6 +303,10 @@ async function triggerCutoutSecondPass(nodeId) {
         }
     }
 
+    const chkAdv = document.getElementById(`chkOcrAdvanced_${nodeId}`);
+    const inpFlags = document.getElementById(`inpOcrCustomFlags_${nodeId}`);
+    const customFlags = (chkAdv && chkAdv.checked && inpFlags) ? inpFlags.value.trim() : '';
+
     const payload = {
         node_id: nodeId,
         image_base64: b64,
@@ -311,7 +314,8 @@ async function triggerCutoutSecondPass(nodeId) {
         page: node.global_page_index || 1,
         pdf_path: pdfSourceFile || '',
         language: activeLanguage || 'en',
-        engines: engines
+        engines: engines,
+        custom_flags: customFlags
     };
 
     try {
