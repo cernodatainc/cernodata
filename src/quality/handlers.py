@@ -205,7 +205,8 @@ class SymbolsLayerHandler(VerificationLayerHandler):
         if supp.get("symbols"):
             return 1.0
         raw_text = node.content.get("raw_text", "")
-        return max(0.0, 1.0 - (compute_garbage_ratio(raw_text) * garbage_multiplier))
+        base_confidence = float(node.content.get("confidence", 1.0))
+        return max(0.0, base_confidence - (compute_garbage_ratio(raw_text) * garbage_multiplier))
 
 
 class DiacriticsLayerHandler(VerificationLayerHandler):

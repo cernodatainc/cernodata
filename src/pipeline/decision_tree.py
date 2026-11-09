@@ -30,8 +30,8 @@ class DecisionTreeEngine:
     def __init__(
         self,
         target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
-        current_preset_score: float = DEFAULT_CURRENT_PRESET_SCORE,
-        next_preset_score: float = DEFAULT_NEXT_PRESET_SCORE,
+        current_preset_score: Optional[float] = None,
+        next_preset_score: Optional[float] = None,
         language: Optional[str] = "en",
         verification_layers: Optional[Sequence[str]] = None,
         preset_id: str = PRESET_ID,
@@ -40,12 +40,26 @@ class DecisionTreeEngine:
         wiggle_parameters: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.target_threshold = target_threshold
-        self.current_preset_score = current_preset_score
-        self.next_preset_score = next_preset_score
         self.language = language
         self.verification_layers = list(verification_layers) if verification_layers is not None else None
         self.preset_id = preset_id
-        self.next_preset_id = next_preset_id or NEXT_PRESET_ID
+
+        from src.pipeline.planner import PresetPlanner
+        scores = PresetPlanner().calculate_scores()
+        order = PresetPlanner().suggest_preset_order(scores)
+        resolved_next = next_preset_id or next((p for p in order if p != preset_id), NEXT_PRESET_ID)
+        self.next_preset_id = resolved_next
+
+        self.current_preset_score = (
+            current_preset_score
+            if current_preset_score is not None
+            else scores.get(self.preset_id, DEFAULT_CURRENT_PRESET_SCORE)
+        )
+        self.next_preset_score = (
+            next_preset_score
+            if next_preset_score is not None
+            else scores.get(self.next_preset_id, DEFAULT_NEXT_PRESET_SCORE)
+        )
         self.wiggle_delta_threshold = wiggle_delta_threshold
         self.wiggle_parameters = dict(wiggle_parameters) if wiggle_parameters is not None else None
 

@@ -9,8 +9,6 @@ from typing import Dict, Any, List, Tuple, Optional, Sequence
 from src.dom import DocumentDOM
 from src.quality import detect_quality_violations, apply_text_skew_alignment
 from src.pipeline.decision_tree import (
-    DEFAULT_CURRENT_PRESET_SCORE,
-    DEFAULT_NEXT_PRESET_SCORE,
     DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
     PRESET_ID,
     DecisionTreeEngine,
@@ -50,8 +48,8 @@ def evaluate_quality_and_decision_tree(
     target_threshold: float = DEFAULT_TARGET_CONFIDENCE_THRESHOLD,
     language: Optional[str] = "en",
     preset: str = PRESET_ID,
-    current_preset_score: float = DEFAULT_CURRENT_PRESET_SCORE,
-    next_preset_score: float = DEFAULT_NEXT_PRESET_SCORE,
+    current_preset_score: Optional[float] = None,
+    next_preset_score: Optional[float] = None,
     config: Optional[IngestionConfig] = None,
     verification_layers: Optional[Sequence[str]] = None,
     next_preset_id: Optional[str] = None,

@@ -150,7 +150,14 @@ class TablesLayerHandler(VerificationLayerHandler):
             if "rows" in node.content and isinstance(node.content["rows"], list):
                 from src.parsers.table_parser import compute_table_alignment_score
                 return compute_table_alignment_score(node.content["rows"])
-            return 0.95
+            if "markdown_table" in node.content and isinstance(node.content["markdown_table"], str):
+                from src.parsers.table_parser import parse_markdown_table
+                return parse_markdown_table(node.content["markdown_table"]).cell_alignment_score
+            raw_text = str(node.content.get("text", "")).strip()
+            if raw_text and "|" in raw_text:
+                from src.parsers.table_parser import parse_markdown_table
+                return parse_markdown_table(raw_text).cell_alignment_score
+            return 0.0
         return 1.0
 
 

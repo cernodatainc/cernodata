@@ -197,7 +197,7 @@ class TestTableParsing(unittest.TestCase):
         self.assertEqual(table.columns[0], ["Region", "North", "South"])
         self.assertEqual(table.columns[1], ["Revenue", "15000", "23000"])
         self.assertTrue(table.is_consistent)
-        self.assertEqual(table.cell_alignment_score, 0.98)
+        self.assertEqual(table.cell_alignment_score, 1.0)
 
         # Cell bounding boxes extracted
         self.assertIsNotNone(table.cells[0]["bbox"])
@@ -323,7 +323,9 @@ class TestTableParsing(unittest.TestCase):
         self.assertIsInstance(parsed_obj, ParsedTable)
 
         score_perfect = compute_table_alignment_score([["a", "b"], ["c", "d"]])
-        self.assertEqual(score_perfect, 0.96)
+        self.assertEqual(score_perfect, 1.0)
+        score_with_conf = compute_table_alignment_score([["a", "b"], ["c", "d"]], cell_confidences=[0.90, 0.90])
+        self.assertEqual(score_with_conf, 0.95)
         score_ragged = compute_table_alignment_score([["a", "b"], ["c"]])
         self.assertLess(score_ragged, score_perfect)
 

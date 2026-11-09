@@ -16,8 +16,6 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("cernodata.parsers.table_parser")
 
-DEFAULT_TABLE_SCORE_DEEP: float = 0.98
-DEFAULT_TABLE_SCORE_FAST: float = 0.96
 DEFAULT_TABLE_MIN_ALIGNMENT_SCORE: float = 0.10
 DEFAULT_TABLE_RAGGED_MULTIPLIER: float = 2.0
 
@@ -131,26 +129,33 @@ def build_column_oriented_view(rows: List[List[str]], num_cols: int) -> List[Lis
 def compute_table_alignment_score(
     rows: List[List[str]],
     expected_cols: Optional[int] = None,
-    preset: str = "docling_fast",
+    cell_confidences: Optional[List[float]] = None,
+    preset: Optional[str] = None,
 ) -> float:
-    """Computes a table cell alignment score based on row column-count raggedness."""
+    """Computes a table cell alignment score based on row column-count raggedness and optional OCR cell confidences."""
+    _ = preset
     if not rows:
-        return 1.0
-    base = DEFAULT_TABLE_SCORE_DEEP if preset == "docling_deep" else DEFAULT_TABLE_SCORE_FAST
+        return 0.0
     row_lens = [len(r) for r in rows if isinstance(r, list)]
     if not row_lens:
-        return base
+        return 0.0
 
     target_cols = expected_cols if expected_cols is not None else max(row_lens)
-    if target_cols == 0 or (len(set(row_lens)) <= 1 and row_lens[0] == target_cols):
-        return base
+    if target_cols == 0:
+        return 0.0
 
     total_dev = sum(abs(l - target_cols) for l in row_lens)
-    ragged_ratio = total_dev / max(1, target_cols * len(row_lens))
-    return round(
-        max(DEFAULT_TABLE_MIN_ALIGNMENT_SCORE, min(1.0, base * (1.0 - ragged_ratio * DEFAULT_TABLE_RAGGED_MULTIPLIER))),
-        4,
-    )
+    total_expected_cells = max(1, target_cols * len(row_lens))
+    ragged_ratio = total_dev / total_expected_cells
+    grid_consistency = max(0.0, 1.0 - ragged_ratio)
+
+    if cell_confidences:
+        avg_cell_conf = sum(cell_confidences) / len(cell_confidences)
+        final_score = (grid_consistency + avg_cell_conf) / 2.0
+    else:
+        final_score = grid_consistency
+
+    return round(final_score, 4)
 
 
 def generate_markdown_table(
@@ -207,9 +212,7 @@ def parse_markdown_table(
     lines = [ln.strip() for ln in markdown_text.strip().splitlines() if ln.strip()]
     table_lines = [ln for ln in lines if "|" in ln]
     if not table_lines:
-        return ParsedTable(
-            cell_alignment_score=DEFAULT_TABLE_SCORE_DEEP if preset == "docling_deep" else DEFAULT_TABLE_SCORE_FAST
-        )
+        return ParsedTable(cell_alignment_score=0.0)
 
     raw_rows: List[List[str]] = []
     sep_idx: Optional[int] = None
@@ -224,9 +227,7 @@ def parse_markdown_table(
         raw_rows.append(cells)
 
     if not raw_rows:
-        return ParsedTable(
-            cell_alignment_score=DEFAULT_TABLE_SCORE_DEEP if preset == "docling_deep" else DEFAULT_TABLE_SCORE_FAST
-        )
+        return ParsedTable(cell_alignment_score=0.0)
 
     headers: List[str] = list(raw_rows[0]) if (sep_idx and sep_idx > 0) or len(raw_rows) > 1 else []
     max_cols = max((len(r) for r in raw_rows), default=0)
@@ -281,14 +282,15 @@ def parse_docling_table(
                     return parse_markdown_table(md, preset=preset)
             except Exception as ex:
                 logger.debug("Failed export_to_markdown fallback: %s", ex)
-        return ParsedTable(cell_alignment_score=0.98 if preset == "docling_deep" else 0.96)
+        return ParsedTable(cell_alignment_score=0.0)
 
     num_rows, num_cols = int(data.num_rows), int(data.num_cols)
     grid_cells = getattr(data, "grid", None)
     if not grid_cells:
-        return ParsedTable(cell_alignment_score=0.98 if preset == "docling_deep" else 0.96)
+        return ParsedTable(cell_alignment_score=0.0)
 
     rows: List[List[str]] = []
+    cell_confidences: List[float] = []
     cell_records: List[Dict[str, Any]] = []
     grid: List[List[Dict[str, Any]]] = []
     header_found = False
@@ -299,6 +301,11 @@ def parse_docling_table(
         for c in range(num_cols):
             cell_obj = grid_cells[r][c] if r < len(grid_cells) and c < len(grid_cells[r]) else None
             if cell_obj is not None:
+                if hasattr(cell_obj, "confidence") and cell_obj.confidence is not None:
+                    try:
+                        cell_confidences.append(float(cell_obj.confidence))
+                    except (ValueError, TypeError) as ex:
+                        logger.debug("Failed cell confidence extraction: %s", ex)
                 if hasattr(cell_obj, "_get_text"):
                     try:
                         text_val = str(cell_obj._get_text(doc=doc)).strip()
@@ -350,7 +357,12 @@ def parse_docling_table(
         grid=grid,
         column_alignments=["default"] * num_cols,
         markdown_table=md_table,
-        cell_alignment_score=compute_table_alignment_score(rows, expected_cols=num_cols, preset=preset),
+        cell_alignment_score=compute_table_alignment_score(
+            rows,
+            expected_cols=num_cols,
+            cell_confidences=cell_confidences if cell_confidences else None,
+            preset=preset,
+        ),
         is_consistent=len(set(len(r) for r in rows)) <= 1,
     )
 
@@ -398,7 +410,7 @@ def parse_table_content(
     if fallback_text and "|" in fallback_text:
         return parse_markdown_table(fallback_text, preset=preset).to_dict()
 
-    return ParsedTable(cell_alignment_score=0.98 if preset == "docling_deep" else 0.96).to_dict()
+    return ParsedTable(cell_alignment_score=0.0).to_dict()
 
 
 class TableParser:

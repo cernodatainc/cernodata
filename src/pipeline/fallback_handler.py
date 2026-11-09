@@ -16,19 +16,12 @@ ACTION_ACCEPT_OUTPUT = "ACCEPT_OUTPUT"
 ACTION_PATH_B_WIGGLE = "PATH_B_WIGGLE_PARAMETERS"
 ACTION_PATH_A_SWITCH = "PATH_A_SWITCH_PRESET"
 
-PRESET_DOCLING_DEEP = "docling_deep"
-
-# Prior suitability scores used only when no plan provides a score for a preset.
-DEFAULT_CURRENT_SCORE = 0.90
-DEFAULT_NEXT_SCORE = 0.72
-
 PROGRESS_PCT_WIGGLE = 72
 PROGRESS_PCT_SWITCH = 80
 
 DEFAULT_WIGGLE_SCALE_RAPIDOCR = 3.5
 DEFAULT_WIGGLE_SCALE_DEFAULT = 4.0
 NON_FALLBACK_PRESETS: frozenset[str] = frozenset({"vision_llm_direct"})
-DEFAULT_FALLBACK_SOURCE_PRESETS: frozenset[str] = frozenset({"docling_fast", "pypdfium_rapidocr"})
 
 DecisionResult = Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]
 
@@ -56,26 +49,41 @@ class FallbackLoopHandler:
         plan: Optional[DocumentPlan] = None,
     ) -> Tuple[Optional[str], bool, float, float]:
         """Resolves next fallback candidate, whether it's part of plan, and suitability scores."""
-        next_candidate: Optional[str] = None
+        effective_plan = plan
         part_of_plan = False
-
-        if plan and plan.fallback_queue:
-            next_candidate = _normalize_fallback_name(plan.fallback_queue[0])
+        if effective_plan and effective_plan.fallback_queue:
             part_of_plan = True
-        elif config.preset in DEFAULT_FALLBACK_SOURCE_PRESETS:
-            next_candidate = PRESET_DOCLING_DEEP
+        else:
+            from src.pipeline.planner import PresetPlanner
+            effective_plan = PresetPlanner().create_plan(
+                target_threshold=config.target_threshold,
+                language=config.language,
+                override_primary=config.preset,
+            )
 
-        curr_score = self._score_for(plan, config.preset, DEFAULT_CURRENT_SCORE)
-        next_score = self._score_for(plan, next_candidate, DEFAULT_NEXT_SCORE)
+        next_candidate: Optional[str] = None
+        if effective_plan and effective_plan.fallback_queue:
+            next_candidate = str(_normalize_fallback_name(effective_plan.fallback_queue[0]))
+
+        curr_score = self._score_for(effective_plan, config.preset)
+        next_score = self._score_for(effective_plan, next_candidate)
 
         return next_candidate, part_of_plan, curr_score, next_score
 
-    @staticmethod
-    def _score_for(plan: Optional[DocumentPlan], preset: Optional[str], default: float) -> float:
-        """Returns the plan's suitability score for a preset, or the given prior when unavailable."""
-        if plan is None or preset is None:
-            return default
-        return plan.scores.get(preset, default)
+    @classmethod
+    def _score_for(
+        cls,
+        plan: Optional[DocumentPlan],
+        preset: Optional[str],
+    ) -> float:
+        """Returns the plan's suitability score for a preset, or calculates it via PresetPlanner."""
+        if preset is None:
+            return 0.0
+        if plan is not None and preset in plan.scores:
+            return float(plan.scores[preset])
+        from src.pipeline.planner import PresetPlanner
+        scores = PresetPlanner().calculate_scores()
+        return float(scores.get(preset, 0.50))
 
     def _resolve_wiggle_parameters(self, config: IngestionConfig) -> Tuple[float, bool]:
         """Resolves OCR parameter wiggling bounds for Path B retries."""
@@ -182,8 +190,9 @@ class FallbackLoopHandler:
             return w_dom, decision_res, w_violations
         return w_dom, w_decision, w_violations
 
-    @staticmethod
+    @classmethod
     def _collect_candidates(
+        cls,
         config: IngestionConfig,
         attempts: List[Dict[str, Any]],
         next_candidate: Optional[str],
@@ -191,15 +200,21 @@ class FallbackLoopHandler:
     ) -> List[str]:
         """Builds the ordered list of Path A presets that have not yet been attempted."""
         candidates: List[str] = []
-        if plan and plan.fallback_queue:
-            for item in plan.fallback_queue:
+        effective_plan = plan
+        if effective_plan is None or not effective_plan.fallback_queue:
+            from src.pipeline.planner import PresetPlanner
+            effective_plan = PresetPlanner().create_plan(
+                target_threshold=config.target_threshold,
+                language=config.language,
+                override_primary=config.preset,
+            )
+        if effective_plan and effective_plan.fallback_queue:
+            for item in effective_plan.fallback_queue:
                 cand_name = str(_normalize_fallback_name(item))
                 if cand_name and cand_name not in candidates:
                     candidates.append(cand_name)
         if next_candidate and next_candidate not in candidates:
             candidates.append(next_candidate)
-        if PRESET_DOCLING_DEEP not in candidates and config.preset != PRESET_DOCLING_DEEP:
-            candidates.append(PRESET_DOCLING_DEEP)
 
         # Exclude presets that cannot execute or have already been attempted
         attempted_presets = {a.get("preset") for a in attempts}
@@ -228,9 +243,9 @@ class FallbackLoopHandler:
             if decision.get("is_accepted"):
                 break
 
-            cand_score = self._score_for(plan, candidate, DEFAULT_CURRENT_SCORE)
+            cand_score = self._score_for(plan, candidate)
             following = remaining[idx + 1] if idx + 1 < len(remaining) else None
-            cand_next_score = self._score_for(plan, following, DEFAULT_NEXT_SCORE)
+            cand_next_score = self._score_for(plan, following)
 
             in_plan = candidate in plan_names
             plan_note = (
@@ -253,11 +268,6 @@ class FallbackLoopHandler:
                 cand_next_score,
                 next_preset_id=following,
             )
-
-            if candidate == PRESET_DOCLING_DEEP:
-                fb_decision["chosen_preset"] = PRESET_DOCLING_DEEP
-                fb_decision["is_accepted"] = True
-                fb_decision["status"] = "ACCEPT"
 
             fb_decision["decision_tree"] = {
                 "action": ACTION_PATH_A_SWITCH,
@@ -300,14 +310,6 @@ class FallbackLoopHandler:
         Executes dual-path fallback loops if primary preset output is not accepted.
         Supports Path B (parameter wiggling) and Path A (multi-candidate preset switching).
         """
-        if config.preset == PRESET_DOCLING_DEEP:
-            decision["chosen_preset"] = PRESET_DOCLING_DEEP
-            decision["decision_tree"] = self._accept_decision_tree(
-                PRESET_DOCLING_DEEP,
-                "Executed using 'docling_deep' preset. All OCR diacritics restored.",
-            )
-            return dom, decision, violations
-
         if decision.get("is_accepted"):
             return dom, decision, violations
 
