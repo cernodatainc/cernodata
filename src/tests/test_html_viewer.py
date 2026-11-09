@@ -9,6 +9,7 @@ import unittest
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.quality import detect_quality_violations
 from src.visualization.html_viewer import generate_interactive_html
+from src.visualization.viewer.scripts import bundle_viewer_js
 
 
 class TestHTMLViewer(unittest.TestCase):
@@ -217,6 +218,24 @@ class TestHTMLViewer(unittest.TestCase):
 
         if os.path.exists(out_path):
             os.remove(out_path)
+
+    def test_viewer_js_syntax_integrity(self):
+        import shutil
+        import subprocess
+        import tempfile
+        js_code = bundle_viewer_js()
+        self.assertTrue(len(js_code) > 0)
+        node_bin = shutil.which("node")
+        if node_bin:
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tmp:
+                tmp.write(js_code)
+                tmp_path = tmp.name
+            try:
+                res = subprocess.run([node_bin, "--check", tmp_path], capture_output=True, text=True, timeout=10)
+                self.assertEqual(res.returncode, 0, f"JS Syntax Error in bundled viewer.js:\n{res.stderr}")
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
 
 if __name__ == "__main__":

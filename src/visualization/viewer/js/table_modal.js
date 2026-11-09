@@ -404,7 +404,6 @@ function renderTableModalGridView(rows, headers, numCols) {
         </div>
     `;
 }
-}
 
 /**
  * Renders the row-oriented view.
