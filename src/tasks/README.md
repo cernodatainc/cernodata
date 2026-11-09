@@ -85,6 +85,9 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 - `TASK-709`: Live formatted output preview in the viewer (depends on `704`)
 - `TASK-710`: In-viewer violation sensitivity and acceptance threshold tuner
 - `TASK-711`: Visual diff and dual-run comparison in the viewer
+- `TASK-712`: ViteJS-based frontend build for the visual viewer
+- `TASK-713`: Preact component integration for interactive viewer (depends on `712`)
+- `TASK-714`: Single served application viewer and removal of per-run viewer.html generation (depends on `712`)
 
 ### 08. Page-Level Subdivision & Reassembly (`08-page-subdivision/`)
 - `TASK-801`: Single-page PDF slicer (`slice_pdf_pages`)
@@ -104,3 +107,10 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 - `TASK-1002`: Instant layout preview (boxes only, skip OCR) in Web Hub and Viewer
 - `TASK-1003`: Subprocess isolation for heavy parser presets
 - `TASK-1004`: Calibrate `PresetPlanner` using observed run timings (depends on `1003`)
+
+### 11. Packaging & Installer (`11-installer/`)
+- `TASK-1101`: Standalone desktop installer and self-contained runtime packager
+
+### 12. Scanner & Email Ingestion (`12-scanner-and-email-ingestion/`)
+- `TASK-1201`: Direct hardware scanner integration and ingestion
+- `TASK-1202`: Inbound email document receiver and scan-to-email consumer

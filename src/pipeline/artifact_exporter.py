@@ -38,6 +38,7 @@ def export_interactive_html_viewer(
     plan: Optional[Dict[str, Any]] = None
 ) -> str:
     """Generates self-contained interactive HTML web viewer file."""
+    # TODO(TASK-714): Deprecate per-run interactive_viewer.html export in favor of served viewer app.
     html_path = os.path.join(output_dir, "interactive_viewer.html")
     return generate_interactive_html(pdf_path, dom, decision, violations, output_path=html_path, plan=plan)
 
