@@ -193,6 +193,9 @@ function renderSVGOverlays() {
     const showBbox = document.getElementById('toggleBbox') ? document.getElementById('toggleBbox').checked : true;
     const showViol = document.getElementById('toggleViolations') ? document.getElementById('toggleViolations').checked : true;
     const filterType = document.getElementById('typeFilter') ? document.getElementById('typeFilter').value : 'ALL';
+    const diffState = (typeof isDiffOverlayActive !== 'undefined' && isDiffOverlayActive && typeof computeVisualDiffForPage === 'function')
+        ? computeVisualDiffForPage(currentPage)
+        : null;
  
     domData.nodes.forEach(node => {
         const nodePage = (typeof getNodePage === 'function') ? getNodePage(node) : (node.global_page_index || 1);
@@ -202,7 +205,7 @@ function renderSVGOverlays() {
         const corners = getBoxCorners(bbox);
         const viols = getViolationsList();
         const nodeViols = viols.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
-        const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v));
+        const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored);
         const hasViol = hasUnfixedViol && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
@@ -212,6 +215,14 @@ function renderSVGOverlays() {
             if (isSelected) classNames.push('highlighted');
             if (hasViol) classNames.push('violation');
             if (isIncorrect) classNames.push('incorrect-text');
+            if (typeof hoveredLiveOutputNodeId !== 'undefined' && hoveredLiveOutputNodeId === node.node_id) {
+                classNames.push('live-hover-highlight');
+            }
+            if (diffState) {
+                if (diffState.added.has(node.node_id)) classNames.push('diff-added');
+                else if (diffState.modified.has(node.node_id)) classNames.push('diff-modified');
+                else classNames.push('diff-unchanged');
+            }
  
             const pointsStr = corners.map(p => `${roundCoord(p.x)},${roundCoord(p.y)}`).join(' ');
             const poly = createSvgElem('polygon', {
@@ -281,6 +292,10 @@ function renderSVGOverlays() {
             });
         }
     });
+
+    if (diffState && typeof renderDiffOverlayBaselineGhosts === 'function') {
+        renderDiffOverlayBaselineGhosts(svg, diffState);
+    }
 }
  
 /**
@@ -410,81 +425,45 @@ function onRotateHandleMouseDown(evt, nodeId) {
 }
 
 /**
- * Initiates dragging interaction on a specific corner handle.
+ * Initializes an active drag state for corner, edge, or polygon translation.
  *
  * @param {MouseEvent} evt - MouseDown event.
- * @param {number} cornerIndex - Corner index (0..3).
- * @param {string} nodeId - Identifier of target DOM node.
+ * @param {string} action - Drag action identifier ('corner'|'edge'|'move').
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {Object} [extraProps={}] - Additional drag metadata fields.
  */
+function _startBoxDrag(evt, action, nodeId, extraProps = {}) {
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return;
+    const svgPt = getSvgCoordinates(evt);
+    const corners = getBoxCorners(node.bounding_box);
+    activeDrag = {
+        action,
+        nodeId,
+        startSvgX: svgPt.x,
+        startSvgY: svgPt.y,
+        initialCorners: corners.map(p => ({ ...p })),
+        origNode: JSON.parse(JSON.stringify(node)),
+        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId),
+        ...extraProps
+    };
+}
+
 function onCornerHandleMouseDown(evt, cornerIndex, nodeId) {
     evt.stopPropagation();
     evt.preventDefault();
-    const node = domData.nodes.find(n => n.node_id === nodeId);
-    if (!node) return;
-
-    const svgPt = getSvgCoordinates(evt);
-    const corners = getBoxCorners(node.bounding_box);
-    activeDrag = {
-        action: 'corner',
-        cornerIndex: cornerIndex,
-        nodeId: nodeId,
-        startSvgX: svgPt.x,
-        startSvgY: svgPt.y,
-        initialCorners: corners.map(p => ({ ...p })),
-        origNode: JSON.parse(JSON.stringify(node)),
-        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
-    };
+    _startBoxDrag(evt, 'corner', nodeId, { cornerIndex });
 }
 
-/**
- * Initiates dragging interaction on a specific edge midpoint handle.
- *
- * @param {MouseEvent} evt - MouseDown event.
- * @param {number} edgeIndex - Edge index (0..3).
- * @param {string} nodeId - Identifier of target DOM node.
- */
 function onEdgeHandleMouseDown(evt, edgeIndex, nodeId) {
     evt.stopPropagation();
     evt.preventDefault();
-    const node = domData.nodes.find(n => n.node_id === nodeId);
-    if (!node) return;
-
-    const svgPt = getSvgCoordinates(evt);
-    const corners = getBoxCorners(node.bounding_box);
-    activeDrag = {
-        action: 'edge',
-        edgeIndex: edgeIndex,
-        nodeId: nodeId,
-        startSvgX: svgPt.x,
-        startSvgY: svgPt.y,
-        initialCorners: corners.map(p => ({ ...p })),
-        origNode: JSON.parse(JSON.stringify(node)),
-        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
-    };
+    _startBoxDrag(evt, 'edge', nodeId, { edgeIndex });
 }
 
-/**
- * Initiates dragging interaction to translate/move an entire bounding box.
- *
- * @param {MouseEvent} evt - MouseDown event.
- * @param {string} nodeId - Identifier of target DOM node.
- */
 function onPolygonMouseDown(evt, nodeId) {
     if (isDrawSectionMode) return;
     if (!selectedNodeIds.includes(nodeId)) return;
     evt.stopPropagation();
-    const node = domData.nodes.find(n => n.node_id === nodeId);
-    if (!node) return;
-
-    const svgPt = getSvgCoordinates(evt);
-    const corners = getBoxCorners(node.bounding_box);
-    activeDrag = {
-        action: 'move',
-        nodeId: nodeId,
-        startSvgX: svgPt.x,
-        startSvgY: svgPt.y,
-        initialCorners: corners.map(p => ({ ...p })),
-        origNode: JSON.parse(JSON.stringify(node)),
-        origIdx: domData.nodes.findIndex(n => n.node_id === nodeId)
-    };
+    _startBoxDrag(evt, 'move', nodeId);
 }

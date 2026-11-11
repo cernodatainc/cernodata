@@ -9,7 +9,7 @@
         <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision log</button>
         <button class="tab-btn" id="tabBtnPlan" onclick="showTab(event, 'planTab')">Plan</button>
         <button class="tab-btn" id="tabBtnRuns" onclick="showTab(event, 'runsTab')">Runs grid</button>
-        <!-- TODO(TASK-709): Add a "Live Output" preview tab (outputTab) rendering synchronous Markdown and RAG chunk preview with hover highlighting to bounding boxes. -->
+        <button class="tab-btn" id="tabBtnOutput" data-name="live output" onclick="showTab(event, 'outputTab')">Live Output</button>
     </div>
 
     <div class="tab-content active" id="domTab">
@@ -31,5 +31,8 @@
     </div>
     <div class="tab-content" id="runsTab">
         <div id="viewerRunsGridContainer" class="viewer-runs-grid-box"></div>
+    </div>
+    <div class="tab-content" id="outputTab">
+        <div id="liveOutputContainer" class="live-output-container"></div>
     </div>
 </div>

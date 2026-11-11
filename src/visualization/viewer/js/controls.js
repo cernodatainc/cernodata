@@ -144,6 +144,9 @@ function switchPage(pageNum) {
     renderDOMTree();
     renderViolationsList();
     renderSelectedEditor();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 }
 
 /**
@@ -257,6 +260,7 @@ function showTab(evt, tabId) {
         else if (tabId === 'logTab') btn = document.getElementById('tabBtnLog');
         else if (tabId === 'planTab') btn = document.getElementById('tabBtnPlan');
         else if (tabId === 'runsTab') btn = document.getElementById('tabBtnRuns');
+        else if (tabId === 'outputTab') btn = document.getElementById('tabBtnOutput');
     }
     if (btn) btn.classList.add('active');
 
@@ -265,6 +269,8 @@ function showTab(evt, tabId) {
 
     if (tabId === 'runsTab') {
         loadViewerRunsGrid();
+    } else if (tabId === 'outputTab' && typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
     }
 }
 

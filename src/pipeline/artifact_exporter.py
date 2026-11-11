@@ -4,8 +4,12 @@ src/pipeline/artifact_exporter.py
 Artifact export helpers for DocumentDOM, quality violations, execution plans, and visual viewers.
 """
 
+import logging
 import os
-from typing import Dict, Any, List, Tuple, Optional
+import warnings
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger("cernodata.pipeline.artifact_exporter")
 
 from src.utils import mkdirs, save_json
 from src.dom import DocumentDOM
@@ -35,10 +39,19 @@ def export_interactive_html_viewer(
     decision: Dict[str, Any],
     violations: List[Dict[str, Any]],
     output_dir: str,
-    plan: Optional[Dict[str, Any]] = None
+    plan: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Generates self-contained interactive HTML web viewer file."""
-    # TODO(TASK-714): Deprecate per-run interactive_viewer.html export in favor of served viewer app.
+    """
+    Deprecated helper generating a standalone per-run interactive HTML viewer file.
+
+    Prefer the served viewer application at `/viewer.html?output_dir=...`.
+    """
+    msg = (
+        "Per-run interactive_viewer.html export is deprecated; "
+        "use the served viewer app (/viewer.html) instead."
+    )
+    warnings.warn(msg, DeprecationWarning, stacklevel=2)
+    logger.warning(msg)
     html_path = os.path.join(output_dir, "interactive_viewer.html")
     return generate_interactive_html(pdf_path, dom, decision, violations, output_path=html_path, plan=plan)
 

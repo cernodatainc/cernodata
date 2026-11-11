@@ -119,7 +119,11 @@ function extractNodeTableData(node) {
         headers = rows[0].map((_, idx) => `Col ${idx + 1}`);
     }
 
-    return { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent, tableTitle };
+    const effectiveHdrIdx = (content.table_header_row_effective_idx !== undefined)
+        ? Number(content.table_header_row_effective_idx)
+        : 0;
+
+    return { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent, tableTitle, effectiveHdrIdx };
 }
 
 /**
@@ -214,7 +218,7 @@ function renderTableModal(node) {
     if (!overlay) return;
 
     const data = extractNodeTableData(node);
-    const { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent, tableTitle } = data;
+    const { rows, columns, headers, numRows, numCols, markdownTable, score, isConsistent, tableTitle, effectiveHdrIdx } = data;
 
     const tabs = [
         { id: 'grid', label: 'Grid View' },
@@ -230,7 +234,7 @@ function renderTableModal(node) {
 
     let bodyHtml = '';
     if (activeTableModalTab === 'grid') {
-        bodyHtml = renderTableModalGridView(rows, headers, numCols);
+        bodyHtml = renderTableModalGridView(rows, headers, numCols, effectiveHdrIdx);
     } else if (activeTableModalTab === 'rows') {
         bodyHtml = renderTableModalRowsView(rows, headers);
     } else if (activeTableModalTab === 'columns') {
@@ -252,27 +256,29 @@ function renderTableModal(node) {
     ` : '';
 
     const customFlagsVal = (node.content && node.content.table_custom_flags) ? String(node.content.table_custom_flags) : '';
+    const hdrPref = (node.content && node.content.table_header_row_mode) ? String(node.content.table_header_row_mode) : 'auto';
+    const stripPref = (node.content && node.content.table_strip_banner) ? String(node.content.table_strip_banner) : 'strip';
     const advancedBarHtml = isTableModalAdvanced ? `
         <div class="table-modal-advanced-bar" id="tableModalAdvancedBar">
             <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-weight:600; color:var(--ui-text);">Header row:</span>
                 <select id="selTableModalHeaderRow" style="font-size:11px; padding:2px 6px;">
-                    <option value="auto">Auto-detect</option>
-                    <option value="1">Row #1 (Column headers)</option>
-                    <option value="0">Row #0 (Banner/Title)</option>
-                    <option value="2">Row #2</option>
+                    <option value="auto" ${hdrPref === 'auto' ? 'selected' : ''}>Auto-detect</option>
+                    <option value="1" ${hdrPref === '1' ? 'selected' : ''}>Row #1 (Column headers)</option>
+                    <option value="0" ${hdrPref === '0' ? 'selected' : ''}>Row #0 (Banner/Title)</option>
+                    <option value="2" ${hdrPref === '2' ? 'selected' : ''}>Row #2</option>
                 </select>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-weight:600; color:var(--ui-text);">Banner:</span>
                 <select id="selTableModalStripBanner" style="font-size:11px; padding:2px 6px;">
-                    <option value="strip">Auto-strip title banner</option>
-                    <option value="keep">Keep in data rows</option>
+                    <option value="strip" ${stripPref === 'strip' ? 'selected' : ''}>Auto-strip title banner</option>
+                    <option value="keep" ${stripPref === 'keep' ? 'selected' : ''}>Keep in data rows</option>
                 </select>
             </div>
             <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:160px;">
                 <span style="font-weight:600; color:var(--ui-text);">Flags:</span>
-                <input type="text" id="inpTableModalFlags" value="${escapeHtml(customFlagsVal)}" placeholder="e.g. --delimiter=| --align-score=0.85" style="flex:1; font-family:monospace; font-size:11px; padding:2px 6px; border:1px solid var(--ui-border); border-radius:3px;" />
+                <input type="text" id="inpTableModalFlags" value="${escapeHtml(customFlagsVal)}" placeholder="e.g. --delimiter=| --align-score=0.85 --skip-empty" style="flex:1; font-family:monospace; font-size:11px; padding:2px 6px; border:1px solid var(--ui-border); border-radius:3px;" />
             </div>
             <button class="action-btn action-btn-decollide-sm" onclick="reparseTableModal()" style="font-weight:600; background:var(--ui-text); color:#FFFFFF;">Re-parse Table</button>
         </div>
@@ -284,7 +290,7 @@ function renderTableModal(node) {
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <span style="font-size:14px; font-weight:700; color:var(--ui-text);">Table: <span style="font-family:var(--font-mono); font-weight:500;">${escapeHtml(node.node_id)}</span></span>
                     <span class="badge-status" style="background:var(--ui-blue-bg); color:var(--ui-blue); border-color:var(--ui-blue-border);">P${node.global_page_index || 1}</span>
-                    <span class="badge-status" style="background:var(--ui-bg-card); border-color:var(--ui-border); color:var(--ui-text);">${numRows} rows × ${numCols} cols</span>
+                    <span class="badge-status" style="background:var(--ui-bg-card); border-color:var(--ui-border); color:var(--ui-text);">${numRows} rows x ${numCols} cols</span>
                     <span class="badge-status" style="background:var(--ui-bg-card); border-color:var(--ui-border); color:${scoreColor};">Score: ${Number(score).toFixed(2)}</span>
                     ${consistencyBadge}
                 </div>
@@ -294,7 +300,6 @@ function renderTableModal(node) {
                 <div class="table-modal-tab-group">
                     ${tabsHtml}
                 </div>
-                <!-- TODO(TASK-707): Mirrored advanced mode table re-parsing with custom header index, delimiter, and layout flags. -->
                 <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:var(--ui-text); cursor:pointer;">
                     <input type="checkbox" id="chkTableModalAdvanced" ${isTableModalAdvanced ? 'checked' : ''} onchange="toggleTableModalAdvanced(this.checked)" />
                     <span>Advanced mode (table flags)</span>
@@ -330,6 +335,7 @@ function reparseTableModal() {
     if (!activeTableModalNodeId || !domData || !domData.nodes) return;
     const node = domData.nodes.find(n => n.node_id === activeTableModalNodeId);
     if (!node || !node.content) return;
+
     const selHdr = document.getElementById('selTableModalHeaderRow');
     const selStrip = document.getElementById('selTableModalStripBanner');
     const inpFlags = document.getElementById('inpTableModalFlags');
@@ -337,33 +343,21 @@ function reparseTableModal() {
     const stripVal = selStrip ? selStrip.value : 'strip';
     const flagsVal = inpFlags ? inpFlags.value.trim() : '';
 
-    let rows = Array.isArray(node.content.rows) ? [...node.content.rows] : [];
-    if (rows.length > 0) {
-        if (hdrVal === '1' && rows.length > 1) {
-            const r0Clean = rows[0].map(c => (c || '').trim()).filter(Boolean);
-            if (r0Clean.length > 0 && new Set(r0Clean).size === 1) {
-                node.content.title = r0Clean[0];
-            }
-            node.content.headers = [...rows[1]];
-            if (stripVal === 'strip') {
-                node.content.rows = rows.slice(1);
-                node.content.num_rows = node.content.rows.length;
-            }
-        } else if (hdrVal === '0') {
-            node.content.headers = [...rows[0]];
-        }
-        if (flagsVal) {
-            node.content.table_custom_flags = flagsVal;
-        }
+    if (typeof applyTableReparseOptions === 'function') {
+        applyTableReparseOptions(node, hdrVal, stripVal, flagsVal);
     }
+
     renderTableModal(node);
     renderSelectedEditor();
+    if (typeof renderDOMTree === 'function') renderDOMTree();
+    if (typeof renderLiveOutput === 'function') renderLiveOutput();
+    if (typeof saveAnnotations === 'function') saveAnnotations(true);
 }
 
 /**
  * Renders the interactive HTML table grid view.
  */
-function renderTableModalGridView(rows, headers, numCols) {
+function renderTableModalGridView(rows, headers, numCols, effectiveHdrIdx = 0) {
     if (!rows || rows.length === 0) {
         return '<div class="table-empty-message">No table rows found in DOM node content.</div>';
     }
@@ -375,8 +369,9 @@ function renderTableModalGridView(rows, headers, numCols) {
         headerCols.push(`<th>${escapeHtml(title)}</th>`);
     }
 
-    const dataRows = (headers && rows.length > 1 && rows[0].every((val, idx) => val === headers[idx]))
-        ? rows.slice(1)
+    const hdrRowIdx = (effectiveHdrIdx >= 0 && effectiveHdrIdx < rows.length) ? effectiveHdrIdx : 0;
+    const dataRows = (headers && rows.length > 1 && rows[hdrRowIdx] && rows[hdrRowIdx].every((val, idx) => val === headers[idx]))
+        ? rows.filter((_, idx) => idx !== hdrRowIdx)
         : rows;
 
     const rowTrs = dataRows.map((r, rIdx) => {

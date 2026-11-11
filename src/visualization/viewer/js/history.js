@@ -137,6 +137,9 @@ class RunDiffManager {
             });
         }
 
+        // 3b. Revert in-place node content edits (e.g. table_edit, reparse_table)
+        this._applyNodeContentSnapshot(diff.meta, 'before');
+
         // 4. Restore page if different
         if (diff.page && typeof switchPage === 'function' && typeof currentPage !== 'undefined' && diff.page !== currentPage) {
             switchPage(diff.page);
@@ -185,6 +188,9 @@ class RunDiffManager {
             });
         }
 
+        // 3b. Re-apply in-place node content edits (e.g. table_edit, reparse_table)
+        this._applyNodeContentSnapshot(diff.meta, 'after');
+
         // 4. Restore page if different
         if (diff.page && typeof switchPage === 'function' && typeof currentPage !== 'undefined' && diff.page !== currentPage) {
             switchPage(diff.page);
@@ -201,6 +207,32 @@ class RunDiffManager {
     }
 
     /**
+     * Applies an in-place node content snapshot ('before' or 'after') from diff metadata.
+     *
+     * @param {Object|undefined} meta - Diff metadata object.
+     * @param {'before'|'after'} direction - Snapshot direction to apply.
+     */
+    _applyNodeContentSnapshot(meta, direction) {
+        const contentKey = `${direction}_content`;
+        const stateKey = `${direction}_node_state`;
+        if (!meta || !meta.node_id || meta[contentKey] === undefined) return;
+        const targetNode = domData.nodes.find(n => n.node_id === meta.node_id);
+        if (!targetNode) return;
+
+        targetNode.content = JSON.parse(JSON.stringify(meta[contentKey]));
+        if (meta[stateKey]) {
+            Object.assign(targetNode, JSON.parse(JSON.stringify(meta[stateKey])));
+        }
+        if (typeof userCorrections === 'object' && userCorrections !== null) {
+            if (targetNode.corrected_text) {
+                userCorrections[targetNode.node_id] = targetNode.corrected_text;
+            } else {
+                delete userCorrections[targetNode.node_id];
+            }
+        }
+    }
+
+    /**
      * Triggers UI and tree re-rendering across the viewer.
      */
     _refreshViews() {
@@ -210,6 +242,11 @@ class RunDiffManager {
         if (typeof renderSVGOverlays === 'function') renderSVGOverlays();
         if (typeof renderSelectedEditor === 'function') renderSelectedEditor();
         if (typeof renderViolationsList === 'function') renderViolationsList();
+        if (typeof renderLiveOutput === 'function') renderLiveOutput();
+        if (typeof activeTableModalNodeId !== 'undefined' && activeTableModalNodeId && typeof renderTableModal === 'function' && domData && Array.isArray(domData.nodes)) {
+            const modalNode = domData.nodes.find(n => n.node_id === activeTableModalNodeId);
+            if (modalNode) renderTableModal(modalNode);
+        }
     }
 
     /**

@@ -29,7 +29,7 @@ class PipelineArtifactPipeline:
         plan: Optional[DocumentPlan] = None,
         render_overlays_fn: Any = render_visual_overlays,
         export_artifacts_fn: Any = export_pipeline_artifacts,
-        export_viewer_fn: Any = export_interactive_html_viewer,
+        export_viewer_fn: Any = None,
     ) -> PipelineExecutionResult:
         """Renders visual overlays, writes output JSON files, and packages result dictionary."""
         plan_dict = plan.to_dict() if plan else None
@@ -39,9 +39,13 @@ class PipelineArtifactPipeline:
         dom_json_path, violations_json_path, plan_result_path = export_artifacts_fn(
             dom, decision, violations, config.language, config.output_dir, plan=plan_dict
         )
-        html_viewer_path = export_viewer_fn(
-            pdf_path, dom, decision, violations, config.output_dir, plan=plan_dict
-        )
+        export_legacy_viewer = bool(config.get_option("export_legacy_viewer", False))
+        html_viewer_path: Optional[str] = None
+        if export_viewer_fn is not None or export_legacy_viewer:
+            target_viewer_fn = export_viewer_fn or export_interactive_html_viewer
+            html_viewer_path = target_viewer_fn(
+                pdf_path, dom, decision, violations, config.output_dir, plan=plan_dict
+            )
 
         return {
             "dom": dom.to_dict(),

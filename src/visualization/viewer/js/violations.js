@@ -17,7 +17,10 @@ function setViolationSuppressed(v, shouldSuppress) {
     const suppStr = shouldSuppress ? "true" : "false";
     v.suppressed = suppStr;
     v.accepted = Boolean(shouldSuppress);
- 
+    if (!shouldSuppress) {
+        v._tolerance_ignored = false;
+    }
+
     if (domData && domData.nodes) {
         const node = domData.nodes.find(n => n.node_id === v.node_id);
         if (node && node.violations) {
@@ -28,24 +31,27 @@ function setViolationSuppressed(v, shouldSuppress) {
             if (nv) {
                 nv.suppressed = suppStr;
                 nv.accepted = Boolean(shouldSuppress);
+                if (!shouldSuppress) {
+                    nv._tolerance_ignored = false;
+                }
             }
         }
     }
 }
- 
+
 /**
  * Renders the categorized list of quality violations for the current page or entire document.
  */
 function renderViolationsList() {
     const container = document.getElementById('violListContainer');
     if (!container) return;
- 
+
     const viols = getViolationsList();
     const violationsToDisplay = showAllViolations
         ? viols
         : viols.filter(v => getViolationPage(v) === currentPage);
- 
-    const activeCount = violationsToDisplay.filter(v => !v.is_fixed && !isSuppressed(v)).length;
+
+    const activeCount = violationsToDisplay.filter(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored).length;
     const countEl = document.getElementById('violCount');
     if (countEl) countEl.textContent = activeCount;
  
@@ -74,7 +80,7 @@ function renderViolationsList() {
     const catKeys = Object.keys(categories).sort();
     catKeys.forEach(cat => {
         const catViols = categories[cat];
-        const catActiveCount = catViols.filter(v => !v.is_fixed && !isSuppressed(v)).length;
+        const catActiveCount = catViols.filter(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored).length;
         const catSuppressedCount = catViols.filter(v => isSuppressed(v)).length;
         const catFixedCount = catViols.filter(v => !!v.is_fixed).length;
         const hasFixable = catViols.some(v => !v.is_fixed && ((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || ''))));

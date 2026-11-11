@@ -237,6 +237,81 @@ class TestHTMLViewer(unittest.TestCase):
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
 
+    def test_chapter7_viewer_components_present_and_rendered(self):
+        dom = DocumentDOM(
+            document_id="doc_ch7",
+            source_filename="ch7.pdf",
+            total_pages=1,
+            nodes=[
+                DOMNode(
+                    node_id="tbl_ch7",
+                    temp_slice_index=1,
+                    global_page_index=1,
+                    type="table_grid",
+                    bounding_box=BoundingBox(10.0, 20.0, 210.0, 120.0),
+                    content={
+                        "rows": [["Title", "Title"], ["Key", "Value"], ["A", "1"]],
+                        "headers": ["Key", "Value"],
+                        "raw_text": "Key;Value\nA;1",
+                        "num_rows": 3,
+                        "num_cols": 2,
+                    },
+                )
+            ],
+        )
+        out_path = generate_interactive_html(
+            "non_existent.pdf",
+            dom=dom,
+            decision={"chosen_preset": "docling_fast", "overall_confidence": 0.9},
+            violations=[],
+            output_path="test_output/test_ch7_viewer.html",
+        )
+        self.assertTrue(os.path.exists(out_path))
+        with open(out_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+
+        # TASK-704 card order controls
+        self.assertIn("btn-order-up", html_content)
+        self.assertIn("btn-order-down", html_content)
+        # TASK-705 inline table editor
+        self.assertIn("renderTableEditorComponent", html_content)
+        self.assertIn("addTableRow", html_content)
+        self.assertIn("addTableColumn", html_content)
+        # TASK-707 advanced table re-parsing
+        self.assertIn("applyTableReparseOptions", html_content)
+        self.assertIn("parseTableCustomFlags", html_content)
+        # TASK-709 Live Output tab
+        self.assertIn("id=\"tabBtnOutput\"", html_content)
+        self.assertIn("id=\"outputTab\"", html_content)
+        self.assertIn("buildLiveOutputPayload", html_content)
+        # TASK-710 Rule Tolerances drawer
+        self.assertIn("id=\"btnRuleTolerances\"", html_content)
+        self.assertIn("id=\"ruleTolerancesDrawer\"", html_content)
+        self.assertIn("applyRuleTolerances", html_content)
+        self.assertIn("isViolationInactive", html_content)
+        # Undo/redo table snapshot & editor helpers
+        self.assertIn("_applyNodeContentSnapshot", html_content)
+        self.assertIn("_snapshotTableNode", html_content)
+        # TASK-711 Diff Overlay toggle
+        self.assertIn("id=\"btnDiffOverlay\"", html_content)
+        self.assertIn("computeVisualDiffForPage", html_content)
+
+        viewer_html_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "visualization",
+            "viewer",
+            "viewer.html",
+        )
+        with open(viewer_html_path, "r", encoding="utf-8") as f:
+            served_html = f.read()
+        self.assertIn("id=\"tabBtnOutput\"", served_html)
+        self.assertIn("id=\"btnRuleTolerances\"", served_html)
+        self.assertIn("id=\"ruleTolerancesDrawer\"", served_html)
+        self.assertIn("id=\"btnDiffOverlay\"", served_html)
+
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
 
 if __name__ == "__main__":
     unittest.main()

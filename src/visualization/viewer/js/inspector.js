@@ -67,7 +67,7 @@ function selectNode(nodeId, pageIndex = null) {
 
 function selectAdjacentViolation(delta) {
     const viols = getViolationsList();
-    const activeViols = viols.filter(v => !v.is_fixed && !isSuppressed(v));
+    const activeViols = viols.filter(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored);
     if (activeViols.length === 0) {
         if (typeof showStatusBanner === 'function') {
             showStatusBanner('No active quality violations found.', 'info', 2000);
@@ -211,6 +211,7 @@ function toggleIncorrectText(nodeId) {
     renderSelectedEditor();
     renderDOMTree();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') renderLiveOutput();
 }
 
 /**
@@ -247,6 +248,7 @@ async function onNodeTypeChange(nodeId, newType) {
     renderDOMTree();
     renderSVGOverlays();
     renderSelectedEditor();
+    if (typeof renderLiveOutput === 'function') renderLiveOutput();
 
     if (typeof saveAnnotations === 'function') {
         await saveAnnotations(true);
@@ -273,6 +275,7 @@ function updateCorrectionNote(nodeId, text) {
         node.content = { raw_text: text };
     }
     renderDOMTree();
+    if (typeof renderLiveOutput === 'function') renderLiveOutput();
 }
 
 /**
@@ -309,6 +312,7 @@ async function deleteDOMNode(nodeId) {
 
     renderDOMTree();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') renderLiveOutput();
     if (typeof saveAnnotations === 'function') {
         await saveAnnotations(true);
     }
@@ -318,53 +322,72 @@ async function deleteDOMNode(nodeId) {
 }
 
 /**
- * Moves a DOM element earlier in the page reading sequence order.
+ * Moves a DOM element earlier or later in the page reading sequence order.
  *
  * @param {string} nodeId - Target DOM node identifier.
+ * @param {'up'|'down'} direction - Direction to shift reading order.
  */
-function moveNodeOrderUp(nodeId) {
+function _moveNodeOrder(nodeId, direction) {
     if (!domData || !domData.nodes) return;
     const targetId = nodeId || selectedNodeId;
     if (!targetId) return;
+    const targetNode = domData.nodes.find(n => n.node_id === targetId);
+    if (!targetNode) return;
 
-    const pageNodes = domData.nodes.filter(n => getNodePage(n) === currentPage);
+    const nodePage = getNodePage(targetNode);
+    const pageNodes = domData.nodes.filter(n => getNodePage(n) === nodePage);
     const pageIdx = pageNodes.findIndex(n => n.node_id === targetId);
-    if (pageIdx <= 0) {
+    const delta = direction === 'up' ? -1 : 1;
+    const neighborIdx = pageIdx + delta;
+
+    if (pageIdx === -1 || neighborIdx < 0 || neighborIdx >= pageNodes.length) {
         if (typeof showStatusBanner === 'function') {
-            showStatusBanner('Element is already at the beginning of reading order.', 'info', 2000);
+            const msg = direction === 'up'
+                ? 'Element is already at the beginning of reading order.'
+                : 'Element is already at the end of reading order.';
+            showStatusBanner(msg, 'info', 2000);
         }
         return;
     }
 
-    const prevNode = pageNodes[pageIdx - 1];
-    const gIdx1 = domData.nodes.findIndex(n => n.node_id === prevNode.node_id);
-    const gIdx2 = domData.nodes.findIndex(n => n.node_id === targetId);
-    const origN1 = JSON.parse(JSON.stringify(domData.nodes[gIdx1]));
-    const origN2 = JSON.parse(JSON.stringify(domData.nodes[gIdx2]));
+    const neighborNode = pageNodes[neighborIdx];
+    const targetGlobalIdx = domData.nodes.findIndex(n => n.node_id === targetId);
+    const neighborGlobalIdx = domData.nodes.findIndex(n => n.node_id === neighborNode.node_id);
+    const origTarget = JSON.parse(JSON.stringify(domData.nodes[targetGlobalIdx]));
 
-    const temp = domData.nodes[gIdx2];
-    domData.nodes.splice(gIdx2, 1);
-    domData.nodes.splice(gIdx1, 0, temp);
+    const movedNode = domData.nodes.splice(targetGlobalIdx, 1)[0];
+    domData.nodes.splice(neighborGlobalIdx, 0, movedNode);
 
     if (typeof recordRunDiff === 'function') {
         recordRunDiff({
             action: 'reorder_node',
-            description: `Move reading order up: ${targetId}`,
-            page: currentPage,
-            removed: [{ index: Math.min(gIdx1, gIdx2), node: origN1 }, { index: Math.max(gIdx1, gIdx2), node: origN2 }],
-            inserted: [{ index: Math.min(gIdx1, gIdx2), node: origN2 }, { index: Math.max(gIdx1, gIdx2), node: origN1 }],
+            description: `Move reading order ${direction}: ${targetId}`,
+            page: nodePage,
+            removed: [{ index: targetGlobalIdx, node: origTarget }],
+            inserted: [{ index: neighborGlobalIdx, node: origTarget }],
             beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
             afterSelection: { selectedNodeId: targetId, selectedNodeIds: [targetId] },
-            meta: { node_id: targetId, direction: 'up' }
+            meta: { node_id: targetId, direction }
         });
     }
 
     renderDOMTree();
     renderSVGOverlays();
     renderSelectedEditor();
-    if (typeof showStatusBanner === 'function') {
-        showStatusBanner(`Moved '${targetId}' earlier in reading order.`, 'success', 2500);
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
     }
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
+    }
+    if (typeof showStatusBanner === 'function') {
+        const verb = direction === 'up' ? 'earlier' : 'later';
+        showStatusBanner(`Moved '${targetId}' ${verb} in reading order.`, 'success', 2500);
+    }
+}
+
+function moveNodeOrderUp(nodeId) {
+    _moveNodeOrder(nodeId, 'up');
 }
 
 /**
@@ -373,55 +396,13 @@ function moveNodeOrderUp(nodeId) {
  * @param {string} nodeId - Target DOM node identifier.
  */
 function moveNodeOrderDown(nodeId) {
-    if (!domData || !domData.nodes) return;
-    const targetId = nodeId || selectedNodeId;
-    if (!targetId) return;
-
-    const pageNodes = domData.nodes.filter(n => getNodePage(n) === currentPage);
-    const pageIdx = pageNodes.findIndex(n => n.node_id === targetId);
-    if (pageIdx === -1 || pageIdx >= pageNodes.length - 1) {
-        if (typeof showStatusBanner === 'function') {
-            showStatusBanner('Element is already at the end of reading order.', 'info', 2000);
-        }
-        return;
-    }
-
-    const nextNode = pageNodes[pageIdx + 1];
-    const gIdx1 = domData.nodes.findIndex(n => n.node_id === targetId);
-    const gIdx2 = domData.nodes.findIndex(n => n.node_id === nextNode.node_id);
-    const origN1 = JSON.parse(JSON.stringify(domData.nodes[gIdx1]));
-    const origN2 = JSON.parse(JSON.stringify(domData.nodes[gIdx2]));
-
-    const temp = domData.nodes[gIdx1];
-    domData.nodes.splice(gIdx1, 1);
-    domData.nodes.splice(gIdx2, 0, temp);
-
-    if (typeof recordRunDiff === 'function') {
-        recordRunDiff({
-            action: 'reorder_node',
-            description: `Move reading order down: ${targetId}`,
-            page: currentPage,
-            removed: [{ index: Math.min(gIdx1, gIdx2), node: origN1 }, { index: Math.max(gIdx1, gIdx2), node: origN2 }],
-            inserted: [{ index: Math.min(gIdx1, gIdx2), node: origN2 }, { index: Math.max(gIdx1, gIdx2), node: origN1 }],
-            beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
-            afterSelection: { selectedNodeId: targetId, selectedNodeIds: [targetId] },
-            meta: { node_id: targetId, direction: 'down' }
-        });
-    }
-
-    renderDOMTree();
-    renderSVGOverlays();
-    renderSelectedEditor();
-    if (typeof showStatusBanner === 'function') {
-        showStatusBanner(`Moved '${targetId}' later in reading order.`, 'success', 2500);
-    }
+    _moveNodeOrder(nodeId, 'down');
 }
 
 /**
  * Renders the hierarchical DOM element tree cards for the active page.
  */
 function renderDOMTree() {
-    // TODO(TASK-704): Add reading-order Move Up / Move Down controls and sequence badges to fix multi-column ordering.
     const container = document.getElementById('domListContainer');
     if (!container) return;
     container.innerHTML = '';
@@ -452,7 +433,7 @@ function renderDOMTree() {
         const isOnCurrentPage = (nodePage === currentPage);
         const pageSeq = pageSeqMap.get(node.node_id) || 1;
         const viols = getViolationsList();
-        const hasActiveViol = viols.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v));
+        const hasActiveViol = viols.some(v => v.node_id === node.node_id && !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored);
         const hasSuppressedViol = viols.some(v => v.node_id === node.node_id && isSuppressed(v));
         const isIncorrect = !!node.is_incorrect_text;
         let displayText = (node.content && node.content.raw_text) ? node.content.raw_text : '';

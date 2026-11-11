@@ -262,10 +262,20 @@ def main(argv: list[str] | None = None) -> None:
     print_summary(result)
 
     viewer_path = result.get("html_viewer_path")
-    if getattr(args, "view", False) and viewer_path:
-        viewer_uri = "file:///" + os.path.abspath(viewer_path).replace("\\", "/")
-        print(f"\n[VIEW] Opening interactive viewer in default browser: {viewer_uri}")
-        webbrowser.open(viewer_uri)
+    if getattr(args, "view", False):
+        if viewer_path:
+            viewer_uri = "file:///" + os.path.abspath(viewer_path).replace("\\", "/")
+            print(f"\n[VIEW] Opening legacy interactive viewer in default browser: {viewer_uri}")
+            webbrowser.open(viewer_uri)
+        else:
+            from src.pipeline.server import start_pipeline_server
+            print("\n[VIEW] Launching served interactive web viewer app...")
+            start_pipeline_server(
+                pdf_path=doc_input,
+                language=args.language,
+                port=args.port,
+                open_browser=True,
+            )
 
 
 if __name__ == "__main__":

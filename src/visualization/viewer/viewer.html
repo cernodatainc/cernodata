@@ -123,6 +123,8 @@
         </div>
 
         <div class="toolbar-actions">
+            <button class="action-btn action-btn-decollide-sm" id="btnRuleTolerances" onclick="toggleRuleTolerancesDrawer()" title="Open Rule Tolerances drawer to tune sensitivities and recalculate confidence scores">Rule Tolerances</button>
+            <button class="action-btn action-btn-decollide-sm" id="btnDiffOverlay" onclick="toggleDiffOverlay()" title="Toggle visual diff highlighting (added, removed, modified boxes) against baseline run">Diff Overlay</button>
             <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()"
                 title="Draw and add a custom section on the page to parse with OCR">Add section</button>
             <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()"
@@ -131,6 +133,7 @@
             <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">Save
                 annotations</button>
         </div>
+        <div id="ruleTolerancesDrawer" class="rule-tolerances-drawer" hidden></div>
     </div>
 
     <div class="workspace">
@@ -159,6 +162,7 @@
                 <button class="tab-btn" id="tabBtnLog" onclick="showTab(event, 'logTab')">Decision log</button>
                 <button class="tab-btn" id="tabBtnPlan" onclick="showTab(event, 'planTab')">Plan</button>
                 <button class="tab-btn" id="tabBtnRuns" onclick="showTab(event, 'runsTab')">Runs</button>
+                <button class="tab-btn" id="tabBtnOutput" data-name="live output" onclick="showTab(event, 'outputTab')">Live Output</button>
             </div>
 
             <div class="tab-content active" id="domTab">
@@ -180,6 +184,9 @@
             </div>
             <div class="tab-content" id="runsTab">
                 <div id="viewerRunsGridContainer" class="viewer-runs-grid-box"></div>
+            </div>
+            <div class="tab-content" id="outputTab">
+                <div id="liveOutputContainer" class="live-output-container"></div>
             </div>
         </div>
     </div>

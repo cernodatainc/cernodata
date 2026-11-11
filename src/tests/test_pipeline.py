@@ -127,6 +127,33 @@ class TestPipelineEngine(unittest.TestCase):
         self.assertEqual(scale, 5.0)
         self.assertTrue(force_ocr)
 
+    def test_deprecated_per_run_viewer_export_skipped_by_default(self):
+        import warnings
+        from unittest.mock import patch
+        from src.pipeline.artifact_exporter import export_interactive_html_viewer
+        from src.pipeline.artifact_pipeline import PipelineArtifactPipeline
+        from src.pipeline.planner.models import IngestionConfig
+
+        dom = make_test_dom("Clean document body", document_id="doc_714", source_filename="doc.pdf")
+        decision = {"overall_confidence": 0.95, "status": "ACCEPT", "chosen_preset": "docling_fast"}
+        cfg_default = IngestionConfig(output_dir="test_output", visualize=False)
+
+        with patch("src.pipeline.artifact_pipeline.render_visual_overlays", return_value=[]), \
+             patch("src.pipeline.artifact_pipeline.export_pipeline_artifacts", return_value=("d.json", "v.json", None)), \
+             patch("src.pipeline.artifact_pipeline.export_interactive_html_viewer") as mock_export_viewer:
+            res = PipelineArtifactPipeline().export_and_package(
+                "doc.pdf", dom, decision, [], cfg_default
+            )
+            self.assertIsNone(res["html_viewer_path"])
+            mock_export_viewer.assert_not_called()
+
+        with patch("src.pipeline.artifact_exporter.generate_interactive_html", return_value="test_output/interactive_viewer.html"):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                out = export_interactive_html_viewer("doc.pdf", dom, decision, [], "test_output")
+            self.assertEqual(out, "test_output/interactive_viewer.html")
+            self.assertTrue(any(issubclass(w.category, DeprecationWarning) for w in caught))
+
 
 if __name__ == "__main__":
     unittest.main()

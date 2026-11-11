@@ -291,6 +291,9 @@ function updatePresetUIState() {
     renderPlanTab();
     renderSelectedEditor();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 }
 
 /**

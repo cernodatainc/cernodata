@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from src.parsers.ocr_flags import parse_ocr_custom_flags, summarize_applied_flags
 from src.parsers.section_ocr import (
     get_available_ocr_engines,
     parse_image_ocr_multi,
@@ -63,8 +64,8 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             )
             return
 
-        # TODO(TASK-706): Advanced mode flags for section OCR parsing (custom engine flags, binarization, psm).
         custom_flags = str(payload.get("custom_flags") or "").strip()
+        parsed_flags = parse_ocr_custom_flags(custom_flags)
         logger.info(
             "Parsing section '%s' using OCR engines: %s (Lang: %s%s)",
             node_id,
@@ -75,10 +76,12 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
 
         multi_results: Dict[str, Any]
         if image_base64:
-            multi_results = parse_image_ocr_multi(image_base64, engines=selected_engines, language=language)
+            multi_results = parse_image_ocr_multi(
+                image_base64, engines=selected_engines, language=language, custom_flags=custom_flags
+            )
         elif pdf_path and bbox:
             multi_results = parse_section_from_pdf_multi(
-                pdf_path, page, bbox, engines=selected_engines, language=language
+                pdf_path, page, bbox, engines=selected_engines, language=language, custom_flags=custom_flags
             )
         else:
             self.send_bad_request("Either image_base64 or (pdf_path and bbox) must be provided.")
@@ -112,6 +115,8 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             "lines": best_result.get("lines", []),
             "engine": best_engine,
             "engines": selected_engines,
+            "custom_flags": custom_flags,
+            "applied_flags": summarize_applied_flags(parsed_flags),
             "results": multi_results,
             "error": best_result.get("error"),
         }

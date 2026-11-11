@@ -434,6 +434,61 @@ class TestSectionOCRParser(unittest.TestCase):
         with self.assertRaises(IndexError):
             crop_pdf_region(pdf_path, page_number=0, bbox=(10.0, 10.0, 50.0, 50.0))
 
+    def test_parse_ocr_custom_flags_and_preprocessing(self) -> None:
+        """Verifies TASK-706 custom OCR flags parsing and image preprocessing pipeline."""
+        from src.parsers.ocr_flags import parse_ocr_custom_flags, preprocess_ocr_image
+
+        parsed = parse_ocr_custom_flags("--psm 6 --oem 1, binarize=1, threshold=160, invert=1, contrast=1.5, scale=2.0")
+        self.assertEqual(parsed["psm"], 6)
+        self.assertEqual(parsed["oem"], 1)
+        self.assertTrue(parsed["binarize"])
+        self.assertEqual(parsed["threshold"], 160)
+        self.assertTrue(parsed["invert"])
+        self.assertAlmostEqual(parsed["contrast"] or 0.0, 1.5)
+        self.assertAlmostEqual(parsed["scale"] or 0.0, 2.0)
+        self.assertIn("--psm 6", parsed["tesseract_config"])
+        self.assertIn("--oem 1", parsed["tesseract_config"])
+
+        captured_pixels = []
+        def mock_engine(arr):
+            captured_pixels.append(arr.copy())
+            return {"text": "Flagged Text", "confidence": 0.96}
+
+        parser = SectionOCRParser()
+        parser.register_engine("flagmock", mock_engine)
+        src_img = Image.new("RGB", (20, 10), color=(200, 200, 200))
+        preprocessed = preprocess_ocr_image(src_img, parsed, apply_scale=True)
+        self.assertEqual(preprocessed.size, (40, 20))
+        # Binarize turns 200 (>= 160) to 255, then invert turns 255 to 0
+        self.assertEqual(preprocessed.getpixel((0, 0)), (0, 0, 0))
+
+        res = parser.parse_image(
+            src_img,
+            engine_name="flagmock",
+            custom_flags="binarize=1, threshold=150, invert=1, scale=2.0",
+        )
+        self.assertTrue(res["success"])
+        self.assertEqual(res["text"], "Flagged Text")
+        self.assertEqual(captured_pixels[0].shape[:2], (20, 40))
+        self.assertEqual(int(captured_pixels[0][0, 0, 0]), 0)
+
+    def test_parse_ocr_custom_flags_edge_cases(self) -> None:
+        """Verifies comma-preserving whitelist, missing/negative flag handling, and flag summary."""
+        from src.parsers.ocr_flags import parse_ocr_custom_flags, summarize_applied_flags
+
+        parsed_wl = parse_ocr_custom_flags("--whitelist=0,1,2,3, --psm 6")
+        self.assertEqual(parsed_wl["whitelist"], "0,1,2,3")
+        self.assertEqual(parsed_wl["psm"], 6)
+        self.assertIn("tessedit_char_whitelist=0,1,2,3", parsed_wl["tesseract_config"])
+        summary = summarize_applied_flags(parsed_wl)
+        self.assertEqual(summary["whitelist"], "0,1,2,3")
+
+        parsed_bad = parse_ocr_custom_flags("--threshold -5 --psm")
+        self.assertEqual(parsed_bad["threshold"], 1)
+        self.assertTrue(parsed_bad["binarize"])
+        self.assertIsNone(parsed_bad["psm"])
+        self.assertEqual(parsed_bad["tesseract_config"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -138,6 +138,17 @@ function isSuppressed(v) {
 }
 
 /**
+ * Evaluates whether a violation is inactive due to being fixed, suppressed, or tolerance-ignored.
+ *
+ * @param {Object} v - Violation object.
+ * @returns {boolean} True if inactive for scoring and highlighting.
+ */
+function isViolationInactive(v) {
+    if (!v) return false;
+    return !!(v.is_fixed || isSuppressed(v) || v._tolerance_ignored === true);
+}
+
+/**
  * Ensures all violation objects have unique identifiers, normalized type categories,
  * and canonical suppressed string states.
  */
@@ -386,12 +397,17 @@ function recalculateScoring() {
     const cleanMax = 1.0;
     const newPerPage = {};
     const numPages = totalPages || 1;
+    const penaltyWeight = (typeof ruleTolerancesState === 'object' && ruleTolerancesState && ruleTolerancesState.penalty_weight !== undefined)
+        ? Number(ruleTolerancesState.penalty_weight)
+        : ((decisionData.rule_tolerances && decisionData.rule_tolerances.penalty_weight !== undefined)
+            ? Number(decisionData.rule_tolerances.penalty_weight)
+            : 1.0);
 
     for (let p = 1; p <= numPages; p++) {
         const pStr = String(p);
         const pViols = viols.filter(v => getViolationPage(v) === p);
         const totalPViols = pViols.length;
-        const activePViols = pViols.filter(v => !v.is_fixed && !isSuppressed(v)).length;
+        const activePViols = pViols.filter(v => !isViolationInactive(v)).length;
         const resolvedPViols = totalPViols - activePViols;
 
         let rawScore = rawAttPerPage[pStr] ?? rawAttPerPage[p] ?? rawPerPage[pStr] ?? rawPerPage[p];
@@ -400,16 +416,21 @@ function recalculateScoring() {
         }
         rawScore = Number(rawScore);
 
-        if (totalPViols === 0) {
-            newPerPage[pStr] = rawScore;
-        } else if (activePViols === 0) {
-            newPerPage[pStr] = Math.max(cleanMax, rawScore);
-        } else {
-            const penalty = Math.max(0, cleanMax - rawScore);
-            const recoveryRatio = resolvedPViols / totalPViols;
-            const computed = rawScore + (penalty * recoveryRatio);
-            newPerPage[pStr] = Math.min(cleanMax, Math.round(computed * 10000) / 10000);
+        let pageScore = rawScore;
+        if (totalPViols > 0) {
+            if (activePViols === 0) {
+                pageScore = Math.max(cleanMax, rawScore);
+            } else {
+                const penalty = Math.max(0, cleanMax - rawScore);
+                const recoveryRatio = resolvedPViols / totalPViols;
+                pageScore = Math.min(cleanMax, Math.round((rawScore + (penalty * recoveryRatio)) * 10000) / 10000);
+            }
         }
+        if (penaltyWeight !== 1.0) {
+            const weightedPenalty = Math.max(0, cleanMax - pageScore) * penaltyWeight;
+            pageScore = Math.max(0.0, Math.min(cleanMax, Math.round((cleanMax - weightedPenalty) * 10000) / 10000));
+        }
+        newPerPage[pStr] = pageScore;
     }
 
     const pageScores = Object.values(newPerPage);
@@ -426,7 +447,7 @@ function recalculateScoring() {
 
     const activePerPageViols = {};
     for (let p = 1; p <= numPages; p++) {
-        const pViols = viols.filter(v => getViolationPage(v) === p && !v.is_fixed && !isSuppressed(v));
+        const pViols = viols.filter(v => getViolationPage(v) === p && !isViolationInactive(v));
         activePerPageViols[String(p)] = pViols.length;
     }
     const totalActiveViolations = Object.values(activePerPageViols).reduce((a, b) => a + b, 0);

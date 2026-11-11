@@ -19,6 +19,7 @@ from PIL import Image
 logger = logging.getLogger("cernodata.parsers.section_ocr")
 
 from src.dom.bounding_box import BoundingBox
+from src.parsers.ocr_flags import OCRCustomFlags, parse_ocr_custom_flags, preprocess_ocr_image
 from src.parsers.ocr_imaging import crop_pdf_region, normalize_to_pil
 from src.parsers.ocr_models import OCRLine, OCRResult, create_ocr_result, normalize_bbox_coords
 
@@ -62,11 +63,19 @@ class SectionOCRParser:
                 known.append(k)
         return known
 
-    def _create_tesseract_engine(self) -> Optional[Any]:
+    def _create_tesseract_engine(
+        self,
+        custom_flags: Optional[OCRCustomFlags] = None,
+        language: Optional[str] = None,
+    ) -> Optional[Any]:
         """Creates Tesseract OCR engine wrapper if pytesseract is installed."""
         try:
             import pytesseract
-            return lambda arr: pytesseract.image_to_string(arr, lang=self.language or "eng")
+            lang_code = language or self.language or "eng"
+            tess_config = custom_flags["tesseract_config"] if custom_flags else ""
+            if tess_config:
+                return lambda arr: pytesseract.image_to_string(arr, lang=lang_code, config=tess_config)
+            return lambda arr: pytesseract.image_to_string(arr, lang=lang_code)
         except Exception as ex:
             logger.debug("Tesseract engine initialization unavailable: %s", ex)
             return None
@@ -97,7 +106,12 @@ class SectionOCRParser:
                 logger.debug("Signature inspection skipped: %s", ex)
         return entry
 
-    def _get_engine_by_name(self, name: str) -> Optional[Any]:
+    def _get_engine_by_name(
+        self,
+        name: str,
+        custom_flags: Optional[OCRCustomFlags] = None,
+        language: Optional[str] = None,
+    ) -> Optional[Any]:
         """Resolves an OCR engine instance or callable by its identifier."""
         norm_name = name.lower().strip()
         if norm_name in self._engine_registry:
@@ -105,7 +119,7 @@ class SectionOCRParser:
         if norm_name == "rapidocr":
             return self._get_engine()
         if norm_name == "tesseract":
-            return self._create_tesseract_engine()
+            return self._create_tesseract_engine(custom_flags=custom_flags, language=language)
         if norm_name == "easyocr":
             return self._create_easyocr_engine()
         return None
@@ -235,13 +249,15 @@ class SectionOCRParser:
 
         return joined_text, avg_confidence, lines
 
-    def parse_image(
+    def _parse_image_with_options(
         self,
         image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
         language: Optional[str] = None,
         engine_name: Optional[str] = None,
+        custom_flags: Optional[str] = None,
+        apply_scale: bool = True,
     ) -> OCRResult:
-        """Parses an image containing a document section using a targeted OCR engine."""
+        """Runs single-engine OCR on an image with parsed custom flags and preprocessing."""
         if not engine_name or not str(engine_name).strip():
             raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
         target_engine_name = str(engine_name).lower().strip()
@@ -260,7 +276,10 @@ class SectionOCRParser:
         if pil_img.width <= 0 or pil_img.height <= 0:
             return create_ocr_result(success=False, error="Image is empty or has invalid dimensions.")
 
-        engine = self._get_engine_by_name(target_engine_name)
+        parsed_flags = parse_ocr_custom_flags(custom_flags)
+        pil_img = preprocess_ocr_image(pil_img, parsed_flags, apply_scale=apply_scale)
+
+        engine = self._get_engine_by_name(target_engine_name, custom_flags=parsed_flags, language=language)
         if engine is None:
             if target_engine_name == "rapidocr":
                 err_msg = "OCR engine not available."
@@ -279,11 +298,24 @@ class SectionOCRParser:
         joined_text, avg_confidence, lines = self._parse_engine_result(result)
         return create_ocr_result(success=True, text=joined_text, confidence=avg_confidence, lines=lines)
 
+    def parse_image(
+        self,
+        image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
+        language: Optional[str] = None,
+        engine_name: Optional[str] = None,
+        custom_flags: Optional[str] = None,
+    ) -> OCRResult:
+        """Parses an image containing a document section using a targeted OCR engine."""
+        return self._parse_image_with_options(
+            image_input, language=language, engine_name=engine_name, custom_flags=custom_flags, apply_scale=True
+        )
+
     def parse_image_multi(
         self,
         image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
         engines: Optional[Sequence[str]] = None,
         language: Optional[str] = None,
+        custom_flags: Optional[str] = None,
     ) -> Dict[str, OCRResult]:
         """Executes multiple OCR engines against an image and returns results mapped by engine name."""
         if not engines:
@@ -291,7 +323,12 @@ class SectionOCRParser:
         engine_list = [str(e).strip().lower() for e in engines if str(e).strip()]
         if not engine_list:
             raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
-        return {eng: self.parse_image(image_input, language=language, engine_name=eng) for eng in engine_list}
+        return {
+            eng: self._parse_image_with_options(
+                image_input, language=language, engine_name=eng, custom_flags=custom_flags, apply_scale=True
+            )
+            for eng in engine_list
+        }
 
     def crop_section_image(
         self,
@@ -311,19 +348,24 @@ class SectionOCRParser:
         language: Optional[str] = None,
         scale: float = 2.0,
         engine_name: Optional[str] = None,
+        custom_flags: Optional[str] = None,
     ) -> OCRResult:
         """Extracts and crops a specific section bounding box from a PDF page and runs OCR."""
         if not engine_name or not str(engine_name).strip():
             raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
+        parsed_flags = parse_ocr_custom_flags(custom_flags)
+        effective_scale = parsed_flags["scale"] if parsed_flags["scale"] is not None else scale
         try:
-            cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=scale)
+            cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=effective_scale)
         except (FileNotFoundError, ValueError, IndexError, RuntimeError) as ex:
             return create_ocr_result(success=False, error=str(ex))
         except Exception as ex:
             logger.warning("Failed to crop PDF section: %s", ex, exc_info=True)
             return create_ocr_result(success=False, error=f"Failed to crop PDF section: {str(ex)}")
 
-        return self.parse_image(cropped_img, language=language, engine_name=engine_name)
+        return self._parse_image_with_options(
+            cropped_img, language=language, engine_name=engine_name, custom_flags=custom_flags, apply_scale=False
+        )
 
     def parse_section_from_pdf_multi(
         self,
@@ -333,6 +375,7 @@ class SectionOCRParser:
         engines: Optional[Sequence[str]] = None,
         language: Optional[str] = None,
         scale: float = 2.0,
+        custom_flags: Optional[str] = None,
     ) -> Dict[str, OCRResult]:
         """Crops a section from a PDF page once and processes it with multiple OCR engines."""
         if not engines:
@@ -340,8 +383,10 @@ class SectionOCRParser:
         engine_list = [str(e).strip().lower() for e in engines if str(e).strip()]
         if not engine_list:
             raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
+        parsed_flags = parse_ocr_custom_flags(custom_flags)
+        effective_scale = parsed_flags["scale"] if parsed_flags["scale"] is not None else scale
         try:
-            cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=scale)
+            cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=effective_scale)
         except (FileNotFoundError, ValueError, IndexError, RuntimeError) as ex:
             err_res = create_ocr_result(success=False, error=str(ex))
             return {eng: err_res for eng in engine_list}
@@ -350,7 +395,12 @@ class SectionOCRParser:
             err_res = create_ocr_result(success=False, error=f"Failed to crop PDF section: {str(ex)}")
             return {eng: err_res for eng in engine_list}
 
-        return self.parse_image_multi(cropped_img, engines=engine_list, language=language)
+        return {
+            eng: self._parse_image_with_options(
+                cropped_img, language=language, engine_name=eng, custom_flags=custom_flags, apply_scale=False
+            )
+            for eng in engine_list
+        }
 
     def process_dom_node(
         self,
@@ -430,22 +480,28 @@ def parse_image_ocr(
     image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
     language: str = "en",
     engine_name: Optional[str] = None,
+    custom_flags: Optional[str] = None,
 ) -> OCRResult:
     """Module-level convenience function for targeted image OCR."""
     if not engine_name or not str(engine_name).strip():
         raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
-    return get_default_section_parser().parse_image(image_input, language=language, engine_name=engine_name)
+    return get_default_section_parser().parse_image(
+        image_input, language=language, engine_name=engine_name, custom_flags=custom_flags
+    )
 
 
 def parse_image_ocr_multi(
     image_input: Union[Image.Image, bytes, bytearray, str, os.PathLike[str], np.ndarray],
     engines: Optional[Sequence[str]] = None,
     language: str = "en",
+    custom_flags: Optional[str] = None,
 ) -> Dict[str, OCRResult]:
     """Module-level convenience function for targeted multi-engine image OCR."""
     if not engines:
         raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
-    return get_default_section_parser().parse_image_multi(image_input, engines=engines, language=language)
+    return get_default_section_parser().parse_image_multi(
+        image_input, engines=engines, language=language, custom_flags=custom_flags
+    )
 
 
 def parse_section_from_pdf(
@@ -455,12 +511,13 @@ def parse_section_from_pdf(
     language: str = "en",
     scale: float = 2.0,
     engine_name: Optional[str] = None,
+    custom_flags: Optional[str] = None,
 ) -> OCRResult:
     """Module-level convenience function for cropping a section from a PDF and running OCR."""
     if not engine_name or not str(engine_name).strip():
         raise ValueError("OCR engine must be explicitly specified (e.g. engine_name='rapidocr').")
     return get_default_section_parser().parse_section_from_pdf(
-        pdf_path, page_number, bbox, language=language, scale=scale, engine_name=engine_name
+        pdf_path, page_number, bbox, language=language, scale=scale, engine_name=engine_name, custom_flags=custom_flags
     )
 
 
@@ -471,12 +528,13 @@ def parse_section_from_pdf_multi(
     engines: Optional[Sequence[str]] = None,
     language: str = "en",
     scale: float = 2.0,
+    custom_flags: Optional[str] = None,
 ) -> Dict[str, OCRResult]:
     """Module-level convenience function for cropping a section from a PDF and running multiple OCR engines."""
     if not engines:
         raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
     return get_default_section_parser().parse_section_from_pdf_multi(
-        pdf_path, page_number, bbox, engines=engines, language=language, scale=scale
+        pdf_path, page_number, bbox, engines=engines, language=language, scale=scale, custom_flags=custom_flags
     )
 
 

@@ -241,14 +241,20 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
                 </div>
             </div>
             <div style="margin-top:8px; border-top:1px solid ${p.border}; padding-top:6px;">
-                <!-- TODO(TASK-706): Advanced mode flags for section OCR parsing (custom engine flags, binarization, psm). -->
                 <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:${p.textPrimary}; cursor:pointer;" title="Enable custom OCR engine flags and parameter overrides">
                     <input type="checkbox" id="chkOcrAdvanced_${node.node_id}" onchange="toggleOcrAdvancedMode('${node.node_id}', this.checked)" />
                     <span>Advanced mode (custom OCR flags)</span>
                 </label>
                 <div id="ocrAdvancedContainer_${node.node_id}" style="display:none; margin-top:6px;">
                     <div style="font-size:10px; color:${p.textMuted}; margin-bottom:2px;">Custom flags / parameters:</div>
-                    <input type="text" id="inpOcrCustomFlags_${node.node_id}" placeholder="e.g. --psm 6 --oem 1, binarize=1" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:11px; padding:3px 6px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgDark}; color:${p.textPrimary};" />
+                    <input type="text" id="inpOcrCustomFlags_${node.node_id}" placeholder="e.g. --psm 6 --oem 1, binarize=1, contrast=1.5" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:11px; padding:3px 6px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgDark}; color:${p.textPrimary};" />
+                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+                        <button type="button" class="action-btn action-btn-decollide-sm" onclick="appendOcrCustomFlag('${node.node_id}', 'binarize=1')">+ Binarize</button>
+                        <button type="button" class="action-btn action-btn-decollide-sm" onclick="appendOcrCustomFlag('${node.node_id}', '--psm 6')">+ PSM 6</button>
+                        <button type="button" class="action-btn action-btn-decollide-sm" onclick="appendOcrCustomFlag('${node.node_id}', '--oem 1')">+ OEM 1</button>
+                        <button type="button" class="action-btn action-btn-decollide-sm" onclick="appendOcrCustomFlag('${node.node_id}', 'invert=1')">+ Invert</button>
+                        <button type="button" class="action-btn action-btn-decollide-sm" onclick="appendOcrCustomFlag('${node.node_id}', 'contrast=1.5')">+ Contrast</button>
+                    </div>
                 </div>
             </div>
             <div class="cutout-action-row" style="margin-top:8px; border-top:1px solid ${p.border}; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
@@ -344,7 +350,7 @@ function renderSingleNodeEditorComponent(node, options) {
             </div>
             ` : ''}
             <div style="margin-top:10px;">
-                <!-- TODO(TASK-705): When node.type === 'table_grid', mount an interactive HTML table cell/row/column editor (table_editor.js). -->
+                ${isTable && typeof renderTableEditorComponent === 'function' ? renderTableEditorComponent(node) : ''}
                 <label style="display:block; font-size:12px; color:${p.textPrimary}; font-weight:500; margin-bottom:2px;">Parsed text / correction note</label>
                 <textarea class="note-area" placeholder="Parsed text or manual correction note…" oninput="updateCorrectionNote('${node.node_id}', this.value)">${escapeHtml(noteVal)}</textarea>
             </div>
@@ -370,6 +376,8 @@ function renderDOMTreeNodeCardComponent(node, options) {
     const { nodePage, isOnCurrentPage, isFixed, isIncorrect, hasActiveViol, hasSuppressedViol, displayText, pageSeq } = options;
     const pageBadgeVariant = isOnCurrentPage ? 'blueSolid' : 'muted';
     const isMerged = node.is_merged || (node.merged_from && node.merged_from.length > 0);
+    const p = VIEWER_PALETTE;
+    const orderBtnStyle = `font-size:10px; padding:1px 5px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgLight}; color:${p.textPrimary}; cursor:pointer; line-height:1.2;`;
 
     return `
         <div class="node-header">
@@ -378,6 +386,8 @@ function renderDOMTreeNodeCardComponent(node, options) {
                 <span class="node-id">${escapeHtml(node.node_id)}</span>
             </div>
             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
+                <button type="button" class="btn-order-up" style="${orderBtnStyle}" onclick="event.stopPropagation(); moveNodeOrderUp('${node.node_id}')" title="Move earlier in reading order">Up</button>
+                <button type="button" class="btn-order-down" style="${orderBtnStyle}" onclick="event.stopPropagation(); moveNodeOrderDown('${node.node_id}')" title="Move later in reading order">Dn</button>
                 <span class="badge-status" style="${inspectorBadgeStyle(pageBadgeVariant)}">P${nodePage}</span>
                 <span class="node-type type-${escapeHtml(node.type)}">${escapeHtml(node.type)}</span>
                 ${isFixed ? '<span class="node-corrected-badge">Fixed</span>' : ''}
@@ -405,4 +415,19 @@ function renderDOMTreeEmptyComponent(currentPage, totalNodes) {
             <span style="font-size:12px; color:${p.textMuted};">Shift+click the DOM page tab to show all ${totalNodes} elements across all pages.</span>
         </div>
     `;
+}
+
+/**
+ * Appends a preset flag token in the advanced custom OCR flags input.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {string} flagToken - Flag snippet to append if absent.
+ */
+function appendOcrCustomFlag(nodeId, flagToken) {
+    const inp = document.getElementById(`inpOcrCustomFlags_${nodeId}`);
+    if (!inp) return;
+    const current = inp.value.trim();
+    if (!current.includes(flagToken)) {
+        inp.value = current ? `${current} ${flagToken}` : flagToken;
+    }
 }
