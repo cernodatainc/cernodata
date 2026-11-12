@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import List, Dict, Any, Optional, Sequence
 from src.dom import DOMNode, DocumentDOM
+from src.quality.assertion_evaluator import evaluate_assertions
 from src.quality.evaluator import load_quality_config
 from src.quality.handlers import (
     DiacriticsLayerHandler,
@@ -20,6 +21,7 @@ from src.quality.handlers import (
 )
 from src.quality.language_config import LanguageConfig, get_language_config
 from src.quality.layers import ActiveVerificationLayers
+from src.schemas.test_suite import DocumentAssertionSuite
 
 
 def _check_garbage_violations(
@@ -39,12 +41,15 @@ def _check_diacritic_violations(
 
 
 def _check_structural_assertion_violations(
-    dom: DocumentDOM, counter: int = 1
+    dom: DocumentDOM,
+    counter: int = 1,
+    suite: Optional[DocumentAssertionSuite] = None,
 ) -> List[Dict[str, Any]]:
-    """Evaluates Level 3 structural and semantic layout consistency."""
-    # TODO(TASK-102): Hook Level 3 structural & semantic spot-checks (`AssertionEvaluator`) here when a
-    # `DocumentAssertionSuite` is provided (expected headers, regex patterns, forbidden boilerplate).
-    return StructureLayerHandler().detect_violations(dom, counter=counter)
+    """Evaluates Level 3 structural layout consistency and user-supplied assertion rules."""
+    violations = StructureLayerHandler().detect_violations(dom, counter=counter)
+    if suite is not None:
+        violations.extend(evaluate_assertions(dom, suite, counter=counter + len(violations)))
+    return violations
 
 
 def _check_table_grid_violations(
@@ -84,9 +89,11 @@ def detect_quality_violations(
     language: Optional[str] = "en",
     page_languages: Optional[Dict[int, str]] = None,
     layers: Optional[Sequence[str]] = None,
+    assertion_suite: Optional[DocumentAssertionSuite] = None,
 ) -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations across selected verification layers.
+    When `assertion_suite` is given, the structure layer also evaluates its rules.
     Composes single-rule check functions with language configuration and layer filters.
     Populates violations directly on each DOMNode.
     """
@@ -137,7 +144,10 @@ def detect_quality_violations(
         violations.extend(node_viols)
 
     document_level_checkers = [
-        (active_layers.structure, _check_structural_assertion_violations),
+        (
+            active_layers.structure,
+            lambda d, counter: _check_structural_assertion_violations(d, counter=counter, suite=assertion_suite),
+        ),
         (active_layers.tables, _check_table_grid_violations),
         (active_layers.geometry, _check_geometry_violations),
     ]
