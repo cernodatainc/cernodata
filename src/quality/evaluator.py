@@ -132,8 +132,6 @@ def evaluate_page_confidence_details(
         combined_text_score = c_score * l_score * s_score * g_score
 
         if node.type == "table_grid" and active_layers.tables:
-            # TODO(TASK-103): Replace static `cell_alignment_score` fallback with real Level 4 Markdown table
-            # grid validation (column count consistency across rows, numeric alignment, and empty header checks).
             t_score = _TABLES_HANDLER.evaluate_node(node)
             table_scores.append(t_score)
             score = 0.5 * combined_text_score + 0.5 * t_score

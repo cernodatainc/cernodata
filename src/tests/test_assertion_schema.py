@@ -66,7 +66,7 @@ class TestAssertionSchema(unittest.TestCase):
             "negative min_page": {"required_headers": [{"text": "A", "min_page": -1}]},
             "min_page above max_page": {"required_headers": [{"text": "A", "min_page": 5, "max_page": 2}]},
             "rule regex": {"regex_rules": [{"pattern": "[a-", "node_type": "text"}]},
-            "unknown node_type": {"regex_rules": [{"pattern": "x", "node_type": "list_item"}]},
+            "unknown node_type": {"regex_rules": [{"pattern": "x", "node_type": "chapter"}]},
             "negative min_matches": {"regex_rules": [{"pattern": "x", "node_type": "text", "min_matches": -1}]},
             "negative min_columns": {"table_rules": [{"min_columns": -1}]},
             "negative min_rows": {"table_rules": [{"min_rows": -2}]},
