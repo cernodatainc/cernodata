@@ -166,21 +166,10 @@ def compute_table_alignment_score(
     preset: Optional[str] = None,
 ) -> float:
     """Computes a table cell alignment score based on row column-count raggedness and optional OCR cell confidences."""
-    _ = preset
-    if not rows:
-        return 0.0
-    row_lens = [len(r) for r in rows if isinstance(r, list)]
-    if not row_lens:
-        return 0.0
+    from src.quality.table_validator import compute_grid_consistency
 
-    target_cols = expected_cols if expected_cols is not None else max(row_lens)
-    if target_cols == 0:
-        return 0.0
-
-    total_dev = sum(abs(l - target_cols) for l in row_lens)
-    total_expected_cells = max(1, target_cols * len(row_lens))
-    ragged_ratio = total_dev / total_expected_cells
-    grid_consistency = max(0.0, 1.0 - ragged_ratio)
+    _ = (expected_cols, preset)
+    grid_consistency = compute_grid_consistency([r for r in rows if isinstance(r, list)])
 
     if cell_confidences:
         avg_cell_conf = sum(cell_confidences) / len(cell_confidences)
