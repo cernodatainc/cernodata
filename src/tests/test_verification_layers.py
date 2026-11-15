@@ -162,7 +162,7 @@ class TestVerificationLayers(unittest.TestCase):
 
     def test_scoring_calculated_based_on_selected_criteria(self) -> None:
         """Verifies confidence scoring penalizes only active verification layers."""
-        node_diacritic_only = make_test_node("Sprawdź termin wykupu Möbel w piątku.", node_id="n_diac")
+        node_diacritic_only = make_test_node("Sprawdź termin wykupu möbel w piątku.", node_id="n_diac")
 
         score_symbols_only = evaluate_page_confidence(
             [node_diacritic_only], language="pl", layers=["symbols"]
@@ -242,7 +242,7 @@ class TestVerificationLayers(unittest.TestCase):
     def test_post_run_reverification_changes_decision_and_scoring(self) -> None:
         """Verifies deciding verification layers after run completion recalculates scoring."""
         dom = make_test_dom(
-            "Firma dostarczy nowe Möbel do biura.",
+            "Firma dostarczy nowe möbel do biura.",
             document_id="doc_post",
             source_filename="post_run.pdf",
             node_id="n_post",

@@ -93,7 +93,7 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertIsNone(get_language_config(None))
 
     def test_detect_quality_violations_with_page_languages(self):
-        dom = make_test_dom("Firma dostarczy nowe Möbel do biura.", document_id="doc_map", node_id="n_lang_map")
+        dom = make_test_dom("Firma dostarczy nowe möbel do biura.", document_id="doc_map", node_id="n_lang_map")
         violations = detect_quality_violations(dom, language="auto", page_languages={1: "pl"})
         self.assertTrue(any(v.get("rule_type") == "diacritic_conflict" for v in violations))
 
@@ -128,7 +128,7 @@ class TestQualityMetrics(unittest.TestCase):
 
     def test_diacritic_conflict_reduces_page_confidence(self):
         clean_node = make_test_node("Sprawdź termin wykupu obligacji w piątku.", node_id="n_clean")
-        conflicted_node = make_test_node("Sprawdź termin wykupu Möbel w piątku.", node_id="n_conflict")
+        conflicted_node = make_test_node("Sprawdź termin wykupu möbel w piątku.", node_id="n_conflict")
         clean_confidence = evaluate_page_confidence([clean_node], language="pl")
         conflicted_confidence = evaluate_page_confidence([conflicted_node], language="pl")
 
@@ -136,27 +136,37 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertLess(conflicted_confidence, clean_confidence)
 
     def test_detect_diacritic_conflict_violation(self):
-        dom = make_test_dom("Firma dostarczy nowe Möbel do biura.", document_id="doc_umlaut", node_id="n_umlaut")
+        dom = make_test_dom("Firma dostarczy nowe möbel do biura.", document_id="doc_umlaut", node_id="n_umlaut")
         violations = detect_quality_violations(dom, language="pl")
 
         conflict_viols = [v for v in violations if v["rule_type"] == "diacritic_conflict"]
         self.assertEqual(len(conflict_viols), 1)
         v = conflict_viols[0]
-        self.assertEqual(v["detected_snippet"], "Möbel")
-        self.assertEqual(v["suggested_correction"], "Móbel")
+        self.assertEqual(v["detected_snippet"], "möbel")
+        self.assertEqual(v["suggested_correction"], "móbel")
         self.assertIn("not valid in Polish", v["description"])
 
     def test_diacritic_conflict_without_replacement_has_no_identity_substitution(self):
-        dom = make_test_dom("Wystawa prac malarza Légera w muzeum.", document_id="doc_legera", node_id="n_legera")
+        dom = make_test_dom("Wystawa prac w małym café w muzeum.", document_id="doc_cafe", node_id="n_cafe")
         violations = detect_quality_violations(dom, language="pl")
 
         conflict_viols = [v for v in violations if v["rule_type"] == "diacritic_conflict"]
         self.assertEqual(len(conflict_viols), 1)
         v = conflict_viols[0]
-        self.assertEqual(v["detected_snippet"], "Légera")
+        self.assertEqual(v["detected_snippet"], "café")
         self.assertEqual(v["suggested_correction"], "")
         self.assertIsNone(v["suggestion"])
-        self.assertEqual(v["description"], "Diacritic conflict detected: 'é' is not valid in Polish in 'Légera'")
+        self.assertEqual(v["description"], "Diacritic conflict detected: 'é' is not valid in Polish in 'café'")
+
+    def test_capitalized_words_do_not_trigger_diacritic_violations(self):
+        dom = make_test_dom(
+            "Wystawa prac malarza Légera z Düsseldorf, Zürich i Quebec.",
+            document_id="doc_proper_nouns",
+            node_id="n_proper_nouns",
+        )
+        violations = detect_quality_violations(dom, language="pl")
+        diacritic_viols = [v for v in violations if v.get("type") == "diacritic"]
+        self.assertEqual(diacritic_viols, [])
 
     def test_custom_language_config_registration(self):
         custom_config = LanguageConfig(
@@ -172,7 +182,7 @@ class TestQualityMetrics(unittest.TestCase):
         self.assertEqual(retrieved.name, "Custom Language")
 
         clean_score = compute_language_score("Poročilo o delu in stroških", language="custom_lang")
-        conflicted_score = compute_language_score("Poročilo o delu Möbel", language="custom_lang")
+        conflicted_score = compute_language_score("Poročilo o delu möbel", language="custom_lang")
         self.assertEqual(clean_score, 1.0)
         self.assertLess(conflicted_score, 1.0)
 

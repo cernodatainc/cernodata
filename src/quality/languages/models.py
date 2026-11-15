@@ -106,6 +106,8 @@ class LanguageConfig:
         conflicts: List[Tuple[str, str, str]] = []
         tokens = re.findall(r"\b\w+\b", text)
         for token in tokens:
+            if not token or token[0].isupper():
+                continue
             seen_chars: Set[str] = set()
             for char in token:
                 if char in self.conflicting_diacritics and char not in seen_chars:
@@ -137,6 +139,8 @@ class LanguageConfig:
             matches = pattern.findall(text)
             for match in matches:
                 clean_match = match.strip(".,;:!?()[]\"'*")
+                if not clean_match or clean_match[0].isupper():
+                    continue
                 if clean_match.lower() not in self.allowed_anomalous_tokens:
                     lower_repl = repl_char.lower()
                     upper_repl = repl_char.upper()
