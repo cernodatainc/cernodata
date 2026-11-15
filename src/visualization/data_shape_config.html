@@ -74,38 +74,6 @@
         <div>
             <div class="status-banner" id="statusBanner"></div>
 
-            <!-- 0. Browse Previous Results & Completed Outputs -->
-            <div class="form-section">
-                <div class="section-header">
-                    <div class="section-num">0</div>
-                    <div class="section-title">Previous results</div>
-                    <div class="help-btn" tabindex="0"
-                        title="Select an existing run to inspect or reuse its parameters">
-                        <span class="help-icon">?</span>
-                    </div>
-                </div>
-
-                <div class="input-group">
-                    <label class="input-label" for="prevRunSelect">Completed run output</label>
-                    <div class="prev-run-row">
-                        <select id="prevRunSelect" class="override-select prev-run-select"
-                            onchange="onPreviousRunSelected(this.value)">
-                            <option value="">Choose a previous run</option>
-                        </select>
-                        <button type="button" class="btn btn-secondary btn-load-params"
-                            onclick="loadSelectedPreviousRunIntoWizard()">
-                            Load parameters
-                        </button>
-                        <a id="btnInspectViewer" href="/viewer.html" target="_blank"
-                            class="btn btn-secondary btn-view-params">
-                            Open in viewer
-                        </a>
-                    </div>
-                    <div id="prevRunSummary" class="prev-run-summary">
-                    </div>
-                </div>
-            </div>
-
             <!-- 1. Document & Ingestion Parameters -->
             <div class="form-section">
                 <div class="section-header">

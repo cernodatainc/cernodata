@@ -39,7 +39,7 @@ class TestPipelineServer(EphemeralServerTestCase):
             except OSError:
                 pass
         with open(dom_file, "w", encoding="utf-8") as f:
-            json.dump({"document_id": "doc_test", "source_filename": "Document 8.pdf", "total_pages": 1, "nodes": []}, f)
+            json.dump({"document_id": "doc_test", "source_filename": "Document 8.pdf", "total_pages": 6, "nodes": []}, f)
         with open(os.path.join(out_dir, "plan.json"), "w", encoding="utf-8") as f:
             json.dump({"document_path": "src/e2e/Document 8.pdf", "primary_preset": "docling_fast", "target_threshold": 0.82}, f)
             with open(os.path.join(out_dir, "plan_execution_result.json"), "w", encoding="utf-8") as f:
@@ -101,13 +101,15 @@ class TestPipelineServer(EphemeralServerTestCase):
             self.assertNotIn(removed, content)
 
     def test_viewer_html_endpoint_serves_untemplated_html(self) -> None:
-        for path in ("/viewer.html", "/viewer"):
-            status, content, headers = self._get(path)
-            self.assertEqual(status, 200)
-            self.assertIn("text/html", headers.get("Content-Type", ""))
-            for asset in ("/viewer.css", "/viewer.js", 'id="tabBtnDom"', 'id="tabBtnViol"'):
-                self.assertIn(asset, content)
-            self.assertNotIn("page-action-bar", content)
+        status, content, headers = self._get("/viewer.html")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", headers.get("Content-Type", ""))
+        for asset in ("/viewer.css", "/viewer.js", 'id="tabBtnDom"', 'id="tabBtnViol"'):
+            self.assertIn(asset, content)
+        self.assertNotIn("page-action-bar", content)
+
+        status_removed, _, _ = self._get("/viewer")
+        self.assertEqual(status_removed, 404)
 
     def test_static_css_and_js_served(self) -> None:
         # Test CSS

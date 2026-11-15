@@ -46,6 +46,18 @@ def open_pdf(pdf_path: str) -> Iterator[Optional[Any]]:
         pdf.close()
 
 
+def get_pdf_page_count(pdf_path: str) -> Optional[int]:
+    """Returns the total page count of a PDF file, or None if unreadable."""
+    with open_pdf(pdf_path) as pdf:
+        if pdf is None:
+            return None
+        try:
+            return len(pdf)
+        except Exception as ex:
+            logger.debug("Failed counting pages for '%s': %s", pdf_path, ex)
+            return None
+
+
 def slice_pdf_pages(pdf_path: str, page_indices: List[int], output_dir: str) -> str:
     """No-op hook returning original PDF path until single-page slicing is implemented."""
     # TODO(TASK-801): Implement `slice_pdf_pages(pdf_path, page_indices, output_dir)` using `pypdfium2` (`import_pages`)

@@ -90,6 +90,7 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 - `TASK-712`: ViteJS-based frontend build for the visual viewer
 - `TASK-713`: Preact component integration for interactive viewer (depends on `712`)
 - `TASK-714`: Single served application viewer and removal of per-run viewer.html generation (depends on `712`)
+- `TASK-715`: Heal missing or defaulted page assignments in DOM nodes
 
 ### 08. Page-Level Subdivision & Reassembly (`08-page-subdivision/`)
 - `TASK-801`: Single-page PDF slicer (`slice_pdf_pages`)
@@ -116,3 +117,7 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 ### 12. Scanner & Email Ingestion (`12-scanner-and-email-ingestion/`)
 - `TASK-1201`: Direct hardware scanner integration and ingestion
 - `TASK-1202`: Inbound email document receiver and scan-to-email consumer
+
+### 13. User-Defined File Groups (`13-file-groups/`)
+- `TASK-1301`: User-defined file groups in the Web Hub Explorer
+- `TASK-1302`: Group-scoped tests, attributes, and user-defined connectors (depends on `1301`)

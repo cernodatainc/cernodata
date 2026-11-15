@@ -131,8 +131,18 @@ class DocumentsMixin:
         return rel
 
     def get_previous_runs(self) -> List[Dict[str, Any]]:
-        """Finds completed output runs available in repository."""
-        return find_previous_runs(self.repo_root)
+        """Finds completed output runs available in repository, excluding removed runs."""
+        from src.pipeline.server.run_mapping_synthesis import is_run_removed
+        from src.pipeline.server.run_mappings import _read_removed_keys
+
+        persistent_data = load_persistent_mappings(self.repo_root)
+        removed_runs = {
+            normalize_path(str(x)) for x in _read_removed_keys(persistent_data) if x
+        }
+        runs = find_previous_runs(self.repo_root)
+        if not removed_runs:
+            return runs
+        return [r for r in runs if not is_run_removed(r, removed_runs)]
 
     def get_runs_grid(self, document_name: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe retrieval of previous runs table grid for a given document."""

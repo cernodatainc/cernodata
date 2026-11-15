@@ -353,4 +353,10 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             document_path=document_path,
             repo_root=self.session.repo_root,
         )
+        self.session._preset_cache.invalidate_document(
+            str(document_path).strip() if document_path else None
+        )
+        self.session.viewer_data = None
+        if self.session.current_result:
+            self.session.current_result = None
         self.send_ok({"run_id": run_id, "success": success})

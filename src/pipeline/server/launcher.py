@@ -129,7 +129,7 @@ def start_pipeline_server(
     print_banner([
         f"cernodata Ingestion Hub & Visual Server running at {url}",
         f"Dashboard Landing Page: {url}",
-        f"Interactive Visual Flow Viewer: {url}viewer",
+        f"Interactive Visual Flow Viewer: {url}viewer.html",
         f"Backend Hydration API: {url}api/viewer_data",
     ])
 

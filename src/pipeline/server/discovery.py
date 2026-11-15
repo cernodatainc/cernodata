@@ -165,7 +165,7 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
 
             seen_dirs.add(norm_rel)
 
-            validated_artifacts = load_validated_run_artifacts(match)
+            validated_artifacts = load_validated_run_artifacts(match, repo_root=root)
             if validated_artifacts is None:
                 # Corrupted or incomplete run failing schema contracts is dropped
                 continue

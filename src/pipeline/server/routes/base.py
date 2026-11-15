@@ -34,9 +34,10 @@ class BaseApiRoutesMixin:
         """Worker thread pool executor provided by host request handler."""
         raise NotImplementedError
 
-    def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:
-        """HTTP error sender stub satisfied by SimpleHTTPRequestHandler."""
-        ...
+    if TYPE_CHECKING:
+        def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:
+            """HTTP error sender stub satisfied by SimpleHTTPRequestHandler."""
+            ...
 
     def send_ok(self, data: Optional[Dict[str, Any]] = None, **extra: Any) -> None:
         """Sends a 200 OK JSON response with success: True."""

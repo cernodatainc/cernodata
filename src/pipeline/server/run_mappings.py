@@ -209,6 +209,27 @@ def record_run_mapping(
             existing_runs.append(run_record)
 
         doc_entry["runs"] = existing_runs
+
+        # Clear any stale removal keys for this document/run so newly executed runs appear in explorer
+        removed_set = set(_read_removed_keys(mappings))
+        if removed_set:
+            norm_run = normalize_path(run_id) if run_id else ""
+            norm_out = normalize_path(output_dir) if output_dir else ""
+            doc_base = os.path.basename(norm_path) if norm_path else ""
+            keys_to_clear: Set[str] = set()
+            for key in (norm_run, norm_out):
+                if not key:
+                    continue
+                if key != "output":
+                    keys_to_clear.add(key)
+                if norm_path:
+                    keys_to_clear.add(f"{norm_path}::{key}")
+                if doc_base:
+                    keys_to_clear.add(f"{doc_base}::{key}")
+            if keys_to_clear:
+                removed_set.difference_update(keys_to_clear)
+                mappings["_removed_runs"] = sorted(removed_set)
+
         save_persistent_mappings(mappings, repo_root)
 
 
@@ -235,15 +256,19 @@ def _record_removal_keys(
     norm_doc: Optional[str],
     doc_base: Optional[str],
 ) -> None:
-    """Adds removal keys to mappings without suppressing the shared "output" folder."""
+    """Adds removal keys scoped to the target run (and document when provided)."""
     removed_set = set(_read_removed_keys(mappings))
-    for item in (norm_run, norm_out):
-        if item and item != "output":
-            removed_set.add(item)
-        elif item == "output" and norm_doc:
-            removed_set.add(f"{norm_doc}::{item}")
-            if doc_base:
-                removed_set.add(f"{doc_base}::{item}")
+    primary_key = norm_run or norm_out
+    if not primary_key:
+        return
+
+    if norm_doc:
+        removed_set.add(f"{norm_doc}::{primary_key}")
+        if doc_base:
+            removed_set.add(f"{doc_base}::{primary_key}")
+    elif primary_key != "output":
+        removed_set.add(primary_key)
+
     mappings["_removed_runs"] = sorted(removed_set)
 
 
@@ -270,12 +295,42 @@ def _drop_matching_runs(
         for r in doc_entry.get("runs", []):
             r_id = normalize_path(str(r.get("run_id") or ""))
             r_dir = normalize_path(str(r.get("output_dir") or ""))
-            is_match = (norm_run and r_id == norm_run) or (norm_out and r_dir == norm_out)
+            if norm_run:
+                is_match = r_id == norm_run
+            else:
+                is_match = bool(norm_out and r_dir == norm_out)
             if is_match and not removed_one:
                 removed_one = True
                 continue
             filtered.append(r)
         doc_entry["runs"] = filtered
+
+
+def _is_directory_still_referenced(
+    root: str,
+    target_dir_name: str,
+    mappings: Dict[str, Any],
+) -> bool:
+    """Returns True if any remaining persisted or discovered run still uses target_dir_name."""
+    norm_target = normalize_path(target_dir_name)
+    for k, doc_entry in mappings.items():
+        if k.startswith("_") or not isinstance(doc_entry, dict):
+            continue
+        for r in doc_entry.get("runs", []):
+            r_dir = normalize_path(str(r.get("output_dir") or ""))
+            if r_dir == norm_target:
+                return True
+
+    removed_runs: Set[str] = {
+        normalize_path(str(x)) for x in _read_removed_keys(mappings) if x
+    }
+    for disc in find_previous_runs(root):
+        if _is_run_removed(disc, removed_runs):
+            continue
+        disc_dir = normalize_path(str(disc.get("dir_path") or ""))
+        if disc_dir == norm_target:
+            return True
+    return False
 
 
 def _delete_run_directory(root: str, target_dir_name: str) -> None:
@@ -343,7 +398,8 @@ def remove_run_mapping(
 
         target_dir_name = output_dir or run_id
         if target_dir_name and target_dir_name != "output":
-            _delete_run_directory(root, target_dir_name)
+            if not _is_directory_still_referenced(root, target_dir_name, mappings):
+                _delete_run_directory(root, target_dir_name)
         elif target_dir_name == "output" and norm_doc:
             _clean_root_output_for_document(root, norm_doc, doc_base)
 
@@ -379,7 +435,7 @@ def get_file_run_mappings(
         }
 
         associate_discovered_runs(doc_mappings, discovered_runs, forgotten_files=forgotten_files)
-        merge_persistent_runs(doc_mappings, persistent_data, removed_runs)
+        merge_persistent_runs(doc_mappings, persistent_data, removed_runs, repo_root=root)
 
         file_sets_list, all_mappings_list = group_into_file_sets(doc_mappings)
         active_doc, active_run = pick_active_selection(all_mappings_list)

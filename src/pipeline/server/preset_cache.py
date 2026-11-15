@@ -109,6 +109,25 @@ class PresetCache:
             for k in keys_to_cache:
                 self.preset_results[k] = cached_copy
 
+    def invalidate_document(self, pdf_path: Optional[str] = None) -> None:
+        """
+        Invalidates cached preset results for a specific document or the entire cache.
+
+        Args:
+            pdf_path: Optional document path whose cache entries should be evicted.
+        """
+        with self._lock:
+            if not pdf_path:
+                self.preset_results.clear()
+                return
+            doc_base = os.path.basename(pdf_path).strip().lower()
+            if not doc_base:
+                self.preset_results.clear()
+                return
+            prefix = f"{doc_base}:"
+            for k in [key for key in self.preset_results if key.startswith(prefix)]:
+                del self.preset_results[k]
+
     def find_in_previous_runs(
         self,
         pdf_path: str,

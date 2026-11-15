@@ -317,7 +317,23 @@ async function removeExplorerRun(runId, outputDir, docPath) {
             currentExplorerRun = '';
             currentExplorerScope = 'file';
         }
+        if (window.runResultsCache) {
+            if (runId) delete window.runResultsCache[runId];
+            if (outputDir) delete window.runResultsCache[outputDir];
+        }
+        if (typeof availableRuns !== 'undefined' && Array.isArray(availableRuns)) {
+            const targetBase = docPath ? docPath.split(/[/\\]/).pop().toLowerCase() : '';
+            availableRuns = availableRuns.filter(r => {
+                const rDir = r.dir_path || r.run_id || '';
+                const rDocBase = (r.document_name || r.document_path || '').split(/[/\\]/).pop().toLowerCase();
+                if (targetBase && rDocBase && rDocBase !== targetBase) return true;
+                return rDir !== outputDir && rDir !== runId;
+            });
+        }
         await loadFileRunMappings();
+        if (typeof loadPreviousRunsList === 'function') {
+            await loadPreviousRunsList();
+        }
     } catch (e) {
         console.log('[WARN] Failed to remove run:', e);
     }

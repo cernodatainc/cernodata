@@ -278,6 +278,7 @@ async function onPipelineCompleted(result) {
 
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof reloadViewerIframe === 'function') reloadViewerIframe();
+    if (typeof loadPreviousRunsList === 'function') loadPreviousRunsList();
     if (typeof loadFileRunMappings === 'function') {
         await loadFileRunMappings();
     }

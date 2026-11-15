@@ -35,9 +35,10 @@ class StaticRoutesMixin:
         """Session context provided by host request handler."""
         raise NotImplementedError
 
-    def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:
-        """HTTP error sender stub satisfied by SimpleHTTPRequestHandler."""
-        ...
+    if TYPE_CHECKING:
+        def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:
+            """HTTP error sender stub satisfied by SimpleHTTPRequestHandler."""
+            ...
 
     def _serve_landing_page(self) -> None:
         """

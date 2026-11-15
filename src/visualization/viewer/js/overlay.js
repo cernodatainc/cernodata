@@ -44,9 +44,6 @@ function createSvgElem(tag, attrs) {
  * @returns {SVGPoint} Scaled point in SVG coordinates.
  */
 function getSvgCoordinates(evt) {
-    if (window.viewerInputManager && typeof window.viewerInputManager.getSvgCoordinates === 'function') {
-        return window.viewerInputManager.getSvgCoordinates(evt);
-    }
     const svg = document.getElementById('svgOverlay');
     if (!svg) return { x: 0, y: 0 };
     try {
@@ -172,6 +169,7 @@ function renderSVGOverlays() {
         }
     };
     svg.onmousedown = (e) => {
+        if (window.viewerInputManager) return;
         if (isDrawSectionMode) {
             e.preventDefault();
             e.stopPropagation();

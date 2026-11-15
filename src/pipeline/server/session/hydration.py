@@ -11,6 +11,7 @@ import os
 import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
 
+from src.parsers.pdf_utils import get_pdf_page_count
 from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.server.artifacts import (
     ViewerDataset,
@@ -162,6 +163,12 @@ class ViewerHydrationMixin:
 
             pdf_path = resolved_pdf
             total_pages = self._validate_total_pages(dom_data, f"in '{target_full}'")
+            if os.path.isfile(pdf_path):
+                actual_pages = get_pdf_page_count(pdf_path)
+                if actual_pages is not None and actual_pages >= 1 and total_pages != actual_pages:
+                    raise ValueError(
+                        f"Run page count ({total_pages}) does not match PDF page count ({actual_pages}) in '{target_full}'."
+                    )
 
             page_images, page_dimensions = load_or_render_page_images(
                 pdf_path=pdf_path,

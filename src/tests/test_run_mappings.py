@@ -415,4 +415,76 @@ class TestRunMappings(unittest.TestCase):
         self.assertNotEqual(mappings.get("active_file"), "test_output")
         self.assertNotEqual(mappings.get("active_file"), "./test_output")
 
+    def test_remove_single_step_in_shared_directory_preserves_other_runs(self) -> None:
+        from src.pipeline.server.run_mappings import remove_run_mapping
+
+        shared_dir = os.path.join(self.test_dir, "output", "shared_run")
+        os.makedirs(shared_dir, exist_ok=True)
+        record_run_mapping(
+            document_path="src/e2e/Document 8.pdf",
+            run_id="output/shared_run:step_1",
+            output_dir="output/shared_run",
+            preset="docling_fast",
+            status="TRIGGER_FALLBACK",
+            confidence=0.60,
+            violations_count=2,
+            repo_root=self.test_dir,
+        )
+        record_run_mapping(
+            document_path="src/e2e/Document 8.pdf",
+            run_id="output/shared_run:step_2",
+            output_dir="output/shared_run",
+            preset="docling_deep",
+            status="ACCEPT",
+            confidence=0.95,
+            violations_count=0,
+            repo_root=self.test_dir,
+        )
+
+        ok = remove_run_mapping(
+            run_id="output/shared_run:step_1",
+            output_dir="output/shared_run",
+            document_path="src/e2e/Document 8.pdf",
+            repo_root=self.test_dir,
+        )
+        self.assertTrue(ok)
+        self.assertTrue(os.path.isdir(shared_dir))
+
+        mappings = get_file_run_mappings(self.test_dir)
+        d8 = next(d for d in mappings["all_mappings"] if d["file_name"] == "Document 8.pdf")
+        run_ids = [r["run_id"] for r in d8["runs"]]
+        self.assertNotIn("output/shared_run:step_1", run_ids)
+        self.assertIn("output/shared_run:step_2", run_ids)
+
+    def test_duplicate_document_paths_deduplicated_by_filename(self) -> None:
+        e2e_dir = os.path.join(self.test_dir, "src", "e2e")
+        out_dir = os.path.join(self.test_dir, "output")
+        os.makedirs(e2e_dir, exist_ok=True)
+        os.makedirs(out_dir, exist_ok=True)
+        for p in (os.path.join(e2e_dir, "Document 8.pdf"), os.path.join(out_dir, "Document 8.pdf")):
+            with open(p, "wb") as f:
+                f.write(b"%PDF-1.4 mock")
+
+        mappings = get_file_run_mappings(
+            self.test_dir,
+            available_docs=["src/e2e/Document 8.pdf", "Document 8.pdf"],
+        )
+        d8_entries = [d for d in mappings["all_mappings"] if d["file_name"] == "Document 8.pdf"]
+        self.assertEqual(len(d8_entries), 1)
+
+    def test_rerecording_removed_run_clears_removal_key(self) -> None:
+        from src.pipeline.server.run_mappings import remove_run_mapping
+
+        record_run_mapping("src/e2e/Document 8.pdf", "output", "output", "docling_fast", "ACCEPT", 0.9, 0, repo_root=self.test_dir)
+        remove_run_mapping(run_id="output", output_dir="output", document_path="src/e2e/Document 8.pdf", repo_root=self.test_dir)
+        after_rm = get_file_run_mappings(self.test_dir)
+        d8_rm = next(d for d in after_rm["all_mappings"] if d["file_name"] == "Document 8.pdf")
+        self.assertEqual(len(d8_rm["runs"]), 0)
+
+        record_run_mapping("src/e2e/Document 8.pdf", "output", "output", "docling_fast", "ACCEPT", 0.95, 0, repo_root=self.test_dir)
+        after_re = get_file_run_mappings(self.test_dir)
+        d8_re = next(d for d in after_re["all_mappings"] if d["file_name"] == "Document 8.pdf")
+        self.assertEqual(len(d8_re["runs"]), 1)
+        self.assertEqual(d8_re["runs"][0]["run_id"], "output")
+
 

@@ -151,3 +151,63 @@ class TestContractSchemas(unittest.TestCase):
         self.assertEqual(run.decision.preset_id, "docling_fast")
         self.assertEqual(run.overall_confidence, 0.94)
         self.assertEqual(run.status, "ACCEPT")
+
+    def test_mismatched_page_count_run_is_dropped(self) -> None:
+        # Document 8.pdf has 6 pages; a run claiming total_pages=2 must be dropped as invalid.
+        dom_file = os.path.join(self.temp_dir, "document_dom.json")
+        with open(dom_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "document_id": "d_mismatch",
+                    "source_filename": "src/e2e/Document 8.pdf",
+                    "total_pages": 2,
+                    "nodes": [],
+                },
+                f,
+            )
+        dec_file = os.path.join(self.temp_dir, "decision_tree.json")
+        with open(dec_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "preset_id": "docling_fast",
+                    "overall_confidence": 0.94,
+                    "per_page_confidence": {"1": 0.94, "2": 0.94},
+                    "status": "ACCEPT",
+                    "chosen_preset": "docling_fast",
+                },
+                f,
+            )
+        self.assertIsNone(load_validated_run_artifacts(self.temp_dir))
+
+    def test_out_of_bounds_node_page_index_is_dropped(self) -> None:
+        dom_file = os.path.join(self.temp_dir, "document_dom.json")
+        with open(dom_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "document_id": "d_oob",
+                    "source_filename": "s.pdf",
+                    "total_pages": 2,
+                    "nodes": [
+                        {
+                            "node_id": "n_oob",
+                            "type": "paragraph",
+                            "global_page_index": 5,
+                            "temp_slice_index": 1,
+                        }
+                    ],
+                },
+                f,
+            )
+        dec_file = os.path.join(self.temp_dir, "decision_tree.json")
+        with open(dec_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "preset_id": "docling_fast",
+                    "overall_confidence": 0.94,
+                    "per_page_confidence": {"1": 0.94},
+                    "status": "ACCEPT",
+                    "chosen_preset": "docling_fast",
+                },
+                f,
+            )
+        self.assertIsNone(load_validated_run_artifacts(self.temp_dir))
