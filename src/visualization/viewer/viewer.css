@@ -601,12 +601,42 @@ select.type-filter option:checked {
 .visual-pane {
     flex: 1.25;
     background: var(--ui-bg-page);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.visual-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 14px;
+    background: var(--ui-bg-hover);
+    border-bottom: 1px solid var(--ui-border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.visual-pane-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ui-text-muted);
+    white-space: nowrap;
+}
+
+.visual-pane-body {
+    flex: 1;
+    width: 100%;
     padding: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    position: relative;
     overflow: auto;
     min-height: 0;
 }
@@ -816,33 +846,43 @@ select.type-filter option:checked {
 /* Score badge */
  
 .score-badge-box {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    background: rgba(247, 246, 243, 0.97);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    background: transparent;
     border: 1px solid var(--ui-border);
-    border-left: 3px solid var(--ui-green);
-    padding: 8px 14px;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(31, 29, 26, 0.12);
-    z-index: 50;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--ui-text-muted);
 }
  
 .score-badge-box.fail {
-    border-left-color: var(--ui-red);
+    border-color: var(--ui-red-border);
+    background: var(--ui-red-bg);
 }
  
 .score-title {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 500;
     color: var(--ui-text);
+}
+
+.score-badge-box.fail .score-title {
+    color: var(--ui-red);
+}
+
+.score-sep {
+    color: var(--ui-border-hover);
 }
  
 .score-sub {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 400;
     color: var(--ui-text-muted);
-    margin-top: 2px;
+    margin-top: 0;
 }
  
 /* Inspector */

@@ -1,13 +1,18 @@
         <div class="visual-pane" id="visualPane">
-            <div class="canvas-container" id="canvasContainer">
-                <img src="{{ img_data_uri }}" id="pageImg" alt="Page Canvas" />
-                <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
+            <div class="visual-pane-header">
+                <span class="visual-pane-title">Visual Flow</span>
+                <div class="score-badge-box {{ score_badge_classes }}" id="scoreBadge">
+                    <span class="score-title" id="scoreTitle">Page 1 confidence score: {{ page1_confidence }}</span>
+                    <span class="score-sep" aria-hidden="true">&middot;</span>
+                    <span class="score-sub" id="scoreSub">
+                        Status: {{ decision_status }} | Overall Confidence: {{ overall_confidence }} | Violations Flagged: {{ violations_count }}
+                    </span>
+                </div>
             </div>
-
-            <div class="score-badge-box {{ score_badge_classes }}" id="scoreBadge">
-                <div class="score-title" id="scoreTitle">Page 1 confidence score: {{ page1_confidence }}</div>
-                <div class="score-sub" id="scoreSub">
-                    Status: {{ decision_status }} | Overall Confidence: {{ overall_confidence }} | Violations Flagged: {{ violations_count }}
+            <div class="visual-pane-body">
+                <div class="canvas-container" id="canvasContainer">
+                    <img src="{{ img_data_uri }}" id="pageImg" alt="Page Canvas" />
+                    <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
                 </div>
             </div>
         </div>

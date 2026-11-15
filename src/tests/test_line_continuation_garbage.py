@@ -22,6 +22,9 @@ class TestLineContinuationNotGarbage(unittest.TestCase):
             "sth sth - sth",
             "sth sth | sth",
             "sth sth \u2212 sth",
+            "72 Nie każda awaria to katastrofa ...w ruchu lotniczym.",
+            "72 Nie każda awaria to katastrofa \u2026w ruchu lotniczym.",
+            "72 Nie każda awaria to katastrofa...w ruchu lotniczym.",
         ]
         for text in samples:
             with self.subTest(text=text):

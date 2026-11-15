@@ -183,15 +183,20 @@
 
     <div class="workspace">
         <div class="visual-pane" id="visualPane">
-            <div class="canvas-container" id="canvasContainer">
-                <img src="" id="pageImg" alt="Page Canvas" />
-                <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
+            <div class="visual-pane-header">
+                <span class="visual-pane-title">Visual Flow</span>
+                <div class="score-badge-box" id="scoreBadge">
+                    <span class="score-title" id="scoreTitle">Page 1 Confidence Score: 1.0000</span>
+                    <span class="score-sep" aria-hidden="true">&middot;</span>
+                    <span class="score-sub" id="scoreSub">
+                        Status: ACCEPT | Overall Confidence: 1.0000 | Violations Flagged: 0
+                    </span>
+                </div>
             </div>
-
-            <div class="score-badge-box" id="scoreBadge">
-                <div class="score-title" id="scoreTitle">Page 1 Confidence Score: 1.0000</div>
-                <div class="score-sub" id="scoreSub">
-                    Status: ACCEPT | Overall Confidence: 1.0000 | Violations Flagged: 0
+            <div class="visual-pane-body">
+                <div class="canvas-container" id="canvasContainer">
+                    <img src="" id="pageImg" alt="Page Canvas" />
+                    <svg class="svg-overlay" id="svgOverlay" viewBox="0 0 595.28 841.89" preserveAspectRatio="none"></svg>
                 </div>
             </div>
         </div>

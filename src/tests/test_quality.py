@@ -37,6 +37,16 @@ class TestQualityMetrics(unittest.TestCase):
         garbage_viols = [v for v in violations if v.get("rule_type") == "garbage_character_ratio"]
         self.assertEqual(len(garbage_viols), 0)
 
+    def test_mid_paragraph_ellipsis_linebreak_does_not_trip_symbol_violation(self):
+        text = "72 Nie każda awaria to katastrofa ...w ruchu lotniczym."
+        self.assertEqual(compute_garbage_ratio(text), 0.0)
+
+        node = make_test_node(text, node_id="node_p5_n131")
+        dom = make_test_dom(nodes=[node], document_id="doc_p5")
+        violations = detect_quality_violations(dom, language="pl")
+        symbol_viols = [v for v in violations if v.get("type") == "symbols"]
+        self.assertEqual(len(symbol_viols), 0)
+
     def test_polish_language_diacritic_anomaly_detection(self):
         clean_pl_text = "Sprawdź termin wykupu swoich obligacji i zamień je na nowe w piątku."
         pl_score_clean = compute_language_score(clean_pl_text, language="pl")

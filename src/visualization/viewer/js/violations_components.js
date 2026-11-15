@@ -172,12 +172,15 @@ function renderViolationCardHeaderComponent(v, cat, vPage, isFixed, isSupp) {
  */
 function renderViolationCardSnippetComponent(v) {
     const p = VIOLATIONS_PALETTE;
-    const hasCorrection = v.suggested_correction && v.suggested_correction !== v.detected_snippet;
-    const snippetHtml = `
+    const snippetStr = (v && v.detected_snippet !== undefined && v.detected_snippet !== null) ? String(v.detected_snippet) : '';
+    const corrStr = (v && v.suggested_correction !== undefined && v.suggested_correction !== null) ? String(v.suggested_correction) : '';
+    const hasSnippet = snippetStr.length > 0;
+    const hasCorrection = corrStr.length > 0 && corrStr !== snippetStr;
+    const snippetHtml = (hasSnippet || hasCorrection) ? `
         <div style="font-size:12px; font-family:monospace; margin-top:6px; padding:4px 8px; background:${p.bgCard}; border:1px solid ${p.border}; border-radius:4px; color:${p.textPrimary}; word-break:break-word;">
-            <span style="color:${p.textMuted};">Snippet:</span> '${escapeHtml(v.detected_snippet || '')}'${hasCorrection ? ` <span style="color:${p.textMuted};">→</span> '${escapeHtml(v.suggested_correction)}'` : ''}
+            <span style="color:${p.textMuted};">Snippet:</span> '${escapeHtml(snippetStr)}'${hasCorrection ? ` <span style="color:${p.textMuted};">→</span> '${escapeHtml(corrStr)}'` : ''}
         </div>
-    `;
+    ` : '';
     const rewriteHtml = (hasCorrection && v.suggestion && v.suggestion !== v.suggested_correction && v.suggestion !== (v.raw_text || '')) ? `
         <div style="font-size:12px; font-family:monospace; margin-top:4px; color:${p.green}; word-break:break-word;">
             <span style="color:${p.textMuted};">Rewrite:</span> '${escapeHtml(v.suggestion)}'

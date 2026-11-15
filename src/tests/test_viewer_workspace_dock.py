@@ -53,6 +53,7 @@ function makeMockEl(id) {
             contains: (c) => classes.has(c)
         },
         querySelector: () => null,
+        addEventListener: () => {},
         getBoundingClientRect: () => ({ left: 40, top: 80, width: 300, height: 40 })
     };
 }
@@ -62,7 +63,10 @@ const mockEls = {
     btnFoldInspector: makeMockEl('btnFoldInspector'),
     btnAnchorInspector: makeMockEl('btnAnchorInspector'),
     toolboxNav: makeMockEl('toolboxNav'),
-    toggleKeyHints: makeMockEl('toggleKeyHints')
+    toggleKeyHints: makeMockEl('toggleKeyHints'),
+    visualPane: Object.assign(makeMockEl('visualPane'), { clientWidth: 700 }),
+    canvasContainer: Object.assign(makeMockEl('canvasContainer'), { offsetHeight: 1000 }),
+    zoomDisplay: makeMockEl('zoomDisplay')
 };
 const bodyClasses = new Set();
 
@@ -111,6 +115,26 @@ assert.strictEqual(updateKeyHintsOverlay(true), true);
 assert.strictEqual(bodyClasses.has('show-key-hints'), true);
 assert.strictEqual(updateKeyHintsOverlay(false), false);
 assert.strictEqual(bodyClasses.has('show-key-hints'), false);
+
+// Test fitWidthZoom default calculation
+fitWidthZoom();
+assert.strictEqual(currentZoom, 0.75);
+assert.strictEqual(mockEls.zoomDisplay.textContent, '75%');
+
+// Test uncovered_visual_region empty snippet/correction rendering
+const emptySnippetHtml = renderViolationCardSnippetComponent({
+    rule_type: 'uncovered_visual_region',
+    detected_snippet: '',
+    suggested_correction: ''
+});
+assert.strictEqual(emptySnippetHtml, '');
+
+const validSnippetHtml = renderViolationCardSnippetComponent({
+    rule_type: 'diacritic',
+    detected_snippet: 'abc',
+    suggested_correction: 'def'
+});
+assert(validSnippetHtml.includes('abc') && validSnippetHtml.includes('def'));
 """
         )
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tmp:

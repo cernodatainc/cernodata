@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 import unittest
 
+from src.dom import BoundingBox, DOMNode, DocumentDOM
+from src.visualization.html_viewer import generate_interactive_html
 from src.visualization.viewer.scripts import bundle_viewer_js
 
 
@@ -100,6 +102,43 @@ assert(!largeTableCardHtml.includes('<td>R6</td>'), 'Rows beyond preview cap sho
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
+
+    def test_score_badge_in_visual_flow_header(self):
+        dom = DocumentDOM(
+            document_id="doc_score_hdr",
+            source_filename="sample.pdf",
+            total_pages=1,
+            nodes=[
+                DOMNode(
+                    node_id="n1",
+                    type="paragraph",
+                    global_page_index=1,
+                    temp_slice_index=1,
+                    bounding_box=BoundingBox(10, 10, 100, 30),
+                    content={"raw_text": "Sample"},
+                )
+            ],
+        )
+        out_path = generate_interactive_html(
+            "non_existent.pdf",
+            dom=dom,
+            decision={"chosen_preset": "docling_fast", "overall_confidence": 0.95},
+            violations=[],
+            output_path="test_output/test_score_header.html",
+        )
+        try:
+            with open(out_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("visual-pane-header", content)
+            self.assertIn("Visual Flow", content)
+            hdr_pos = content.find("visual-pane-header")
+            badge_pos = content.find('id="scoreBadge"')
+            canvas_pos = content.find('id="canvasContainer"')
+            self.assertGreater(badge_pos, hdr_pos)
+            self.assertLess(badge_pos, canvas_pos)
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
 
 
 if __name__ == "__main__":

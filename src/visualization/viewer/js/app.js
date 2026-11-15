@@ -49,6 +49,9 @@ async function startViewer() {
 
     initPageControls();
     switchPage(targetPageParam);
+    if (typeof fitWidthZoom === 'function') {
+        fitWidthZoom();
+    }
 }
 
 const pageImgEl = document.getElementById('pageImg');

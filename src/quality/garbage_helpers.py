@@ -39,6 +39,9 @@ SOUP_PENALTY_WEIGHT: int = 2
 
 _LEADING_CONTINUATION_RE = re.compile(r"^(?:-|\.{3}|\u2026)[^\W\d_]+$")
 _TRAILING_CONTINUATION_RE = re.compile(r"^[^\W\d_]+-$")
+_ELLIPSIS_CONTINUATION_RE = re.compile(
+    r"^(?:[^\W_]+)?(?:\.{2,4}|\u2026)[^\W_]+[,;:.!?]*$"
+)
 
 
 def evaluate_unicode_anomalies(text: str) -> int:
@@ -94,9 +97,15 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
         if is_line_continuation_token(stripped, idx == 0, idx == last_idx):
             continue
 
+        # Line-break / continuation ellipses attached to words (e.g. "...w", "…w")
+        # are layout/linebreak artifacts rather than OCR symbol corruption.
+        if _ELLIPSIS_CONTINUATION_RE.match(stripped):
+            continue
+
         is_bullet_or_allowed = stripped in ALLOWED_STANDALONE
         is_pure_punct = all(unicodedata.category(c).startswith(('P', 'S')) for c in stripped)
-        clean_punct = re.sub(r'\.{2,4}$', '', stripped).rstrip('…')
+        clean_punct = re.sub(r'^(?:\.{2,4}|\u2026)', '', stripped)
+        clean_punct = re.sub(r'\.{2,4}$', '', clean_punct).rstrip('…')
 
         if is_pure_punct and not is_bullet_or_allowed:
             soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT

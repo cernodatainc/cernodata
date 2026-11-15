@@ -205,7 +205,9 @@ function resetZoom() {
  */
 function fitWidthZoom() {
     const pane = document.getElementById('visualPane');
+    if (!pane) return;
     const availableW = pane.clientWidth - 40;
+    if (availableW <= 0) return;
     currentZoom = Math.min(2.0, Math.max(0.6, availableW / 880));
     applyZoom();
 }
@@ -231,7 +233,7 @@ function applyZoom() {
 function updateLayers() {
     renderSVGOverlays();
     const showScore = document.getElementById('toggleScore').checked;
-    document.getElementById('scoreBadge').style.display = showScore ? 'block' : 'none';
+    document.getElementById('scoreBadge').style.display = showScore ? '' : 'none';
 }
 
 

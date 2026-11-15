@@ -627,6 +627,9 @@ function hydrateViewer(data, pageNum = null) {
     }
     initPageControls();
     switchPage(targetPage);
+    if (typeof fitWidthZoom === 'function') {
+        fitWidthZoom();
+    }
     renderDecisionLog();
     renderPlanTab();
 }

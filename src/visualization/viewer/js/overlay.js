@@ -267,9 +267,19 @@ function renderSVGOverlays() {
             nodeViols.forEach((viol, vIdx) => {
                 const g = createSvgElem('g', {});
                 const isFixed = !!viol.is_fixed || !!node.is_fixed || activePresetIndex === 1;
-                const labelText = isFixed
-                    ? `Fixed: '${viol.detected_snippet}' → '${viol.suggested_correction || ''}'`
-                    : `Violation: '${viol.detected_snippet}' → '${viol.suggested_correction || ''}'`;
+                const snippetStr = (viol.detected_snippet !== undefined && viol.detected_snippet !== null) ? String(viol.detected_snippet) : '';
+                const corrStr = (viol.suggested_correction !== undefined && viol.suggested_correction !== null) ? String(viol.suggested_correction) : '';
+                const hasSnippet = snippetStr.length > 0;
+                const hasCorr = corrStr.length > 0 && corrStr !== snippetStr;
+                const prefix = isFixed ? 'Fixed' : 'Violation';
+                let labelText;
+                if (hasSnippet && hasCorr) {
+                    labelText = `${prefix}: '${snippetStr}' → '${corrStr}'`;
+                } else if (hasSnippet) {
+                    labelText = `${prefix}: '${snippetStr}'`;
+                } else {
+                    labelText = `${prefix}: ${viol.rule_type || viol.type || 'Manual review'}`;
+                }
  
                 const yOffset = vIdx * 20;
                 const badgeBg = createSvgElem('rect', {
