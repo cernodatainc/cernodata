@@ -416,3 +416,70 @@ function renderTableEditorComponent(node) {
         </div>
     `;
 }
+
+/**
+ * Renders a compact HTML table preview for a table_grid node in the DOM tree card.
+ *
+ * @param {Object} node - Target DOM node.
+ * @param {string} displayText - Fallback raw text if structured table rows are unavailable.
+ * @returns {string} HTML markup.
+ */
+function renderDOMTreeNodeTablePreviewComponent(node, displayText) {
+    if (typeof extractNodeTableData !== 'function') {
+        return `<div class="node-text">${escapeHtml(displayText)}</div>`;
+    }
+    const data = extractNodeTableData(node);
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    const headers = Array.isArray(data.headers) ? data.headers : [];
+    const numCols = data.numCols || (headers.length || (rows[0] ? rows[0].length : 0));
+    if (rows.length === 0 || numCols === 0) {
+        return `<div class="node-text">${escapeHtml(displayText)}</div>`;
+    }
+
+    const fixCell = (val) => {
+        const str = String(val === null || val === undefined ? '' : val);
+        if (typeof activePresetIndex !== 'undefined' && activePresetIndex === 1 && typeof applyCorrectionsToNodeText === 'function') {
+            return applyCorrectionsToNodeText(str);
+        }
+        return str;
+    };
+
+    const effectiveHdrIdx = Number.isFinite(data.effectiveHdrIdx) ? data.effectiveHdrIdx : 0;
+    const hdrRowIdx = (effectiveHdrIdx >= 0 && effectiveHdrIdx < rows.length) ? effectiveHdrIdx : 0;
+    const skipHdr = headers.length > 0 && rows.length > 1 && rows[hdrRowIdx] &&
+        rows[hdrRowIdx].every((val, idx) => val === headers[idx] || (!val && String(headers[idx] || '').startsWith('Col ')));
+    const dataRows = skipHdr ? rows.filter((_, idx) => idx !== hdrRowIdx) : rows;
+    const previewRows = dataRows.slice(0, 5);
+    const hiddenRowCount = Math.max(0, dataRows.length - previewRows.length);
+
+    const headerCellsHtml = Array.from({ length: numCols }, (_, c) => {
+        const title = (c < headers.length && headers[c]) ? fixCell(headers[c]) : `Col ${c + 1}`;
+        return `<th>${escapeHtml(title)}</th>`;
+    }).join('');
+    const bodyRowsHtml = previewRows.map((r) => {
+        const tds = Array.from({ length: numCols }, (_, c) => {
+            const val = (Array.isArray(r) && c < r.length) ? fixCell(r[c]) : '';
+            return `<td>${escapeHtml(val)}</td>`;
+        }).join('');
+        return `<tr>${tds}</tr>`;
+    }).join('');
+
+    const safeId = escapeHtml(node.node_id || '');
+    const titleHtml = data.tableTitle ? `<div class="node-table-preview-title">${escapeHtml(fixCell(data.tableTitle))}</div>` : '';
+    const moreRowsText = hiddenRowCount > 0 ? ` (+${hiddenRowCount} more)` : '';
+    return `
+        <div class="node-table-preview">
+            <div class="node-table-preview-meta">
+                <span>${data.numRows || rows.length} rows x ${numCols} cols${moreRowsText}</span>
+                <button type="button" class="node-table-preview-btn" onclick="event.stopPropagation(); openTableModal('${safeId}')" title="Open full table viewer">View table</button>
+            </div>
+            ${titleHtml}
+            <div class="node-table-preview-scroll">
+                <table class="node-table-preview-table">
+                    <thead><tr>${headerCellsHtml}</tr></thead>
+                    <tbody>${bodyRowsHtml}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}

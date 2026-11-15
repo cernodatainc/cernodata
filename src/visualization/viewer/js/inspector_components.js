@@ -432,6 +432,10 @@ function renderDOMTreeNodeCardComponent(node, options) {
     const isMerged = node.is_merged || (node.merged_from && node.merged_from.length > 0);
     const p = INSPECTOR_PALETTE;
     const orderBtnStyle = `font-size:10px; padding:1px 5px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgCard}; color:${p.textPrimary}; cursor:pointer; line-height:1.2;`;
+    const isTable = node.type === 'table_grid' || (node.content && (node.content.rows || node.content.markdown_table || node.content.grid));
+    const bodyHtml = (isTable && typeof renderDOMTreeNodeTablePreviewComponent === 'function')
+        ? renderDOMTreeNodeTablePreviewComponent(node, displayText)
+        : `<div class="node-text">${escapeHtml(displayText)}</div>`;
 
     return `
         <div class="node-header">
@@ -451,7 +455,7 @@ function renderDOMTreeNodeCardComponent(node, options) {
                 ${isIncorrect ? '<span class="node-incorrect-badge">Incorrect text</span>' : ''}
             </div>
         </div>
-        <div class="node-text">${escapeHtml(displayText)}</div>
+        ${bodyHtml}
         ${isSymbolsOnlyNode(node) ? renderStructuringElementPromptComponent(node.node_id) : ''}
     `;
 }
