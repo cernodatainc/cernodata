@@ -115,6 +115,16 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
                 soup_chars += len(stripped)
                 noise_tokens.append(stripped)
 
+    has_alnum = any(c.isalnum() for c in text)
+    if (
+        has_alnum
+        and unmatched_parens == 0
+        and len(noise_tokens) == 1
+        and len(noise_tokens[0]) == 1
+        and unicodedata.category(noise_tokens[0]).startswith(('P', 'S'))
+    ):
+        return 0, []
+
     return soup_chars, noise_tokens
 
 

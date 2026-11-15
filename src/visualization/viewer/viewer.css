@@ -189,10 +189,18 @@ header {
  
 .status-banner {
     display: none;
-    background: var(--ui-bg-hover);
-    border-bottom: 1px solid var(--ui-border);
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9000;
+    max-width: min(640px, calc(100vw - 32px));
+    background: var(--ui-bg-card);
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
     color: var(--ui-text);
-    padding: 8px 24px;
+    padding: 8px 16px;
     font-size: 13px;
     font-weight: 500;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -2171,6 +2179,36 @@ polygon.node-bbox.live-hover-highlight {
     stroke: #1E4B8A !important;
     stroke-width: 3.5px !important;
     fill: rgba(30, 75, 138, 0.22) !important;
+}
+
+.structuring-element-prompt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    background: #FBEEDC;
+    border: 1px solid #EBCB9F;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #A15C07;
+}
+
+.structuring-element-prompt-text {
+    font-weight: 500;
+}
+
+.structuring-element-prompt-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.structuring-remove-btn {
+    color: #B42318;
+    border-color: #E8C3BE;
 }
 
 /* Rule Tolerances Drawer (TASK-710) */

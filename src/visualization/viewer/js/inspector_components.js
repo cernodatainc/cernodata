@@ -303,6 +303,7 @@ function renderSingleNodeEditorComponent(node, options) {
 
     return `
         <div class="editor-box">
+            ${isSymbolsOnlyNode(node) ? renderStructuringElementPromptComponent(node.node_id) : ''}
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <h4 style="margin-bottom:0;">Selected: <span style="font-family:monospace; font-weight:500;">${escapeHtml(node.node_id)}</span></h4>
@@ -366,6 +367,47 @@ function renderSingleNodeEditorComponent(node, options) {
 }
 
 /**
+ * Returns true if a DOM node has non-empty text consisting exclusively of symbols/punctuation.
+ *
+ * @param {Object} node - Target DOM node.
+ * @returns {boolean} True if symbols-only and not dismissed.
+ */
+function isSymbolsOnlyNode(node) {
+    if (!node || node._structuring_dismissed) return false;
+    const raw = (node.content && typeof node.content.raw_text === 'string') ? node.content.raw_text.trim() : '';
+    if (!raw) return false;
+    return !/[\p{L}\p{N}]/u.test(raw);
+}
+
+/**
+ * Renders the inline structuring-element removal prompt for symbols-only nodes.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @returns {string} HTML markup.
+ */
+function dismissStructuringPrompt(nodeId) {
+    if (!domData || !domData.nodes) return;
+    const node = domData.nodes.find(n => n.node_id === nodeId);
+    if (!node) return;
+    node._structuring_dismissed = true;
+    renderDOMTree();
+    renderSelectedEditor();
+}
+
+function renderStructuringElementPromptComponent(nodeId) {
+    const safeId = escapeHtml(nodeId);
+    return `
+        <div class="structuring-element-prompt" onclick="event.stopPropagation()">
+            <span class="structuring-element-prompt-text">This looks like a structuring element. Remove?</span>
+            <div class="structuring-element-prompt-actions">
+                <button type="button" class="action-btn action-btn-decollide-sm structuring-remove-btn" onclick="event.stopPropagation(); deleteDOMNode('${safeId}')">Remove</button>
+                <button type="button" class="action-btn action-btn-decollide-sm" onclick="event.stopPropagation(); dismissStructuringPrompt('${safeId}')">Keep</button>
+            </div>
+        </div>
+    `;
+}
+
+/**
  * Renders HTML markup for an individual node card in the DOM list tree.
  *
  * @param {Object} node - Target DOM node.
@@ -397,6 +439,7 @@ function renderDOMTreeNodeCardComponent(node, options) {
             </div>
         </div>
         <div class="node-text">${escapeHtml(displayText)}</div>
+        ${isSymbolsOnlyNode(node) ? renderStructuringElementPromptComponent(node.node_id) : ''}
     `;
 }
 

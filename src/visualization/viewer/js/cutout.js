@@ -318,12 +318,14 @@ async function triggerCutoutSecondPass(nodeId) {
             body: JSON.stringify(payload)
         });
 
+        const data = await resp.json().catch(() => ({}));
         if (!resp.ok) {
-            const errData = await resp.json().catch(() => ({}));
-            throw new Error(errData.error || `Server returned ${resp.status}`);
+            if (data && data.results && typeof data.results === 'object') {
+                window.pendingOcrResultsMap[nodeId] = data;
+                promptAcceptOcrOutput(nodeId, data);
+            }
+            throw new Error(data.error || `Server returned ${resp.status}`);
         }
-
-        const data = await resp.json();
         window.pendingOcrResultsMap[nodeId] = data;
         promptAcceptOcrOutput(nodeId, data);
     } catch (err) {
@@ -335,10 +337,7 @@ async function triggerCutoutSecondPass(nodeId) {
             setTimeout(() => { banner.style.display = 'none'; }, 6000);
         }
     } finally {
-        if (ocrBtn) {
-            ocrBtn.disabled = false;
-            ocrBtn.textContent = 'Parse section with OCR';
-        }
+        if (ocrBtn) { ocrBtn.disabled = false; ocrBtn.textContent = 'Parse section with OCR'; }
     }
 }
 

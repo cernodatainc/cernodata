@@ -80,11 +80,12 @@ class SectionOCRParser:
             logger.debug("Tesseract engine initialization unavailable: %s", ex)
             return None
 
-    def _create_easyocr_engine(self) -> Optional[Any]:
+    def _create_easyocr_engine(self, language: Optional[str] = None) -> Optional[Any]:
         """Creates EasyOCR engine wrapper if easyocr is installed."""
         try:
             import easyocr
-            langs = [self.language] if self.language else ["en"]
+            target_lang = (language or self.language or "en").strip().lower()
+            langs = [target_lang] if target_lang else ["en"]
             reader = easyocr.Reader(langs)
             return lambda arr: reader.readtext(arr)
         except Exception as ex:
@@ -121,7 +122,7 @@ class SectionOCRParser:
         if norm_name == "tesseract":
             return self._create_tesseract_engine(custom_flags=custom_flags, language=language)
         if norm_name == "easyocr":
-            return self._create_easyocr_engine()
+            return self._create_easyocr_engine(language=language)
         return None
 
     @property
@@ -203,8 +204,14 @@ class SectionOCRParser:
         if txts is None and isinstance(result, (list, tuple)) and len(result) > 0:
             first = result[0]
             if isinstance(first, (list, tuple)):
+                is_flat_tuple_list = (
+                    len(first) >= 3
+                    and isinstance(first[1], str)
+                    and isinstance(first[2], (int, float))
+                )
+                entries = result if is_flat_tuple_list else first
                 parsed_txts, parsed_scores, parsed_boxes = [], [], []
-                for entry in first:
+                for entry in entries:
                     if isinstance(entry, (list, tuple)) and len(entry) >= 2:
                         parsed_boxes.append(entry[0])
                         if len(entry) == 2 and isinstance(entry[1], (list, tuple)):

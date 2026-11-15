@@ -19,6 +19,9 @@ class TestLineContinuationNotGarbage(unittest.TestCase):
             "st-",
             "...th",
             "alpha beta \u2026",
+            "sth sth - sth",
+            "sth sth | sth",
+            "sth sth \u2212 sth",
         ]
         for text in samples:
             with self.subTest(text=text):
