@@ -127,6 +127,7 @@ function switchPage(pageNum) {
 
     const pageImg = document.getElementById('pageImg');
     if (pageImg && pageImages[currentPage - 1]) {
+        pageImg.addEventListener('load', applyZoom, { once: true });
         pageImg.src = pageImages[currentPage - 1];
     }
 
@@ -215,6 +216,12 @@ function fitWidthZoom() {
 function applyZoom() {
     const container = document.getElementById('canvasContainer');
     container.style.transform = `scale(${currentZoom})`;
+    // transform does not affect layout, so compensate the bottom margin to keep the
+    // scrollable height equal to the visually rendered (scaled) height.
+    const baseMarginBottom = 60;
+    const layoutHeight = container.offsetHeight || 0;
+    const margin = Math.max(0, baseMarginBottom + (currentZoom - 1) * layoutHeight);
+    container.style.marginBottom = `${margin}px`;
     document.getElementById('zoomDisplay').textContent = `${Math.round(currentZoom * 100)}%`;
 }
 

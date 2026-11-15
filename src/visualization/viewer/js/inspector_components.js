@@ -94,8 +94,8 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
             ${nodeViols.map((v, vIdx) => {
         const isFixed = !!v.is_fixed || !!node.is_fixed || activePresetIndex === 1;
         const isSupp = isSuppressed(v);
-        const hasCorrection = !!(v.suggested_correction && v.suggested_correction !== v.detected_snippet);
-        const canFix = hasCorrection || !!(v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || ''));
+        const hasCorrection = !!(v.suggested_correction && _normFixText(v.suggested_correction) !== _normFixText(v.detected_snippet));
+        const canFix = violationHasEffectiveFix(v);
         const cat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         let statusHtml = `<span style="font-size:11px; font-weight:500; color:${p.red};">${escapeHtml(v.severity || 'WARNING')}</span>`;
         if (isFixed) {

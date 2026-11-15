@@ -6,6 +6,36 @@
  */
  
 /**
+ * Normalizes text for no-op comparison (Unicode NFC, so composed and decomposed
+ * forms of the same character compare equal).
+ *
+ * @param {string|null|undefined} s - Raw text.
+ * @returns {string} Normalized text.
+ */
+function _normFixText(s) {
+    const str = String(s || '');
+    return typeof str.normalize === 'function' ? str.normalize('NFC') : str;
+}
+
+/**
+ * Determines whether a violation carries a suggested correction that would actually
+ * change the text. A correction identical to the detected snippet is a no-op and is
+ * never offered as a fix.
+ *
+ * @param {Object} v - Violation object.
+ * @returns {boolean} True if applying the suggestion would modify the text.
+ */
+function violationHasEffectiveFix(v) {
+    if (!v) return false;
+    const snippet = _normFixText(v.detected_snippet);
+    if (v.suggested_correction) {
+        return _normFixText(v.suggested_correction) !== snippet;
+    }
+    const sugg = v.suggestion;
+    return !!(sugg && _normFixText(sugg) !== snippet && sugg !== (v.raw_text || ''));
+}
+
+/**
  * Updates suppression and acceptance state on a violation object and its matching
  * node-level violation entry in domData.
  *
@@ -83,7 +113,7 @@ function renderViolationsList() {
         const catActiveCount = catViols.filter(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored).length;
         const catSuppressedCount = catViols.filter(v => isSuppressed(v)).length;
         const catFixedCount = catViols.filter(v => !!v.is_fixed).length;
-        const hasFixable = catViols.some(v => !v.is_fixed && ((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || ''))));
+        const hasFixable = catViols.some(v => !v.is_fixed && violationHasEffectiveFix(v));
  
         const bundleEl = document.createElement('div');
         bundleEl.className = 'viol-bundle';
@@ -104,7 +134,7 @@ function renderViolationsList() {
             card.className = `viol-card ${isFixed ? 'fixed' : ''} ${isSupp ? 'suppressed' : ''}`;
             const vPage = getViolationPage(v);
             card.onclick = () => selectNode(v.node_id, vPage);
-            const canFix = !!((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || '')));
+            const canFix = violationHasEffectiveFix(v);
  
             card.innerHTML = renderViolationCardComponent(v, {
                 cat,
@@ -279,7 +309,7 @@ function applyAllFixesForCategory(category, targetPage = null) {
     const targets = viols.filter(v => {
         const vCat = v.type || (v.rule_type === 'garbage_character_ratio' ? 'symbols' : 'diacritic');
         const vPage = getViolationPage(v);
-        return vCat === category && (page === null || vPage === page) && !v.is_fixed && ((v.suggested_correction && v.suggested_correction !== v.detected_snippet) || (v.suggestion && v.suggestion !== v.detected_snippet && v.suggestion !== (v.raw_text || '')));
+        return vCat === category && (page === null || vPage === page) && !v.is_fixed && violationHasEffectiveFix(v);
     });
  
     targets.forEach(v => {
@@ -332,6 +362,18 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
         }
     }
  
+    if (targetSnippet && targetFix !== undefined && targetFix !== null
+        && _normFixText(targetFix) === _normFixText(targetSnippet)) {
+        const noopBanner = document.getElementById('statusBanner');
+        if (noopBanner) {
+            noopBanner.className = 'status-banner';
+            noopBanner.style.display = 'block';
+            noopBanner.textContent = `No automated fix for '${targetSnippet}': suggestion is identical to the original text. Manual review required.`;
+            setTimeout(() => { noopBanner.style.display = 'none'; }, 4000);
+        }
+        return;
+    }
+
     const node = domData.nodes.find(n => n.node_id === targetNodeId);
     if (!node) return;
  

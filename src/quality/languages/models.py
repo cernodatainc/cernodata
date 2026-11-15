@@ -12,7 +12,7 @@ import functools
 import json
 import os
 import re
-
+import unicodedata
 _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configurations")
 _CROSS_CUTTING_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.json")
 
@@ -112,7 +112,7 @@ class LanguageConfig:
                     seen_chars.add(char)
                     replacement_char = self.conflicting_diacritic_replacements.get(char, "")
                     suggested = token.replace(char, replacement_char) if replacement_char else ""
-                    if suggested == token:
+                    if unicodedata.normalize("NFC", suggested) == unicodedata.normalize("NFC", token):
                         suggested = ""
                     conflicts.append((char, token, suggested))
         return conflicts

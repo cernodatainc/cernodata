@@ -65,6 +65,8 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 - `TASK-505`: Regex replacement and PII redaction postprocessor (depends on `501`)
 - `TASK-506`: Web UI postprocessing checklist and viewer preview (depends on `501`-`505`)
 - `TASK-507`: Corporate letterhead, watermark, and boilerplate pattern catalog
+- `TASK-508`: Detect line continuations across DOM nodes and merge them (depends on `503`)
+- `TASK-509`: Join line continuations inside a single DOM node (depends on `503`)
 
 ### 06. Dataset Topic Balance (`06-dataset-balance/`)
 - `TASK-601`: Multi-document corpus scanner and manifest

@@ -37,6 +37,9 @@ MIN_ALNUM_CHECK_LENGTH: int = 6
 REPEAT_CHAR_THRESHOLD: int = 4
 SOUP_PENALTY_WEIGHT: int = 2
 
+_LEADING_CONTINUATION_RE = re.compile(r"^(?:-|\.{3}|\u2026)[^\W\d_]+$")
+_TRAILING_CONTINUATION_RE = re.compile(r"^[^\W\d_]+-$")
+
 
 def evaluate_unicode_anomalies(text: str) -> int:
     """Counts Unicode replacement characters, private use codepoints, and raw control characters."""
@@ -55,6 +58,22 @@ def evaluate_character_repetitions(text: str) -> int:
     return sum(len(m.group(0)) for m in re.finditer(pattern, text))
 
 
+def is_line_continuation_token(token: str, is_first: bool, is_last: bool) -> bool:
+    """
+    Detects a valid line-continuation fragment of a word split across lines or nodes.
+
+    A leading tail (`-th`, `-h`, `...sth`) is valid only as the first token of the text;
+    a trailing head (`st-`) is valid only as the last token. Trailing sentence punctuation
+    after a tail is ignored (`-th,`).
+    """
+    core = token.rstrip(",;:.!?")
+    if is_first and _LEADING_CONTINUATION_RE.match(core):
+        return True
+    if is_last and _TRAILING_CONTINUATION_RE.match(token):
+        return True
+    return False
+
+
 def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[int, List[str]]:
     """Evaluates unmatched brackets, isolated punctuation soup, and invalid short tokens."""
     open_parens = text.count('(')
@@ -66,9 +85,13 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
     soup_chars = unmatched_parens * SOUP_PENALTY_WEIGHT
     noise_tokens: List[str] = []
 
-    for t in tokens:
+    last_idx = len(tokens) - 1
+    for idx, t in enumerate(tokens):
         stripped = t.strip()
         if not stripped:
+            continue
+
+        if is_line_continuation_token(stripped, idx == 0, idx == last_idx):
             continue
 
         is_bullet_or_allowed = stripped in ALLOWED_STANDALONE

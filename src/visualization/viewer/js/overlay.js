@@ -206,7 +206,7 @@ function renderSVGOverlays() {
         const viols = getViolationsList();
         const nodeViols = viols.filter(v => v.node_id === node.node_id && getViolationPage(v) === currentPage);
         const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored);
-        const hasViol = hasUnfixedViol && activePresetIndex === 0;
+        const hasViol = showViol && hasUnfixedViol && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
         const isIncorrect = !!node.is_incorrect_text;
  
@@ -265,7 +265,7 @@ function renderSVGOverlays() {
             }
         }
  
-        if ((showViol || isSelected) && nodeViols.length > 0) {
+        if (showViol && nodeViols.length > 0) {
             nodeViols.forEach((viol, vIdx) => {
                 const g = createSvgElem('g', {});
                 const isFixed = !!viol.is_fixed || !!node.is_fixed || activePresetIndex === 1;
