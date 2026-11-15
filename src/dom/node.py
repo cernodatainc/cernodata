@@ -31,6 +31,7 @@ class DOMNode:
     is_incorrect_text: Optional[bool] = None
     ocr_confidence: Optional[float] = None
     is_custom: Optional[bool] = None
+    origin: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         node_type = self.type.value if isinstance(self.type, DOMNodeType) else str(self.type)
@@ -52,6 +53,7 @@ class DOMNode:
             "is_custom",
             "is_incorrect_text",
             "ocr_confidence",
+            "origin",
         ):
             val = getattr(self, key)
             if key in ("is_incorrect_text", "ocr_confidence"):
@@ -85,6 +87,7 @@ class DOMNode:
                 "is_incorrect_text",
                 "ocr_confidence",
                 "is_custom",
+                "origin",
             )
             if k in data
         }
@@ -212,6 +215,7 @@ class DOMNode:
             is_incorrect_text=self.is_incorrect_text,
             ocr_confidence=self.ocr_confidence,
             is_custom=self.is_custom,
+            origin=self.origin,
         )
 
     def split_at_offset(

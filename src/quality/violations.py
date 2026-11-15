@@ -139,8 +139,13 @@ def detect_quality_violations(
 
     for node in dom.nodes:
         existing_suppressed = get_suppressed_violation_lookup(node)
+        preserved_viols = [
+            dict(v)
+            for v in node.violations
+            if isinstance(v, dict) and v.get("rule_type") == "uncovered_visual_region"
+        ]
         raw_text = node.content.get("raw_text", "")
-        node_viols: List[Dict[str, Any]] = []
+        node_viols: List[Dict[str, Any]] = list(preserved_viols)
 
         if active_layers.symbols:
             gb_viols = _check_garbage_violations(node, raw_text, counter, threshold=garbage_threshold)

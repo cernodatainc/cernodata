@@ -266,6 +266,17 @@ function renderCutoutPreviewCardComponent(node, bbox, effectiveAngle, hasAngle, 
     `;
 }
 
+function getNodeProvenanceBadgeHtml(node) {
+    const origin = (node && (node.origin || (node.content && node.content.origin) || (node.is_custom ? 'manual' : 'parsed'))) || 'parsed';
+    const postSuffix = (node && node.content && node.content.postprocessor) ? ` (${node.content.postprocessor})` : '';
+    const cfg = origin === 'postprocessed'
+        ? { label: 'Postprocessed', variant: 'yellow', title: `Added in postprocessing${postSuffix}` }
+        : (origin === 'manual'
+            ? { label: 'Manual', variant: 'blue', title: 'Manually added by user' }
+            : { label: 'Original parse', variant: 'muted', title: 'Extracted during primary document parse' });
+    return `<span class="badge-status node-origin-badge" data-origin="${escapeHtml(origin)}" style="${inspectorBadgeStyle(cfg.variant)}" title="${escapeHtml(cfg.title)}">${cfg.label}</span>`;
+}
+
 /**
  * Renders complete HTML markup for the single-node inspector editor pane.
  *
@@ -308,6 +319,7 @@ function renderSingleNodeEditorComponent(node, options) {
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <h4 style="margin-bottom:0;">Selected: <span style="font-family:monospace; font-weight:500;">${escapeHtml(node.node_id)}</span></h4>
                     <span class="badge-status" style="${inspectorBadgeStyle('neutral')}" title="Reading sequence position">#${pageSeq || 1}</span>
+                    ${getNodeProvenanceBadgeHtml(node)}
                     <select id="selectNodeType_${escapeHtml(node.node_id)}" class="type-filter" style="font-size:12px; padding:2px 6px;" onchange="onNodeTypeChange('${node.node_id}', this.value)" title="Change node semantic type">
                         ${typeOptionsHtml}
                     </select>
@@ -431,6 +443,7 @@ function renderDOMTreeNodeCardComponent(node, options) {
                 <button type="button" class="btn-order-up" style="${orderBtnStyle}" onclick="event.stopPropagation(); moveNodeOrderUp('${node.node_id}')" title="Move earlier in reading order">Up</button>
                 <button type="button" class="btn-order-down" style="${orderBtnStyle}" onclick="event.stopPropagation(); moveNodeOrderDown('${node.node_id}')" title="Move later in reading order">Dn</button>
                 <span class="badge-status" style="${inspectorBadgeStyle(pageBadgeVariant)}">P${nodePage}</span>
+                ${getNodeProvenanceBadgeHtml(node)}
                 <span class="node-type type-${escapeHtml(node.type)}">${escapeHtml(node.type)}</span>
                 ${isFixed ? '<span class="node-corrected-badge">Fixed</span>' : ''}
                 ${isMerged ? `<span class="badge-status" style="${inspectorBadgeStyle('blue')}">Merged</span>` : ''}

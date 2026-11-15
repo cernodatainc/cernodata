@@ -396,7 +396,7 @@ class ViewerInputManager {
                 x1: Math.max(x0, x1), y1: Math.max(y0, y1),
                 angle: 0.0, quad: null
             },
-            content: { raw_text: rawText }, user_correction_note: rawText, is_custom: true, violations: []
+            content: { raw_text: rawText, origin: 'manual' }, user_correction_note: rawText, is_custom: true, origin: 'manual', violations: []
         };
 
         const newIdx = domData.nodes.length;

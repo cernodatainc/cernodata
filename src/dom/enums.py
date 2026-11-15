@@ -48,3 +48,13 @@ class PipelineAction(str, Enum):
 
     def __str__(self) -> str:
         return str(self.value)
+
+
+class DOMNodeOrigin(str, Enum):
+    """Provenance classification for DocumentDOM nodes."""
+    PARSED = "parsed"
+    POSTPROCESSED = "postprocessed"
+    MANUAL = "manual"
+
+    def __str__(self) -> str:
+        return str(self.value)

@@ -57,6 +57,7 @@ class DOMNodeSchema(BaseModel):
     is_incorrect_text: Optional[bool] = None
     ocr_confidence: Optional[float] = None
     is_custom: Optional[bool] = None
+    origin: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod

@@ -24,13 +24,19 @@ def align_document_skew(dom: DocumentDOM, pdf_path: str, align_skew: bool) -> Do
 
 
 def run_postprocessing_steps(
-    dom: DocumentDOM, config: Optional[IngestionConfig] = None
+    dom: DocumentDOM,
+    config: Optional[IngestionConfig] = None,
+    pdf_path: Optional[str] = None,
 ) -> DocumentDOM:
-    """No-op hook for running declarative DOM postprocessing steps."""
-    # TODO(TASK-501): Execute `PostprocessorChain` (letterhead stripping TASK-502, hyphenation defragmentation
-    # TASK-503, watermark filter TASK-504, and regex/PII scrubbing TASK-505) and record audit trail on `dom`.
-    _ = config
-    return dom
+    """Executes declarative DOM postprocessing steps (defaulting to uncovered visual region recovery)."""
+    if config is not None and not bool(config.get_option("enable_postprocessing", True)):
+        return dom
+
+    from src.pipeline.postprocessors import build_default_postprocessor_chain
+
+    chain = build_default_postprocessor_chain(config=config, pdf_path=pdf_path)
+    processed_dom, _ = chain.run(dom)
+    return processed_dom
 
 
 def run_ollama_ocr_repair_step(

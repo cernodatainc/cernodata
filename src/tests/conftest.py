@@ -116,6 +116,9 @@ def patch_pipeline_io(
         else:
             stack.enter_context(patch("src.pipeline.attempt_runner.parse_document", return_value=parse_return))
         stack.enter_context(patch("src.pipeline.attempt_runner.align_document_skew", side_effect=lambda d, p, a: d))
+        stack.enter_context(
+            patch("src.pipeline.attempt_runner.run_postprocessing_steps", side_effect=lambda d, c=None, p=None: d)
+        )
         if eval_side_effect is not None:
             stack.enter_context(
                 patch("src.pipeline.attempt_runner.evaluate_quality_and_decision_tree", side_effect=eval_side_effect)

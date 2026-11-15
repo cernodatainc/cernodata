@@ -9,7 +9,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from src.dom import DocumentDOM
 from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.parsers.dispatch import parse_document
-from src.pipeline.pipeline_steps import align_document_skew, evaluate_quality_and_decision_tree
+from src.pipeline.pipeline_steps import (
+    align_document_skew,
+    evaluate_quality_and_decision_tree,
+    run_postprocessing_steps,
+)
 from src.pipeline.planner.models import IngestionConfig
 
 
@@ -21,10 +25,12 @@ class AttemptRunner:
         parse_fn: Optional[Callable[..., DocumentDOM]] = None,
         align_fn: Optional[Callable[..., DocumentDOM]] = None,
         evaluate_fn: Optional[Callable[..., Tuple[Dict[str, Any], List[Dict[str, Any]]]]] = None,
+        postprocess_fn: Optional[Callable[..., DocumentDOM]] = None,
     ) -> None:
         self._parse_fn = parse_fn or parse_document
         self._align_fn = align_fn or align_document_skew
         self._evaluate_fn = evaluate_fn or evaluate_quality_and_decision_tree
+        self._postprocess_fn = postprocess_fn or run_postprocessing_steps
 
     def execute_attempt(
         self,
@@ -34,9 +40,10 @@ class AttemptRunner:
         next_score: float,
         next_preset_id: Optional[str] = None,
     ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
-        """Executes a single extraction attempt: parse -> skew align -> quality evaluate."""
+        """Executes a single extraction attempt: parse -> skew align -> postprocess -> quality evaluate."""
         dom = self._parse_fn(pdf_path, config=config)
         dom = self._align_fn(dom, pdf_path, config.align_skew)
+        dom = self._postprocess_fn(dom, config, pdf_path)
         decision, violations = self._evaluate_fn(
             dom,
             config=config,

@@ -67,6 +67,7 @@ Each task corresponds to an isolated no-op hook (`TODO(TASK-XXX)`) in `src/` so 
 - `TASK-507`: Corporate letterhead, watermark, and boilerplate pattern catalog
 - `TASK-508`: Detect line continuations across DOM nodes and merge them (depends on `503`)
 - `TASK-509`: Join line continuations inside a single DOM node (depends on `503`)
+- `TASK-510`: Default-on uncovered region image detector and node provenance (depends on `501`)
 
 ### 06. Dataset Topic Balance (`06-dataset-balance/`)
 - `TASK-601`: Multi-document corpus scanner and manifest
