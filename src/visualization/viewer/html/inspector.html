@@ -1,4 +1,14 @@
-<div class="inspector-pane">
+<div class="inspector-pane" id="inspectorPane">
+    <div class="inspector-header" id="inspectorHeader" title="Drag to move when unanchored">
+        <div class="inspector-header-title">
+            <span class="drag-grip" aria-hidden="true">::</span>
+            <span>Node Viewer</span>
+        </div>
+        <div class="inspector-header-actions">
+            <button type="button" class="pane-ctrl-btn" id="btnFoldInspector" onclick="toggleInspectorFold()" title="Fold or unfold node viewer">Fold</button>
+            <button type="button" class="pane-ctrl-btn" id="btnAnchorInspector" onclick="toggleInspectorAnchor()" title="Unanchor and float node viewer, or dock it back">Unanchor</button>
+        </div>
+    </div>
     <div class="tab-bar">
         <button class="tab-btn active" id="tabBtnDom" data-name="dom page" onclick="showTab(event, 'domTab')"
             title="Click: Show selected page | Shift+Click: Show all pages"><span id="domTabLabel">DOM Page</span>

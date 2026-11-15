@@ -324,7 +324,7 @@ function renderSingleNodeEditorComponent(node, options) {
                         ${typeOptionsHtml}
                     </select>
                 </div>
-                <button style="background:transparent; border:none; color:${p.textMuted}; cursor:pointer; font-size:12px; padding:2px 4px;" onclick="clearSelection()">Close</button>
+                <button style="background:transparent; border:none; color:${p.textMuted}; cursor:pointer; font-size:12px; padding:2px 4px;" data-key-hint="Esc" onclick="clearSelection()">Close</button>
             </div>
             ${mergedBadgeHtml}
             <div class="coord-grid">
@@ -352,7 +352,7 @@ function renderSingleNodeEditorComponent(node, options) {
             </div>
             ` : ''}
             ${violationsHtml}
-            <button class="flag-btn ${isIncorrect ? 'flagged' : ''}" onclick="toggleIncorrectText('${node.node_id}')">
+            <button class="flag-btn ${isIncorrect ? 'flagged' : ''}" data-key-hint="V" onclick="toggleIncorrectText('${node.node_id}')">
                 ${isIncorrect ? 'Flagged as incorrect text (click to unmark)' : 'Mark as incorrect parsed text'}
             </button>
             ${isTable ? `
@@ -369,7 +369,7 @@ function renderSingleNodeEditorComponent(node, options) {
             </div>
             <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <button class="action-btn action-btn-decollide-sm" style="color:${p.blue}; border-color:${p.blueBorder};" onclick="splitSelectedDOMNode('${node.node_id}')">[SPLIT] Split at Cursor</button>
-                <button class="action-btn action-btn-decollide-sm" style="color:${p.red}; border-color:${p.redBorder};" onclick="deleteDOMNode('${node.node_id}')">Delete element</button>
+                <button class="action-btn action-btn-decollide-sm" style="color:${p.red}; border-color:${p.redBorder};" data-key-hint="Del" onclick="deleteDOMNode('${node.node_id}')">Delete element</button>
             </div>
             <div style="margin-top:10px; font-size:11px; color:${p.textMuted}; border-top:1px solid ${p.border}; padding-top:8px; line-height:1.45;">
                 Tip: hold Shift and click another box to multi-select and decollide them.

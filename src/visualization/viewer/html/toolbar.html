@@ -1,65 +1,97 @@
     <div class="toolbar">
-        <div class="zoom-controls">
-            <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom out">−</button>
-            <span class="zoom-label" id="zoomDisplay">100%</span>
-            <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom in">+</button>
-            <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset zoom">100%</button>
-            <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit width">Fit</button>
+        <div class="toolbox" id="toolboxNav" data-toolbox-id="toolboxNav">
+            <div class="toolbox-header" title="Drag to move when unanchored">
+                <span class="toolbox-title">Navigation</span>
+                <button type="button" class="toolbox-anchor-btn" onclick="toggleToolboxAnchor('toolboxNav')" title="Unanchor toolbox to drag anywhere">Float</button>
+            </div>
+            <div class="toolbox-body">
+                <div class="zoom-controls" data-key-hint="Ctrl+Scroll">
+                    <button class="zoom-btn" onclick="adjustZoom(-0.15)" title="Zoom out">-</button>
+                    <span class="zoom-label" id="zoomDisplay">100%</span>
+                    <button class="zoom-btn" onclick="adjustZoom(0.15)" title="Zoom in">+</button>
+                    <button class="zoom-btn zoom-btn-sm" onclick="resetZoom()" title="Reset zoom">100%</button>
+                    <button class="zoom-btn zoom-btn-sm" onclick="fitWidthZoom()" title="Fit width">Fit</button>
+                </div>
+                <div class="page-controls">
+                    <span class="control-label">Page</span>
+                    <button class="zoom-btn" id="btnPrevPage" data-key-hint="&larr;" onclick="prevPage()" title="Previous page">&lt;</button>
+                    <select class="type-filter page-select-dropdown" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))"></select>
+                    <button class="zoom-btn" id="btnNextPage" data-key-hint="&rarr;" onclick="nextPage()" title="Next page">&gt;</button>
+                    <span class="control-label"><span id="currentPageNum" class="current-page-num">1</span> / <span id="totalPagesNum">{{ total_pages }}</span></span>
+                </div>
+            </div>
         </div>
- 
-        <div class="page-controls page-controls-group">
-            <span class="control-label">Page</span>
-            <button class="zoom-btn" id="btnPrevPage" onclick="prevPage()" title="Previous page">&lt;</button>
-            <select class="type-filter page-select-dropdown" id="pageSelect" onchange="onPageSelectChanged(parseInt(this.value, 10))"></select>
-            <button class="zoom-btn" id="btnNextPage" onclick="nextPage()" title="Next page">&gt;</button>
-            <span class="control-label"><span id="currentPageNum" class="current-page-num">1</span> / <span id="totalPagesNum">{{ total_pages }}</span></span>
+
+        <div class="toolbox" id="toolboxLayers" data-toolbox-id="toolboxLayers">
+            <div class="toolbox-header" title="Drag to move when unanchored">
+                <span class="toolbox-title">Layers</span>
+                <button type="button" class="toolbox-anchor-btn" onclick="toggleToolboxAnchor('toolboxLayers')" title="Unanchor toolbox to drag anywhere">Float</button>
+            </div>
+            <div class="toolbox-body">
+                <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding boxes</label></div>
+                <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality violations</label></div>
+                <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score badge</label></div>
+                <div class="toggle-group"><label><input type="checkbox" id="toggleKeyHints" onchange="updateKeyHintsOverlay()"> Key hints</label></div>
+                <div class="filter-controls-group">
+                    <span class="control-label">Filter</span>
+                    <select class="type-filter" id="typeFilter" onchange="updateLayers()">
+                        <option value="ALL">All types</option>
+                        <option value="heading">Headings</option>
+                        <option value="paragraph">Paragraphs</option>
+                        <option value="table_grid">Tables</option>
+                        <option value="figure">Figures</option>
+                    </select>
+                </div>
+            </div>
         </div>
- 
-        <div class="toolbar-group page-controls-group">
-            <div class="toggle-group"><label><input type="checkbox" id="toggleBbox" checked onchange="updateLayers()"> Bounding boxes</label></div>
-            <div class="toggle-group"><label><input type="checkbox" id="toggleViolations" checked onchange="updateLayers()"> Quality violations</label></div>
-            <div class="toggle-group"><label><input type="checkbox" id="toggleBadges" checked onchange="updateLayers()"> Badges</label></div>
-            <div class="toggle-group"><label><input type="checkbox" id="toggleScore" checked onchange="updateLayers()"> Score badge</label></div>
-            <div class="filter-controls-group">
-                <span class="control-label">Filter</span>
-                <select class="type-filter" id="typeFilter" onchange="updateLayers()">
-                    <option value="ALL">All types</option>
-                    <option value="heading">Headings</option>
-                    <option value="paragraph">Paragraphs</option>
-                    <option value="table_grid">Tables</option>
-                    <option value="figure">Figures</option>
+
+        <div class="toolbox" id="toolboxLanguage" data-toolbox-id="toolboxLanguage">
+            <div class="toolbox-header" title="Drag to move when unanchored">
+                <span class="toolbox-title">Language</span>
+                <button type="button" class="toolbox-anchor-btn" onclick="toggleToolboxAnchor('toolboxLanguage')" title="Unanchor toolbox to drag anywhere">Float</button>
+            </div>
+            <div class="toolbox-body">
+                <span class="control-label">Detected language</span>
+                <span class="badge-status lang" id="detectedLangBadge">P1: {{ primary_detected }}</span>
+                <span class="control-label">Override</span>
+                <select class="type-filter" id="selectLanguage" onchange="onLanguageChanged()">
+                    <option value="auto">Auto-detect</option>
+                    <option value="pl" {{ pl_selected }}>Polish (pl)</option>
+                    <option value="en" {{ en_selected }}>English (en)</option>
+                    <option value="de" {{ de_selected }}>German (de)</option>
+                    <option value="fr" {{ fr_selected }}>French (fr)</option>
+                    <option value="es" {{ es_selected }}>Spanish (es)</option>
                 </select>
             </div>
         </div>
- 
-        <div class="lang-controls-group">
-            <span class="control-label">Detected language</span>
-            <span class="badge-status lang" id="detectedLangBadge">P1: {{ primary_detected }}</span>
-            <span class="control-label">Override</span>
-            <select class="type-filter" id="selectLanguage" onchange="onLanguageChanged()">
-                <option value="auto">Auto-detect</option>
-                <option value="pl" {{ pl_selected }}>Polish (pl)</option>
-                <option value="en" {{ en_selected }}>English (en)</option>
-                <option value="de" {{ de_selected }}>German (de)</option>
-                <option value="fr" {{ fr_selected }}>French (fr)</option>
-                <option value="es" {{ es_selected }}>Spanish (es)</option>
-            </select>
-        </div>
- 
-        <div class="history-controls-group page-controls-group">
-            <button class="zoom-btn zoom-btn-sm" id="btnUndo" disabled onclick="undo()" title="Undo last change (Ctrl+Z)">Undo</button>
-            <button class="zoom-btn zoom-btn-sm" id="btnRedo" disabled onclick="redo()" title="Redo reverted change (Ctrl+Y)">Redo</button>
+
+        <div class="toolbox" id="toolboxEdit" data-toolbox-id="toolboxEdit">
+            <div class="toolbox-header" title="Drag to move when unanchored">
+                <span class="toolbox-title">Edit</span>
+                <button type="button" class="toolbox-anchor-btn" onclick="toggleToolboxAnchor('toolboxEdit')" title="Unanchor toolbox to drag anywhere">Float</button>
+            </div>
+            <div class="toolbox-body">
+                <button class="zoom-btn zoom-btn-sm" id="btnUndo" data-key-hint="Ctrl+Z" disabled onclick="undo()" title="Undo last change (Ctrl+Z)">Undo</button>
+                <button class="zoom-btn zoom-btn-sm" id="btnRedo" data-key-hint="Ctrl+Y" disabled onclick="redo()" title="Redo reverted change (Ctrl+Y)">Redo</button>
+                <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">Add section</button>
+                <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">Decollide page</button>
+                <button class="action-btn action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">Revert to raw</button>
+                <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">Save annotations</button>
+            </div>
         </div>
 
-        <div class="toolbar-actions">
-            <button class="action-btn action-btn-decollide-sm" id="btnRuleTolerances" onclick="toggleRuleTolerancesDrawer()" title="Open Rule Tolerances drawer to tune sensitivities and recalculate confidence scores">Rule Tolerances</button>
-            <button class="action-btn action-btn-decollide-sm" id="btnDiffOverlay" onclick="toggleDiffOverlay()" title="Toggle visual diff highlighting (added, removed, modified boxes) against baseline run">Diff Overlay</button>
-            <button class="action-btn action-btn-decollide-sm" id="btnPrevViol" onclick="selectPreviousViolation()" title="Jump to previous violation ([)">[ Viol</button>
-            <button class="action-btn action-btn-decollide-sm" id="btnNextViol" onclick="selectNextViolation()" title="Jump to next violation (])">Viol ]</button>
-            <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()" title="Draw and add a custom section on the page to parse with OCR">Add section</button>
-            <button class="action-btn action-btn-decollide" id="btnDecollidePage" hidden onclick="decollideCurrentPage()" title="Automatically detect and de-collide overlapping bounding boxes on this page">Decollide page</button>
-            <button class="action-btn action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">Revert to raw</button>
-            <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">Save annotations</button>
+        <div class="toolbox" id="toolboxReview" data-toolbox-id="toolboxReview">
+            <div class="toolbox-header" title="Drag to move when unanchored">
+                <span class="toolbox-title">Review</span>
+                <button type="button" class="toolbox-anchor-btn" onclick="toggleToolboxAnchor('toolboxReview')" title="Unanchor toolbox to drag anywhere">Float</button>
+            </div>
+            <div class="toolbox-body">
+                <button class="action-btn action-btn-decollide-sm" id="btnPrevViol" data-key-hint="[" onclick="selectPreviousViolation()" title="Jump to previous violation ([)">Prev Viol</button>
+                <button class="action-btn action-btn-decollide-sm" id="btnNextViol" data-key-hint="]" onclick="selectNextViolation()" title="Jump to next violation (])">Next Viol</button>
+                <button class="action-btn action-btn-decollide-sm" id="btnDiffOverlay" onclick="toggleDiffOverlay()" title="Toggle visual diff highlighting (added, removed, modified boxes) against baseline run">Diff Overlay</button>
+                <button class="action-btn action-btn-decollide-sm" id="btnRuleTolerances" onclick="toggleRuleTolerancesDrawer()" title="Open Rule Tolerances drawer to tune sensitivities and recalculate confidence scores">Rule Tolerances</button>
+            </div>
         </div>
+
         <div id="ruleTolerancesDrawer" class="rule-tolerances-drawer" hidden></div>
     </div>

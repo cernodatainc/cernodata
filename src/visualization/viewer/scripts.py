@@ -34,6 +34,7 @@ JS_MODULE_ORDER: List[str] = [
     "live_output.js",
     "rule_tolerances.js",
     "diff_overlay.js",
+    "workspace_dock.js",
     "api.js",
     "app.js",
 ]
