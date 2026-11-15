@@ -18,9 +18,11 @@ from src.quality.handlers import (
     SymbolsLayerHandler,
     TablesLayerHandler,
     get_suppressed_violation_lookup,
+    make_node_violation,
 )
 from src.quality.language_config import LanguageConfig, get_language_config
-from src.quality.layers import ActiveVerificationLayers
+from src.quality.layers import ActiveVerificationLayers, VerificationLayer
+from src.quality.table_validator import check_table_assertion
 from src.schemas.test_suite import DocumentAssertionSuite
 
 
@@ -53,12 +55,31 @@ def _check_structural_assertion_violations(
 
 
 def _check_table_grid_violations(
-    dom: DocumentDOM, counter: int = 1
+    dom: DocumentDOM,
+    counter: int = 1,
+    suite: Optional[DocumentAssertionSuite] = None,
 ) -> List[Dict[str, Any]]:
-    """Evaluates Level 4 Markdown and tabular grid consistency."""
-    # TODO(TASK-103): Replace static cell_alignment_score fallback with real Level 4 Markdown table
-    # grid validation (column count consistency across rows, numeric alignment, and empty header checks).
-    return TablesLayerHandler().detect_violations(dom, counter=counter)
+    """Evaluates Level 4 table grid consistency and user-supplied table assertions."""
+    violations = TablesLayerHandler().detect_violations(dom, counter=counter)
+    if suite is None:
+        return violations
+    for node in dom.nodes:
+        if node.type != "table_grid":
+            continue
+        rows = node.content.get("rows") or []
+        for rule in suite.table_rules:
+            failures = check_table_assertion(rows, rule)
+            if failures:
+                violations.append(
+                    make_node_violation(
+                        node=node,
+                        counter=counter + len(violations),
+                        v_type=VerificationLayer.TABLES.value,
+                        rule_type="table_assertion_failed",
+                        description="Table failed assertion: " + "; ".join(failures),
+                    )
+                )
+    return violations
 
 
 def _check_geometry_violations(
@@ -148,7 +169,10 @@ def detect_quality_violations(
             active_layers.structure,
             lambda d, counter: _check_structural_assertion_violations(d, counter=counter, suite=assertion_suite),
         ),
-        (active_layers.tables, _check_table_grid_violations),
+        (
+            active_layers.tables,
+            lambda d, counter: _check_table_grid_violations(d, counter=counter, suite=assertion_suite),
+        ),
         (active_layers.geometry, _check_geometry_violations),
     ]
     for is_active, check_fn in document_level_checkers:
