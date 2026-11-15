@@ -22,6 +22,9 @@ function _resolveLiveNodeText(node) {
     if (typeof userCorrections === 'object' && userCorrections !== null && userCorrections[node.node_id]) {
         return String(userCorrections[node.node_id]);
     }
+    if (node.user_correction_note !== undefined && node.user_correction_note !== null && String(node.user_correction_note).trim() !== '') {
+        return String(node.user_correction_note);
+    }
     if (node.corrected_text) return String(node.corrected_text);
     const content = node.content || {};
     if (node.type === 'table_grid') {
@@ -47,7 +50,7 @@ function _resolveLiveNodeText(node) {
     if (node.type === 'figure') {
         return String(content.caption || content.raw_text || `[Figure ${node.node_id}]`);
     }
-    return String(content.markdown_text || content.raw_text || content.caption || '');
+    return String(content.raw_text || content.markdown_text || content.caption || '');
 }
 
 /**
@@ -62,7 +65,8 @@ function _formatNodeMarkdown(node, rawText) {
     if (!clean) return '';
     if (node.type === 'heading') {
         const lvl = Math.max(1, Math.min(6, Number((node.content && node.content.heading_level) || 2)));
-        return `${'#'.repeat(lvl)} ${clean.replace(/\s+/g, ' ')}`;
+        const headingClean = clean.replace(/^#+\s*/, '');
+        return `${'#'.repeat(lvl)} ${headingClean.replace(/\s+/g, ' ')}`;
     }
     if (node.type === 'figure') {
         return `> [Figure] ${clean}`;
@@ -77,8 +81,9 @@ function _formatNodeMarkdown(node, rawText) {
  */
 function buildLiveOutputPayload() {
     const nodes = (typeof domData !== 'undefined' && domData && Array.isArray(domData.nodes)) ? domData.nodes : [];
+    const currP = (typeof currentPage !== 'undefined') ? Number(currentPage) : 1;
     const targetNodes = liveOutputPageOnly
-        ? nodes.filter(n => (typeof getNodePage === 'function' ? getNodePage(n) : (n.global_page_index || 1)) === currentPage)
+        ? nodes.filter(n => (typeof getNodePage === 'function' ? getNodePage(n) : Number(n.global_page_index || 1)) === currP)
         : nodes;
 
     const headingStack = [];
@@ -156,12 +161,36 @@ function toggleLiveOutputPageFilter(pageOnly) {
 function copyLiveOutputMarkdown() {
     const payload = buildLiveOutputPayload();
     if (!payload.fullMarkdown) return;
+    const showSuccess = () => {
+        if (typeof showStatusBanner === 'function') {
+            showStatusBanner('Copied Live Markdown output to clipboard.', 'success', 2000);
+        }
+    };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(payload.fullMarkdown).then(() => {
-            if (typeof showStatusBanner === 'function') {
-                showStatusBanner('Copied Live Markdown output to clipboard.', 'success', 2000);
-            }
+        navigator.clipboard.writeText(payload.fullMarkdown).then(showSuccess).catch(() => {
+            _fallbackCopyLiveMarkdown(payload.fullMarkdown, showSuccess);
         });
+    } else {
+        _fallbackCopyLiveMarkdown(payload.fullMarkdown, showSuccess);
+    }
+}
+
+function _fallbackCopyLiveMarkdown(text, onSuccess) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        if (typeof onSuccess === 'function') onSuccess();
+    } catch (e) {
+        if (typeof showStatusBanner === 'function') {
+            showStatusBanner('Failed to copy to clipboard.', 'warning', 2000);
+        }
+    } finally {
+        ta.remove();
     }
 }
 

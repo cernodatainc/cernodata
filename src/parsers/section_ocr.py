@@ -411,12 +411,15 @@ class SectionOCRParser:
         language: Optional[str] = None,
         prompt_accept: Optional[Callable[[str, str, float], bool]] = None,
         interactive: bool = False,
+        custom_flags: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Processes a DOM node bounding box across one or more OCR engines and prompts for acceptance."""
         if not engines:
             raise ValueError("At least one OCR engine must be explicitly specified in 'engines'.")
         if image_input is not None:
-            results = self.parse_image_multi(image_input, engines=engines, language=language)
+            results = self.parse_image_multi(
+                image_input, engines=engines, language=language, custom_flags=custom_flags
+            )
         elif pdf_path:
             results = self.parse_section_from_pdf_multi(
                 pdf_path,
@@ -424,6 +427,7 @@ class SectionOCRParser:
                 getattr(node, "bounding_box", (0.0, 0.0, 0.0, 0.0)),
                 engines=engines,
                 language=language,
+                custom_flags=custom_flags,
             )
         else:
             return {"results": {}, "accepted": False, "error": "Either image_input or pdf_path must be provided."}

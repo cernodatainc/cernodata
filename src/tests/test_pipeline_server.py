@@ -101,13 +101,13 @@ class TestPipelineServer(EphemeralServerTestCase):
             self.assertNotIn(removed, content)
 
     def test_viewer_html_endpoint_serves_untemplated_html(self) -> None:
-        status, content, headers = self._get("/viewer.html")
-        self.assertEqual(status, 200)
-        self.assertIn("text/html", headers.get("Content-Type", ""))
-
-        for asset in ("/viewer.css", "/viewer.js", 'id="tabBtnDom"', 'id="tabBtnViol"'):
-            self.assertIn(asset, content)
-        self.assertNotIn("page-action-bar", content)
+        for path in ("/viewer.html", "/viewer"):
+            status, content, headers = self._get(path)
+            self.assertEqual(status, 200)
+            self.assertIn("text/html", headers.get("Content-Type", ""))
+            for asset in ("/viewer.css", "/viewer.js", 'id="tabBtnDom"', 'id="tabBtnViol"'):
+                self.assertIn(asset, content)
+            self.assertNotIn("page-action-bar", content)
 
     def test_static_css_and_js_served(self) -> None:
         # Test CSS

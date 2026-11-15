@@ -163,7 +163,7 @@ function _commitTableEdit(node, headers, rows, prevSnapshot, actionDesc) {
 
     if (typeof renderDOMTree === 'function') renderDOMTree();
     if (typeof renderLiveOutput === 'function') renderLiveOutput();
-    if (activeTableModalNodeId === node.node_id && typeof renderTableModal === 'function') {
+    if (typeof activeTableModalNodeId !== 'undefined' && activeTableModalNodeId === node.node_id && typeof renderTableModal === 'function') {
         renderTableModal(node);
     }
     if (typeof saveAnnotations === 'function') saveAnnotations(true);
@@ -188,15 +188,18 @@ function updateTableHeaderCell(nodeId, colIdx, value, rerender = false) {
 
     const oldHeader = headers[colIdx];
     headers[colIdx] = String(value || '');
-    if (rows.length > 0 && rows[0][colIdx] === oldHeader) {
-        rows[0][colIdx] = String(value || '');
+    for (let r = 0; r < rows.length; r++) {
+        if (rows[r][colIdx] === oldHeader && rows[r].every((val, idx) => idx === colIdx || val === headers[idx])) {
+            rows[r][colIdx] = String(value || '');
+            break;
+        }
     }
 
     _commitTableEdit(node, headers, rows, prevSnap, `Edit table header (${nodeId} col ${colIdx + 1})`);
     if (rerender && typeof renderSelectedEditor === 'function') {
         renderSelectedEditor();
     } else {
-        const noteEl = document.querySelector('#editorContent textarea.note-area');
+        const noteEl = document.querySelector('#selectedEditorContainer textarea.note-area') || document.querySelector('textarea.note-area');
         if (noteEl) noteEl.value = node.content.markdown_table || '';
     }
 }
@@ -218,19 +221,17 @@ function updateTableCell(nodeId, rowIdx, colIdx, value) {
     const { headers, rows } = _getEditableTableState(node);
     if (rowIdx < 0 || rowIdx >= rows.length || colIdx < 0 || colIdx >= headers.length) return;
 
-    const isFirstRowHeader = rowIdx === 0
-        && node.content
-        && Array.isArray(node.content.headers)
-        && node.content.headers.length === rows[0].length
-        && rows[0].every((val, idx) => val === headers[idx]);
+    const isMatchingHeaderRow = Array.isArray(node.content.headers)
+        && node.content.headers.length === rows[rowIdx].length
+        && rows[rowIdx].every((val, idx) => val === headers[idx]);
 
     rows[rowIdx][colIdx] = String(value || '');
-    if (isFirstRowHeader) {
+    if (isMatchingHeaderRow) {
         headers[colIdx] = String(value || '');
     }
 
     _commitTableEdit(node, headers, rows, prevSnap, `Edit table cell (${nodeId} R${rowIdx + 1}C${colIdx + 1})`);
-    const noteEl = document.querySelector('#editorContent textarea.note-area');
+    const noteEl = document.querySelector('#selectedEditorContainer textarea.note-area') || document.querySelector('textarea.note-area');
     if (noteEl) noteEl.value = node.content.markdown_table || '';
 }
 

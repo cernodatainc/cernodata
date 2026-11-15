@@ -370,7 +370,7 @@ function renderTableModalGridView(rows, headers, numCols, effectiveHdrIdx = 0) {
     }
 
     const hdrRowIdx = (effectiveHdrIdx >= 0 && effectiveHdrIdx < rows.length) ? effectiveHdrIdx : 0;
-    const dataRows = (headers && rows.length > 1 && rows[hdrRowIdx] && rows[hdrRowIdx].every((val, idx) => val === headers[idx]))
+    const dataRows = (headers && rows.length > 1 && rows[hdrRowIdx] && rows[hdrRowIdx].every((val, idx) => val === headers[idx] || (!val && String(headers[idx] || '').startsWith('Col '))))
         ? rows.filter((_, idx) => idx !== hdrRowIdx)
         : rows;
 

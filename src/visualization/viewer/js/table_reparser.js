@@ -203,10 +203,9 @@ function applyTableReparseOptions(node, hdrSelection, stripSelection, flagsVal) 
         `| ${resolvedHeaders.map(c => String(c || '').replace(/\|/g, '\\|')).join(' | ')} |`,
         `| ${resolvedHeaders.map(() => '---').join(' | ')} |`
     ];
-    const bodyRows = normalizedRows.filter((row, idx) => {
-        if (idx !== effectiveHdrIdx) return true;
-        return !row.every((val, cIdx) => val === resolvedHeaders[cIdx]);
-    });
+    const bodyRows = (effectiveHdrIdx >= 0 && effectiveHdrIdx < normalizedRows.length)
+        ? normalizedRows.filter((_, idx) => idx !== effectiveHdrIdx)
+        : normalizedRows;
     for (const row of bodyRows) mdLines.push(`| ${row.map(c => String(c || '').replace(/\|/g, '\\|')).join(' | ')} |`);
 
     const markdownTable = mdLines.join('\n');

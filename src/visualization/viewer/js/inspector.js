@@ -271,8 +271,11 @@ function updateCorrectionNote(nodeId, text) {
     node.user_correction_note = text;
     if (node.content) {
         node.content.raw_text = text;
+        if (node.content.markdown_text !== undefined) {
+            node.content.markdown_text = text;
+        }
     } else {
-        node.content = { raw_text: text };
+        node.content = { raw_text: text, markdown_text: text };
     }
     renderDOMTree();
     if (typeof renderLiveOutput === 'function') renderLiveOutput();

@@ -65,6 +65,16 @@ function _applyToleranceFiltersToViolations() {
         }
 
         viol._tolerance_ignored = ignored;
+        if (domNodes.length > 0) {
+            const node = domNodes.find(n => n.node_id === viol.node_id);
+            if (node && Array.isArray(node.violations)) {
+                const nv = node.violations.find(v =>
+                    (v.violation_id && viol.violation_id && v.violation_id === viol.violation_id) ||
+                    (v.node_id === viol.node_id && (v.rule_type === viol.rule_type || v.type === viol.type))
+                );
+                if (nv) nv._tolerance_ignored = ignored;
+            }
+        }
     }
 }
 
@@ -127,6 +137,13 @@ function resetRuleTolerances() {
     viols.forEach(v => {
         if (v) v._tolerance_ignored = false;
     });
+    if (typeof domData === 'object' && domData && Array.isArray(domData.nodes)) {
+        domData.nodes.forEach(n => {
+            if (Array.isArray(n.violations)) {
+                n.violations.forEach(v => { if (v) v._tolerance_ignored = false; });
+            }
+        });
+    }
     if (rawDecisionData && rawDecisionData.target_confidence_threshold !== undefined && rawDecisionData.target_confidence_threshold !== null) {
         ruleTolerancesState.target_confidence_threshold = Number(rawDecisionData.target_confidence_threshold);
     }

@@ -449,28 +449,19 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertIn("--psm 6", parsed["tesseract_config"])
         self.assertIn("--oem 1", parsed["tesseract_config"])
 
-        captured_pixels = []
-        def mock_engine(arr):
-            captured_pixels.append(arr.copy())
-            return {"text": "Flagged Text", "confidence": 0.96}
-
+        captured = []
         parser = SectionOCRParser()
-        parser.register_engine("flagmock", mock_engine)
+        parser.register_engine("flagmock", lambda arr: captured.append(arr.copy()) or {"text": "Flagged Text", "confidence": 0.96})
         src_img = Image.new("RGB", (20, 10), color=(200, 200, 200))
         preprocessed = preprocess_ocr_image(src_img, parsed, apply_scale=True)
         self.assertEqual(preprocessed.size, (40, 20))
-        # Binarize turns 200 (>= 160) to 255, then invert turns 255 to 0
         self.assertEqual(preprocessed.getpixel((0, 0)), (0, 0, 0))
 
-        res = parser.parse_image(
-            src_img,
-            engine_name="flagmock",
-            custom_flags="binarize=1, threshold=150, invert=1, scale=2.0",
-        )
+        res = parser.parse_image(src_img, engine_name="flagmock", custom_flags="binarize=1, threshold=150, invert=1, scale=2.0")
         self.assertTrue(res["success"])
         self.assertEqual(res["text"], "Flagged Text")
-        self.assertEqual(captured_pixels[0].shape[:2], (20, 40))
-        self.assertEqual(int(captured_pixels[0][0, 0, 0]), 0)
+        self.assertEqual(captured[0].shape[:2], (20, 40))
+        self.assertEqual(int(captured[0][0, 0, 0]), 0)
 
     def test_parse_ocr_custom_flags_edge_cases(self) -> None:
         """Verifies comma-preserving whitelist, missing/negative flag handling, and flag summary."""
@@ -480,14 +471,29 @@ class TestSectionOCRParser(unittest.TestCase):
         self.assertEqual(parsed_wl["whitelist"], "0,1,2,3")
         self.assertEqual(parsed_wl["psm"], 6)
         self.assertIn("tessedit_char_whitelist=0,1,2,3", parsed_wl["tesseract_config"])
-        summary = summarize_applied_flags(parsed_wl)
-        self.assertEqual(summary["whitelist"], "0,1,2,3")
+        self.assertEqual(summarize_applied_flags(parsed_wl)["whitelist"], "0,1,2,3")
 
         parsed_bad = parse_ocr_custom_flags("--threshold -5 --psm")
         self.assertEqual(parsed_bad["threshold"], 1)
         self.assertTrue(parsed_bad["binarize"])
         self.assertIsNone(parsed_bad["psm"])
         self.assertEqual(parsed_bad["tesseract_config"], "")
+
+    def test_process_dom_node_with_custom_flags(self) -> None:
+        """Verifies process_dom_node forwards custom_flags properly."""
+        from src.dom import BoundingBox, DOMNode
+
+        parser = SectionOCRParser()
+        parser.register_engine("dummy", lambda arr: {"text": "Processed Node", "confidence": 0.99})
+        node = DOMNode("n_custom", "paragraph", 1, 1, BoundingBox(0.0, 0.0, 10.0, 10.0))
+        src_img = Image.new("RGB", (20, 20), color=(128, 128, 128))
+        res = parser.process_dom_node(
+            node, image_input=src_img, engines=["dummy"],
+            prompt_accept=lambda eng, text, conf: True, custom_flags="binarize=1, invert=1",
+        )
+        self.assertIn("dummy", res["results"])
+        self.assertTrue(res["results"]["dummy"]["success"])
+        self.assertEqual(node.content.get("raw_text"), "Processed Node")
 
 
 if __name__ == "__main__":

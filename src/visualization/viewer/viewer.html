@@ -125,11 +125,14 @@
         <div class="toolbar-actions">
             <button class="action-btn action-btn-decollide-sm" id="btnRuleTolerances" onclick="toggleRuleTolerancesDrawer()" title="Open Rule Tolerances drawer to tune sensitivities and recalculate confidence scores">Rule Tolerances</button>
             <button class="action-btn action-btn-decollide-sm" id="btnDiffOverlay" onclick="toggleDiffOverlay()" title="Toggle visual diff highlighting (added, removed, modified boxes) against baseline run">Diff Overlay</button>
+            <button class="action-btn action-btn-decollide-sm" id="btnPrevViol" onclick="selectPreviousViolation()" title="Jump to previous violation ([)">[ Viol</button>
+            <button class="action-btn action-btn-decollide-sm" id="btnNextViol" onclick="selectNextViolation()" title="Jump to next violation (])">Viol ]</button>
             <button class="action-btn action-btn-draw-section" id="btnDrawSection" onclick="toggleDrawSectionMode()"
                 title="Draw and add a custom section on the page to parse with OCR">Add section</button>
             <button class="action-btn action-btn-decollide" id="btnDecollidePage" onclick="decollideCurrentPage()"
                 title="Automatically detect and de-collide overlapping bounding boxes on this page">Decollide
                 page</button>
+            <button class="action-btn action-btn-revert" id="btnRevertRaw" onclick="revertToRawResult()" title="Revert all post-run modifications back to pristine raw preset result without rerunning">Revert to raw</button>
             <button class="action-btn secondary" id="btnSaveAnnotations" onclick="saveAnnotations()">Save
                 annotations</button>
         </div>

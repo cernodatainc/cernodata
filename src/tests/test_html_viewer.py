@@ -308,6 +308,11 @@ class TestHTMLViewer(unittest.TestCase):
         self.assertIn("id=\"btnRuleTolerances\"", served_html)
         self.assertIn("id=\"ruleTolerancesDrawer\"", served_html)
         self.assertIn("id=\"btnDiffOverlay\"", served_html)
+        self.assertIn("id=\"btnPrevViol\"", served_html)
+        self.assertIn("id=\"btnNextViol\"", served_html)
+        self.assertIn("id=\"btnRevertRaw\"", served_html)
+        self.assertIn("--ui-blue-bg", html_content)
+        self.assertIn("--ui-blue-border", html_content)
 
         if os.path.exists(out_path):
             os.remove(out_path)
