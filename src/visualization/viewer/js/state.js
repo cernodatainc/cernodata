@@ -185,8 +185,8 @@ function syncDomAndViolations() {
             if (!node.violations) {
                 node.violations = [];
             }
+            const matching = violationsData.filter(v => v.node_id === node.node_id);
             if (node.violations.length === 0) {
-                const matching = violationsData.filter(v => v.node_id === node.node_id);
                 if (matching.length > 0) {
                     node.violations = JSON.parse(JSON.stringify(matching));
                 }
@@ -200,8 +200,14 @@ function syncDomAndViolations() {
                     } else {
                         nv.suppressed = String(nv.suppressed);
                     }
-                    const found = violationsData.find(v => (nv.violation_id && v.violation_id === nv.violation_id) || (v.node_id === node.node_id && v.rule_type === nv.rule_type));
+                    const found = violationsData.find(v =>
+                        (nv.violation_id && v.violation_id === nv.violation_id) ||
+                        (!nv.violation_id && v.node_id === node.node_id && v.rule_type === nv.rule_type && (v.detected_snippet || '') === (nv.detected_snippet || ''))
+                    );
                     if (found) {
+                        if (!nv.violation_id && found.violation_id) {
+                            nv.violation_id = found.violation_id;
+                        }
                         if (found.suppressed !== undefined) {
                             nv.suppressed = found.suppressed;
                             nv.accepted = found.accepted;
@@ -211,6 +217,15 @@ function syncDomAndViolations() {
                         }
                         found.type = nv.type;
                         if (nv.suggestion) found.suggestion = nv.suggestion;
+                    }
+                });
+                matching.forEach(mv => {
+                    const alreadyInNode = node.violations.some(nv =>
+                        (mv.violation_id && nv.violation_id === mv.violation_id) ||
+                        (nv.rule_type === mv.rule_type && (nv.detected_snippet || '') === (mv.detected_snippet || ''))
+                    );
+                    if (!alreadyInNode) {
+                        node.violations.push(JSON.parse(JSON.stringify(mv)));
                     }
                 });
             }

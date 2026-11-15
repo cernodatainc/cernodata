@@ -20,7 +20,6 @@ from src.dom import BoundingBox, DOMNode, DOMNodeOrigin, DOMNodeType, DocumentDO
 from src.parsers.pdf_utils import HAS_PYPDFIUM, open_pdf
 from src.parsers.section_ocr import SectionOCRParser, get_default_section_parser
 from src.pipeline.postprocessors.base import PostprocessActionRecord
-from src.quality.handlers import make_node_violation
 
 logger = logging.getLogger("cernodata.pipeline.postprocessors.uncovered_region_detector")
 
@@ -416,7 +415,7 @@ class UncoveredRegionPostprocessor:
                     bounding_box=cand.bounding_box,
                     content=content,
                     ocr_confidence=ocr_conf,
-                    is_incorrect_text=True if not ocr_text else None,
+                    is_incorrect_text=None,
                     origin=DOMNodeOrigin.POSTPROCESSED.value,
                 )
 
@@ -424,16 +423,6 @@ class UncoveredRegionPostprocessor:
                     reason = (
                         f"Uncovered visual contrast region (std={cand.contrast_std:.1f}, "
                         f"ink={cand.ink_density:.1%}) detected with empty OCR output"
-                    )
-                    new_node.add_violation(
-                        make_node_violation(
-                            node=new_node,
-                            counter=len(records) + 1,
-                            v_type="structure",
-                            rule_type="uncovered_visual_region",
-                            severity="WARNING",
-                            description=f"{reason}; manual review recommended",
-                        )
                     )
                 else:
                     reason = (

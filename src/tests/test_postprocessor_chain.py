@@ -234,12 +234,12 @@ def test_uncovered_region_detector_flags_placeholder_when_ocr_empty() -> None:
     placeholder = processed_dom.nodes[0]
     assert placeholder.origin == DOMNodeOrigin.POSTPROCESSED.value
     assert placeholder.content["raw_text"] == ""
-    assert placeholder.is_incorrect_text is True
-    assert any(v.get("rule_type") == "uncovered_visual_region" for v in placeholder.violations)
+    assert placeholder.is_incorrect_text is None
+    assert placeholder.violations == []
 
     viols = detect_quality_violations(processed_dom, language="en")
-    assert any(v.get("rule_type") == "uncovered_visual_region" for v in placeholder.violations)
-    assert any(v.get("rule_type") == "uncovered_visual_region" for v in viols)
+    assert not any(v.get("rule_type") == "uncovered_visual_region" for v in placeholder.violations)
+    assert not any(v.get("rule_type") == "uncovered_visual_region" for v in viols)
 
 
 def test_run_postprocessing_steps_disabled_and_attempt_runner_wiring() -> None:

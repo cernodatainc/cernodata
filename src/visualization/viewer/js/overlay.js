@@ -212,7 +212,7 @@ function renderSVGOverlays() {
             let classNames = ['node-bbox', `type-${node.type || 'paragraph'}`];
             if (isSelected) classNames.push('highlighted');
             if (hasViol) classNames.push('violation');
-            if (isIncorrect) classNames.push('incorrect-text');
+            if (showViol && isIncorrect) classNames.push('incorrect-text');
             if (typeof hoveredLiveOutputNodeId !== 'undefined' && hoveredLiveOutputNodeId === node.node_id) {
                 classNames.push('live-hover-highlight');
             }
@@ -244,7 +244,7 @@ function renderSVGOverlays() {
                 renderQuadResizeHandles(svg, node, corners);
             }
  
-            if (isIncorrect) {
+            if (showViol && isIncorrect) {
                 const tagW = 84, tagH = 16;
                 const tagBg = createSvgElem('rect', {
                     x: bbox.x0, y: Math.max(0, bbox.y0 - tagH - 2),

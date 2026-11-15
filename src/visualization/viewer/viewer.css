@@ -2647,3 +2647,9 @@ body.show-key-hints [data-key-hint]::after {
     z-index: 1300;
     white-space: nowrap;
 }
+
+.viol-card.viol-card-flash {
+    border-color: var(--ui-blue) !important;
+    box-shadow: 0 0 0 2px var(--ui-blue-border);
+    background: var(--ui-blue-bg);
+}

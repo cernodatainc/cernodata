@@ -56,7 +56,7 @@ function setViolationSuppressed(v, shouldSuppress) {
         if (node && node.violations) {
             const nv = node.violations.find(item =>
                 (v.violation_id && item.violation_id === v.violation_id) ||
-                item.rule_type === v.rule_type
+                (!v.violation_id && item.rule_type === v.rule_type && (item.detected_snippet || '') === (v.detected_snippet || ''))
             );
             if (nv) {
                 nv.suppressed = suppStr;
@@ -81,7 +81,13 @@ function renderViolationsList() {
         ? viols
         : viols.filter(v => getViolationPage(v) === currentPage);
 
-    const activeCount = violationsToDisplay.filter(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored).length;
+    const allNodes = (typeof domData !== 'undefined' && domData && Array.isArray(domData.nodes)) ? domData.nodes : [];
+    const incorrectNodes = allNodes.filter(n =>
+        !!n.is_incorrect_text && (showAllViolations || getNodePage(n) === currentPage)
+    );
+    const totalIncorrectCount = allNodes.filter(n => !!n.is_incorrect_text).length;
+
+    const activeCount = violationsToDisplay.filter(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored).length + incorrectNodes.length;
     const countEl = document.getElementById('violCount');
     if (countEl) countEl.textContent = activeCount;
  
@@ -90,8 +96,8 @@ function renderViolationsList() {
         labelEl.textContent = showAllViolations ? 'All violations' : 'Violations';
     }
  
-    if (violationsToDisplay.length === 0) {
-        container.innerHTML = renderViolationsEmptyComponent(currentPage, viols.length);
+    if (violationsToDisplay.length === 0 && incorrectNodes.length === 0) {
+        container.innerHTML = renderViolationsEmptyComponent(currentPage, viols.length + totalIncorrectCount);
         return;
     }
  
@@ -132,6 +138,12 @@ function renderViolationsList() {
             const isFixed = !!v.is_fixed;
             const isSupp = isSuppressed(v);
             card.className = `viol-card ${isFixed ? 'fixed' : ''} ${isSupp ? 'suppressed' : ''}`;
+            if (v.violation_id) {
+                card.id = `viol-card-${v.violation_id}`;
+            }
+            if (v.node_id) {
+                card.setAttribute('data-node-id', v.node_id);
+            }
             const vPage = getViolationPage(v);
             card.onclick = () => selectNode(v.node_id, vPage);
             const canFix = violationHasEffectiveFix(v);
@@ -148,6 +160,38 @@ function renderViolationsList() {
  
         container.appendChild(bundleEl);
     });
+
+    if (incorrectNodes.length > 0 && typeof renderIncorrectTextBundleElement === 'function') {
+        container.appendChild(renderIncorrectTextBundleElement(incorrectNodes));
+    }
+}
+
+/**
+ * Dismisses the is_incorrect_text flag for a node directly from the Violations tab.
+ *
+ * @param {Event|null} evt - Triggering click event.
+ * @param {string} nodeId - Target DOM node identifier.
+ */
+function dismissIncorrectTextFromViolationsTab(evt, nodeId) {
+    if (evt && evt.stopPropagation) {
+        evt.stopPropagation();
+    }
+    const node = (typeof domData !== 'undefined' && domData && Array.isArray(domData.nodes))
+        ? domData.nodes.find(n => n.node_id === nodeId)
+        : null;
+    if (!node) return;
+    node.is_incorrect_text = false;
+
+    if (typeof saveAnnotations === 'function') {
+        saveAnnotations(true);
+    }
+    renderDOMTree();
+    renderSelectedEditor();
+    renderSVGOverlays();
+    renderViolationsList();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 }
  
 /**

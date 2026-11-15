@@ -246,3 +246,53 @@ function renderViolationCardComponent(v, options) {
         ${actionsHtml}
     `;
 }
+
+/**
+ * Builds the DOM bundle element for nodes flagged with is_incorrect_text.
+ *
+ * @param {Array<Object>} incorrectNodes - Nodes flagged as incorrect text.
+ * @returns {HTMLElement} Rendered bundle container element.
+ */
+function renderIncorrectTextBundleElement(incorrectNodes) {
+    const p = VIOLATIONS_PALETTE;
+    const incBundle = document.createElement('div');
+    incBundle.className = 'viol-bundle';
+    incBundle.innerHTML = `
+        <div class="viol-bundle-header">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="viol-bundle-title">Category: incorrect_text</span>
+                <span class="badge-status" style="${violationsBadgeStyle('muted')}">${incorrectNodes.length} active</span>
+            </div>
+        </div>
+        <div class="viol-bundle-items" id="bundle-items-incorrect_text"></div>
+    `;
+    const incItems = incBundle.querySelector('#bundle-items-incorrect_text');
+    incorrectNodes.forEach(node => {
+        const card = document.createElement('div');
+        card.className = 'viol-card';
+        card.id = `viol-card-incorrect-${node.node_id}`;
+        card.setAttribute('data-node-id', node.node_id);
+        const nPage = getNodePage(node);
+        card.onclick = () => selectNode(node.node_id, nPage);
+        const rawPreview = (node.content && node.content.raw_text) ? String(node.content.raw_text).trim().slice(0, 140) : '';
+        card.innerHTML = `
+            <div class="viol-header">
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span class="viol-title">incorrect_text</span>
+                    <span class="badge-status" style="${violationsBadgeStyle('muted')}">manual_flag</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="badge-status" style="${violationsBadgeStyle('neutral')}">P${nPage}</span>
+                    <span style="font-size:11px; font-weight:500; color:${p.yellow};">FLAGGED</span>
+                </div>
+            </div>
+            <div class="viol-desc">Node <span style="font-family:monospace;">${escapeHtml(node.node_id)}</span> is flagged as containing incorrect parsed text.</div>
+            ${rawPreview ? `<div style="font-size:12px; font-family:monospace; margin-top:6px; padding:4px 8px; background:${p.bgCard}; border:1px solid ${p.border}; border-radius:4px; color:${p.textPrimary}; word-break:break-word;">${escapeHtml(rawPreview)}</div>` : ''}
+            <div style="display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                <button type="button" class="btn-accept-bundle" onclick="dismissIncorrectTextFromViolationsTab(event, '${escapeHtml(node.node_id)}')">Dismiss incorrect text</button>
+            </div>
+        `;
+        incItems.appendChild(card);
+    });
+    return incBundle;
+}

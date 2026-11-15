@@ -135,6 +135,40 @@ const validSnippetHtml = renderViolationCardSnippetComponent({
     suggested_correction: 'def'
 });
 assert(validSnippetHtml.includes('abc') && validSnippetHtml.includes('def'));
+
+// Test node -> violations tab link and multi-violation sync/suppression
+const nodeViolsHtml = renderNodeViolationsComponent(
+    [{ violation_id: 'v_1', node_id: 'n1', rule_type: 'diacritic', type: 'diacritic', detected_snippet: 'x', suggested_correction: 'y' }],
+    { node_id: 'n1', is_fixed: false },
+    0
+);
+assert(nodeViolsHtml.includes('jumpToViolationInTab'), 'Expected jumpToViolationInTab button in node violations');
+
+domData = {
+    nodes: [{
+        node_id: 'n_multi',
+        global_page_index: 1,
+        is_incorrect_text: true,
+        content: { raw_text: 'test' },
+        violations: [{ violation_id: 'v_struct', node_id: 'n_multi', rule_type: 'structure', type: 'structure', suppressed: 'false' }]
+    }]
+};
+violationsData = [
+    { violation_id: 'v_struct', node_id: 'n_multi', rule_type: 'structure', type: 'structure', suppressed: 'false' },
+    { violation_id: 'v_diac', node_id: 'n_multi', rule_type: 'diacritic', type: 'diacritic', detected_snippet: 'a', suggested_correction: 'b', suppressed: 'false' }
+];
+syncDomAndViolations();
+assert.strictEqual(domData.nodes[0].violations.length, 2, 'Expected both violations synced onto node');
+
+toggleSuppressSingleViolation(null, 'v_struct', true);
+assert.strictEqual(violationsData[0].suppressed, 'true');
+assert.strictEqual(violationsData[1].suppressed, 'false');
+
+toggleSuppressSingleViolation(null, 'v_diac', true);
+assert.strictEqual(violationsData[1].suppressed, 'true');
+
+dismissIncorrectTextFromViolationsTab(null, 'n_multi');
+assert.strictEqual(domData.nodes[0].is_incorrect_text, false);
 """
         )
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tmp:

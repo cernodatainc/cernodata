@@ -89,7 +89,7 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
         <div class="selected-violations-box" style="background:${p.white}; border:1px solid ${p.border}; border-left:3px solid ${p.red}; color:${p.textPrimary};">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
                 <span style="font-size:13px; font-weight:600; color:${p.textPrimary};">Quality violations (${nodeViols.length})</span>
-                <span class="badge-status" style="${inspectorBadgeStyle('muted')}">Violation inspector</span>
+                <button type="button" class="action-btn action-btn-decollide-sm" onclick="jumpToViolationInTab('${escapeHtml(node.node_id)}')" title="Open this node's violations in the Violations tab">View in Violations tab</button>
             </div>
             ${nodeViols.map((v, vIdx) => {
         const isFixed = !!v.is_fixed || !!node.is_fixed || activePresetIndex === 1;
@@ -147,6 +147,7 @@ function renderNodeViolationsComponent(nodeViols, node, activePresetIndex) {
                             ` : `
                                 <span style="font-size:11px; color:${p.textMuted};">No automated fix, manual review required</span>
                             `}
+                            <button type="button" class="action-btn action-btn-decollide-sm" onclick="jumpToViolationInTab('${escapeHtml(node.node_id)}', '${escapeHtml(v.violation_id || '')}')" title="Jump to this violation in the Violations tab">Open in Violations</button>
                         </div>
                     </div>
                 `;
@@ -355,6 +356,11 @@ function renderSingleNodeEditorComponent(node, options) {
             <button class="flag-btn ${isIncorrect ? 'flagged' : ''}" data-key-hint="V" onclick="toggleIncorrectText('${node.node_id}')">
                 ${isIncorrect ? 'Flagged as incorrect text (click to unmark)' : 'Mark as incorrect parsed text'}
             </button>
+            ${isIncorrect ? `
+            <div style="margin-top:6px;">
+                <button type="button" class="action-btn action-btn-decollide-sm" onclick="jumpToViolationInTab('${escapeHtml(node.node_id)}', 'incorrect-${escapeHtml(node.node_id)}')" title="Open this incorrect text flag in the Violations tab">View in Violations tab</button>
+            </div>
+            ` : ''}
             ${isTable ? `
             <div style="margin-top:10px;">
                 <button class="action-btn action-btn-view-table" id="btnOpenTableModal_${escapeHtml(node.node_id)}" onclick="openTableModal('${escapeHtml(node.node_id)}')" title="View structured table content in modal">

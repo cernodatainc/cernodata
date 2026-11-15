@@ -226,3 +226,43 @@ if (typeof document !== 'undefined') {
         initWorkspaceDockDragHandlers();
     }
 }
+
+/**
+ * Jumps from a selected node in the DOM tab to its corresponding violation card
+ * in the Violations tab, unfolding the inspector if needed.
+ *
+ * @param {string} nodeId - Target DOM node identifier.
+ * @param {string|null} [violationId=null] - Optional specific violation ID.
+ */
+function jumpToViolationInTab(nodeId, violationId = null) {
+    const pane = document.getElementById('inspectorPane');
+    if (pane && pane.classList && pane.classList.contains('folded')) {
+        toggleInspectorFold(false);
+    }
+    if (typeof showTab === 'function') {
+        showTab(null, 'violTab');
+    }
+    if (typeof renderViolationsList === 'function') {
+        renderViolationsList();
+    }
+
+    let targetCard = null;
+    if (violationId) {
+        targetCard = document.getElementById(`viol-card-${violationId}`);
+    }
+    if (!targetCard && nodeId) {
+        targetCard = document.querySelector(`#violListContainer .viol-card[data-node-id="${nodeId}"]`)
+            || document.getElementById(`viol-card-incorrect-${nodeId}`);
+    }
+    if (targetCard) {
+        if (typeof targetCard.scrollIntoView === 'function') {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (targetCard.classList) {
+            targetCard.classList.add('viol-card-flash');
+            setTimeout(() => {
+                targetCard.classList.remove('viol-card-flash');
+            }, 1500);
+        }
+    }
+}
