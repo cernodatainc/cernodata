@@ -233,11 +233,6 @@ function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewe
     }
 }
 
-/**
- * Triggers backend targeted OCR re-extraction pass for the selected section.
- *
- * @param {string} nodeId - Target DOM node identifier.
- */
 window.selectedOcrEnginesMap = window.selectedOcrEnginesMap || {};
 window.pendingOcrResultsMap = window.pendingOcrResultsMap || {};
 

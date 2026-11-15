@@ -102,7 +102,7 @@ function buildLiveOutputPayload() {
             while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= lvl) {
                 headingStack.pop();
             }
-            headingStack.push({ level: lvl, title: text.replace(/\s+/g, ' ').trim() });
+            headingStack.push({ level: lvl, title: text.replace(/^#+\s*/, '').replace(/\s+/g, ' ').trim() });
         }
 
         const headingPath = headingStack.map(h => h.title);

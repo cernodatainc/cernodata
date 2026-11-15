@@ -204,7 +204,7 @@ function renderSVGOverlays() {
         const bbox = node.bounding_box;
         const corners = getBoxCorners(bbox);
         const viols = getViolationsList();
-        const nodeViols = viols.filter(v => v.node_id === node.node_id && (v.global_page_index || 1) === currentPage);
+        const nodeViols = viols.filter(v => v.node_id === node.node_id && getViolationPage(v) === currentPage);
         const hasUnfixedViol = nodeViols.some(v => !v.is_fixed && !isSuppressed(v) && !v._tolerance_ignored);
         const hasViol = hasUnfixedViol && activePresetIndex === 0;
         const isSelected = selectedNodeIds.includes(node.node_id);
