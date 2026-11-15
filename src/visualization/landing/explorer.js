@@ -6,6 +6,7 @@
  */
 
 window.explorerData = null;
+window.activeParsingRun = null;
 let currentExplorerScope = 'file';
 let currentExplorerFolder = '';
 let currentExplorerDoc = '';
@@ -13,6 +14,23 @@ let currentExplorerRun = '';
 let explorerSearchQuery = '';
 const expandedFolders = new Set();
 const expandedRuns = new Set();
+
+/** Normalizes a document path for cross-platform comparison. */
+function normalizeExplorerPath(filePath) {
+    return String(filePath || '').replace(/\\/g, '/').toLowerCase();
+}
+
+/** Returns true if the active parsing run belongs to the given document entry. */
+function doesActiveRunMatchDoc(doc) {
+    const active = window.activeParsingRun;
+    if (!active || !doc) return false;
+    const docNorm = normalizeExplorerPath(doc.file_path);
+    const activeNorm = normalizeExplorerPath(active.document_path);
+    if (docNorm && activeNorm && docNorm === activeNorm) return true;
+    const docBase = docNorm.split('/').pop();
+    const activeBase = activeNorm.split('/').pop();
+    return Boolean(docBase && activeBase && docBase === activeBase);
+}
 
 /** Retrieves file and run mappings from /api/file_run_mappings and renders explorer. */
 async function loadFileRunMappings() {
@@ -35,19 +53,22 @@ async function loadFileRunMappings() {
         }
 
         const activeDocEntry = allMappings.find(m => m.file_path === currentExplorerDoc);
+        const isViewingActiveRun = Boolean(window.activeParsingRun && currentExplorerRun === window.activeParsingRun.run_id);
         if (activeDocEntry) {
             currentExplorerFolder = activeDocEntry.file_set || 'workspace';
-            if (activeDocEntry.runs && activeDocEntry.runs.length > 0) {
-                const hasRun = activeDocEntry.runs.some(r => r.run_id === currentExplorerRun);
-                if (!hasRun) {
-                    currentExplorerRun = activeDocEntry.latest_run
-                        ? (activeDocEntry.latest_run.run_id || activeDocEntry.latest_run.output_dir)
-                        : (activeDocEntry.runs[0].run_id || activeDocEntry.runs[0].output_dir);
+            if (!isViewingActiveRun) {
+                if (activeDocEntry.runs && activeDocEntry.runs.length > 0) {
+                    const hasRun = activeDocEntry.runs.some(r => r.run_id === currentExplorerRun);
+                    if (!hasRun) {
+                        currentExplorerRun = activeDocEntry.latest_run
+                            ? (activeDocEntry.latest_run.run_id || activeDocEntry.latest_run.output_dir)
+                            : (activeDocEntry.runs[0].run_id || activeDocEntry.runs[0].output_dir);
+                    }
+                } else {
+                    currentExplorerRun = '';
                 }
-            } else {
-                currentExplorerRun = '';
             }
-        } else {
+        } else if (!isViewingActiveRun) {
             currentExplorerRun = data.active_run || '';
             if (fileSets.length > 0 && !currentExplorerFolder) currentExplorerFolder = fileSets[0].file_set;
         }
@@ -63,6 +84,19 @@ async function loadFileRunMappings() {
 
 /** Finds the currently selected run metadata object from explorer dataset. */
 function getSelectedRunObject() {
+    if (window.activeParsingRun && currentExplorerRun === window.activeParsingRun.run_id) {
+        const allMappings = (window.explorerData && window.explorerData.all_mappings) || [];
+        const matchedDoc = allMappings.find(m => doesActiveRunMatchDoc(m));
+        const activePath = window.activeParsingRun.document_path || currentExplorerDoc || 'Document';
+        const parts = activePath.replace(/\\/g, '/').split('/');
+        const fallbackDoc = {
+            file_name: parts[parts.length - 1] || activePath,
+            file_path: activePath,
+            file_set: currentExplorerFolder || 'workspace',
+            runs: [],
+        };
+        return { doc: matchedDoc || fallbackDoc, run: window.activeParsingRun };
+    }
     if (!window.explorerData || !currentExplorerRun) return null;
     const allMappings = window.explorerData.all_mappings || [];
     if (currentExplorerDoc) {
@@ -154,9 +188,35 @@ function renderExplorerTree() {
                     + `<span class="tree-icon file-icon">[PDF]</span><span class="tree-label file-label" title="${escapeHtml(doc.file_path)}">${escapeHtml(doc.file_name)}</span>`
                     + `<span class="tree-runs-count-badge" title="${runCount} past runs">${runCount} runs</span></div>`;
 
-                if (doc.runs && doc.runs.length > 0) {
+                const hasActiveRun = doesActiveRunMatchDoc(doc);
+                const combinedRuns = hasActiveRun
+                    ? [window.activeParsingRun, ...(doc.runs || [])]
+                    : (doc.runs || []);
+
+                if (combinedRuns.length > 0) {
                     html += '<div class="tree-runs-list">';
-                    doc.runs.forEach(r => {
+                    combinedRuns.forEach(r => {
+                        if (r.is_active_progress) {
+                            const isRunSelected = (currentExplorerScope === 'run' && r.run_id === currentExplorerRun);
+                            const runClass = ' active-parsing-run-row' + (isRunSelected ? ' active-run-node selected' : '');
+                            const activeStatusCls = r.status === 'error'
+                                ? 'status-error'
+                                : (r.status === 'completed' ? 'status-pass' : 'status-running');
+                            const pctVal = Number.isFinite(Number(r.progress)) ? Number(r.progress) : 0;
+                            const pctBadgeText = r.status === 'error' ? 'ERR' : `${pctVal}%`;
+                            const activeLabel = r.status === 'error'
+                                ? 'Failed'
+                                : (r.status === 'completed' ? 'Completed' : 'Parsing...');
+
+                            html += `<div class="tree-row run-row${runClass}" data-run-id="${escapeHtml(r.run_id)}" data-doc-path="${escapeHtml(doc.file_path)}"`
+                                + ` onclick="selectExplorerRun('${escapeHtml(r.run_id)}', '', '${escapeHtml(doc.file_path)}')">`
+                                + `<span class="tree-arrow-spacer"></span>`
+                                + `<span class="tree-icon run-icon">[RUN]</span><span class="run-preset-tag">${escapeHtml(r.preset)}</span>`
+                                + `<span id="explorerTreeActiveRunPct" class="run-score-badge ${activeStatusCls}">${pctBadgeText}</span>`
+                                + `<span id="explorerTreeActiveRunLabel" class="run-name-label" title="${escapeHtml(r.current_step || activeLabel)}">${activeLabel}</span></div>`;
+                            return;
+                        }
+
                         const isRunSelected = (currentExplorerScope === 'run' && r.run_id === currentExplorerRun);
                         const runClass = isRunSelected ? ' active-run-node selected' : '';
                         const statusClass = (r.status === 'ACCEPT') ? 'status-pass' : 'status-warn';
@@ -260,8 +320,125 @@ async function selectExplorerRun(runId, outputDir, docPath) {
         if (inp) inp.value = docPath;
     }
     renderExplorerUI();
+    if (window.activeParsingRun && runId === window.activeParsingRun.run_id) {
+        return;
+    }
     if (typeof choosePreviousRun === 'function') {
         await choosePreviousRun(runId || outputDir, 1, false);
+    }
+}
+
+/** Creates an active parsing run entry in the explorer UI and focuses its progress view. */
+function startExplorerActiveRun(pdfPath, preset, language) {
+    window.activeParsingRun = {
+        run_id: '__active_run__',
+        is_active_progress: true,
+        document_path: pdfPath,
+        preset: preset || 'docling_fast',
+        language: language || 'pl',
+        status: 'running',
+        progress: 10,
+        step_index: 1,
+        current_step: 'Starting ingestion...',
+        logs: [],
+        error: null,
+        summary: null,
+    };
+
+    const allMappings = (window.explorerData && window.explorerData.all_mappings) || [];
+    const matchedDoc = allMappings.find(m => doesActiveRunMatchDoc(m));
+    if (matchedDoc) {
+        currentExplorerDoc = matchedDoc.file_path;
+        currentExplorerFolder = matchedDoc.file_set || 'workspace';
+        expandedFolders.add(currentExplorerFolder);
+    } else if (pdfPath) {
+        currentExplorerDoc = pdfPath;
+    }
+
+    currentExplorerScope = 'run';
+    currentExplorerRun = window.activeParsingRun.run_id;
+
+    if (typeof switchNavTab === 'function') {
+        switchNavTab('input');
+    }
+    renderExplorerUI();
+}
+
+/** Updates embedded explorer progress elements in-place without full DOM re-render. */
+function updateExplorerProgressUI() {
+    const active = window.activeParsingRun;
+    if (!active) return;
+
+    const pct = Number.isFinite(Number(active.progress)) ? Number(active.progress) : 0;
+    const isError = active.status === 'error';
+    const isDone = active.status === 'completed';
+
+    const treePct = document.getElementById('explorerTreeActiveRunPct');
+    if (treePct) {
+        treePct.textContent = isError ? 'ERR' : `${pct}%`;
+        treePct.className = 'run-score-badge ' + (isError ? 'status-error' : (isDone ? 'status-pass' : 'status-running'));
+    }
+    const treeLabel = document.getElementById('explorerTreeActiveRunLabel');
+    if (treeLabel) {
+        treeLabel.textContent = isError ? 'Failed' : (isDone ? 'Completed' : 'Parsing...');
+        treeLabel.title = active.current_step || '';
+    }
+
+    const tablePct = document.getElementById('explorerTableActiveRunPct');
+    if (tablePct) tablePct.textContent = `${pct}%`;
+    const tableFill = document.getElementById('explorerTableActiveRunFill');
+    if (tableFill) tableFill.style.width = `${pct}%`;
+    const tableStep = document.getElementById('explorerTableActiveRunStep');
+    if (tableStep) tableStep.textContent = active.current_step || '';
+    const tableStatus = document.getElementById('explorerTableActiveRunStatus');
+    if (tableStatus) {
+        tableStatus.textContent = isError ? 'ERROR' : (isDone ? 'COMPLETED' : 'PARSING');
+        tableStatus.className = 'badge ' + (isError ? 'badge-error' : (isDone ? 'badge-success' : 'badge-running'));
+    }
+
+    const spinner = document.getElementById('explorerProgressSpinner');
+    if (spinner) spinner.classList.toggle('hidden', isError || isDone);
+
+    const fillBar = document.getElementById('explorerProgressFillBar');
+    if (fillBar) fillBar.style.width = `${pct}%`;
+    const pctText = document.getElementById('explorerProgressPercentText');
+    if (pctText) pctText.textContent = `${pct}%`;
+    const stepText = document.getElementById('explorerProgressCurrentStepText');
+    if (stepText) stepText.textContent = active.current_step || '';
+
+    const statusBadge = document.getElementById('explorerProgressStatusBadge');
+    if (statusBadge) {
+        statusBadge.textContent = isError ? 'ERROR' : (isDone ? 'COMPLETED' : 'PARSING');
+        statusBadge.className = 'badge ' + (isError ? 'badge-error' : (isDone ? 'badge-success' : 'badge-running'));
+    }
+
+    const stepIdx = active.step_index || 1;
+    for (let i = 1; i <= 5; i++) {
+        const card = document.getElementById(`explorerStepCard${i}`);
+        if (card) {
+            if (isDone) card.className = 'step-card done';
+            else if (i < stepIdx) card.className = 'step-card done';
+            else if (i === stepIdx) card.className = 'step-card active';
+            else card.className = 'step-card';
+        }
+    }
+
+    const consoleEl = document.getElementById('explorerProgressLogConsole');
+    if (consoleEl && Array.isArray(active.logs)) {
+        const nextText = active.logs.join('\n') || '--- Starting pipeline execution ---';
+        if (consoleEl.textContent !== nextText) {
+            consoleEl.textContent = nextText;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+    }
+
+    const banner = document.getElementById('explorerProgressCompletionBanner');
+    if (banner) {
+        banner.style.display = isDone ? 'flex' : 'none';
+        const summaryEl = document.getElementById('explorerProgressSummaryText');
+        if (summaryEl && active.summary) {
+            summaryEl.textContent = active.summary;
+        }
     }
 }
 

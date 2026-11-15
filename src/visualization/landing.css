@@ -1124,8 +1124,10 @@ body.viewer-open-fullscreen {
 
 .action-cell {
     white-space: nowrap;
-    display: flex;
-    gap: 4px;
+}
+
+.action-cell .btn + .btn {
+    margin-left: 4px;
 }
 
 .table-muted-cell {
@@ -2080,4 +2082,63 @@ body.viewer-open-fullscreen {
     background: #EFF1F2;
     margin: 4px 0;
 }
+
+/* Explorer Embedded Parsing Progress */
+
+.run-score-badge.status-running {
+    background: #EBF3FB;
+    color: var(--accent-blue);
+    border: 1px solid #C6DDF5;
+}
+
+.run-score-badge.status-error {
+    background: #FDF2F2;
+    color: var(--accent-red);
+    border: 1px solid #F8D7DA;
+}
+
+.explorer-row-active-run {
+    background: #F4F9FD;
+}
+
+.explorer-inline-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 90px;
+}
+
+.explorer-inline-progress-track {
+    flex: 1;
+    height: 6px;
+    background: #E5E7EB;
+    border-radius: 999px;
+    overflow: hidden;
+    min-width: 48px;
+}
+
+.explorer-inline-progress-fill {
+    height: 100%;
+    background: var(--accent-blue);
+    transition: width 0.25s ease;
+}
+
+.explorer-progress-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px 14px;
+}
+
+.explorer-progress-steps {
+    margin-top: 2px;
+}
+
+.explorer-progress-terminal {
+    height: 150px;
+}
+
 

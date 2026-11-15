@@ -48,8 +48,12 @@ async function triggerRunPipeline(withPlan = false) {
         }
     }
 
-    switchNavTab('progress');
     resetProgressUI();
+    if (typeof startExplorerActiveRun === 'function') {
+        startExplorerActiveRun(pdfPath, preset, language);
+    } else {
+        switchNavTab('progress');
+    }
 
     appendLog(`[START] Initiating pipeline run for '${pdfPath}' (Preset: ${preset}, Lang: ${language})...`);
 
@@ -189,6 +193,22 @@ function startProgressPolling() {
                             }
                         }
                     }
+
+                    if (window.activeParsingRun && window.activeParsingRun.status === 'running') {
+                        if (data.progress !== undefined) window.activeParsingRun.progress = data.progress;
+                        if (data.current_step) window.activeParsingRun.current_step = data.current_step;
+                        if (data.step_index) window.activeParsingRun.step_index = data.step_index;
+                        if (data.logs && Array.isArray(data.logs) && data.logs.length > 0) {
+                            window.activeParsingRun.logs = data.logs;
+                        }
+                        if (data.status === 'error') {
+                            window.activeParsingRun.status = 'error';
+                            window.activeParsingRun.error = data.error || data.current_step;
+                        }
+                        if (typeof updateExplorerProgressUI === 'function') {
+                            updateExplorerProgressUI();
+                        }
+                    }
                 }
             }
         } catch (e) {
@@ -212,7 +232,7 @@ function stopProgressPolling() {
  *
  * @param {Object} result - Execution result payload returned by backend.
  */
-function onPipelineCompleted(result) {
+async function onPipelineCompleted(result) {
     stopProgressPolling();
     const spinner = document.getElementById('progressSpinner');
     if (spinner) spinner.classList.add('hidden');
@@ -243,11 +263,44 @@ function onPipelineCompleted(result) {
     const banner = document.getElementById('progressCompletionBanner');
     if (banner) banner.style.display = 'flex';
 
+    if (window.activeParsingRun) {
+        window.activeParsingRun.status = 'completed';
+        window.activeParsingRun.progress = 100;
+        window.activeParsingRun.step_index = 5;
+        window.activeParsingRun.current_step = 'Ingestion and verification finished.';
+        window.activeParsingRun.summary = summaryStr;
+        if (typeof updateExplorerProgressUI === 'function') {
+            updateExplorerProgressUI();
+        }
+    }
+
     appendLog(`[COMPLETE] ${summaryStr}`);
 
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof reloadViewerIframe === 'function') reloadViewerIframe();
-    if (typeof loadFileRunMappings === 'function') loadFileRunMappings();
+    if (typeof loadFileRunMappings === 'function') {
+        await loadFileRunMappings();
+    }
+
+    if (window.activeParsingRun) {
+        const wasViewingActive = (typeof currentExplorerScope !== 'undefined' && currentExplorerScope === 'run'
+            && typeof currentExplorerRun !== 'undefined' && currentExplorerRun === window.activeParsingRun.run_id);
+        const completedPreset = dec.chosen_preset || window.activeParsingRun.preset;
+        window.activeParsingRun = null;
+
+        if (wasViewingActive && window.explorerData && Array.isArray(window.explorerData.all_mappings)) {
+            const matchedDoc = window.explorerData.all_mappings.find(m => m.file_path === currentExplorerDoc);
+            if (matchedDoc && Array.isArray(matchedDoc.runs) && matchedDoc.runs.length > 0) {
+                const matchedRun = matchedDoc.runs.find(r => r.preset === completedPreset) || matchedDoc.latest_run || matchedDoc.runs[0];
+                if (matchedRun) {
+                    currentExplorerRun = matchedRun.run_id || matchedRun.output_dir;
+                }
+            }
+        }
+        if (typeof renderExplorerUI === 'function') {
+            renderExplorerUI();
+        }
+    }
 
     setTimeout(() => {
         switchNavTab('results');
@@ -272,6 +325,19 @@ function updateProgressStatus(status, message) {
     }
     const stepText = document.getElementById('progressCurrentStepText');
     if (stepText) stepText.textContent = message;
+
+    if (window.activeParsingRun) {
+        if (status === 'ERROR') {
+            window.activeParsingRun.status = 'error';
+            window.activeParsingRun.error = message;
+        } else if (status === 'COMPLETED') {
+            window.activeParsingRun.status = 'completed';
+        }
+        window.activeParsingRun.current_step = message;
+        if (typeof updateExplorerProgressUI === 'function') {
+            updateExplorerProgressUI();
+        }
+    }
 }
 
 /**
@@ -281,10 +347,21 @@ function updateProgressStatus(status, message) {
  */
 function appendLog(line) {
     const consoleEl = document.getElementById('progressLogConsole');
-    if (!consoleEl) return;
     const now = new Date().toISOString().substring(11, 19);
-    consoleEl.textContent += `\n[${now}] ${line}`;
-    consoleEl.scrollTop = consoleEl.scrollHeight;
+    const formattedLine = `[${now}] ${line}`;
+    if (consoleEl) {
+        consoleEl.textContent += `\n${formattedLine}`;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+    if (window.activeParsingRun) {
+        if (!Array.isArray(window.activeParsingRun.logs)) {
+            window.activeParsingRun.logs = [];
+        }
+        window.activeParsingRun.logs.push(formattedLine);
+        if (typeof updateExplorerProgressUI === 'function') {
+            updateExplorerProgressUI();
+        }
+    }
 }
 
 /**
@@ -315,8 +392,12 @@ async function triggerRerunWithPreset(presetName) {
     }
 
     appendLog(`[RERUN] Triggering live rerun with preset '${presetName}' for '${pdfPath}'...`);
-    switchNavTab('progress');
     resetProgressUI();
+    if (typeof startExplorerActiveRun === 'function') {
+        startExplorerActiveRun(pdfPath, presetName, language);
+    } else {
+        switchNavTab('progress');
+    }
     startProgressPolling();
 
     try {
@@ -355,8 +436,12 @@ async function triggerForceRerunPreset(presetName, docName = null) {
     const language = (document.getElementById('inpLanguage') ? document.getElementById('inpLanguage').value : '') || 'pl';
 
     appendLog(`[FORCE RERUN] Triggering live forced rerun with preset '${presetName}' for '${pdfPath}' (bypassing caches)...`);
-    switchNavTab('progress');
     resetProgressUI();
+    if (typeof startExplorerActiveRun === 'function') {
+        startExplorerActiveRun(pdfPath, presetName, language);
+    } else {
+        switchNavTab('progress');
+    }
     startProgressPolling();
 
     try {

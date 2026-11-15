@@ -92,9 +92,33 @@ function renderFileRunsView(titleEl, tableHead, tbody) {
 
     const runs = (doc && doc.runs) ? doc.runs : [];
     const filteredRuns = runs.filter(r => !query || r.run_id.toLowerCase().includes(query) || r.preset.toLowerCase().includes(query) || r.status.toLowerCase().includes(query));
+    const hasActiveRun = Boolean(typeof doesActiveRunMatchDoc === 'function' && doesActiveRunMatchDoc(doc));
 
     let rowsHtml = '';
-    if (filteredRuns.length === 0) {
+    if (hasActiveRun) {
+        const active = window.activeParsingRun;
+        const pct = Number.isFinite(Number(active.progress)) ? Number(active.progress) : 0;
+        const isError = active.status === 'error';
+        const isDone = active.status === 'completed';
+        const badgeCls = isError ? 'badge-error' : (isDone ? 'badge-success' : 'badge-running');
+        const statusLabel = isError ? 'ERROR' : (isDone ? 'COMPLETED' : 'PARSING');
+        const isSelectedRun = (currentExplorerScope === 'run' && active.run_id === currentExplorerRun);
+        const rowClass = 'explorer-row-active-run' + (isSelectedRun ? ' explorer-row-selected' : '');
+
+        rowsHtml += `<tr class="${rowClass}" data-run-id="${escapeHtml(active.run_id)}" data-doc-path="${escapeHtml(docPath)}"`
+            + ` onclick="selectExplorerRun('${escapeHtml(active.run_id)}', '', '${escapeHtml(docPath)}')">`
+            + `<td><span class="run-id-cell">In progress</span></td>`
+            + `<td><span class="preset-badge">${escapeHtml(active.preset)}</span></td>`
+            + `<td><div class="explorer-inline-progress"><div class="explorer-inline-progress-track">`
+            + `<div class="explorer-inline-progress-fill" id="explorerTableActiveRunFill" style="width: ${pct}%;"></div>`
+            + `</div><span class="score-num" id="explorerTableActiveRunPct">${pct}%</span></div></td>`
+            + `<td><span class="table-muted-cell">-</span></td>`
+            + `<td><span class="badge ${badgeCls}" id="explorerTableActiveRunStatus">${statusLabel}</span></td>`
+            + `<td><span class="run-time-sub" id="explorerTableActiveRunStep">${escapeHtml(active.current_step || '')}</span></td>`
+            + `<td class="action-cell"><button class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); selectExplorerRun('${escapeHtml(active.run_id)}', '', '${escapeHtml(docPath)}')">View progress</button></td></tr>`;
+    }
+
+    if (filteredRuns.length === 0 && !hasActiveRun) {
         rowsHtml += '<tr><td colspan="7" class="table-empty-message">No parsing runs recorded for this file yet. Select a preset below to run it.</td></tr>';
     } else {
         filteredRuns.forEach(run => {
@@ -174,6 +198,11 @@ function renderRunPagesView(titleEl, container) {
     }
 
     const { doc, run } = selected;
+    if (run.is_active_progress) {
+        renderEmbeddedParsingProgressView(titleEl, container, doc, run);
+        return;
+    }
+
     const totalP = run.total_pages || 1;
     const statusClass = (run.status === 'ACCEPT') ? 'badge-accept' : 'badge-warn';
     const scoreFormatted = Number(run.overall_confidence).toFixed(4);
@@ -203,6 +232,69 @@ function renderRunPagesView(titleEl, container) {
         + `<span class="badge ${statusClass}">${escapeHtml(run.status)}</span>`
         + `<span class="breakdown-viols-sub">${run.violations_count || 0} total viols</span></div></div>`
         + `<div class="page-cards-grid">${cardsHtml}</div>`;
+}
+
+/** Renders live parsing progress embedded inside the explorer run view. */
+function renderEmbeddedParsingProgressView(titleEl, container, doc, run) {
+    const pct = Number.isFinite(Number(run.progress)) ? Number(run.progress) : 0;
+    const isError = run.status === 'error';
+    const isDone = run.status === 'completed';
+    const badgeCls = isError ? 'badge-error' : (isDone ? 'badge-success' : 'badge-running');
+    const statusLabel = isError ? 'ERROR' : (isDone ? 'COMPLETED' : 'PARSING');
+    const spinnerCls = (isError || isDone) ? 'progress-spinner hidden' : 'progress-spinner';
+    const stepIdx = run.step_index || 1;
+    const stepTitles = [
+        'Document validation & slicing',
+        'Layout & OCR parsing',
+        'Text skew alignment',
+        'Quality checks',
+        'Decision tree & fallback',
+    ];
+
+    if (titleEl) titleEl.textContent = `Parsing progress: ${doc.file_name} (${run.preset})`;
+
+    const stepsHtml = stepTitles.map((label, idx) => {
+        const num = idx + 1;
+        let cls = 'step-card';
+        if (isDone || num < stepIdx) cls = 'step-card done';
+        else if (num === stepIdx) cls = 'step-card active';
+        return `<div class="${cls}" id="explorerStepCard${num}">`
+            + `<div class="step-card-num">Step ${num}</div>`
+            + `<div class="step-card-title">${escapeHtml(label)}</div>`
+            + `</div>`;
+    }).join('');
+
+    const logsText = (Array.isArray(run.logs) && run.logs.length > 0)
+        ? run.logs.join('\n')
+        : '--- Starting pipeline execution ---';
+
+    container.innerHTML = `<div class="page-breakdown-header">`
+        + `<div class="page-breakdown-title">`
+        + `<button class="btn btn-secondary btn-xs" onclick="selectExplorerDoc('${escapeHtml(doc.file_path)}')">Back to file runs</button>`
+        + `<span class="breakdown-run-id">Parsing: ${escapeHtml(doc.file_name)}</span>`
+        + `<span class="breakdown-doc-sub">(${escapeHtml(run.preset)})</span>`
+        + `</div>`
+        + `<div class="page-breakdown-meta">`
+        + `<span id="explorerProgressSpinner" class="${spinnerCls}"></span>`
+        + `<span class="badge ${badgeCls}" id="explorerProgressStatusBadge">${statusLabel}</span>`
+        + `<span id="explorerProgressPercentText" class="progress-pct-text">${pct}%</span>`
+        + `</div>`
+        + `</div>`
+        + `<div class="explorer-progress-panel">`
+        + `<div class="progress-header-row">`
+        + `<div class="progress-step-container">`
+        + `<span id="explorerProgressCurrentStepText" class="progress-step-text">${escapeHtml(run.current_step || 'Starting ingestion...')}</span>`
+        + `</div>`
+        + `</div>`
+        + `<div class="progress-track"><div class="progress-fill" id="explorerProgressFillBar" style="width: ${pct}%;"></div></div>`
+        + `<div class="pipeline-steps explorer-progress-steps">${stepsHtml}</div>`
+        + `<div class="terminal-box explorer-progress-terminal" id="explorerProgressLogConsole">${escapeHtml(logsText)}</div>`
+        + `<div id="explorerProgressCompletionBanner" class="progress-completion-banner" style="display: ${isDone ? 'flex' : 'none'};">`
+        + `<div><div class="progress-completion-title">Pipeline run completed</div>`
+        + `<div class="progress-completion-summary" id="explorerProgressSummaryText">${escapeHtml(run.summary || '')}</div></div>`
+        + `<div class="progress-completion-actions"><button class="btn btn-primary btn-xs" onclick="switchNavTab('results')">View results</button></div>`
+        + `</div>`
+        + `</div>`;
 }
 
 /** Loads the chosen run into active session and navigates to the page in the viewer. */

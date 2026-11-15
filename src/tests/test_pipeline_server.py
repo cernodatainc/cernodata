@@ -137,13 +137,13 @@ class TestPipelineServer(EphemeralServerTestCase):
         self.assertEqual(status_l_css, 200)
         self.assertIn("text/css", headers_l_css.get("Content-Type", ""))
         self.assertIn(".hub-nav-bar", content_l_css)
+        self.assertIn(".explorer-progress-panel", content_l_css)
 
         status_l_js, content_l_js, headers_l_js = self._get("/landing.js")
         self.assertEqual(status_l_js, 200)
         self.assertIn("application/javascript", headers_l_js.get("Content-Type", ""))
-        self.assertIn("switchNavTab", content_l_js)
-        self.assertIn("triggerAddFileDiscovery", content_l_js)
-        self.assertIn("addDocumentByPath", content_l_js)
+        for fn in ("switchNavTab", "triggerAddFileDiscovery", "addDocumentByPath", "startExplorerActiveRun", "updateExplorerProgressUI", "renderEmbeddedParsingProgressView"):
+            self.assertIn(fn, content_l_js)
 
         # Test data shape config CSS and JS
         status_ds_css, content_ds_css, headers_ds_css = self._get("/data_shape_config.css")
