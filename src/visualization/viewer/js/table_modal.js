@@ -35,7 +35,7 @@ function parseClientMarkdownTable(mdText) {
         let line = lines[i];
         if (line.startsWith('|')) line = line.substring(1);
         if (line.endsWith('|')) line = line.substring(0, line.length - 1);
-        const cells = line.split('|').map(c => c.trim().replace(/\\\|/g, '|'));
+        const cells = line.split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, '|'));
         const isSep = cells.length > 0 && cells.every(c => /^:?-+:?$/.test(c));
         if (isSep && sepIdx === -1) {
             sepIdx = i;
@@ -97,19 +97,24 @@ function extractNodeTableData(node) {
     }
 
     // Detect if headers represent a repeated spanning title banner across all columns
+    // (Skip auto-promotion when the user explicitly chose header row 0 or chose to keep banner in data rows)
+    const explicitHdrMode = content.table_header_row_mode !== undefined ? String(content.table_header_row_mode) : null;
+    const explicitStripBanner = content.table_strip_banner !== undefined ? String(content.table_strip_banner) : null;
     const cleanHdrs = headers.map(h => (h || '').trim()).filter(Boolean);
-    if (cleanHdrs.length > 1 && new Set(cleanHdrs).size === 1 && rows.length > 1) {
+    if (explicitHdrMode !== '0' && cleanHdrs.length > 1 && new Set(cleanHdrs).size === 1 && rows.length > 1) {
         if (!tableTitle) tableTitle = cleanHdrs[0];
         const r0Clean = (rows[0] || []).map(c => (c || '').trim()).filter(Boolean);
         if (r0Clean.length > 0 && new Set(r0Clean).size === 1 && r0Clean[0] === cleanHdrs[0] && rows.length > 1) {
             const r1Clean = (rows[1] || []).map(c => (c || '').trim()).filter(Boolean);
             if (new Set(r1Clean).size > 1) {
                 headers = [...rows[1]];
-                rows = rows.slice(1);
-                numRows = rows.length;
-                columns = [];
-                for (let c = 0; c < numCols; c++) {
-                    columns.push(rows.map(r => (c < r.length ? r[c] : '')));
+                if (explicitStripBanner !== 'keep') {
+                    rows = rows.slice(1);
+                    numRows = rows.length;
+                    columns = [];
+                    for (let c = 0; c < numCols; c++) {
+                        columns.push(rows.map(r => (c < r.length ? r[c] : '')));
+                    }
                 }
             }
         }

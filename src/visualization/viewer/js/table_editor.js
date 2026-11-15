@@ -116,8 +116,12 @@ function _commitTableEdit(node, headers, rows, prevSnapshot, actionDesc) {
         `| ${normHeaders.map(escapeCell).join(' | ')} |`,
         `| ${normHeaders.map(() => '---').join(' | ')} |`
     ];
-    const skipFirst = normRows.length > 0 && normRows[0].every((val, idx) => val === normHeaders[idx]);
-    const bodyRows = skipFirst ? normRows.slice(1) : normRows;
+    const effectiveHdrIdx = (node.content && node.content.table_header_row_effective_idx !== undefined)
+        ? Number(node.content.table_header_row_effective_idx)
+        : 0;
+    const hdrRowIdx = (effectiveHdrIdx >= 0 && effectiveHdrIdx < normRows.length) ? effectiveHdrIdx : 0;
+    const skipHeaderRow = normRows.length > 0 && normRows[hdrRowIdx].every((val, idx) => val === normHeaders[idx]);
+    const bodyRows = skipHeaderRow ? normRows.filter((_, idx) => idx !== hdrRowIdx) : normRows;
     for (const row of bodyRows) {
         mdLines.push(`| ${row.map(escapeCell).join(' | ')} |`);
     }
@@ -221,7 +225,11 @@ function updateTableCell(nodeId, rowIdx, colIdx, value) {
     const { headers, rows } = _getEditableTableState(node);
     if (rowIdx < 0 || rowIdx >= rows.length || colIdx < 0 || colIdx >= headers.length) return;
 
-    const isMatchingHeaderRow = Array.isArray(node.content.headers)
+    const effectiveHdrIdx = (node.content && node.content.table_header_row_effective_idx !== undefined)
+        ? Number(node.content.table_header_row_effective_idx)
+        : 0;
+    const isMatchingHeaderRow = rowIdx === effectiveHdrIdx
+        && Array.isArray(node.content.headers)
         && node.content.headers.length === rows[rowIdx].length
         && rows[rowIdx].every((val, idx) => val === headers[idx]);
 

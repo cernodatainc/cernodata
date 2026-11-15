@@ -155,6 +155,9 @@ function acceptCategoryOnPage(category, targetPage = null) {
     renderSelectedEditor();
     renderSVGOverlays();
     renderViolationsList();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
  
     const banner = document.getElementById('statusBanner');
     if (banner) {
@@ -201,6 +204,9 @@ function restoreCategoryOnPage(category, targetPage = null) {
     renderSelectedEditor();
     renderSVGOverlays();
     renderViolationsList();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
  
     const banner = document.getElementById('statusBanner');
     if (banner) {
@@ -245,6 +251,9 @@ function toggleSuppressSingleViolation(evt, violationId, shouldSuppress = true) 
     renderSelectedEditor();
     renderSVGOverlays();
     renderViolationsList();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
  
     const banner = document.getElementById('statusBanner');
     if (banner) {
@@ -378,6 +387,9 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
     renderSelectedEditor();
     renderSVGOverlays();
     renderViolationsList();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
  
     const banner = document.getElementById('statusBanner');
     if (banner) {

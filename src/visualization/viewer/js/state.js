@@ -270,9 +270,21 @@ function computeDomDiff() {
     const rawNodes = (rawDomData && rawDomData.nodes) || [];
     const currentNodes = (domData && domData.nodes) || [];
     const rawMap = new Map();
-    rawNodes.forEach(n => { if (n && n.node_id) rawMap.set(n.node_id, n); });
+    const rawIdxMap = new Map();
+    rawNodes.forEach((n, idx) => {
+        if (n && n.node_id) {
+            rawMap.set(n.node_id, n);
+            rawIdxMap.set(n.node_id, idx);
+        }
+    });
     const currMap = new Map();
-    currentNodes.forEach(n => { if (n && n.node_id) currMap.set(n.node_id, n); });
+    const currIdxMap = new Map();
+    currentNodes.forEach((n, idx) => {
+        if (n && n.node_id) {
+            currMap.set(n.node_id, n);
+            currIdxMap.set(n.node_id, idx);
+        }
+    });
 
     const added = [];
     const modified = [];
@@ -297,16 +309,18 @@ function computeDomDiff() {
             );
             const typeChanged = raw.type !== curr.type;
             const noteChanged = (raw.user_correction_note || '') !== (curr.user_correction_note || '');
+            const flagChanged = (!!raw.is_incorrect_text !== !!curr.is_incorrect_text) || (!!raw.is_fixed !== !!curr.is_fixed) || (!!raw.is_corrected !== !!curr.is_corrected);
+            const orderChanged = rawIdxMap.get(id) !== currIdxMap.get(id);
             const rawViols = (raw.violations || []).filter(v => isSuppressed(v)).map(v => v.violation_id || v.rule_type).sort();
             const currViols = (curr.violations || []).filter(v => isSuppressed(v)).map(v => v.violation_id || v.rule_type).sort();
             const violationsChanged = JSON.stringify(rawViols) !== JSON.stringify(currViols);
 
-            if (boxChanged || textChanged || typeChanged || noteChanged || violationsChanged) {
+            if (boxChanged || textChanged || typeChanged || noteChanged || flagChanged || orderChanged || violationsChanged) {
                 modified.push({
                     node_id: id,
                     raw: raw,
                     current: curr,
-                    changes: { boxChanged, textChanged, typeChanged, noteChanged, violationsChanged }
+                    changes: { boxChanged, textChanged, typeChanged, noteChanged, flagChanged, orderChanged, violationsChanged }
                 });
             }
         }

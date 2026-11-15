@@ -4,7 +4,7 @@
  * Image crop preview, polygon vertex extraction, affine warping unskew transformations,
  * and targeted section OCR re-parsing.
  */
- 
+
 /**
  * Computes or retrieves the effective rotation angle in degrees for a bounding box.
  *
@@ -27,7 +27,7 @@ function getEffectiveNodeAngle(nodeId, bbox) {
     const pageSkewNode = domData.nodes.find(n => (n.global_page_index === pageNo) && n.bounding_box && n.bounding_box.angle);
     return pageSkewNode ? pageSkewNode.bounding_box.angle : 0.0;
 }
- 
+
 /**
  * Toggles between unskewed affine-rectified crop and raw skewed oriented polygon cutout.
  *
@@ -48,7 +48,7 @@ function toggleCutoutUnskew(nodeId) {
         modeLabel.textContent = isCutoutUnskewed ? 'Mode: unskewed (rectified)' : 'Mode: skewed (oriented selection)';
     }
 }
- 
+
 /**
  * Warps a source image triangle (s0, s1, s2) onto a destination canvas triangle (d0, d1, d2)
  * using an affine 2D transform matrix.
@@ -67,17 +67,17 @@ function renderTriangleWarp(ctx, img, s0, s1, s2, d0, d1, d2) {
     const X2 = s2.x - s0.x, Y2 = s2.y - s0.y;
     const det = X1 * Y2 - X2 * Y1;
     if (Math.abs(det) < 0.0001) return;
- 
+
     const U1 = d1.x - d0.x, U2 = d2.x - d0.x;
     const a = (U1 * Y2 - U2 * Y1) / det;
     const c = (U2 * X1 - U1 * X2) / det;
     const e = d0.x - a * s0.x - c * s0.y;
- 
+
     const V1 = d1.y - d0.y, V2 = d2.y - d0.y;
     const b = (V1 * Y2 - V2 * Y1) / det;
     const d = (V2 * X1 - V1 * X2) / det;
     const f = d0.y - b * s0.x - d * s0.y;
- 
+
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(d0.x, d0.y);
@@ -89,7 +89,7 @@ function renderTriangleWarp(ctx, img, s0, s1, s2, d0, d1, d2) {
     ctx.drawImage(img, 0, 0);
     ctx.restore();
 }
- 
+
 /**
  * Calculates quadrilateral polygon vertices representing the skewed footprint of a bounding box.
  *
@@ -105,7 +105,7 @@ function getNodeSkewCorners(nodeId, bbox) {
     const x0 = bbox.x0, y0 = bbox.y0, x1 = bbox.x1, y1 = bbox.y1;
     const wSpan = Math.max(1, x1 - x0);
     const hSpan = Math.max(1, y1 - y0);
- 
+
     if (angle === 0) {
         return [
             { x: x0, y: y0 },
@@ -114,11 +114,9 @@ function getNodeSkewCorners(nodeId, bbox) {
             { x: x0, y: y1 }
         ];
     }
- 
+
     const rad = angle * Math.PI / 180.0;
-    const deltaY = wSpan * Math.tan(rad);
-    const absDeltaY = Math.abs(deltaY);
- 
+    const absDeltaY = Math.abs(wSpan * Math.tan(rad));
     if (angle < 0) {
         return [
             { x: x0, y: y0 },
@@ -135,7 +133,7 @@ function getNodeSkewCorners(nodeId, bbox) {
         ];
     }
 }
- 
+
 /**
  * Extracts base64 encoded PNG data URI of a node's cropped canvas.
  *
@@ -234,7 +232,7 @@ function renderCutoutPreview(nodeId, bbox, targetImgId, unskew = isCutoutUnskewe
         pageImg.addEventListener('load', doDraw, { once: true });
     }
 }
- 
+
 /**
  * Triggers backend targeted OCR re-extraction pass for the selected section.
  *
@@ -442,6 +440,9 @@ async function acceptOcrOutput(nodeId, engineName) {
     const chosenText = txtElem ? txtElem.value : (engRes.text || '');
     const chosenConf = engRes.confidence || 0.0;
 
+    const nodeIdx = domData.nodes.findIndex(n => n.node_id === nodeId);
+    const origNode = JSON.parse(JSON.stringify(node));
+
     if (!node.content) node.content = {};
     node.content.raw_text = chosenText;
     node.user_correction_note = chosenText;
@@ -449,11 +450,24 @@ async function acceptOcrOutput(nodeId, engineName) {
     node.is_incorrect_text = false;
     node.is_fixed = true;
 
-    dismissOcrPrompt(nodeId, true);
+    if (typeof recordRunDiff === 'function' && nodeIdx !== -1) {
+        recordRunDiff({
+            action: 'accept_ocr',
+            description: `Accept ${engineName} OCR output for '${nodeId}'`,
+            page: typeof getNodePage === 'function' ? getNodePage(node) : 1,
+            removed: [{ index: nodeIdx, node: origNode }],
+            inserted: [{ index: nodeIdx, node: JSON.parse(JSON.stringify(node)) }],
+            beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
+            afterSelection: { selectedNodeId: nodeId, selectedNodeIds: [nodeId] },
+            meta: { node_id: nodeId, engine: engineName }
+        });
+    }
 
+    dismissOcrPrompt(nodeId, true);
     renderDOMTree();
     renderSelectedEditor();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') renderLiveOutput();
     await saveAnnotations(true);
 
     const banner = document.getElementById('statusBanner');

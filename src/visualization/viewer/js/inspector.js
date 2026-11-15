@@ -357,17 +357,25 @@ function _moveNodeOrder(nodeId, direction) {
     const targetGlobalIdx = domData.nodes.findIndex(n => n.node_id === targetId);
     const neighborGlobalIdx = domData.nodes.findIndex(n => n.node_id === neighborNode.node_id);
     const origTarget = JSON.parse(JSON.stringify(domData.nodes[targetGlobalIdx]));
+    const origNeighbor = JSON.parse(JSON.stringify(domData.nodes[neighborGlobalIdx]));
 
-    const movedNode = domData.nodes.splice(targetGlobalIdx, 1)[0];
-    domData.nodes.splice(neighborGlobalIdx, 0, movedNode);
+    const temp = domData.nodes[targetGlobalIdx];
+    domData.nodes[targetGlobalIdx] = domData.nodes[neighborGlobalIdx];
+    domData.nodes[neighborGlobalIdx] = temp;
 
     if (typeof recordRunDiff === 'function') {
         recordRunDiff({
             action: 'reorder_node',
             description: `Move reading order ${direction}: ${targetId}`,
             page: nodePage,
-            removed: [{ index: targetGlobalIdx, node: origTarget }],
-            inserted: [{ index: neighborGlobalIdx, node: origTarget }],
+            removed: [
+                { index: targetGlobalIdx, node: origTarget },
+                { index: neighborGlobalIdx, node: origNeighbor }
+            ],
+            inserted: [
+                { index: targetGlobalIdx, node: origNeighbor },
+                { index: neighborGlobalIdx, node: origTarget }
+            ],
             beforeSelection: { selectedNodeId, selectedNodeIds: [...selectedNodeIds] },
             afterSelection: { selectedNodeId: targetId, selectedNodeIds: [targetId] },
             meta: { node_id: targetId, direction }
@@ -428,8 +436,13 @@ function renderDOMTree() {
     }
 
     const pageSeqMap = new Map();
-    const currPageNodes = domData.nodes.filter(n => getNodePage(n) === currentPage);
-    currPageNodes.forEach((n, idx) => { pageSeqMap.set(n.node_id, idx + 1); });
+    const pageCounters = new Map();
+    domData.nodes.forEach(n => {
+        const pg = getNodePage(n);
+        const seq = (pageCounters.get(pg) || 0) + 1;
+        pageCounters.set(pg, seq);
+        pageSeqMap.set(n.node_id, seq);
+    });
 
     nodesToDisplay.forEach(node => {
         const nodePage = getNodePage(node);

@@ -134,6 +134,9 @@ async function splitSelectedDOMNode(nodeId) {
     renderDOMTree();
     renderSelectedEditor();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 
     if (typeof saveAnnotations === 'function') {
         await saveAnnotations(true);

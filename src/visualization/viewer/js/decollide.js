@@ -247,6 +247,9 @@ async function mergeDOMNodes(nodeId1, nodeId2, options = {}) {
     renderViolationsList();
     renderSelectedEditor();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 
     if (typeof saveAnnotations === 'function') {
         await saveAnnotations(true);
@@ -327,6 +330,9 @@ async function unmergeDOMNode(nodeId) {
     renderViolationsList();
     renderSelectedEditor();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 
     if (typeof saveAnnotations === 'function') {
         await saveAnnotations(true);

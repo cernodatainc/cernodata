@@ -65,7 +65,12 @@
                     d="M3777.84 552H3851.39L3803.39 600H3803.39L3830 650H3768.83L3742.22 600H3587.78L3561.17 650H3500L3665 340L3777.84 552ZM3613.33 552H3716.67L3665 454.93L3613.33 552Z"
                     fill="black" />
             </svg>
+            <div class="brand-doc-meta">
+                Document: <span id="domSourceFilename">-</span>
+                · ID: <span id="domDocId">-</span><span id="planHeaderSub"></span>
+            </div>
         </div>
+        <a href="/" class="header-back-btn">Back to dashboard</a>
     </header>
 
     <div class="toolbar">
@@ -120,6 +125,11 @@
                 <option value="fr">French (fr)</option>
                 <option value="es">Spanish (es)</option>
             </select>
+        </div>
+
+        <div class="history-controls-group page-controls-group">
+            <button class="zoom-btn zoom-btn-sm" id="btnUndo" disabled onclick="undo()" title="Undo last change (Ctrl+Z)">Undo</button>
+            <button class="zoom-btn zoom-btn-sm" id="btnRedo" disabled onclick="redo()" title="Redo reverted change (Ctrl+Y)">Redo</button>
         </div>
 
         <div class="toolbar-actions">

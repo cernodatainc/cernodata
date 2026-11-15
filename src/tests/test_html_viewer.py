@@ -311,11 +311,145 @@ class TestHTMLViewer(unittest.TestCase):
         self.assertIn("id=\"btnPrevViol\"", served_html)
         self.assertIn("id=\"btnNextViol\"", served_html)
         self.assertIn("id=\"btnRevertRaw\"", served_html)
+        self.assertIn("id=\"btnUndo\"", served_html)
+        self.assertIn("id=\"btnRedo\"", served_html)
+        self.assertIn("id=\"domSourceFilename\"", served_html)
+        self.assertIn("id=\"domDocId\"", served_html)
         self.assertIn("--ui-blue-bg", html_content)
         self.assertIn("--ui-blue-border", html_content)
 
         if os.path.exists(out_path):
             os.remove(out_path)
+
+    def test_viewer_js_runtime_behavior_in_node(self):
+        import shutil
+        import subprocess
+        import tempfile
+
+        node_bin = shutil.which("node")
+        if not node_bin:
+            self.skipTest("node binary not available")
+
+        js_code = bundle_viewer_js()
+        test_harness = """
+const assert = require('assert');
+global.window = global;
+global.window.addEventListener = () => {};
+global.document = {
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    createElement: () => ({ style: {}, classList: { add: () => {}, remove: () => {} }, appendChild: () => {} }),
+    body: { appendChild: () => {} }
+};
+global.window.location = { search: '', pathname: '/viewer.html' };
+global.navigator = {};
+
+""" + js_code + """
+
+// 1. Test renderDOMTreeNodeCardComponent does not throw ReferenceError
+const cardHtml = renderDOMTreeNodeCardComponent(
+    { node_id: 'n1', type: 'paragraph', is_merged: false },
+    {
+        nodePage: 1,
+        isOnCurrentPage: true,
+        isFixed: false,
+        isIncorrect: false,
+        hasActiveViol: false,
+        hasSuppressedViol: false,
+        displayText: 'Hello world',
+        pageSeq: 1
+    }
+);
+assert(cardHtml.includes('btn-order-up'), 'Expected btn-order-up in card HTML');
+assert(cardHtml.includes('Hello world'), 'Expected displayText in card HTML');
+assert(!INSPECTOR_PALETTE.bgCardHover.endsWith(';'), 'Expected no trailing semicolon in bgCardHover');
+
+// 2. Test multi-page node reordering, undo/redo, and computeDomDiff
+const initialNodes = [
+    { node_id: 'p1_a', type: 'paragraph', global_page_index: 1, bounding_box: { x0: 0, y0: 0, x1: 10, y1: 10 }, content: { raw_text: 'A' } },
+    { node_id: 'p2_x', type: 'paragraph', global_page_index: 2, bounding_box: { x0: 0, y0: 0, x1: 10, y1: 10 }, content: { raw_text: 'X' } },
+    { node_id: 'p1_b', type: 'paragraph', global_page_index: 1, bounding_box: { x0: 0, y0: 20, x1: 10, y1: 30 }, content: { raw_text: 'B' } }
+];
+rawDomData = JSON.parse(JSON.stringify({ nodes: initialNodes }));
+domData = JSON.parse(JSON.stringify({ nodes: initialNodes }));
+window.runDiffManager.clear();
+
+moveNodeOrderDown('p1_a');
+assert.deepStrictEqual(
+    domData.nodes.map(n => n.node_id),
+    ['p1_b', 'p2_x', 'p1_a'],
+    'Expected p1_a and p1_b to swap exact positions across intervening page 2 node'
+);
+const diffAfterReorder = computeDomDiff();
+assert.strictEqual(diffAfterReorder.has_changes, true, 'Expected computeDomDiff().has_changes to be true after reorder');
+
+undo();
+assert.deepStrictEqual(
+    domData.nodes.map(n => n.node_id),
+    ['p1_a', 'p2_x', 'p1_b'],
+    'Expected undo() to restore exact initial node order'
+);
+
+redo();
+assert.deepStrictEqual(
+    domData.nodes.map(n => n.node_id),
+    ['p1_b', 'p2_x', 'p1_a'],
+    'Expected redo() to re-apply exact node swap'
+);
+
+// 3. Test table reparse options (explicit header row 0 and keep banner) + escaped pipe parsing
+const tblNode = {
+    node_id: 'tbl_1',
+    type: 'table_grid',
+    global_page_index: 1,
+    content: {
+        rows: [['Banner', 'Banner'], ['ColA', 'ColB'], ['1', '2']],
+        headers: ['Banner', 'Banner'],
+        num_rows: 3,
+        num_cols: 2
+    }
+};
+applyTableReparseOptions(tblNode, '0', 'keep', '');
+const extractedHdr0 = extractNodeTableData(tblNode);
+assert.deepStrictEqual(extractedHdr0.headers, ['Banner', 'Banner'], 'Explicit header row 0 must not be overridden');
+
+applyTableReparseOptions(tblNode, '1', 'keep', '');
+const extractedKeep = extractNodeTableData(tblNode);
+assert.deepStrictEqual(extractedKeep.headers, ['ColA', 'ColB'], 'Header row 1 should be ColA, ColB');
+assert.strictEqual(extractedKeep.rows.length, 3, 'keep banner mode must retain all 3 rows in extractNodeTableData');
+assert.strictEqual(extractedKeep.effectiveHdrIdx, 1, 'Effective header index must be 1');
+
+const mdParsed = parseClientMarkdownTable('| A \\\\| B | C |\\n| --- | --- |\\n| 1 \\\\| 2 | 3 |');
+assert.deepStrictEqual(mdParsed.headers, ['A | B', 'C'], 'Escaped pipes in headers must not split cells');
+assert.deepStrictEqual(mdParsed.rows[1], ['1 | 2', '3'], 'Escaped pipes in rows must not split cells');
+
+// 4. Test updateTableCell does not overwrite headers when editing a non-header row with identical values
+domData.nodes = [{
+    node_id: 'tbl_dup',
+    type: 'table_grid',
+    global_page_index: 1,
+    content: {
+        headers: ['X', 'Y'],
+        rows: [['X', 'Y'], ['X', 'Y']],
+        num_rows: 2,
+        num_cols: 2
+    }
+}];
+updateTableCell('tbl_dup', 1, 0, 'ChangedBody');
+assert.deepStrictEqual(domData.nodes[0].content.headers, ['X', 'Y'], 'Editing body row 1 must not mutate table headers');
+assert.strictEqual(domData.nodes[0].content.rows[1][0], 'ChangedBody');
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tmp:
+            tmp.write(test_harness)
+            tmp_path = tmp.name
+        try:
+            res = subprocess.run([node_bin, tmp_path], capture_output=True, text=True, timeout=10)
+            self.assertEqual(res.returncode, 0, f"Viewer JS runtime test failed:\n{res.stderr}\n{res.stdout}")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
 
 if __name__ == "__main__":

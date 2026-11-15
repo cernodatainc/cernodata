@@ -12,7 +12,7 @@
 const INSPECTOR_PALETTE = {
     bgDark: '#EFF1F2',
     bgCard: '#FDFCFC',
-    bgCardHover: '#F5F7F8;',
+    bgCardHover: '#F5F7F8',
     white: '#FFFFFF',
     border: '#D0CDC6',
     textPrimary: '#1F1D1A',
@@ -376,8 +376,8 @@ function renderDOMTreeNodeCardComponent(node, options) {
     const { nodePage, isOnCurrentPage, isFixed, isIncorrect, hasActiveViol, hasSuppressedViol, displayText, pageSeq } = options;
     const pageBadgeVariant = isOnCurrentPage ? 'blueSolid' : 'muted';
     const isMerged = node.is_merged || (node.merged_from && node.merged_from.length > 0);
-    const p = VIEWER_PALETTE;
-    const orderBtnStyle = `font-size:10px; padding:1px 5px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgLight}; color:${p.textPrimary}; cursor:pointer; line-height:1.2;`;
+    const p = INSPECTOR_PALETTE;
+    const orderBtnStyle = `font-size:10px; padding:1px 5px; border:1px solid ${p.border}; border-radius:3px; background:${p.bgCard}; color:${p.textPrimary}; cursor:pointer; line-height:1.2;`;
 
     return `
         <div class="node-header">

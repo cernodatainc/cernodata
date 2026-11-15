@@ -81,8 +81,11 @@ function _splitTextByDelimiter(rawText, delimiter, trimCells, skipEmpty) {
         } else if (!line.trim()) {
             continue;
         }
-        const rawCells = line.split(delimiter);
-        const cells = rawCells.map(c => (trimCells ? c.trim() : c));
+        const rawCells = delimiter === '|' ? line.split(/(?<!\\)\|/) : line.split(delimiter);
+        const cells = rawCells.map(c => {
+            const unescaped = delimiter === '|' ? c.replace(/\\\|/g, '|') : c;
+            return trimCells ? unescaped.trim() : unescaped;
+        });
         if (delimiter === '|' && cells.length > 0 && cells.every(c => /^:?-+:?$/.test(c.trim()))) {
             continue;
         }

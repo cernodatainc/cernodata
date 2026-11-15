@@ -434,6 +434,13 @@ function revertToRawResult() {
     decisionData = JSON.parse(JSON.stringify(rawDecisionData));
     ensureViolationIds();
 
+    if (window.runDiffManager && typeof window.runDiffManager.clear === 'function') {
+        window.runDiffManager.clear();
+    }
+    if (typeof userCorrections === 'object' && userCorrections !== null) {
+        Object.keys(userCorrections).forEach(k => { delete userCorrections[k]; });
+    }
+
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();
     }
@@ -452,6 +459,9 @@ function revertToRawResult() {
     renderViolationsList();
     renderSelectedEditor();
     renderSVGOverlays();
+    if (typeof renderLiveOutput === 'function') {
+        renderLiveOutput();
+    }
 
     const banner = document.getElementById('statusBanner');
     if (banner) {
