@@ -47,6 +47,9 @@ function handleNodeClick(evt, nodeId) {
             card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
+    if (typeof scrollLiveOutputToNode === 'function') {
+        scrollLiveOutputToNode(selectedNodeId);
+    }
     renderSelectedEditor();
     renderSVGOverlays();
 }

@@ -2122,8 +2122,10 @@ select.type-filter option:checked {
 
 .live-output-block:hover,
 .live-output-block.is-hovered,
+.live-output-block.is-selected,
 .live-rag-chunk:hover,
-.live-rag-chunk.is-hovered {
+.live-rag-chunk.is-hovered,
+.live-rag-chunk.is-selected {
     border-color: var(--ui-blue);
     background: var(--ui-blue-bg);
 }

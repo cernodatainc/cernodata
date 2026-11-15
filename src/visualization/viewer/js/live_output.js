@@ -9,6 +9,7 @@
 
 let liveOutputViewMode = 'split';
 let liveOutputPageOnly = false;
+let liveOutputDehyphenate = false;
 let hoveredLiveOutputNodeId = null;
 
 /**
@@ -54,6 +55,17 @@ function _resolveLiveNodeText(node) {
 }
 
 /**
+ * Joins words split across line breaks with a trailing hyphen (e.g. "każde-\ngo" -> "każdego").
+ *
+ * @param {string} text - Raw text string.
+ * @returns {string} Dehyphenated text.
+ */
+function _dehyphenateLineBreaks(text) {
+    if (!text) return '';
+    return String(text).replace(/([\p{Ll}])-\s*\r?\n\s*([\p{Ll}])/gu, '$1$2');
+}
+
+/**
  * Formats a single DOM node into a Markdown block string.
  *
  * @param {Object} node - DOM node record.
@@ -93,7 +105,10 @@ function buildLiveOutputPayload() {
 
     targetNodes.forEach((node, idx) => {
         const nodePage = typeof getNodePage === 'function' ? getNodePage(node) : (node.global_page_index || 1);
-        const text = _resolveLiveNodeText(node);
+        let text = _resolveLiveNodeText(node);
+        if (liveOutputDehyphenate && node.type !== 'table_grid') {
+            text = _dehyphenateLineBreaks(text);
+        }
         const mdBlock = _formatNodeMarkdown(node, text);
         if (!mdBlock) return;
 
@@ -153,6 +168,36 @@ function setLiveOutputViewMode(mode) {
 function toggleLiveOutputPageFilter(pageOnly) {
     liveOutputPageOnly = !!pageOnly;
     renderLiveOutput();
+}
+
+/**
+ * Toggles joining hyphenated words broken across lines in Live Output.
+ *
+ * @param {boolean} enabled - True to merge line-break hyphenated words.
+ */
+function toggleLiveOutputDehyphenate(enabled) {
+    liveOutputDehyphenate = !!enabled;
+    renderLiveOutput();
+}
+
+/**
+ * Highlights and scrolls Live Output preview panes to the given DOM node.
+ *
+ * @param {string|null} nodeId - Target node identifier.
+ */
+function scrollLiveOutputToNode(nodeId) {
+    const container = document.getElementById('liveOutputContainer');
+    if (!container) return;
+    container.querySelectorAll('.live-output-block.is-selected, .live-rag-chunk.is-selected').forEach(el => {
+        el.classList.remove('is-selected');
+    });
+    if (!nodeId) return;
+    container.querySelectorAll(`[data-live-node-id="${nodeId}"]`).forEach(el => {
+        el.classList.add('is-selected');
+        if (typeof el.scrollIntoView === 'function') {
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
 }
 
 /**
@@ -247,9 +292,11 @@ function renderLiveOutput() {
 
     const { blocks, chunks } = buildLiveOutputPayload();
 
+    const activeSelectedId = (typeof selectedNodeId !== 'undefined') ? selectedNodeId : null;
+
     const mdHtml = blocks.length > 0
         ? blocks.map(b => `
-            <div class="live-output-block live-type-${escapeHtml(b.type)} ${hoveredLiveOutputNodeId === b.node_id ? 'is-hovered' : ''}"
+            <div class="live-output-block live-type-${escapeHtml(b.type)} ${hoveredLiveOutputNodeId === b.node_id ? 'is-hovered' : ''} ${activeSelectedId === b.node_id ? 'is-selected' : ''}"
                  data-live-node-id="${escapeHtml(b.node_id)}"
                  onmouseenter="highlightLiveOutputNode('${escapeHtml(b.node_id)}', true)"
                  onmouseleave="highlightLiveOutputNode('${escapeHtml(b.node_id)}', false)"
@@ -268,7 +315,7 @@ function renderLiveOutput() {
         ? chunks.map(ch => {
             const pathText = ch.heading_path.length > 0 ? ch.heading_path.join(' > ') : 'Document Root';
             return `
-                <div class="live-rag-chunk ${hoveredLiveOutputNodeId === ch.node_id ? 'is-hovered' : ''}"
+                <div class="live-rag-chunk ${hoveredLiveOutputNodeId === ch.node_id ? 'is-hovered' : ''} ${activeSelectedId === ch.node_id ? 'is-selected' : ''}"
                      data-live-node-id="${escapeHtml(ch.node_id)}"
                      onmouseenter="highlightLiveOutputNode('${escapeHtml(ch.node_id)}', true)"
                      onmouseleave="highlightLiveOutputNode('${escapeHtml(ch.node_id)}', false)"
@@ -295,6 +342,10 @@ function renderLiveOutput() {
                 <button type="button" class="action-btn action-btn-decollide-sm ${liveOutputViewMode === 'chunks' ? 'active' : ''}" onclick="setLiveOutputViewMode('chunks')">RAG Chunks (${chunks.length})</button>
             </div>
             <div class="live-output-tools">
+                <label class="live-output-page-toggle" title="Merge words split across line breaks with a trailing hyphen">
+                    <input type="checkbox" ${liveOutputDehyphenate ? 'checked' : ''} onchange="toggleLiveOutputDehyphenate(this.checked)" />
+                    <span>Join line-break hyphens</span>
+                </label>
                 <label class="live-output-page-toggle">
                     <input type="checkbox" ${liveOutputPageOnly ? 'checked' : ''} onchange="toggleLiveOutputPageFilter(this.checked)" />
                     <span>Page ${typeof currentPage !== 'undefined' ? currentPage : 1} only</span>
@@ -307,4 +358,8 @@ function renderLiveOutput() {
             ${showChunks ? `<div class="live-output-section"><div class="live-section-heading">RAG Chunks (${chunks.length})</div><div id="liveRagChunksPreview" class="live-chunk-list">${chunksHtml}</div></div>` : ''}
         </div>
     `;
+
+    if (activeSelectedId) {
+        scrollLiveOutputToNode(activeSelectedId);
+    }
 }
