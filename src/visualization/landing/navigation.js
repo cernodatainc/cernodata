@@ -150,11 +150,14 @@ function updateSuggestedPlan() {
 }
 
 /**
- * No-op UI hook for initializing the guided Custom OCR Preset Builder modal in the Web Hub.
+ * Initializes the Custom OCR Preset Builder modal in the Web Hub by delegating
+ * to the shared preset modal controller loaded via data_shape/ui.js.
  */
-function initCustomPresetBuilderModal() {
-    // TODO(TASK-207): Render the 'Add / Connect Custom OCR Preset' modal with the community OCR recipe
-    // selector (TASK-208), local app / web service inputs, and 'Test Connection' button.
+function initCustomPresetBuilderModal(catalogOverride) {
+    if (typeof setupCustomPresetBuilderModal === 'function') {
+        return setupCustomPresetBuilderModal(catalogOverride);
+    }
+    return null;
 }
 
 /**

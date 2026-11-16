@@ -55,7 +55,8 @@ class TestModularParserDispatch(unittest.TestCase):
 
         self.assertTrue(docling_adapter.can_handle("docling_fast"))
         self.assertTrue(docling_adapter.can_handle("docling_deep"))
-        self.assertTrue(docling_adapter.can_handle("any_custom_preset"))
+        self.assertTrue(docling_adapter.can_handle("docling_custom"))
+        self.assertFalse(docling_adapter.can_handle("any_custom_preset"))
 
     def test_custom_parser_registry_registration(self):
         registry = ParserPresetRegistry()

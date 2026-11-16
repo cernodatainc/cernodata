@@ -238,6 +238,10 @@
                                     <option value="pypdfium_rapidocr">pypdfium_rapidocr (RapidOCR Standalone)</option>
                                     <option value="vision_llm_direct">vision_llm_direct (Vision LLM Direct)</option>
                                 </select>
+                                <button type="button" class="btn-secondary custom-preset-trigger-btn"
+                                    id="btnOpenCustomPresetFromRun" onclick="openCustomPresetBuilderModal()">
+                                    Add / Connect Custom OCR Preset
+                                </button>
                             </div>
 
                             <div class="form-group">
@@ -342,6 +346,10 @@
                                 <option value="docling_deep">docling_deep</option>
                                 <option value="vision_llm_direct">vision_llm_direct</option>
                             </select>
+                            <button type="button" class="btn-secondary custom-preset-trigger-btn"
+                                id="btnOpenCustomPresetFromPlanner" onclick="openCustomPresetBuilderModal()">
+                                Add / Connect Custom OCR Preset
+                            </button>
                         </div>
                         <button class="submit-btn" id="submitBtn" onclick="submitPlan()"
                             data-submit-endpoint="/api/submit_plan">Start pipeline</button>
@@ -443,6 +451,96 @@
         </section>
 
     </main>
+
+    <div id="customPresetBuilderModal" class="custom-preset-modal-backdrop hidden" role="dialog" aria-modal="true"
+        aria-labelledby="customPresetModalTitle">
+        <div class="custom-preset-modal-card">
+            <div class="custom-preset-modal-header">
+                <h3 id="customPresetModalTitle">Add / Connect Custom OCR Preset</h3>
+                <button type="button" class="custom-preset-modal-close" onclick="closeCustomPresetBuilderModal()"
+                    aria-label="Close modal">x</button>
+            </div>
+            <div class="custom-preset-modal-body">
+                <div class="custom-preset-field">
+                    <label for="cpRecipeSelect">Community OCR Recipe Starter</label>
+                    <select id="cpRecipeSelect" class="override-select" onchange="onCustomPresetRecipeSelected()">
+                        <option value="">-- Start from scratch or choose a recipe --</option>
+                    </select>
+                </div>
+                <div class="custom-preset-grid-2">
+                    <div class="custom-preset-field">
+                        <label for="cpPresetId">Preset ID</label>
+                        <input type="text" id="cpPresetId" placeholder="e.g. tesseract_custom" />
+                    </div>
+                    <div class="custom-preset-field">
+                        <label for="cpDisplayName">Display Name</label>
+                        <input type="text" id="cpDisplayName" placeholder="e.g. Tesseract Multi-Lang" />
+                    </div>
+                </div>
+                <div class="custom-preset-grid-2">
+                    <div class="custom-preset-field">
+                        <label for="cpBackendType">Backend Connection Mode</label>
+                        <select id="cpBackendType" class="override-select"
+                            onchange="onCustomPresetBackendTypeChanged()">
+                            <option value="cli_subprocess">Local Application / CLI Command</option>
+                            <option value="http_endpoint">Local / Remote HTTP OCR Service</option>
+                        </select>
+                    </div>
+                    <div class="custom-preset-field">
+                        <label for="cpOutputFormat">Output Format</label>
+                        <select id="cpOutputFormat" class="override-select">
+                            <option value="text">Plain Text (text)</option>
+                            <option value="markdown">Markdown (markdown)</option>
+                            <option value="hocr">hOCR HTML (hocr)</option>
+                            <option value="cernodata_dom_json">cernodata DOM JSON</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="cpCliFields" class="custom-preset-field">
+                    <label for="cpCommandTemplate">CLI Command Template</label>
+                    <input type="text" id="cpCommandTemplate"
+                        placeholder="e.g. tesseract {input_path} {output_path} -l {language}" />
+                </div>
+                <div id="cpHttpFields" class="custom-preset-field hidden">
+                    <label for="cpEndpointUrl">HTTP OCR Endpoint URL</label>
+                    <input type="text" id="cpEndpointUrl"
+                        placeholder="e.g. http://127.0.0.1:8866/predict/ocr_system" />
+                </div>
+                <div class="custom-preset-grid-2">
+                    <div class="custom-preset-field">
+                        <label for="cpHardwareWeight">Hardware Profile</label>
+                        <select id="cpHardwareWeight" class="override-select">
+                            <option value="light_cpu">Light CPU</option>
+                            <option value="heavy_cpu">Heavy CPU</option>
+                            <option value="gpu_vram">GPU VRAM</option>
+                        </select>
+                    </div>
+                    <div class="custom-preset-field">
+                        <label for="cpTimeoutSec">Timeout (seconds)</label>
+                        <input type="number" id="cpTimeoutSec" min="5" max="3600" value="120" />
+                    </div>
+                </div>
+                <div class="custom-preset-field">
+                    <label for="cpTaxonomyHints">Best Document Types (comma-separated)</label>
+                    <input type="text" id="cpTaxonomyHints"
+                        placeholder="e.g. scanned_form, tabular_ledger" />
+                </div>
+                <div class="custom-preset-field">
+                    <label for="cpDescription">Description (optional)</label>
+                    <input type="text" id="cpDescription" placeholder="Notes on language packs or usage" />
+                </div>
+                <div id="cpTestResult" class="custom-preset-status hidden"></div>
+            </div>
+            <div class="custom-preset-modal-footer">
+                <button type="button" class="custom-preset-btn-secondary" id="cpTestBtn"
+                    onclick="testCustomPresetConnection()">Test Connection</button>
+                <button type="button" class="custom-preset-btn-secondary"
+                    onclick="closeCustomPresetBuilderModal()">Cancel</button>
+                <button type="button" class="custom-preset-btn-primary" id="cpSaveBtn"
+                    onclick="saveCustomPresetFromModal()">Save &amp; Register Preset</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/landing.js"></script>
     <script src="/data_shape_config.js"></script>

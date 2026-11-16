@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof refreshResultsData === 'function') refreshResultsData();
     if (typeof loadRunsGrid === 'function') loadRunsGrid();
     if (typeof updateNextStepHints === 'function') updateNextStepHints();
+    if (typeof initCustomPresetBuilderModal === 'function') initCustomPresetBuilderModal();
 
     const inpPdf = document.getElementById('inpPdfPath');
     const docPathInput = document.getElementById('docPath');

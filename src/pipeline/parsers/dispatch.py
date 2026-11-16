@@ -68,6 +68,12 @@ class DocumentParserDispatcher:
             config=config,
         )
 
+        custom_presets_path = getattr(config, "custom_presets_path", None) if config is not None else None
+        if custom_presets_path:
+            self._registry.load_custom_presets(custom_presets_path)
+        elif self._registry.resolve(options.preset) is None:
+            self._registry.load_custom_presets()
+
         resolved_path = resolve_pdf_path(pdf_path)
         if not os.path.exists(resolved_path):
             raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")

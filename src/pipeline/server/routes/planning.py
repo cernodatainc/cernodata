@@ -10,6 +10,7 @@ import os
 import threading
 from typing import Any, Dict
 
+from src.pipeline.planner import PresetPlanner
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
 from src.utils import mkdirs
@@ -17,6 +18,19 @@ from src.utils import mkdirs
 
 class PlanningRoutesMixin(BaseApiRoutesMixin):
     """Mixin handling data shape criteria scoring and document plan configuration."""
+
+    def _get_active_planner(self) -> PresetPlanner:
+        """Returns the server's active PresetPlanner with custom presets loaded if present."""
+        existing = getattr(self.server, "planner", None)
+        if existing is not None:
+            return existing
+        custom_path = getattr(self.server, "custom_presets_path", None)
+        if not custom_path:
+            out_dir = getattr(self.server, "output_dir", None) or "output"
+            custom_path = os.path.join(str(out_dir), "custom_presets.json")
+        if custom_path and os.path.isfile(str(custom_path)):
+            return PresetPlanner(custom_presets_path=str(custom_path))
+        return PresetPlanner()
 
     def _evaluate_corpus_topic_balance(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """No-op hook for evaluating multi-document topic skew for the Browser Wizard UI."""
@@ -39,8 +53,7 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: Questionnaire criteria dictionary.
         """
-        from src.pipeline.planner import PresetPlanner
-        planner = getattr(self.server, "planner", None) or PresetPlanner()
+        planner = self._get_active_planner()
         criteria = PlannerCriteria.from_dict(payload)
         scores = planner.calculate_scores(criteria=criteria)
         suggested = planner.suggest_preset_order(scores)
@@ -59,8 +72,7 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: Plan parameters or serialized plan dictionary.
         """
-        from src.pipeline.planner import PresetPlanner
-        planner = getattr(self.server, "planner", None) or PresetPlanner()
+        planner = self._get_active_planner()
 
         if "primary_preset" in payload or ("target_threshold" in payload and "steps" in payload):
             plan = DocumentPlan.from_dict(payload)

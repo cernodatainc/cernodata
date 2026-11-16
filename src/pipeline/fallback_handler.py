@@ -5,12 +5,18 @@ Confidence-guided fallback orchestration, parameter wiggling, and preset switchi
 """
 
 from dataclasses import replace
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.dom import DocumentDOM
 from src.pipeline.attempt_runner import AttemptRunner
+from src.pipeline.parsers.registry import get_default_parser_registry
 from src.pipeline.planner.models import DocumentPlan, IngestionConfig
 from src.pipeline.progress_notifier import PipelineProgressNotifier
+from src.schemas.custom_preset import (
+    CustomPresetConfig,
+    ParameterWiggleSpec,
+    load_custom_presets_file,
+)
 
 ACTION_ACCEPT_OUTPUT = "ACCEPT_OUTPUT"
 ACTION_PATH_B_WIGGLE = "PATH_B_WIGGLE_PARAMETERS"
@@ -85,10 +91,88 @@ class FallbackLoopHandler:
         scores = PresetPlanner().calculate_scores()
         return float(scores.get(preset, 0.50))
 
+    def _get_custom_preset_config(self, config: IngestionConfig) -> Optional[CustomPresetConfig]:
+        """Resolves CustomPresetConfig from config options, registries, or manifest path."""
+        inline_cfg = config.options.get("custom_preset_config") or config.options.get("custom_preset")
+        if isinstance(inline_cfg, CustomPresetConfig):
+            return inline_cfg
+        if isinstance(inline_cfg, Mapping):
+            return CustomPresetConfig.from_dict(inline_cfg)
+
+        parse_self = getattr(getattr(self.attempt_runner, "_parse_fn", None), "__self__", None)
+        bound_registry = getattr(parse_self, "_registry", None)
+        if bound_registry is not None and hasattr(bound_registry, "get_custom_preset"):
+            found = bound_registry.get_custom_preset(config.preset)
+            if isinstance(found, CustomPresetConfig):
+                return found
+
+        default_found = get_default_parser_registry().get_custom_preset(config.preset)
+        if default_found is not None:
+            return default_found
+
+        if config.custom_presets_path:
+            for item in load_custom_presets_file(config.custom_presets_path):
+                if item.preset_id == config.preset:
+                    return item
+        return None
+
+    def _get_wiggle_specs(self, config: IngestionConfig) -> List[ParameterWiggleSpec]:
+        """Collects ParameterWiggleSpec entries from custom preset config or options."""
+        custom_cfg = self._get_custom_preset_config(config)
+        if custom_cfg is not None and custom_cfg.wiggle_parameters:
+            return list(custom_cfg.wiggle_parameters)
+
+        raw_specs = config.options.get("wiggle_specs")
+        if raw_specs is None and isinstance(config.options.get("wiggle_parameters"), Sequence):
+            if not isinstance(config.options.get("wiggle_parameters"), (str, bytes)):
+                raw_specs = config.options.get("wiggle_parameters")
+        if not isinstance(raw_specs, Sequence) or isinstance(raw_specs, (str, bytes)):
+            return []
+
+        specs: List[ParameterWiggleSpec] = []
+        for entry in raw_specs:
+            if isinstance(entry, ParameterWiggleSpec):
+                specs.append(entry)
+            elif isinstance(entry, Mapping):
+                specs.append(ParameterWiggleSpec.from_dict(entry))
+        return specs
+
+    def _resolve_custom_wiggle_sets(self, config: IngestionConfig) -> List[Dict[str, Any]]:
+        """Builds ordered parameter dictionaries for custom ParameterWiggleSpec fallback attempts."""
+        specs = self._get_wiggle_specs(config)
+        if not specs:
+            return []
+
+        base_defaults: Dict[str, Any] = {
+            spec.name: spec.default_value
+            for spec in specs
+            if spec.default_value is not None
+        }
+        raw_extra = config.options.get("extra_parameters")
+        if isinstance(raw_extra, Mapping):
+            base_defaults.update({str(k): v for k, v in raw_extra.items()})
+
+        candidates: List[Dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        for spec in specs:
+            current_val = base_defaults.get(spec.name, spec.default_value)
+            for fallback_val in spec.fallback_values:
+                if fallback_val == current_val:
+                    continue
+                candidate = dict(base_defaults)
+                candidate[spec.name] = fallback_val
+                sig = repr(sorted((str(k), repr(v)) for k, v in candidate.items()))
+                if sig not in seen_keys:
+                    seen_keys.add(sig)
+                    candidates.append(candidate)
+        return candidates
+
     def _resolve_wiggle_parameters(self, config: IngestionConfig) -> Tuple[float, bool]:
         """Resolves OCR parameter wiggling bounds for Path B retries."""
-        # TODO(TASK-206): Read custom parameter wiggling bounds (`ParameterWiggleSpec`) from `CustomPresetConfig`
-        # instead of only wiggling `ocr_scale` and `force_full_page_ocr`.
+        for spec in self._get_wiggle_specs(config):
+            if spec.name.lower() in ("ocr_scale", "scale") and spec.fallback_values:
+                return float(spec.fallback_values[0]), True
+
         custom_scale = config.get_option("wiggle_scale") if hasattr(config, "get_option") else None
         if custom_scale is not None:
             wiggled_scale = float(custom_scale)
@@ -135,6 +219,79 @@ class FallbackLoopHandler:
             "reason": reason,
         }
 
+    def _build_wiggled_config(
+        self,
+        config: IngestionConfig,
+        param_set: Dict[str, Any],
+    ) -> IngestionConfig:
+        """Creates an IngestionConfig copy carrying a single custom wiggle parameter set."""
+        next_options = dict(config.options)
+        raw_extra = config.options.get("extra_parameters")
+        merged_extra = dict(raw_extra) if isinstance(raw_extra, Mapping) else {}
+        merged_extra.update(param_set)
+        next_options["extra_parameters"] = merged_extra
+        next_options["wiggle_parameters"] = dict(merged_extra)
+
+        raw_scale = merged_extra.get("ocr_scale", merged_extra.get("scale"))
+        raw_force = merged_extra.get("force_full_page_ocr")
+        return replace(
+            config,
+            ocr_scale=float(raw_scale) if raw_scale is not None else config.ocr_scale,
+            force_full_page_ocr=(
+                bool(raw_force) if raw_force is not None else config.force_full_page_ocr
+            ),
+            options=next_options,
+        )
+
+    def _run_custom_wiggle_attempts(
+        self,
+        target_pdf: str,
+        config: IngestionConfig,
+        wiggle_sets: List[Dict[str, Any]],
+        attempts: List[Dict[str, Any]],
+        curr_score: float,
+        next_score: float,
+    ) -> DecisionResult:
+        """Iterates through CustomPresetConfig wiggle parameter sets for Path B retries."""
+        best_result: Optional[DecisionResult] = None
+        best_score = -1.0
+
+        for param_set in wiggle_sets:
+            wiggled_config = self._build_wiggled_config(config, param_set)
+            w_dom, w_decision, w_violations = self._execute_isolated_attempt(
+                target_pdf,
+                wiggled_config,
+                curr_score,
+                next_score,
+                next_preset_id=config.preset,
+            )
+            summary = ", ".join(f"{k}={v}" for k, v in param_set.items())
+            attempts.append(dict(self.attempt_runner.make_attempt_record(
+                len(attempts) + 1,
+                config.preset,
+                w_decision,
+                w_violations,
+                action=ACTION_PATH_B_WIGGLE,
+                reason=f"Wiggled custom parameters: {summary}.",
+                parameters=dict(param_set),
+            )))
+            if w_decision.get("is_accepted"):
+                decision_res = dict(w_decision)
+                decision_res["decision_tree"] = self._accept_decision_tree(
+                    config.preset,
+                    f"Preset '{config.preset}' reached target threshold after parameter wiggling ({summary}).",
+                )
+                return w_dom, decision_res, w_violations
+
+            candidate_score = _confidence_or_zero(w_decision)
+            if best_result is None or candidate_score >= best_score:
+                best_score = candidate_score
+                best_result = (w_dom, w_decision, w_violations)
+
+        if best_result is None:
+            raise ValueError("wiggle_sets must not be empty.")
+        return best_result
+
     def _run_path_b(
         self,
         pdf_path: str,
@@ -160,8 +317,19 @@ class FallbackLoopHandler:
                 f"Running attempt with wiggled parameters for '{curr_preset}'...",
             )
 
-        wiggled_scale, wiggled_force_ocr = self._resolve_wiggle_parameters(config)
         target_pdf = self._slice_failing_pages_if_needed(pdf_path, dom, violations)
+        custom_wiggle_sets = self._resolve_custom_wiggle_sets(config)
+        if custom_wiggle_sets:
+            return self._run_custom_wiggle_attempts(
+                target_pdf,
+                config,
+                custom_wiggle_sets,
+                attempts,
+                curr_score,
+                next_score,
+            )
+
+        wiggled_scale, wiggled_force_ocr = self._resolve_wiggle_parameters(config)
         wiggled_config = replace(
             config,
             ocr_scale=wiggled_scale,
