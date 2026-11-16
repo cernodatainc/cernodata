@@ -324,26 +324,13 @@ class FallbackLoopHandler:
         custom_wiggle_sets = self._resolve_custom_wiggle_sets(config)
         if custom_wiggle_sets:
             return self._run_custom_wiggle_attempts(
-                target_pdf,
-                config,
-                custom_wiggle_sets,
-                attempts,
-                curr_score,
-                next_score,
+                target_pdf, config, custom_wiggle_sets, attempts, curr_score, next_score,
             )
 
         wiggled_scale, wiggled_force_ocr = self._resolve_wiggle_parameters(config)
-        wiggled_config = replace(
-            config,
-            ocr_scale=wiggled_scale,
-            force_full_page_ocr=wiggled_force_ocr,
-        )
+        wiggled_config = replace(config, ocr_scale=wiggled_scale, force_full_page_ocr=wiggled_force_ocr)
         w_dom, w_decision, w_violations = self._execute_isolated_attempt(
-            target_pdf,
-            wiggled_config,
-            curr_score,
-            next_score,
-            next_preset_id=config.preset,
+            target_pdf, wiggled_config, curr_score, next_score, next_preset_id=config.preset,
         )
         attempts.append(dict(self.attempt_runner.make_attempt_record(
             len(attempts) + 1, config.preset, w_decision, w_violations,
