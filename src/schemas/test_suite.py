@@ -165,3 +165,72 @@ class DocumentAssertionSuite:
             table_rules=[TableAssertion.from_dict(item) for item in data.get("table_rules", [])],
             min_node_counts=dict(data.get("min_node_counts", {})),
         )
+
+
+@dataclass
+class RetrievalQuestionCase:
+    """A question the retrieved chunks must answer, with required and forbidden text."""
+
+    question_id: str
+    question: str
+    expected_answer_substrings: list[str]
+    expected_source_docs: list[str] | None = None
+    forbidden_substrings: list[str] = field(default_factory=list)
+    top_k: int = 3
+
+    def __post_init__(self) -> None:
+        if self.top_k < 1:
+            raise ValueError(f"top_k must be >= 1, got {self.top_k}")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RetrievalQuestionCase:
+        source_docs = data.get("expected_source_docs")
+        return cls(
+            question_id=data["question_id"],
+            question=data["question"],
+            expected_answer_substrings=list(data["expected_answer_substrings"]),
+            expected_source_docs=None if source_docs is None else list(source_docs),
+            forbidden_substrings=list(data.get("forbidden_substrings", [])),
+            top_k=data.get("top_k", 3),
+        )
+
+
+@dataclass
+class RetrievalTestSuite:
+    """Question-and-answer checks run against the chunks indexed from parsed documents."""
+
+    suite_name: str
+    questions: list[RetrievalQuestionCase]
+    chunk_size_chars: int = 1000
+    chunk_overlap_chars: int = 150
+    min_pass_rate: float = 1.0
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.min_pass_rate <= 1.0:
+            raise ValueError(f"min_pass_rate must be between 0.0 and 1.0, got {self.min_pass_rate}")
+        if self.chunk_overlap_chars >= self.chunk_size_chars:
+            raise ValueError(
+                f"chunk_overlap_chars ({self.chunk_overlap_chars}) must be < chunk_size_chars ({self.chunk_size_chars})"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "suite_name": self.suite_name,
+            "questions": [question.to_dict() for question in self.questions],
+            "chunk_size_chars": self.chunk_size_chars,
+            "chunk_overlap_chars": self.chunk_overlap_chars,
+            "min_pass_rate": self.min_pass_rate,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RetrievalTestSuite:
+        return cls(
+            suite_name=data["suite_name"],
+            questions=[RetrievalQuestionCase.from_dict(item) for item in data["questions"]],
+            chunk_size_chars=data.get("chunk_size_chars", 1000),
+            chunk_overlap_chars=data.get("chunk_overlap_chars", 150),
+            min_pass_rate=data.get("min_pass_rate", 1.0),
+        )
