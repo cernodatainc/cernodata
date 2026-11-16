@@ -6,6 +6,16 @@
  */
 
 /**
+ * Resets the planner submit button back to its interactive ready state.
+ */
+function resetSubmitPlanButton() {
+    const submitBtn = document.getElementById("submitBtn");
+    if (!submitBtn) return;
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Start pipeline";
+}
+
+/**
  * Validates wizard questionnaire answers and submits the compiled DocumentPlan to the backend.
  */
 async function submitPlan() {
@@ -73,10 +83,15 @@ async function submitPlan() {
                 return docName === targetDocName && rPreset === chosenPreset.toLowerCase();
             });
 
-            if (!forceRerun && existingRun) {
+            const existingConf = (existingRun && existingRun.overall_confidence !== undefined && existingRun.overall_confidence !== null)
+                ? Number(existingRun.overall_confidence)
+                : 1.0;
+            const meetsThreshold = !existingRun || Number.isNaN(threshold) || existingConf >= threshold;
+
+            if (!forceRerun && existingRun && meetsThreshold) {
                 const confStr = existingRun.overall_confidence !== undefined ? Number(existingRun.overall_confidence).toFixed(4) : "1.0000";
                 showBanner(`[INFO] Run already completed for '${targetDocName}' with preset '${chosenPreset}' (Confidence: ${confStr}). Reusing existing result without rerun.`, "success");
-                submitBtn.disabled = false;
+                resetSubmitPlanButton();
 
                 const inpPdf = document.getElementById("inpPdfPath");
                 if (inpPdf) inpPdf.value = docPath;
@@ -92,7 +107,11 @@ async function submitPlan() {
                 return;
             }
 
-            showBanner("[SUCCESS] Data shape plan configured successfully. Starting pipeline execution...", "success");
+            if (existingRun && !meetsThreshold) {
+                showBanner(`[INFO] Existing '${chosenPreset}' run confidence (${existingConf.toFixed(4)}) is below target threshold (${threshold.toFixed(2)}). Running fallback pipeline...`, "success");
+            } else {
+                showBanner("[SUCCESS] Data shape plan configured successfully. Starting pipeline execution...", "success");
+            }
             if (typeof triggerRunPipeline === "function") {
                 const inpPdf = document.getElementById("inpPdfPath");
                 if (inpPdf && docPath) {
@@ -109,6 +128,8 @@ async function submitPlan() {
                 setTimeout(() => {
                     triggerRunPipeline(false);
                 }, 600);
+            } else {
+                resetSubmitPlanButton();
             }
         } else {
             const err = await response.json().catch(() => ({}));

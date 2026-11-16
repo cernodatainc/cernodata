@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.dom import DocumentDOM
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
@@ -36,16 +37,30 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         _ = payload
         return None
 
-    def _try_serve_cached_preset(self, pdf_path: str, preset: str, language: str) -> bool:
-        """Checks session preset cache and sends a 200 JSON response if a cached result exists."""
+    def _try_serve_cached_preset(
+        self,
+        pdf_path: str,
+        preset: str,
+        language: str,
+        target_threshold: Optional[float] = None,
+    ) -> bool:
+        """Checks session preset cache and sends a 200 JSON response if a cached result meets threshold."""
         cached = self.session.get_cached_preset_result(pdf_path, preset, language)
         if cached is None:
             return False
-        logger.info("Reusing existing result for preset '%s' (PDF: %s, Lang: %s)", preset, pdf_path, language)
-        self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
         dec = cached.get("decision", {})
         raw_score = dec.get("overall_confidence")
         score = float(raw_score) if raw_score is not None else 0.0
+        if target_threshold is not None and score < target_threshold:
+            logger.info(
+                "Cached result for preset '%s' (score=%.4f) is below target threshold (%.4f); continuing.",
+                preset,
+                score,
+                target_threshold,
+            )
+            return False
+        logger.info("Reusing existing result for preset '%s' (PDF: %s, Lang: %s)", preset, pdf_path, language)
+        self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
         raw_status = dec.get("status")
         status = str(raw_status) if raw_status is not None else "UNKNOWN"
         viols = cached.get("violations", [])
@@ -250,7 +265,9 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             self.send_bad_request("Missing 'preset' in request payload and no active execution plan is configured.")
             return
 
-        if not force and self._try_serve_cached_preset(pdf_path, preset, language):
+        if not force and self._try_serve_cached_preset(
+            pdf_path, preset, language, target_threshold=threshold
+        ):
             return
 
         self.session.reset_progress(
@@ -268,7 +285,28 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             else None
         )
 
+        def _lookup_cached_dom(target_preset: str) -> Optional[DocumentDOM]:
+            cached = session.get_cached_preset_result(pdf_path, target_preset, language)
+            if not cached:
+                return None
+            raw_dom = cached.get("dom")
+            if isinstance(raw_dom, DocumentDOM):
+                dom_obj = raw_dom
+            elif isinstance(raw_dom, dict):
+                dom_obj = DocumentDOM.from_dict(raw_dom)
+            else:
+                return None
+            t_cache = datetime.now().strftime("%H:%M:%S")
+            session.add_log(
+                f"[{t_cache}] [CACHE] Reusing deterministic DOM for preset '{target_preset}' "
+                f"to evaluate against threshold {threshold:.2f}."
+            )
+            return dom_obj
+
         def _execute_run() -> PipelineExecutionResult:
+            extra_opts: Dict[str, Any] = {}
+            if not force:
+                extra_opts["cached_dom_lookup"] = _lookup_cached_dom
             res = run_pipeline(
                 pdf_path=pdf_path,
                 target_threshold=threshold,
@@ -280,6 +318,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 plan=plan_obj,
                 verification_layers=resolved_run_layers,
                 progress_callback=on_progress,
+                **extra_opts,
             )
             return self._finalize_pipeline_run(res, pdf_path, language, preset, "Run")
 

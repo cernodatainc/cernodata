@@ -4,8 +4,11 @@ src/pipeline/fallback_handler.py
 Confidence-guided fallback orchestration, parameter wiggling, and preset switching loops.
 """
 
+import logging
 from dataclasses import replace
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
+logger = logging.getLogger("cernodata.pipeline.fallback_handler")
 
 from src.dom import DocumentDOM
 from src.pipeline.attempt_runner import AttemptRunner
@@ -406,9 +409,13 @@ class FallbackLoopHandler:
         curr_preset = config.preset
         plan_names = {str(_normalize_fallback_name(item)) for item in (plan.fallback_queue or [])} if plan else set()
 
+        best_dom, best_decision, best_violations = dom, decision, violations
+        best_conf = _confidence_or_zero(decision)
+        prev_conf = best_conf
+
         remaining = self._collect_candidates(config, attempts, next_candidate, plan)
         for idx, candidate in enumerate(remaining):
-            if decision.get("is_accepted"):
+            if best_decision.get("is_accepted"):
                 break
 
             cand_score = self._score_for(plan, candidate)
@@ -421,7 +428,6 @@ class FallbackLoopHandler:
                 if in_plan
                 else f"'{candidate}' wasn't part of the original plan, falling back to it."
             )
-            prev_conf = _confidence_or_zero(decision)
             switch_msg = f"{curr_preset} confidence too low ({prev_conf:.2f} < {thresh_val:.2f}), starting {candidate}"
 
             if notifier is not None:
@@ -429,35 +435,41 @@ class FallbackLoopHandler:
                 notifier.notify_preset_execution(candidate, pct=PROGRESS_PCT_SWITCH)
 
             fallback_config = replace(config, preset=candidate)
-            fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
-                pdf_path,
-                fallback_config,
-                cand_score,
-                cand_next_score,
-                next_preset_id=following,
-            )
+            try:
+                fb_dom, fb_decision, fb_violations = self.attempt_runner.execute_attempt(
+                    pdf_path, fallback_config, cand_score, cand_next_score, next_preset_id=following,
+                )
+            except Exception as exc:
+                logger.warning("Fallback preset '%s' failed: %s", candidate, exc)
+                if notifier is not None:
+                    notifier.notify(PROGRESS_PCT_SWITCH, f"{candidate} failed, continuing", f"Fallback '{candidate}' failed ({exc}); skipping.")
+                fail_dec: Dict[str, Any] = {"chosen_preset": candidate, "status": "ERROR", "overall_confidence": 0.0, "is_accepted": False}
+                attempts.append(dict(self.attempt_runner.make_attempt_record(
+                    len(attempts) + 1, candidate, fail_dec, [], action=ACTION_PATH_A_SWITCH,
+                    reason=f"Fallback preset '{candidate}' failed: {exc}", detail=plan_note,
+                )))
+                continue
 
             fb_decision["decision_tree"] = {
                 "action": ACTION_PATH_A_SWITCH,
                 "preset_executed": candidate,
                 "fallback_triggered": True,
-                "reason": (
-                    f"Previous preset fell below threshold "
-                    f"({prev_conf:.4f} < {config.target_threshold}). {plan_note}"
-                ),
+                "reason": f"Previous preset fell below threshold ({prev_conf:.4f} < {config.target_threshold}). {plan_note}",
                 "plan_status": "in_plan" if in_plan else "dynamic_fallback",
                 "detail": plan_note,
             }
             attempts.append(dict(self.attempt_runner.make_attempt_record(
                 len(attempts) + 1, candidate, fb_decision, fb_violations,
-                action=fb_decision["decision_tree"]["action"],
-                reason=fb_decision["decision_tree"]["reason"],
-                detail=plan_note,
+                action=ACTION_PATH_A_SWITCH, reason=fb_decision["decision_tree"]["reason"], detail=plan_note,
             )))
-            dom, decision, violations = fb_dom, fb_decision, fb_violations
+            fb_conf = _confidence_or_zero(fb_decision)
+            if fb_decision.get("is_accepted") or fb_conf > best_conf:
+                best_dom, best_decision, best_violations = fb_dom, fb_decision, fb_violations
+                best_conf = fb_conf
+            prev_conf = fb_conf
             curr_preset = candidate
 
-        return dom, decision, violations
+        return best_dom, best_decision, best_violations
 
     def handle_fallback(
         self,

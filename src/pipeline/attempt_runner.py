@@ -41,9 +41,23 @@ class AttemptRunner:
         next_preset_id: Optional[str] = None,
     ) -> Tuple[DocumentDOM, Dict[str, Any], List[Dict[str, Any]]]:
         """Executes a single extraction attempt: parse -> skew align -> postprocess -> quality evaluate."""
-        dom = self._parse_fn(pdf_path, config=config)
-        dom = self._align_fn(dom, pdf_path, config.align_skew)
-        dom = self._postprocess_fn(dom, config, pdf_path)
+        cached_dom_lookup = config.options.get("cached_dom_lookup")
+        is_wiggled = bool(
+            config.ocr_scale is not None
+            or config.force_full_page_ocr
+            or config.options.get("wiggle_parameters")
+        )
+        dom: Optional[DocumentDOM] = None
+        if callable(cached_dom_lookup) and not is_wiggled:
+            maybe_dom = cached_dom_lookup(config.preset)
+            if isinstance(maybe_dom, DocumentDOM):
+                dom = maybe_dom
+
+        if dom is None:
+            dom = self._parse_fn(pdf_path, config=config)
+            dom = self._align_fn(dom, pdf_path, config.align_skew)
+            dom = self._postprocess_fn(dom, config, pdf_path)
+
         decision, violations = self._evaluate_fn(
             dom,
             config=config,

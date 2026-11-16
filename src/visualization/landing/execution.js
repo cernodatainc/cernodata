@@ -28,6 +28,7 @@ async function triggerRunPipeline(withPlan = false) {
 
     if (!pdfPath) {
         alert("Please provide an input document path.");
+        if (typeof resetSubmitPlanButton === 'function') resetSubmitPlanButton();
         return;
     }
 
@@ -40,11 +41,19 @@ async function triggerRunPipeline(withPlan = false) {
             return docName === targetDocName && rPreset === preset.toLowerCase();
         });
         if (existingRun) {
-            const conf = existingRun.overall_confidence !== undefined ? Number(existingRun.overall_confidence).toFixed(4) : "1.0000";
-            appendLog(`[INFO] Found previous run for '${targetDocName}' with preset '${preset}' in '${existingRun.dir_path}' (Confidence: ${conf}). Loading existing result without rerun.`);
-            await choosePreviousRun(existingRun.dir_path);
-            switchNavTab('results');
-            return;
+            const existingConf = (existingRun.overall_confidence !== undefined && existingRun.overall_confidence !== null)
+                ? Number(existingRun.overall_confidence)
+                : 1.0;
+            const meetsThreshold = Number.isNaN(threshold) || existingConf >= threshold;
+            if (meetsThreshold) {
+                const conf = existingRun.overall_confidence !== undefined ? Number(existingRun.overall_confidence).toFixed(4) : "1.0000";
+                appendLog(`[INFO] Found previous run for '${targetDocName}' with preset '${preset}' in '${existingRun.dir_path}' (Confidence: ${conf}). Loading existing result without rerun.`);
+                await choosePreviousRun(existingRun.dir_path);
+                if (typeof resetSubmitPlanButton === 'function') resetSubmitPlanButton();
+                switchNavTab('results');
+                return;
+            }
+            appendLog(`[INFO] Previous run for '${targetDocName}' with preset '${preset}' (Confidence: ${existingConf.toFixed(4)}) is below threshold ${threshold.toFixed(2)}. Running evaluation and fallback...`);
         }
     }
 
@@ -108,6 +117,7 @@ async function triggerRunPipeline(withPlan = false) {
             appendLog(`[ERROR] Pipeline run failed: ${errData.error || resp.statusText}`);
             updateProgressStatus('ERROR', 'Pipeline execution error.');
             stopProgressPolling();
+            if (typeof resetSubmitPlanButton === 'function') resetSubmitPlanButton();
             return;
         }
 
@@ -117,6 +127,7 @@ async function triggerRunPipeline(withPlan = false) {
         appendLog(`[ERROR] Network or server communication error: ${e.message}`);
         updateProgressStatus('ERROR', e.message);
         stopProgressPolling();
+        if (typeof resetSubmitPlanButton === 'function') resetSubmitPlanButton();
     }
 }
 
@@ -234,6 +245,7 @@ function stopProgressPolling() {
  */
 async function onPipelineCompleted(result) {
     stopProgressPolling();
+    if (typeof resetSubmitPlanButton === 'function') resetSubmitPlanButton();
     const spinner = document.getElementById('progressSpinner');
     if (spinner) spinner.classList.add('hidden');
     const fillBar = document.getElementById('progressFillBar');
