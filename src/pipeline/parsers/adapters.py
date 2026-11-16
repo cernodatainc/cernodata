@@ -33,7 +33,7 @@ class ParserExecutionOptions:
     def from_inputs(
         cls,
         language: Optional[str] = "en",
-        preset: str = DEFAULT_PARSER_PRESET,
+        preset: Optional[str] = None,
         ocr_engine: str = DEFAULT_OCR_ENGINE,
         ocr_scale: Optional[float] = None,
         force_full_page_ocr: bool = False,
@@ -68,6 +68,9 @@ class ParserExecutionOptions:
                 do_table_structure=resolved_tables,
                 extra_parameters=merged_extra,
             )
+
+        if not preset:
+            raise ValueError("A parser preset or IngestionConfig must be provided.")
 
         return cls(
             language=language,

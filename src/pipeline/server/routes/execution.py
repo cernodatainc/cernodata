@@ -156,7 +156,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         pdf_path, language = self._extract_document_and_language(payload)
         threshold = float(payload.get("target_threshold", 0.85))
         explicit_preset = payload.get("preset")
-        preset = str(explicit_preset).strip() if explicit_preset else "docling_fast"
+        preset: Optional[str] = str(explicit_preset).strip() if explicit_preset else None
         align_skew = bool(payload.get("align_skew", True))
         visualize = bool(payload.get("visualize", True))
         with_plan = bool(payload.get("with_plan", False))
@@ -240,11 +240,15 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                     fallback_queue=list(stored_plan.fallback_queue),
                 )
                 # An explicitly requested preset must never be overridden by the stored plan.
-                if explicit_preset:
+                if preset:
                     if plan_obj.primary_preset != preset:
                         plan_obj.apply_preset_override(preset)
                 elif plan_obj.primary_preset:
                     preset = plan_obj.primary_preset
+
+        if not preset:
+            self.send_bad_request("Missing 'preset' in request payload and no active execution plan is configured.")
+            return
 
         if not force and self._try_serve_cached_preset(pdf_path, preset, language):
             return
@@ -294,7 +298,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: JSON request body dictionary.
         """
-        preset = payload.get("preset", "docling_deep")
+        raw_preset = payload.get("preset")
+        preset = str(raw_preset).strip() if raw_preset else ""
+        if not preset:
+            self.send_bad_request("Missing 'preset' in request payload.")
+            return
         pdf_path, language = self._extract_document_and_language(payload)
         force = bool(payload.get("force", payload.get("force_rerun", False)))
 

@@ -132,6 +132,43 @@ class TestModularParserDispatch(unittest.TestCase):
         self.assertEqual(cfg.target_threshold, 0.88)
         self.assertIsNone(plan)
 
+    def test_config_resolver_explicit_docling_fast_overrides_plan(self):
+        from src.pipeline.planner.models import DocumentPlan
+
+        plan = DocumentPlan(document_path="test.pdf", primary_preset="docling_deep")
+        _, cfg, resolved_plan = PipelineConfigResolver.resolve_request(
+            pdf_path="test.pdf",
+            preset="docling_fast",
+            target_threshold=0.85,
+            language="en",
+            align_skew=True,
+            visualize=True,
+            output_dir="test_output",
+            plan=plan,
+        )
+        self.assertEqual(cfg.preset, "docling_fast")
+        self.assertIsNotNone(resolved_plan)
+        self.assertEqual(resolved_plan.primary_preset, "docling_fast")
+
+    def test_config_resolver_requires_preset_without_plan_or_config(self):
+        with self.assertRaises(ValueError):
+            PipelineConfigResolver.resolve_request(
+                pdf_path="test.pdf",
+                preset=None,
+                target_threshold=0.85,
+                language="en",
+                align_skew=True,
+                visualize=True,
+                output_dir="test_output",
+            )
+
+    def test_parser_execution_options_and_dispatch_require_preset(self):
+        with self.assertRaises(ValueError):
+            ParserExecutionOptions.from_inputs()
+        dispatcher = DocumentParserDispatcher(registry=MagicMock())
+        with self.assertRaises(ValueError):
+            dispatcher.parse("dummy.pdf")
+
     def test_cli_progress_reporter(self):
         import io
         from unittest.mock import patch

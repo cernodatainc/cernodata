@@ -50,7 +50,7 @@ class DocumentParserDispatcher:
         self,
         pdf_path: str,
         language: Optional[str] = "en",
-        preset: str = "docling_fast",
+        preset: Optional[str] = None,
         ocr_engine: str = "auto",
         ocr_scale: Optional[float] = None,
         force_full_page_ocr: bool = False,
@@ -86,7 +86,7 @@ _default_dispatcher = DocumentParserDispatcher()
 def parse_document(
     pdf_path: str,
     language: Optional[str] = "en",
-    preset: str = "docling_fast",
+    preset: Optional[str] = None,
     ocr_engine: str = "auto",
     ocr_scale: Optional[float] = None,
     force_full_page_ocr: bool = False,

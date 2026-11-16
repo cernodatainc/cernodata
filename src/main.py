@@ -241,6 +241,13 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Language Hint: {args.language}")
         print(f"Target Confidence Threshold: {args.target_threshold}")
 
+    if not active_plan and not args.override_preset:
+        print(
+            "[ERROR] A parser preset (--preset / --override-preset) or execution plan "
+            "(--plan / --create-plan) is required for batch mode."
+        )
+        sys.exit(1)
+
     if not os.path.exists(doc_input):
         print(f"[ERROR] Specified input file '{doc_input}' does not exist.")
         sys.exit(1)
@@ -250,7 +257,7 @@ def main(argv: list[str] | None = None) -> None:
         pdf_path=doc_input,
         target_threshold=args.target_threshold,
         language=args.language,
-        preset=args.override_preset or "docling_fast",
+        preset=args.override_preset,
         align_skew=not args.no_align_skew,
         visualize=not args.no_visuals,
         output_dir=args.output_dir,
