@@ -227,6 +227,20 @@ class TestPresetRoutesAndWebUi(unittest.TestCase):
                 self.assertEqual(st_css, 200)
                 self.assertIn(".custom-preset-modal-backdrop", css_text)
 
+    def test_api_run_and_rerun_require_preset_without_plan(self) -> None:
+        with running_test_server(
+            output_dir=self.test_dir,
+            custom_presets_path=self.presets_path,
+        ) as (server, base_url):
+            server.session_context.submitted_plan = None
+            run_status, run_data = http_post_json(f"{base_url}/api/run", {"pdf_path": "src/e2e/Document 8.pdf"})
+            self.assertEqual(run_status, 400)
+            self.assertFalse(run_data.get("success", True))
+
+            rerun_status, rerun_data = http_post_json(f"{base_url}/api/rerun", {"pdf_path": "src/e2e/Document 8.pdf"})
+            self.assertEqual(rerun_status, 400)
+            self.assertFalse(rerun_data.get("success", True))
+
 
 if __name__ == "__main__":
     unittest.main()

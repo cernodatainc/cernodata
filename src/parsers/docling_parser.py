@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import logging
-from typing import List, Optional, Any
+from typing import Callable, Dict, List, Optional, Tuple
 
 from src.utils import generate_document_id, resolve_and_validate_pdf_path
 from src.dom import BoundingBox, DOMNode, DocumentDOM
@@ -21,11 +21,26 @@ from src.parsers.docling_helpers import (
     extract_page_no_and_bbox,
     resolve_node_type,
 )
+from src.parsers.docling_types import (
+    AngleBearing,
+    DoclingDocument,
+    OcrLangConfigurable,
+    OcrModeConfigurable,
+    OcrScaleConfigurable,
+    ProvenanceBearing,
+)
 
 HAS_DOCLING = False
 try:
     from docling.document_converter import DocumentConverter, PdfFormatOption
-    from docling.datamodel.pipeline_options import PdfPipelineOptions, OcrMode
+    from docling.datamodel.pipeline_options import (
+        EasyOcrOptions,
+        OcrMode,
+        OcrOptions,
+        PdfPipelineOptions,
+        RapidOcrOptions,
+        TesseractOcrOptions,
+    )
     from docling.datamodel.base_models import InputFormat
     HAS_DOCLING = True
 except ImportError:
@@ -53,7 +68,7 @@ class DoclingParser:
         self.force_full_page_ocr = force_full_page_ocr
         self.do_table_structure = do_table_structure
 
-    def build_pipeline_options(self) -> Any:
+    def build_pipeline_options(self) -> Optional[PdfPipelineOptions]:
         """Constructs and configures PdfPipelineOptions and specialized OCR options."""
         if not HAS_DOCLING:
             return None
@@ -62,8 +77,7 @@ class DoclingParser:
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = self.use_ocr
         pipeline_options.do_table_structure = self.do_table_structure
-        if hasattr(pipeline_options, "images_scale"):
-            pipeline_options.images_scale = self.ocr_scale
+        pipeline_options.images_scale = self.ocr_scale
 
         ocr_mode = OcrMode.FULL_PAGE if self.force_full_page_ocr else OcrMode.DEFAULT
 
@@ -72,48 +86,65 @@ class DoclingParser:
         if engine == "auto" and self.preset == "docling_fast":
             engine = "rapidocr"
 
-        def _instantiate_ocr_options(cls: Any, **extra_kwargs: Any) -> Any:
+        def _instantiate_ocr_options(
+            factory: Callable[[], OcrOptions],
+            fallback_factory: Callable[[], OcrOptions],
+            label: str,
+        ) -> Optional[OcrOptions]:
             try:
-                return cls(mode=ocr_mode, scale=self.ocr_scale, **extra_kwargs)
+                return factory()
             except TypeError as te:
-                logger.debug("Failed initializing %s with mode; retrying with scale only: %s", cls.__name__, te)
+                logger.debug("Failed initializing %s with mode; retrying with scale only: %s", label, te)
                 try:
-                    return cls(scale=self.ocr_scale, **extra_kwargs)
+                    return fallback_factory()
                 except Exception as ex:
-                    logger.warning("Failed initializing OCR options for %s: %s", cls.__name__, ex)
+                    logger.warning("Failed initializing OCR options for %s: %s", label, ex)
                     return None
             except Exception as ex:
-                logger.warning("Unexpected error creating %s: %s", cls.__name__, ex)
+                logger.warning("Unexpected error creating %s: %s", label, ex)
                 return None
 
-        engine_map = {
-            "rapidocr": ("RapidOcrOptions", {"backend": "torch"}),
-            "tesseract": ("TesseractOcrOptions", {}),
-            "tesseract_cli": ("TesseractOcrOptions", {}),
-            "easyocr": ("EasyOcrOptions", {}),
+        engine_factories: Dict[str, Tuple[str, Callable[[], OcrOptions], Callable[[], OcrOptions]]] = {
+            "rapidocr": (
+                "RapidOcrOptions",
+                lambda: RapidOcrOptions(mode=ocr_mode, scale=self.ocr_scale, backend="torch"),
+                lambda: RapidOcrOptions(scale=self.ocr_scale, backend="torch"),
+            ),
+            "tesseract": (
+                "TesseractOcrOptions",
+                lambda: TesseractOcrOptions(mode=ocr_mode, scale=self.ocr_scale),
+                lambda: TesseractOcrOptions(scale=self.ocr_scale),
+            ),
+            "tesseract_cli": (
+                "TesseractOcrOptions",
+                lambda: TesseractOcrOptions(mode=ocr_mode, scale=self.ocr_scale),
+                lambda: TesseractOcrOptions(scale=self.ocr_scale),
+            ),
+            "easyocr": (
+                "EasyOcrOptions",
+                lambda: EasyOcrOptions(mode=ocr_mode, scale=self.ocr_scale),
+                lambda: EasyOcrOptions(scale=self.ocr_scale),
+            ),
         }
-        ocr_opts = None
-        if engine in engine_map:
-            cls_name, extra_kw = engine_map[engine]
+        ocr_opts: Optional[OcrOptions] = None
+        if engine in engine_factories:
+            label, factory, fallback_factory = engine_factories[engine]
             try:
-                import docling.datamodel.pipeline_options as dl_opts
-                opts_cls = getattr(dl_opts, cls_name)
-                ocr_opts = _instantiate_ocr_options(opts_cls, **extra_kw)
-            except (ImportError, AttributeError) as ie:
-                logger.debug("%s not available in docling datamodel: %s", cls_name, ie)
+                ocr_opts = _instantiate_ocr_options(factory, fallback_factory, label)
             except Exception as ex:
                 logger.warning("%s engine option configuration failed: %s", engine, ex)
 
         if ocr_opts is not None:
             pipeline_options.ocr_options = ocr_opts
 
-        if hasattr(pipeline_options, "ocr_options") and pipeline_options.ocr_options:
-            if hasattr(pipeline_options.ocr_options, "lang"):
-                pipeline_options.ocr_options.lang = ocr_langs
-            if hasattr(pipeline_options.ocr_options, "scale"):
-                pipeline_options.ocr_options.scale = self.ocr_scale
-            if hasattr(pipeline_options.ocr_options, "mode"):
-                pipeline_options.ocr_options.mode = ocr_mode
+        current_ocr_opts = pipeline_options.ocr_options
+        if current_ocr_opts is not None:
+            if isinstance(current_ocr_opts, OcrLangConfigurable):
+                current_ocr_opts.lang = ocr_langs
+            if isinstance(current_ocr_opts, OcrScaleConfigurable):
+                current_ocr_opts.scale = self.ocr_scale
+            if isinstance(current_ocr_opts, OcrModeConfigurable):
+                current_ocr_opts.mode = ocr_mode
 
         return pipeline_options
 
@@ -142,15 +173,17 @@ class DoclingParser:
 
         doc = converter.convert(pdf_path).document
         nodes: List[DOMNode] = []
-        total_pages = len(doc.pages) if hasattr(doc, "pages") and doc.pages else 1
+        total_pages = len(doc.pages) if isinstance(doc, DoclingDocument) and doc.pages else 1
 
         node_counter = 1
         for item, _ in doc.iterate_items():
             page_no, x0, y0, x1, y1, angle = 1, 0.0, 0.0, 0.0, 0.0, 0.0
-            if hasattr(item, "prov") and item.prov:
+            if isinstance(item, ProvenanceBearing) and item.prov:
                 prov_item = item.prov[0]
                 page_no, x0, y0, x1, y1 = extract_page_no_and_bbox(doc, item, prov_item)
-                angle = getattr(item, "angle", 0.0) or getattr(prov_item, "angle", 0.0)
+                item_angle = item.angle if isinstance(item, AngleBearing) and item.angle else 0.0
+                prov_angle = prov_item.angle if isinstance(prov_item, AngleBearing) and prov_item.angle else 0.0
+                angle = item_angle or prov_angle
 
             node_type = resolve_node_type(item)
             dom_node = DOMNode(

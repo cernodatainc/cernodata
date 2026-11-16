@@ -11,8 +11,19 @@ from __future__ import annotations
 import html
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field, fields
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from src.parsers.docling_types import (
+    BBoxBearing,
+    ConfidenceBearing,
+    DoclingTableItem,
+    DocTextCell,
+    HeaderCell,
+    MarkdownExportable,
+    SpanningCell,
+    TextItem,
+)
 
 logger = logging.getLogger("cernodata.parsers.table_parser")
 
@@ -131,7 +142,7 @@ def build_column_oriented_view(rows: List[List[str]], num_cols: int) -> List[Lis
 def extract_table_headers_and_title(
     rows: List[List[str]],
     num_cols: int,
-    grid_cells: Optional[List[List[Any]]] = None,
+    grid_cells: Optional[Sequence[Sequence[object]]] = None,
 ) -> Tuple[List[str], List[List[str]], str]:
     """Extracts column headers, body rows, and optional table title banner from raw row data.
 
@@ -149,7 +160,7 @@ def extract_table_headers_and_title(
         is_spanning = True
     elif grid_cells and len(grid_cells) > 0 and len(grid_cells[0]) > 0:
         c0 = grid_cells[0][0]
-        if getattr(c0, "col_span", 1) >= num_cols and r0_clean:
+        if isinstance(c0, SpanningCell) and c0.col_span >= num_cols and r0_clean:
             is_spanning = True
     if is_spanning and len(rows) > 1:
         title = r0_clean[0]
@@ -289,17 +300,29 @@ def parse_markdown_table(
     )
 
 
+def _extract_cell_text(cell_obj: object, doc: object) -> str:
+    """Extracts stripped text from a Docling table cell using document lookup with text fallback."""
+    fallback = str(cell_obj.text).strip() if isinstance(cell_obj, TextItem) and cell_obj.text is not None else ""
+    if isinstance(cell_obj, DocTextCell):
+        try:
+            return str(cell_obj._get_text(doc=doc)).strip()
+        except Exception as ex:
+            logger.debug("Failed cell _get_text extraction: %s", ex)
+            return fallback
+    return fallback
+
+
 def parse_docling_table(
-    item: Any,
-    doc: Any = None,
+    item: object,
+    doc: object = None,
     preset: str = "docling_fast",
 ) -> ParsedTable:
     """Parses a Docling TableItem into a structured ParsedTable with row and column awareness."""
-    data = getattr(item, "data", None)
-    if data is None or not getattr(data, "num_rows", 0) or not getattr(data, "num_cols", 0):
-        if hasattr(item, "export_to_markdown"):
+    data = item.data if isinstance(item, DoclingTableItem) else None
+    if data is None or not data.num_rows or not data.num_cols:
+        if isinstance(item, MarkdownExportable):
             try:
-                md = item.export_to_markdown(doc=doc) if doc else item.export_to_markdown()
+                md = item.export_to_markdown(doc=doc) if doc is not None else item.export_to_markdown()
                 if md:
                     return parse_markdown_table(md, preset=preset)
             except Exception as ex:
@@ -307,7 +330,7 @@ def parse_docling_table(
         return ParsedTable(cell_alignment_score=0.0)
 
     num_rows, num_cols = int(data.num_rows), int(data.num_cols)
-    grid_cells = getattr(data, "grid", None)
+    grid_cells = data.grid
     if not grid_cells:
         return ParsedTable(cell_alignment_score=0.0)
 
@@ -322,25 +345,24 @@ def parse_docling_table(
         for c in range(num_cols):
             cell_obj = grid_cells[r][c] if r < len(grid_cells) and c < len(grid_cells[r]) else None
             if cell_obj is not None:
-                if hasattr(cell_obj, "confidence") and cell_obj.confidence is not None:
+                if isinstance(cell_obj, ConfidenceBearing) and cell_obj.confidence is not None:
                     try:
                         cell_confidences.append(float(cell_obj.confidence))
                     except (ValueError, TypeError) as ex:
                         logger.debug("Failed cell confidence extraction: %s", ex)
-                if hasattr(cell_obj, "_get_text"):
-                    try:
-                        text_val = str(cell_obj._get_text(doc=doc)).strip()
-                    except Exception as ex:
-                        logger.debug("Failed cell _get_text extraction: %s", ex)
-                        text_val = str(getattr(cell_obj, "text", "")).strip()
-                else:
-                    text_val = str(getattr(cell_obj, "text", "")).strip()
-                is_hdr = bool(getattr(cell_obj, "column_header", False))
-                row_span = int(getattr(cell_obj, "row_span", 1))
-                col_span = int(getattr(cell_obj, "col_span", 1))
+                text_val = _extract_cell_text(cell_obj, doc)
+                is_hdr = bool(cell_obj.column_header) if isinstance(cell_obj, HeaderCell) else False
+                row_span = int(cell_obj.row_span) if isinstance(cell_obj, SpanningCell) else 1
+                col_span = int(cell_obj.col_span) if isinstance(cell_obj, SpanningCell) else 1
                 bbox_dict = (
-                    {"x0": float(cell_obj.bbox.l), "y0": float(cell_obj.bbox.t), "x1": float(cell_obj.bbox.r), "y1": float(cell_obj.bbox.b)}
-                    if getattr(cell_obj, "bbox", None) else None
+                    {
+                        "x0": float(cell_obj.bbox.l),
+                        "y0": float(cell_obj.bbox.t),
+                        "x1": float(cell_obj.bbox.r),
+                        "y1": float(cell_obj.bbox.b),
+                    }
+                    if isinstance(cell_obj, BBoxBearing) and cell_obj.bbox is not None
+                    else None
                 )
             else:
                 text_val, is_hdr, row_span, col_span, bbox_dict = "", False, 1, 1, None
@@ -357,9 +379,9 @@ def parse_docling_table(
     columns = build_column_oriented_view(rows, num_cols)
 
     md_table = ""
-    if hasattr(item, "export_to_markdown"):
+    if isinstance(item, MarkdownExportable):
         try:
-            md_table = item.export_to_markdown(doc=doc) if doc else item.export_to_markdown()
+            md_table = item.export_to_markdown(doc=doc) if doc is not None else item.export_to_markdown()
         except Exception as ex:
             logger.debug("Failed export_to_markdown: %s", ex)
             md_table = ""
@@ -388,18 +410,18 @@ def parse_docling_table(
 
 
 def parse_table_content(
-    table_input: Any,
-    doc: Any = None,
+    table_input: object,
+    doc: object = None,
     preset: str = "docling_fast",
     fallback_text: str = "",
 ) -> Dict[str, Any]:
     """Parses table input from a Docling item, Markdown string, or dictionary into a node content dict."""
-    if table_input is not None and hasattr(table_input, "data"):
+    if isinstance(table_input, DoclingTableItem):
         return parse_docling_table(table_input, doc=doc, preset=preset).to_dict()
 
-    if table_input is not None and hasattr(table_input, "export_to_markdown"):
+    if isinstance(table_input, MarkdownExportable):
         try:
-            md = table_input.export_to_markdown(doc=doc) if doc else table_input.export_to_markdown()
+            md = table_input.export_to_markdown(doc=doc) if doc is not None else table_input.export_to_markdown()
             if md:
                 return parse_markdown_table(md, preset=preset).to_dict()
         except Exception as ex:
@@ -441,13 +463,14 @@ class TableParser:
 
     def parse(
         self,
-        table_input: Any,
-        doc: Any = None,
+        table_input: object,
+        doc: object = None,
         fallback_text: str = "",
     ) -> ParsedTable:
         """Parses any table representation into a ParsedTable model."""
         res = parse_table_content(table_input=table_input, doc=doc, preset=self.preset, fallback_text=fallback_text)
-        flds = {k: v for k, v in res.items() if k in getattr(ParsedTable, "__dataclass_fields__", {})}
+        valid_fields = {f.name for f in fields(ParsedTable)}
+        flds = {k: v for k, v in res.items() if k in valid_fields}
         return ParsedTable(**flds)
 
     def parse_markdown(self, markdown_text: str) -> ParsedTable:
