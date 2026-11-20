@@ -8,9 +8,16 @@ PDF crops, and extensible custom OCR engine backends.
 
 from __future__ import annotations
 
+import base64
 import inspect
+import io
+import json
 import logging
 import os
+import subprocess
+import tempfile
+import urllib.error
+import urllib.request
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -91,6 +98,124 @@ class SectionOCRParser:
         except Exception as ex:
             logger.debug("EasyOCR engine initialization unavailable: %s", ex)
             return None
+
+    def _create_cli_subprocess_engine(
+        self,
+        command_template: Sequence[str],
+        timeout_sec: int = 120,
+        output_format: str = "text",
+        language: Optional[str] = None,
+    ) -> Callable[[Any], str]:
+        """Creates a section OCR engine callable backed by an external CLI subprocess."""
+        cmd_tpl = [str(tok) for tok in command_template]
+        target_lang = (language or self.language or "en").strip() or "en"
+
+        def _cli_engine(image_input: Any) -> str:
+            pil_img = image_input if isinstance(image_input, Image.Image) else Image.fromarray(image_input)
+            with tempfile.TemporaryDirectory(prefix="cernodata_sec_cli_") as tmp_dir:
+                in_path = os.path.join(tmp_dir, "section.png")
+                out_path = os.path.join(tmp_dir, "section_out.txt")
+                pil_img.save(in_path, format="PNG")
+                replacements = {
+                    "{input_path}": in_path,
+                    "{output_path}": out_path,
+                    "{page_index}": "1",
+                    "{language}": target_lang,
+                }
+                cmd: List[str] = []
+                for tok in cmd_tpl:
+                    rendered = tok
+                    for marker, val in replacements.items():
+                        rendered = rendered.replace(marker, val)
+                    cmd.append(rendered)
+
+                proc = subprocess.run(
+                    cmd,
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec,
+                )
+                if proc.returncode != 0:
+                    err = (proc.stderr or proc.stdout or "").strip()
+                    raise RuntimeError(f"CLI section OCR failed ({proc.returncode}): {err}")
+
+                raw_out = proc.stdout or ""
+                for cand in (out_path, f"{out_path}.txt"):
+                    if os.path.isfile(cand) and os.path.getsize(cand) > 0:
+                        with open(cand, "r", encoding="utf-8", errors="replace") as fp:
+                            raw_out = fp.read()
+                        break
+
+                if output_format == "cernodata_dom_json" and raw_out.strip():
+                    try:
+                        parsed = json.loads(raw_out)
+                        if isinstance(parsed, dict) and isinstance(parsed.get("nodes"), list):
+                            return "\n".join(
+                                str(n.get("content", {}).get("raw_text", "")).strip()
+                                for n in parsed["nodes"]
+                                if isinstance(n, dict) and n.get("content", {}).get("raw_text")
+                            )
+                    except json.JSONDecodeError as exc:
+                        logger.debug("Section CLI JSON parse skipped: %s", exc)
+                return raw_out.strip()
+
+        return _cli_engine
+
+    def _create_http_endpoint_engine(
+        self,
+        endpoint_url: str,
+        timeout_sec: int = 120,
+        preset_id: str = "http_ocr",
+        language: Optional[str] = None,
+    ) -> Callable[[Any], Dict[str, Any]]:
+        """Creates a section OCR engine callable posting PNG cutouts to an HTTP OCR endpoint."""
+        target_lang = (language or self.language or "en").strip() or "en"
+
+        def _http_engine(image_input: Any) -> Dict[str, Any]:
+            pil_img = image_input if isinstance(image_input, Image.Image) else Image.fromarray(image_input)
+            buf = io.BytesIO()
+            pil_img.save(buf, format="PNG")
+            img_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            payload = {
+                "filename": "section.png",
+                "image_base64": img_b64,
+                "preset": preset_id,
+                "language": target_lang,
+            }
+            req = urllib.request.Request(
+                endpoint_url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    raw_body = resp.read().decode("utf-8")
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                raise RuntimeError(f"HTTP section OCR request failed: {exc}") from exc
+
+            decoded = json.loads(raw_body) if raw_body.strip() else {}
+            if isinstance(decoded, dict):
+                if "text" in decoded:
+                    return decoded
+                if isinstance(decoded.get("pages"), list):
+                    joined = "\n".join(
+                        str(p.get("text", "")).strip()
+                        for p in decoded["pages"]
+                        if isinstance(p, dict) and p.get("text")
+                    )
+                    return {"text": joined, "confidence": float(decoded.get("confidence", 1.0))}
+                if isinstance(decoded.get("nodes"), list):
+                    joined_nodes = "\n".join(
+                        str(n.get("content", {}).get("raw_text", "")).strip()
+                        for n in decoded["nodes"]
+                        if isinstance(n, dict) and n.get("content", {}).get("raw_text")
+                    )
+                    return {"text": joined_nodes, "confidence": float(decoded.get("confidence", 1.0))}
+            return {"text": str(decoded), "confidence": 1.0}
+
+        return _http_engine
 
     def _resolve_engine_entry(self, entry: Any) -> Any:
         if callable(entry):

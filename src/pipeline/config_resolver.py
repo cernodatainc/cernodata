@@ -7,7 +7,6 @@ Input resolution and normalization for pipeline execution requests.
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from src.pipeline.planner.models import DocumentPlan, IngestionConfig
-from src.pipeline.planner.options import DEFAULT_PRIMARY_PRESET
 
 
 class PipelineConfigResolver:
@@ -33,7 +32,7 @@ class PipelineConfigResolver:
         plan_obj: Optional[DocumentPlan],
         target_threshold: float,
         language: Optional[str],
-        preset: str,
+        preset: Optional[str],
         align_skew: bool,
         visualize: bool,
         output_dir: str,
@@ -48,7 +47,7 @@ class PipelineConfigResolver:
                 config.options[k] = v
             return config
         if plan_obj is not None:
-            if preset and preset != DEFAULT_PRIMARY_PRESET and preset != plan_obj.primary_preset:
+            if preset and preset != plan_obj.primary_preset:
                 plan_obj = plan_obj.evolve(
                     preset_order=list(plan_obj.preset_order),
                     fallback_queue=list(plan_obj.fallback_queue),
@@ -66,6 +65,8 @@ class PipelineConfigResolver:
             for k, v in extra_options.items():
                 cfg.options[k] = v
             return cfg
+        if not preset:
+            raise ValueError("A parser preset, execution plan, or IngestionConfig must be provided.")
         layers = list(verification_layers) if verification_layers is not None else None
         return IngestionConfig(
             target_threshold=target_threshold,
@@ -84,7 +85,7 @@ class PipelineConfigResolver:
         pdf_path: Optional[str],
         target_threshold: float,
         language: Optional[str],
-        preset: str,
+        preset: Optional[str],
         align_skew: bool,
         visualize: bool,
         output_dir: str,
@@ -95,7 +96,7 @@ class PipelineConfigResolver:
     ) -> Tuple[str, IngestionConfig, Optional[DocumentPlan]]:
         """Resolves target PDF path, IngestionConfig, and DocumentPlan."""
         plan_obj = cls.resolve_plan(plan)
-        if plan_obj is not None and preset and preset != DEFAULT_PRIMARY_PRESET and preset != plan_obj.primary_preset:
+        if plan_obj is not None and preset and preset != plan_obj.primary_preset:
             plan_obj = plan_obj.evolve(
                 preset_order=list(plan_obj.preset_order),
                 fallback_queue=list(plan_obj.fallback_queue),

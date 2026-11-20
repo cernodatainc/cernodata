@@ -127,14 +127,16 @@ class IngestionConfig(ExtensibleOptionsMixin):
     force_full_page_ocr: bool = False
     do_table_structure: bool = True
     verification_layers: Optional[List[str]] = None
+    custom_presets_path: Optional[str] = None
     options: Dict[str, Any] = field(default_factory=dict)
     # TODO(stride): Extend `IngestionConfig` with optional paths/flags for `test_suite_path` (TASK-107),
-    # `custom_presets_path` (TASK-204), `postprocess_steps` (TASK-506), and `template_hint_path` (TASK-903).
+    # `postprocess_steps` (TASK-506), and `template_hint_path` (TASK-903).
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> IngestionConfig:
         raw_scale = data.get("ocr_scale")
         raw_layers = data.get("verification_layers")
+        raw_custom_presets = data.get("custom_presets_path")
         return cls(
             target_threshold=float(data.get("target_threshold", DEFAULT_TARGET_THRESHOLD)),
             language=data.get("language"),
@@ -146,6 +148,7 @@ class IngestionConfig(ExtensibleOptionsMixin):
             force_full_page_ocr=bool(data.get("force_full_page_ocr", False)),
             do_table_structure=bool(data.get("do_table_structure", True)),
             verification_layers=[str(x) for x in raw_layers] if raw_layers is not None else None,
+            custom_presets_path=str(raw_custom_presets) if raw_custom_presets is not None else None,
             options=cls._extract_unknown_options(data),
         )
 

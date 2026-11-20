@@ -152,6 +152,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
                 send_json_response(self, 500, {"error": str(e)})
         elif raw_path in ("/api/ocr_engines", "/api/engines"):
             self._handle_get_ocr_engines()
+        elif raw_path == "/api/presets":
+            self._handle_get_presets()
         elif raw_path == "/api/runs_grid":
             target_doc: Optional[str] = (
                 query_params.get("document", [""])[0]
@@ -191,6 +193,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             "/api/upload": self._handle_post_add_document,
             "/api/open_file_dialog": self._handle_post_open_file_dialog,
             "/api/browse_files": self._handle_post_open_file_dialog,
+            "/api/presets": self._handle_post_presets,
+            "/api/presets/test": self._handle_post_test_preset,
         }
         handler_fn = post_handlers.get(raw_path)
         if handler_fn is not None:

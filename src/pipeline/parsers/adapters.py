@@ -6,8 +6,8 @@ Preset-specific parser adapters and options normalization for document ingestion
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from src.dom import DocumentDOM
 from src.parsers import DoclingParser, PyPdfiumParser
@@ -27,19 +27,32 @@ class ParserExecutionOptions:
     ocr_scale: Optional[float] = None
     force_full_page_ocr: bool = False
     do_table_structure: bool = True
+    extra_parameters: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_inputs(
         cls,
         language: Optional[str] = "en",
-        preset: str = DEFAULT_PARSER_PRESET,
+        preset: Optional[str] = None,
         ocr_engine: str = DEFAULT_OCR_ENGINE,
         ocr_scale: Optional[float] = None,
         force_full_page_ocr: bool = False,
         do_table_structure: bool = True,
         config: Optional[IngestionConfig] = None,
+        extra_parameters: Optional[Dict[str, Any]] = None,
     ) -> ParserExecutionOptions:
         """Constructs normalized execution options prioritizing explicit config if provided."""
+        merged_extra: Dict[str, Any] = {}
+        if config is not None:
+            cfg_extra = config.get_option("extra_parameters")
+            if isinstance(cfg_extra, dict):
+                merged_extra.update(cfg_extra)
+            cfg_wiggle = config.get_option("wiggle_parameters")
+            if isinstance(cfg_wiggle, dict):
+                merged_extra.update(cfg_wiggle)
+        if extra_parameters:
+            merged_extra.update(extra_parameters)
+
         if config is not None:
             resolved_lang = config.language
             resolved_preset = config.preset
@@ -53,7 +66,11 @@ class ParserExecutionOptions:
                 ocr_scale=resolved_scale,
                 force_full_page_ocr=resolved_full_page,
                 do_table_structure=resolved_tables,
+                extra_parameters=merged_extra,
             )
+
+        if not preset:
+            raise ValueError("A parser preset or IngestionConfig must be provided.")
 
         return cls(
             language=language,
@@ -62,6 +79,7 @@ class ParserExecutionOptions:
             ocr_scale=ocr_scale,
             force_full_page_ocr=force_full_page_ocr,
             do_table_structure=do_table_structure,
+            extra_parameters=merged_extra,
         )
 
 
@@ -94,11 +112,10 @@ class PyPdfiumPresetAdapter:
 class DoclingPresetAdapter:
     """Adapter executing Docling layout and OCR parser presets."""
 
+    SUPPORTED_PRESETS = frozenset({"docling_fast", "docling_deep"})
+
     def can_handle(self, preset: str) -> bool:
-        # TODO(TASK-204): Restrict `can_handle` to explicit Docling preset IDs (`docling_fast`, `docling_deep`)
-        # instead of returning `True` unconditionally, which currently swallows `vision_llm_direct` and custom presets.
-        # Default fallback adapter handling all docling presets
-        return True
+        return preset in self.SUPPORTED_PRESETS or preset.startswith("docling_")
 
     def parse(self, resolved_path: str, options: ParserExecutionOptions) -> DocumentDOM:
         return DoclingParser(

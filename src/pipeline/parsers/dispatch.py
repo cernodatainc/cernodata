@@ -50,7 +50,7 @@ class DocumentParserDispatcher:
         self,
         pdf_path: str,
         language: Optional[str] = "en",
-        preset: str = "docling_fast",
+        preset: Optional[str] = None,
         ocr_engine: str = "auto",
         ocr_scale: Optional[float] = None,
         force_full_page_ocr: bool = False,
@@ -68,6 +68,12 @@ class DocumentParserDispatcher:
             config=config,
         )
 
+        custom_presets_path = getattr(config, "custom_presets_path", None) if config is not None else None
+        if custom_presets_path:
+            self._registry.load_custom_presets(custom_presets_path)
+        elif self._registry.resolve(options.preset) is None:
+            self._registry.load_custom_presets()
+
         resolved_path = resolve_pdf_path(pdf_path)
         if not os.path.exists(resolved_path):
             raise FileNotFoundError(f"PDF document not found: '{pdf_path}'")
@@ -80,7 +86,7 @@ _default_dispatcher = DocumentParserDispatcher()
 def parse_document(
     pdf_path: str,
     language: Optional[str] = "en",
-    preset: str = "docling_fast",
+    preset: Optional[str] = None,
     ocr_engine: str = "auto",
     ocr_scale: Optional[float] = None,
     force_full_page_ocr: bool = False,

@@ -181,7 +181,7 @@ class TestPlanner(unittest.TestCase):
                 pdf_path="test.pdf",
                 target_threshold=0.82,
                 language="pl",
-                preset="docling_fast",
+                preset=None,
                 align_skew=True,
                 visualize=False,
                 output_dir="test_output",

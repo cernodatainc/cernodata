@@ -122,6 +122,40 @@ class TestMainEntrypoint(unittest.TestCase):
         args = cli_parse_args(["--port", "8500"])
         self.assertEqual(args.port, 8500)
 
+    @patch("src.main.run_pipeline")
+    def test_batch_mode_requires_preset_or_plan(self, mock_run_pipeline: MagicMock) -> None:
+        """Verifies batch mode fails fast instead of defaulting to docling_fast when no preset or plan is given."""
+        with self.assertRaises(SystemExit) as ctx:
+            src_main(["--batch", "-i", "sample.pdf"])
+        self.assertEqual(ctx.exception.code, 1)
+        mock_run_pipeline.assert_not_called()
+
+    @patch("src.cli.print_summary")
+    @patch("src.main.run_pipeline")
+    def test_batch_mode_with_plan_does_not_default_preset_to_docling_fast(
+        self,
+        mock_run_pipeline: MagicMock,
+        mock_print_summary: MagicMock,
+    ) -> None:
+        """Verifies batch mode with --plan passes preset=None so the plan's primary_preset is preserved."""
+        import os
+        import tempfile
+        from src.pipeline.planner.models import DocumentPlan
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_path = os.path.join(tmpdir, "doc.pdf")
+            with open(pdf_path, "wb") as f:
+                f.write(b"%PDF-1.4\n%mock\n")
+            plan_path = os.path.join(tmpdir, "plan.json")
+            DocumentPlan(document_path=pdf_path, primary_preset="docling_deep").save(plan_path)
+            mock_run_pipeline.return_value = {"decision": {}, "dom": {}, "violations": []}
+
+            src_main(["--batch", "--plan", plan_path, "--no-visuals"])
+
+            mock_run_pipeline.assert_called_once()
+            self.assertIsNone(mock_run_pipeline.call_args.kwargs["preset"])
+            self.assertEqual(mock_run_pipeline.call_args.kwargs["plan"].primary_preset, "docling_deep")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -25,12 +25,90 @@ from src.pipeline.planner.options import (
 from src.pipeline.planner.wizard import resolve_choice, run_interactive_wizard
 
 
+from typing import Mapping, Sequence
+
+from src.schemas.custom_preset import (
+    CustomPresetConfig,
+    PresetBackendType,
+    load_custom_presets_file,
+)
+
+
 class PresetPlanner:
     """Calculates preset confidence scores and generates pipeline execution plans."""
 
-    def __init__(self, weights: Optional[Dict[str, Dict[str, float]]] = None) -> None:
-        # TODO(TASK-205): Merge user-defined `CustomPresetConfig` suitability weights into `self.weights`.
-        self.weights = weights or DEFAULT_PRESET_WEIGHTS
+    _TAXONOMY_KEYS = (
+        "financial_report",
+        "multicolumn_article",
+        "scanned_form",
+        "tabular_ledger",
+        "mixed_text_image",
+        "general_text",
+    )
+
+    @staticmethod
+    def derive_custom_preset_weights(config: CustomPresetConfig) -> Dict[str, float]:
+        """Derives planner dimension suitability weights for a custom preset config."""
+        hints = {str(h).strip().lower() for h in config.taxonomy_hints if str(h).strip()}
+        weights: Dict[str, float] = {}
+        for tax in PresetPlanner._TAXONOMY_KEYS:
+            if hints:
+                weights[tax] = 0.88 if tax in hints else (0.55 if tax == "general_text" else 0.45)
+            else:
+                weights[tax] = 0.7 if tax == "general_text" else 0.55
+
+        for hint in hints:
+            weights.setdefault(hint, 0.88)
+
+        hw = (config.hardware_weight or "light_cpu").strip().lower()
+        if hw == "heavy_cpu":
+            weights["rapid_approximate"] = 0.5
+            weights["high_precision_structure"] = 0.82
+        elif hw == "gpu_vram":
+            weights["rapid_approximate"] = 0.45
+            weights["high_precision_structure"] = 0.9
+        else:
+            weights["rapid_approximate"] = 0.85
+            weights["high_precision_structure"] = 0.6
+
+        if config.backend_type == PresetBackendType.HTTP_ENDPOINT:
+            weights["air_gapped_local"] = 0.25
+            weights["hosted_vision_api"] = 0.85
+        else:
+            weights["air_gapped_local"] = 0.9
+            weights["hosted_vision_api"] = 0.5
+
+        for key, val in config.suitability_weights.items():
+            weights[str(key)] = float(val)
+        return weights
+
+    def __init__(
+        self,
+        weights: Optional[Dict[str, Dict[str, float]]] = None,
+        custom_presets: Optional[Sequence[Union[CustomPresetConfig, Mapping[str, Any]]]] = None,
+        custom_presets_path: Optional[str] = None,
+    ) -> None:
+        base_weights = weights if weights is not None else DEFAULT_PRESET_WEIGHTS
+        self.weights: Dict[str, Dict[str, float]] = {
+            preset_id: dict(dim_weights)
+            for preset_id, dim_weights in base_weights.items()
+        }
+        if custom_presets_path:
+            for cfg in load_custom_presets_file(custom_presets_path):
+                self.register_custom_preset(cfg)
+        if custom_presets:
+            for item in custom_presets:
+                self.register_custom_preset(item)
+
+    def register_custom_preset(
+        self,
+        config: Union[CustomPresetConfig, Mapping[str, Any]],
+    ) -> Dict[str, float]:
+        """Merges a CustomPresetConfig's derived and explicit suitability weights into self.weights."""
+        cfg = config if isinstance(config, CustomPresetConfig) else CustomPresetConfig.from_dict(config)
+        merged = self.derive_custom_preset_weights(cfg)
+        self.weights[cfg.preset_id] = merged
+        return merged
 
     def _apply_hardware_calibration(self, scores: Dict[str, float]) -> Dict[str, float]:
         """No-op hook for adjusting preset scores using empirical hardware benchmark logs."""

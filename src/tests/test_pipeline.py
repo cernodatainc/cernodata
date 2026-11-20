@@ -154,6 +154,126 @@ class TestPipelineEngine(unittest.TestCase):
             self.assertEqual(out, "test_output/interactive_viewer.html")
             self.assertTrue(any(issubclass(w.category, DeprecationWarning) for w in caught))
 
+    def test_attempt_runner_reuses_cached_dom_unless_wiggled(self):
+        from src.pipeline.attempt_runner import AttemptRunner
+        from src.pipeline.planner.models import IngestionConfig
+
+        cached_dom = make_test_dom("piqtku w piqtku", document_id="doc_cached", source_filename="test.pdf")
+        parse_calls = []
+
+        def fake_parse(pdf_path, config=None):
+            parse_calls.append(config.preset if config else None)
+            return make_test_dom("piątku w piątku", document_id="doc_reparsed", source_filename="test.pdf")
+
+        runner = AttemptRunner(
+            parse_fn=fake_parse,
+            align_fn=lambda dom, pdf_path, align_skew: dom,
+            postprocess_fn=lambda dom, config, pdf_path: dom,
+        )
+
+        # Non-wiggled attempt should reuse cached DOM and skip parse_fn
+        cfg_normal = IngestionConfig(
+            preset="docling_deep",
+            target_threshold=0.90,
+            language="pl",
+            options={"cached_dom_lookup": lambda p: cached_dom if p == "docling_deep" else None},
+        )
+        dom1, dec1, _ = runner.execute_attempt("test.pdf", cfg_normal, 0.90, 0.72)
+        self.assertEqual(parse_calls, [])
+        self.assertEqual(dom1.document_id, "doc_cached")
+        self.assertFalse(dec1["is_accepted"])
+
+        # Wiggled attempt (force_full_page_ocr=True) must NOT reuse cached DOM
+        cfg_wiggled = IngestionConfig(
+            preset="docling_deep",
+            target_threshold=0.90,
+            language="pl",
+            force_full_page_ocr=True,
+            options={"cached_dom_lookup": lambda p: cached_dom if p == "docling_deep" else None},
+        )
+        dom2, dec2, _ = runner.execute_attempt("test.pdf", cfg_wiggled, 0.90, 0.72)
+        self.assertEqual(parse_calls, ["docling_deep"])
+        self.assertEqual(dom2.document_id, "doc_reparsed")
+        self.assertTrue(dec2["is_accepted"])
+
+    def test_orchestrator_skips_reparse_when_cached_dom_below_raised_threshold(self):
+        from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
+
+        dom_deep_cached = make_test_dom("piqtku w piqtku", document_id="doc_deep", source_filename="test.pdf")
+        dom_fallback = make_test_dom("piątku w piątku", document_id="doc_fb", source_filename="test.pdf")
+
+        plan = DocumentPlan(
+            document_path="test.pdf",
+            criteria=PlannerCriteria(),
+            language="pl",
+            target_threshold=0.90,
+            primary_preset="docling_deep",
+            preset_order=["docling_deep", "docling_fast"],
+            fallback_queue=[{"preset": "docling_fast", "score": 0.75}],
+            scores={"docling_deep": 0.88, "docling_fast": 0.75},
+        )
+
+        # Only 1 parse_side_effect needed (for docling_fast fallback), because docling_deep uses cached_dom_lookup
+        with patch_pipeline_io(parse_side_effect=[dom_fallback]):
+            res = run_pipeline(
+                pdf_path="test.pdf",
+                target_threshold=0.90,
+                language="pl",
+                preset="docling_deep",
+                align_skew=False,
+                visualize=False,
+                output_dir="test_output",
+                plan=plan,
+                cached_dom_lookup=lambda p: dom_deep_cached if p == "docling_deep" else None,
+            )
+            attempts = res["decision"]["attempts"]
+            self.assertEqual(len(attempts), 2)
+            self.assertEqual(attempts[0]["preset"], "docling_deep")
+            self.assertFalse(attempts[0]["is_accepted"])
+            self.assertEqual(attempts[1]["preset"], "docling_fast")
+            self.assertTrue(attempts[1]["is_accepted"])
+
+    def test_fallback_skips_failing_preset_and_keeps_best_result(self):
+        from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
+
+        dom_deep = make_test_dom("piqtku w piqtku", document_id="doc_deep", source_filename="test.pdf")
+        dom_worse = make_test_dom("piqtku piqtku piqtku piqtku", document_id="doc_worse", source_filename="test.pdf")
+
+        plan = DocumentPlan(
+            document_path="test.pdf",
+            criteria=PlannerCriteria(),
+            language="pl",
+            target_threshold=0.95,
+            primary_preset="docling_deep",
+            preset_order=["docling_deep", "pypdfium_rapidocr", "paddleocr_cjk_http"],
+            fallback_queue=[
+                {"preset": "pypdfium_rapidocr", "score": 0.75},
+                {"preset": "paddleocr_cjk_http", "score": 0.70},
+            ],
+            scores={"docling_deep": 0.88, "pypdfium_rapidocr": 0.75, "paddleocr_cjk_http": 0.70},
+        )
+
+        with patch_pipeline_io(
+            parse_side_effect=[dom_deep, dom_worse, RuntimeError("HTTP connection refused")]
+        ):
+            res = run_pipeline(
+                pdf_path="test.pdf",
+                target_threshold=0.95,
+                language="pl",
+                preset="docling_deep",
+                align_skew=False,
+                visualize=False,
+                output_dir="test_output",
+                plan=plan,
+            )
+
+        decision = res["decision"]
+        self.assertEqual(decision["chosen_preset"], "docling_deep")
+        attempts = decision["attempts"]
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual(attempts[2]["preset"], "paddleocr_cjk_http")
+        self.assertEqual(attempts[2]["status"], "ERROR")
+
 
 if __name__ == "__main__":
     unittest.main()

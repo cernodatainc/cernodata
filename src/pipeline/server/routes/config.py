@@ -7,9 +7,14 @@ Configuration and run retrieval API endpoints for cernodata HTTP server.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from typing import Any, Dict, List, Optional
+from src.pipeline.parsers.registry import get_default_parser_registry
+from src.pipeline.planner import PresetPlanner
 from src.pipeline.planner.options import (
     DEFAULT_PRESET_WEIGHTS,
     SECURITY_OPTIONS,
@@ -19,6 +24,13 @@ from src.pipeline.planner.options import (
 )
 from src.quality.layers import ALL_VERIFICATION_LAYERS, DEFAULT_VERIFICATION_LAYERS, LAYER_METADATA
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
+from src.schemas.custom_preset import (
+    CustomPresetConfig,
+    PresetBackendType,
+    get_community_preset_recipes,
+    load_custom_presets_file,
+    save_custom_presets_file,
+)
 
 
 def open_system_file_dialog(mock_paths: Optional[List[str]] = None) -> List[str]:
@@ -175,11 +187,147 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             "file_run_mappings": self.session.get_file_run_mappings(),
         })
 
+    def _resolve_custom_presets_path(self) -> str:
+        """Resolves the JSON manifest path for persisting user-defined custom presets."""
+        configured = getattr(self.server, "custom_presets_path", None)
+        if configured:
+            return str(configured)
+        srv_out = getattr(self.server, "output_dir", None)
+        if srv_out:
+            return os.path.join(str(srv_out), "custom_presets.json")
+        return os.path.join("output", "custom_presets.json")
+
     def _get_custom_presets_catalog(self) -> List[Dict[str, Any]]:
-        """No-op hook returning custom OCR presets and community recipes for the Web Hub UI."""
-        # TODO(TASK-207): Return user-saved CustomPresetConfig entries and community OCR recipes (TASK-208)
-        # to populate the guided 'Add / Connect Custom OCR Preset' modal in the Web Hub.
-        return []
+        """Returns user-saved CustomPresetConfig entries and community OCR recipes for the Web Hub UI."""
+        catalog: List[Dict[str, Any]] = []
+        user_presets = load_custom_presets_file(self._resolve_custom_presets_path())
+        user_ids = {cfg.preset_id for cfg in user_presets}
+
+        for cfg in user_presets:
+            entry = cfg.to_dict()
+            entry["source"] = "user"
+            entry["installed"] = True
+            entry["suitability_weights"] = PresetPlanner.derive_custom_preset_weights(cfg)
+            catalog.append(entry)
+
+        for recipe in get_community_preset_recipes():
+            entry = recipe.to_dict()
+            entry["source"] = "community"
+            entry["installed"] = recipe.preset_id in user_ids
+            entry["suitability_weights"] = PresetPlanner.derive_custom_preset_weights(recipe)
+            catalog.append(entry)
+
+        return catalog
+
+    def _handle_get_presets(self) -> None:
+        """Returns user-registered presets, community recipes, and combined UI catalog."""
+        user_presets = load_custom_presets_file(self._resolve_custom_presets_path())
+        community = get_community_preset_recipes()
+        self.send_ok({
+            "presets": [p.to_dict() for p in user_presets],
+            "community_recipes": [r.to_dict() for r in community],
+            "catalog": self._get_custom_presets_catalog(),
+        })
+
+    def _handle_post_presets(self, payload: Dict[str, Any]) -> None:
+        """Validates, persists, and registers a user-defined custom OCR preset."""
+        try:
+            config = CustomPresetConfig.from_dict(payload)
+        except ValueError as exc:
+            self.send_bad_request(str(exc))
+            return
+
+        path = self._resolve_custom_presets_path()
+        existing = load_custom_presets_file(path)
+        updated = [item for item in existing if item.preset_id != config.preset_id]
+        updated.append(config)
+        save_custom_presets_file(path, updated)
+
+        get_default_parser_registry().register_custom_preset(config, prepend=True)
+
+        active_planner = getattr(self.server, "planner", None)
+        if active_planner is None:
+            setattr(self.server, "planner", PresetPlanner(custom_presets=updated))
+        else:
+            active_planner.register_custom_preset(config)
+
+        self.send_ok({
+            "preset": config.to_dict(),
+            "suitability_weights": PresetPlanner.derive_custom_preset_weights(config),
+            "custom_presets": self._get_custom_presets_catalog(),
+        })
+
+    def _handle_post_test_preset(self, payload: Dict[str, Any]) -> None:
+        """Verifies CLI executable presence or HTTP endpoint reachability for a custom preset draft."""
+        probe_payload = dict(payload)
+        probe_payload["preset_id"] = payload.get("preset_id") or "test_preset"
+        probe_payload["display_name"] = payload.get("display_name") or "Test Preset"
+        try:
+            config = CustomPresetConfig.from_dict(probe_payload)
+        except ValueError as exc:
+            self.send_bad_request(str(exc))
+            return
+
+        if config.backend_type == PresetBackendType.CLI_SUBPROCESS:
+            exe = config.command_template[0] if config.command_template else ""
+            resolved = shutil.which(exe) or (exe if exe and os.path.isfile(exe) else None)
+            if resolved:
+                self.send_json(200, {
+                    "success": True,
+                    "reachable": True,
+                    "backend_type": config.backend_type.value,
+                    "executable": resolved,
+                    "message": f"Executable found at '{resolved}'.",
+                })
+            else:
+                self.send_json(200, {
+                    "success": False,
+                    "reachable": False,
+                    "backend_type": config.backend_type.value,
+                    "executable": None,
+                    "error": f"Executable '{exe}' was not found on PATH.",
+                })
+            return
+
+        if config.backend_type == PresetBackendType.HTTP_ENDPOINT:
+            url = config.endpoint_url or ""
+            req = urllib.request.Request(url, method="GET")
+            timeout = min(int(config.timeout_sec), 5)
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    status_code = getattr(resp, "status", 200)
+                self.send_json(200, {
+                    "success": True,
+                    "reachable": True,
+                    "backend_type": config.backend_type.value,
+                    "status_code": status_code,
+                    "message": f"HTTP endpoint reachable (status {status_code}).",
+                })
+            except urllib.error.HTTPError as exc:
+                logger.debug("Preset test probe received HTTP status %s for '%s'", exc.code, url)
+                self.send_json(200, {
+                    "success": True,
+                    "reachable": True,
+                    "backend_type": config.backend_type.value,
+                    "status_code": exc.code,
+                    "message": f"HTTP endpoint responded with status {exc.code}.",
+                })
+            except (urllib.error.URLError, OSError, ValueError) as exc:
+                logger.info("Preset HTTP connectivity check failed for '%s': %s", url, exc)
+                self.send_json(200, {
+                    "success": False,
+                    "reachable": False,
+                    "backend_type": config.backend_type.value,
+                    "error": str(exc),
+                })
+            return
+
+        self.send_json(200, {
+            "success": False,
+            "reachable": False,
+            "backend_type": config.backend_type.value,
+            "error": f"Connection testing is not supported for backend '{config.backend_type.value}'.",
+        })
 
     def _get_ollama_models_status(self) -> Dict[str, Any]:
         """No-op hook returning local Ollama availability and installed models for the Web UI."""
@@ -203,11 +351,17 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         default_lang = getattr(self.server, "default_lang", None) or self.session.language or "en"
         default_thresh = getattr(self.server, "default_threshold", 0.85)
 
+        preset_weights: Dict[str, Dict[str, float]] = {
+            k: dict(v) for k, v in DEFAULT_PRESET_WEIGHTS.items()
+        }
+        for cfg in load_custom_presets_file(self._resolve_custom_presets_path()):
+            preset_weights[cfg.preset_id] = PresetPlanner.derive_custom_preset_weights(cfg)
+
         self.send_json(200, {
             "default_doc": default_doc,
             "default_lang": default_lang,
             "default_threshold": default_thresh,
-            "preset_weights": DEFAULT_PRESET_WEIGHTS,
+            "preset_weights": preset_weights,
             "dimensions": [d.to_dict() for d in WIZARD_DIMENSIONS],
             "taxonomy_options": TAXONOMY_OPTIONS,
             "target_options": TARGET_OPTIONS,

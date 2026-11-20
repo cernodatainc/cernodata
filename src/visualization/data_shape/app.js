@@ -26,9 +26,20 @@ window.addEventListener("DOMContentLoaded", async () => {
             if (cfg.previous_runs && cfg.previous_runs.length > 0) {
                 populatePreviousRunsDropdown(cfg.previous_runs);
             }
+            if (cfg.preset_weights && typeof PRESET_WEIGHTS !== "undefined") {
+                Object.assign(PRESET_WEIGHTS, cfg.preset_weights);
+            }
+            if (Array.isArray(cfg.custom_presets) && typeof hydrateCustomPresetUi === "function") {
+                hydrateCustomPresetUi(cfg.custom_presets, cfg.preset_weights || null);
+            }
         }
     } catch (e) {
         // Standalone offline fallback
+    }
+
+    if ((!window._customPresetCatalog || window._customPresetCatalog.length === 0)
+            && typeof setupCustomPresetBuilderModal === "function") {
+        setupCustomPresetBuilderModal(null);
     }
 
     // Also attempt loading previous runs if not already loaded from config
