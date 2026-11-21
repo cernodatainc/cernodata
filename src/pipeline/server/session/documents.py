@@ -74,7 +74,7 @@ class DocumentsMixin:
                 if rel not in docs and not _is_forgotten(rel) and not is_excluded_path(rel, repo_root=self.repo_root):
                     docs.append(rel)
         with self._lock:
-            for reg in getattr(self, "_registered_documents", []):
+            for reg in self._registered_documents:
                 if reg not in docs and not _is_forgotten(reg) and not is_excluded_path(reg, repo_root=self.repo_root):
                     docs.append(reg)
             if self.pdf_path and _is_forgotten(self.pdf_path):
@@ -92,11 +92,10 @@ class DocumentsMixin:
         """
         norm = normalize_path(path)
         with self._lock:
-            if hasattr(self, "_registered_documents"):
-                self._registered_documents = [
-                    d for d in self._registered_documents
-                    if normalize_path(d) != norm and os.path.basename(d) != os.path.basename(norm)
-                ]
+            self._registered_documents = [
+                d for d in self._registered_documents
+                if normalize_path(d) != norm and os.path.basename(d) != os.path.basename(norm)
+            ]
             if normalize_path(self.pdf_path) == norm or os.path.basename(self.pdf_path) == os.path.basename(norm):
                 self.pdf_path = ""
         return _forget_doc(norm, repo_root=self.repo_root)
@@ -126,8 +125,6 @@ class DocumentsMixin:
             return ""
 
         with self._lock:
-            if not hasattr(self, "_registered_documents"):
-                self._registered_documents = []
             if rel not in self._registered_documents:
                 self._registered_documents.append(rel)
             self.pdf_path = rel

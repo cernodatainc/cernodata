@@ -187,13 +187,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         force = bool(payload.get("force", payload.get("force_rerun", False)))
 
         from src.pipeline.orchestrator import run_pipeline
-        from src.pipeline.planner import PresetPlanner
         from src.utils import resolve_pdf_path
 
         plan_obj: Optional[DocumentPlan] = None
         if with_plan and plan_config:
-            get_planner = getattr(self, "_get_active_planner", None)
-            planner = get_planner() if callable(get_planner) else PresetPlanner()
+            planner = self._get_active_planner()
             raw_tax = str(plan_config.get("taxonomy", "standard"))
             tax_map = {
                 "standard": "general_text",

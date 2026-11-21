@@ -334,26 +334,36 @@ def parse_docling_table(
     if not grid_cells:
         return ParsedTable(cell_alignment_score=0.0)
 
-    rows: List[List[str]] = []
+    raw_rows: List[List[str]] = []
     cell_confidences: List[float] = []
-    cell_records: List[Dict[str, Any]] = []
-    grid: List[List[Dict[str, Any]]] = []
-
     for r in range(num_rows):
         row_vals: List[str] = []
+        for c in range(num_cols):
+            cell_obj = grid_cells[r][c] if r < len(grid_cells) and c < len(grid_cells[r]) else None
+            if cell_obj is not None and isinstance(cell_obj, ConfidenceBearing) and cell_obj.confidence is not None:
+                try:
+                    cell_confidences.append(float(cell_obj.confidence))
+                except (ValueError, TypeError) as ex:
+                    logger.debug("Failed cell confidence extraction: %s", ex)
+            row_vals.append(_extract_cell_text(cell_obj, doc) if cell_obj is not None else "")
+        raw_rows.append(row_vals)
+
+    headers, rows, table_title = extract_table_headers_and_title(raw_rows, num_cols, grid_cells=grid_cells)
+    start_row = 1 if (table_title and len(rows) == len(raw_rows) - 1) else 0
+
+    cell_records: List[Dict[str, Any]] = []
+    grid: List[List[Dict[str, Any]]] = []
+    for out_r, r in enumerate(range(start_row, num_rows)):
         grid_row: List[Dict[str, Any]] = []
         for c in range(num_cols):
             cell_obj = grid_cells[r][c] if r < len(grid_cells) and c < len(grid_cells[r]) else None
+            text_val = raw_rows[r][c]
             if cell_obj is not None:
-                if isinstance(cell_obj, ConfidenceBearing) and cell_obj.confidence is not None:
-                    try:
-                        cell_confidences.append(float(cell_obj.confidence))
-                    except (ValueError, TypeError) as ex:
-                        logger.debug("Failed cell confidence extraction: %s", ex)
-                text_val = _extract_cell_text(cell_obj, doc)
-                is_hdr = bool(cell_obj.column_header) if isinstance(cell_obj, HeaderCell) else False
-                row_span = int(cell_obj.row_span or 1) if isinstance(cell_obj, SpanningCell) else 1
-                col_span = int(cell_obj.col_span or 1) if isinstance(cell_obj, SpanningCell) else 1
+                is_hdr = (isinstance(cell_obj, HeaderCell) and bool(cell_obj.column_header)) or (
+                    start_row == 1 and bool(headers and out_r == 0)
+                )
+                row_span = int(cell_obj.row_span) if isinstance(cell_obj, SpanningCell) else 1
+                col_span = int(cell_obj.col_span) if isinstance(cell_obj, SpanningCell) else 1
                 bbox_dict = (
                     {"x0": float(cell_obj.bbox.l), "y0": float(cell_obj.bbox.t),
                      "x1": float(cell_obj.bbox.r), "y1": float(cell_obj.bbox.b)}
@@ -361,24 +371,12 @@ def parse_docling_table(
                     else None
                 )
             else:
-                text_val, is_hdr, row_span, col_span, bbox_dict = "", False, 1, 1, None
-
-            c_dict = ParsedTableCell(r, c, text_val, row_span, col_span, is_hdr, bbox_dict).to_dict()
+                is_hdr = start_row == 1 and bool(headers and out_r == 0)
+                row_span, col_span, bbox_dict = 1, 1, None
+            c_dict = ParsedTableCell(out_r, c, text_val, row_span, col_span, is_hdr, bbox_dict).to_dict()
             cell_records.append(c_dict)
             grid_row.append(c_dict)
-            row_vals.append(text_val)
-        rows.append(row_vals)
         grid.append(grid_row)
-
-    orig_rows_len = len(rows)
-    headers, rows, table_title = extract_table_headers_and_title(rows, num_cols, grid_cells=grid_cells)
-    if table_title and len(rows) == orig_rows_len - 1:
-        grid = grid[1:] if len(grid) > 1 else []
-        cell_records = [cell_rec for cell_rec in cell_records if int(cell_rec.get("row_idx", 0)) >= 1]
-        for cell_rec in cell_records:
-            cell_rec["row_idx"] = int(cell_rec["row_idx"]) - 1
-            if headers and cell_rec["row_idx"] == 0:
-                cell_rec["is_header"] = True
     num_rows = len(rows)
     columns = build_column_oriented_view(rows, num_cols)
 

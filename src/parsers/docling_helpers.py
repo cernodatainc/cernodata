@@ -75,9 +75,10 @@ def extract_page_no_and_bbox(
 ) -> Tuple[int, float, float, float, float]:
     """Extracts page number and top-left origin normalized bounding box coordinates."""
     _ = item
-    raw_page = getattr(prov_item, "page_no", None)
-    page_no = int(raw_page) if isinstance(raw_page, int) and raw_page >= 1 else 1
-    bbox = getattr(prov_item, "bbox", None)
+    if not isinstance(prov_item, DoclingProvenance):
+        return 1, 0.0, 0.0, 0.0, 0.0
+    page_no = prov_item.page_no if prov_item.page_no >= 1 else 1
+    bbox = prov_item.bbox
     if bbox is None:
         return page_no, 0.0, 0.0, 0.0, 0.0
 
@@ -92,12 +93,7 @@ def extract_page_no_and_bbox(
             and 0 <= page_no - 1 < len(doc.pages)
         ):
             page_obj = doc.pages[page_no - 1]
-        if (
-            isinstance(page_obj, DoclingPage)
-            and page_obj.size is not None
-            and isinstance(page_obj.size.height, (int, float))
-            and page_obj.size.height > 0
-        ):
+        if page_obj is not None and page_obj.size is not None:
             page_height = page_obj.size.height
 
     if isinstance(bbox, DoclingBBoxConvertible):

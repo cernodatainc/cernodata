@@ -18,6 +18,7 @@ from src.dom import DocumentDOM
 from src.quality.evaluator import evaluate_document_confidence
 from src.quality.layers import normalize_layer_name, normalize_layers
 from src.quality.violations import detect_quality_violations
+from src.schemas.decision import DecisionTreeSchema
 from src.utils import mkdirs, safe_load_json, save_json
 
 logger = logging.getLogger("cernodata.quality.materialization")
@@ -83,29 +84,27 @@ class MaterializedVerificationResult:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> MaterializedVerificationResult:
         """Hydrates a MaterializedVerificationResult instance from dictionary payload."""
-        raw_viols = list(data.get("violations") or [])
-        raw_total = data.get("total_violations")
-        total_viols = int(raw_total) if raw_total is not None else len(raw_viols)
-        raw_thresh = data.get("target_threshold")
+        clean = {k: v for k, v in data.items() if v is not None}
+        raw_viols = list(clean.get("violations", []))
         return cls(
-            document_id=str(data.get("document_id", "")),
-            source_filename=str(data.get("source_filename", "")),
-            selected_layers=list(data.get("selected_layers") or []),
-            overall_confidence=float(data.get("overall_confidence") or 0.0),
-            per_page_confidence=cls._parse_page_scores(data.get("per_page_confidence") or {}),
-            layer_scores={str(k): float(v) for k, v in (data.get("layer_scores") or {}).items()},
-            per_page_layer_scores=cls._parse_page_layer_scores(data.get("per_page_layer_scores") or {}),
-            total_violations=total_viols,
+            document_id=str(clean.get("document_id", "")),
+            source_filename=str(clean.get("source_filename", "")),
+            selected_layers=list(clean.get("selected_layers", [])),
+            overall_confidence=float(clean.get("overall_confidence", 0.0)),
+            per_page_confidence=cls._parse_page_scores(clean.get("per_page_confidence", {})),
+            layer_scores={str(k): float(v) for k, v in clean.get("layer_scores", {}).items()},
+            per_page_layer_scores=cls._parse_page_layer_scores(clean.get("per_page_layer_scores", {})),
+            total_violations=int(clean.get("total_violations", len(raw_viols))),
             violations=raw_viols,
             violations_by_layer={
-                str(k): list(v) for k, v in (data.get("violations_by_layer") or {}).items()
+                str(k): list(v) for k, v in clean.get("violations_by_layer", {}).items()
             },
-            is_accepted=bool(data.get("is_accepted", False)),
-            target_threshold=float(raw_thresh) if raw_thresh is not None else 0.82,
-            status=str(data.get("status", "ACCEPT")),
-            materialized_at=str(data.get("materialized_at", datetime.now(timezone.utc).isoformat())),
+            is_accepted=bool(clean.get("is_accepted", False)),
+            target_threshold=float(clean.get("target_threshold", 0.82)),
+            status=str(clean.get("status", "ACCEPT")),
+            materialized_at=str(clean.get("materialized_at", datetime.now(timezone.utc).isoformat())),
             output_dir=data.get("output_dir"),
-            metadata=dict(data.get("metadata") or {}),
+            metadata=dict(clean.get("metadata", {})),
         )
 
     @classmethod
@@ -120,24 +119,26 @@ class MaterializedVerificationResult:
         materialized_at: Optional[str] = None,
     ) -> MaterializedVerificationResult:
         """Constructs a MaterializedVerificationResult from evaluated DOM, decision payload, and violations."""
-        raw_overall = decision.get("overall_confidence", 1.0)
-        conf_val = float(raw_overall) if raw_overall is not None else 1.0
-        raw_thresh = decision.get("target_confidence_threshold", 0.82)
-        thresh_val = float(raw_thresh) if raw_thresh is not None else 0.82
+        dec = DecisionTreeSchema.model_validate(decision)
+        is_accepted = (
+            dec.is_accepted
+            if "is_accepted" in dec.model_fields_set
+            else (dec.overall_confidence >= dec.target_confidence_threshold)
+        )
         return cls(
             document_id=dom.document_id,
             source_filename=dom.source_filename,
             selected_layers=active_layers,
-            overall_confidence=conf_val,
-            per_page_confidence=cls._parse_page_scores(decision.get("per_page_confidence") or {}),
-            layer_scores={str(k): float(v) for k, v in (decision.get("layer_scores") or {}).items()},
-            per_page_layer_scores=cls._parse_page_layer_scores(decision.get("per_page_layer_scores") or {}),
+            overall_confidence=dec.overall_confidence,
+            per_page_confidence=cls._parse_page_scores(dec.per_page_confidence),
+            layer_scores=dict(dec.layer_scores),
+            per_page_layer_scores=cls._parse_page_layer_scores(dec.per_page_layer_scores),
             total_violations=len(violations),
             violations=violations,
             violations_by_layer=group_violations_by_layer(violations, active_layers),
-            is_accepted=bool(decision.get("is_accepted", conf_val >= thresh_val)),
-            target_threshold=thresh_val,
-            status=str(decision.get("status", "ACCEPT")),
+            is_accepted=is_accepted,
+            target_threshold=dec.target_confidence_threshold,
+            status=dec.status,
             materialized_at=materialized_at or datetime.now(timezone.utc).isoformat(),
             output_dir=output_dir,
             metadata=metadata or {},

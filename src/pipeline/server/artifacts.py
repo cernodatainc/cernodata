@@ -15,11 +15,13 @@ import logging
 import os
 import re
 from typing import Any, Dict, List, Optional
+from pydantic import ValidationError
 
 from src.pipeline.artifact_registry import default_artifact_registry
 from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.server.artifact_models import RunArtifacts, ViewerDataset
 from src.pipeline.server.page_images import load_or_render_page_images
+from src.schemas.decision import DecisionTreeSchema
 from src.utils import safe_load_json
 
 logger = logging.getLogger("cernodata.server.artifacts")
@@ -103,6 +105,11 @@ def _resolve_decision(
         # Favor HTML decision if plan_execution_result was missing, HTML is newer, or HTML has more page scores
         if not decision_data or html_mtime > plan_mtime or html_page_count > dec_page_count:
             decision_data = html_decision
+    if decision_data:
+        try:
+            return DecisionTreeSchema.model_validate(decision_data).model_dump()
+        except ValidationError as exc:
+            logger.debug("Using unvalidated decision payload in '%s': %s", run_dir, exc)
     return decision_data
 
 

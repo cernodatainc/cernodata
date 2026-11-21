@@ -65,30 +65,29 @@ class RunMetadata:
         """Constructs canonical RunMetadata directly from validated artifacts."""
         active_viols_pages = [str(v.global_page_index) for v in artifacts.active_violations]
         node_pages = [str(n.global_page_index) for n in artifacts.dom.nodes]
-        raw_conf: Optional[float] = artifacts.overall_confidence
+        raw_conf = artifacts.overall_confidence
         timestamp = artifacts.plan.created_at if artifacts.plan else ""
         status = artifacts.status
-        diff_scoring = (artifacts.diff or {}).get("scoring") or {}
+        diff_scoring = artifacts.diff.get("scoring") or {}
         if diff_scoring:
             if diff_scoring.get("current_overall_confidence") is not None:
                 raw_conf = float(diff_scoring["current_overall_confidence"])
             if diff_scoring.get("status"):
                 status = str(diff_scoring["status"])
 
-        conf_val = float(raw_conf) if raw_conf is not None else 1.0
         doc_name = artifacts.document_name or "Unknown"
         chosen_preset = artifacts.chosen_preset or "docling_fast"
         violations_count = len(active_viols_pages)
-        label = f"{doc_name} [{chosen_preset} | {status} {conf_val:.4f} | {violations_count} viols] ({norm_rel})"
+        label = f"{doc_name} [{chosen_preset} | {status} {raw_conf:.4f} | {violations_count} viols] ({norm_rel})"
 
         return cls(
             id=norm_rel,
             dir_path=norm_rel,
             document_name=doc_name,
-            document_path=artifacts.document_path or "",
+            document_path=artifacts.document_path,
             chosen_preset=chosen_preset,
             status=status,
-            overall_confidence=conf_val,
+            overall_confidence=raw_conf,
             violations_count=violations_count,
             timestamp=timestamp,
             has_viewer=os.path.exists(os.path.join(match, "interactive_viewer.html")),
@@ -180,31 +179,35 @@ def find_previous_runs(repo_root: Optional[str] = None) -> List[Dict[str, Any]]:
                     att_id = f"{norm_rel}:step_{att_step}"
                     is_active = (att_preset == base_run.chosen_preset)
 
-                    att_conf = att.overall_confidence
-                    if att_conf is None:
-                        att_conf = base_run.overall_confidence if is_active else 1.0
-
-                    att_status = att.status or (base_run.status if is_active else "ACCEPT")
-
-                    att_viols = att.violations_count
-                    if att_viols is None:
-                        att_viols = base_run.violations_count if is_active else 0
-
+                    att_conf = (
+                        att.overall_confidence
+                        if ("overall_confidence" in att.model_fields_set or not is_active)
+                        else base_run.overall_confidence
+                    )
+                    att_status = (
+                        att.status
+                        if ("status" in att.model_fields_set or not is_active)
+                        else base_run.status
+                    )
+                    att_viols = (
+                        att.violations_count
+                        if ("violations_count" in att.model_fields_set or not is_active)
+                        else base_run.violations_count
+                    )
                     att_page_conf = att.per_page_confidence or (base_run.per_page_confidence if is_active else {})
                     att_page_viols = base_run.per_page_violations if is_active else {}
 
-                    conf_str = f"{float(att_conf):.4f}" if att_conf is not None else "1.0000"
                     att_label = (
                         f"{base_run.document_name} [{att_preset} (Step {att_step}) | "
-                        f"{att_status} {conf_str} | {att_viols} viols] ({norm_rel})"
+                        f"{att_status} {att_conf:.4f} | {att_viols} viols] ({norm_rel})"
                     )
 
                     step_run = base_run.evolve(
                         id=att_id,
                         chosen_preset=att_preset,
                         status=att_status,
-                        overall_confidence=float(att_conf) if att_conf is not None else 1.0,
-                        violations_count=int(att_viols),
+                        overall_confidence=att_conf,
+                        violations_count=att_viols,
                         per_page_confidence=att_page_conf,
                         per_page_violations=att_page_viols,
                         label=att_label,

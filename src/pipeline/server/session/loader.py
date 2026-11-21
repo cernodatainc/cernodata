@@ -131,16 +131,10 @@ class RunLoaderMixin:
             # Invalidate cached viewer_data so it rehydrates from the newly loaded run
             self.viewer_data = None
 
-            raw_conf = decision_dict.get("overall_confidence")
-            conf_val = float(raw_conf) if raw_conf is not None else 0.0
-
-            raw_status = decision_dict.get("status")
-            status_val = str(raw_status) if raw_status is not None else "UNKNOWN"
-
-            raw_chosen = decision_dict.get("chosen_preset")
-            chosen_preset = str(raw_chosen) if raw_chosen is not None else "unknown"
+            conf_val = float(decision_dict.get("overall_confidence", 0.0))
+            status_val = str(decision_dict.get("status", "UNKNOWN"))
+            chosen_preset = str(decision_dict.get("chosen_preset") or "unknown")
             artifact_chosen_preset = chosen_preset
-
             viol_count = len(viol_list)
 
             target_att = None
@@ -156,10 +150,10 @@ class RunLoaderMixin:
                 raw_att_conf = target_att.get("overall_confidence")
                 if raw_att_conf is not None:
                     conf_val = float(raw_att_conf)
-                status_val = str(target_att.get("status") or status_val)
-                raw_att_viols = target_att.get("violations_count")
-                if raw_att_viols is not None:
-                    viol_count = int(raw_att_viols)
+                if target_att.get("status"):
+                    status_val = str(target_att["status"])
+                if "violations_count" in target_att:
+                    viol_count = int(target_att["violations_count"])
 
             # Cache loaded preset result only when on-disk DOM matches the active preset
             if dom_dict and chosen_preset == artifact_chosen_preset:

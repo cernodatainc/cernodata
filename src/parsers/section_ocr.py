@@ -29,6 +29,7 @@ from src.dom.bounding_box import BoundingBox
 from src.parsers.ocr_flags import OCRCustomFlags, parse_ocr_custom_flags, preprocess_ocr_image
 from src.parsers.ocr_imaging import crop_pdf_region, normalize_to_pil
 from src.parsers.ocr_models import OCRLine, OCRResult, create_ocr_result, normalize_bbox_coords
+from src.schemas.custom_preset import ParameterWiggleSpec
 
 HAS_RAPIDOCR = False
 try:
@@ -116,18 +117,16 @@ class SectionOCRParser:
         timeout_sec: int = 120,
         output_format: str = "text",
         language: Optional[str] = None,
-        wiggle_parameters: Optional[Sequence[Any]] = None,
+        wiggle_parameters: Sequence[ParameterWiggleSpec] = (),
     ) -> Callable[[Any], str]:
         """Creates a section OCR engine callable backed by an external CLI subprocess."""
         cmd_tpl = [str(tok) for tok in command_template]
         target_lang = (language or self.language or "en").strip() or "en"
-        wiggle_defaults: Dict[str, str] = {}
-        if wiggle_parameters:
-            for wp in wiggle_parameters:
-                w_name = wp.get("name") if isinstance(wp, dict) else getattr(wp, "name", None)
-                w_val = wp.get("default_value") if isinstance(wp, dict) else getattr(wp, "default_value", None)
-                if w_name and w_val is not None:
-                    wiggle_defaults[f"{{{str(w_name).strip()}}}"] = str(w_val)
+        wiggle_defaults = {
+            f"{{{wp.name}}}": str(wp.default_value)
+            for wp in wiggle_parameters
+            if wp.default_value is not None
+        }
 
         def _cli_engine(image_input: Any) -> str:
             pil_img = image_input if isinstance(image_input, Image.Image) else Image.fromarray(image_input)

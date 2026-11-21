@@ -17,6 +17,7 @@ from src.quality.handlers import (
     StructureLayerHandler,
     SymbolsLayerHandler,
     TablesLayerHandler,
+    apply_violation_suppression,
     get_suppressed_violation_lookup,
     make_node_violation,
 )
@@ -162,11 +163,7 @@ def detect_quality_violations(
             node_viols.extend(lang_viols)
 
         for v in node_viols:
-            v_id = str(v.get("violation_id") or "")
-            r_type = str(v.get("rule_type") or "")
-            v_type = str(v.get("type") or "")
-            if existing_suppressed.get(v_id) or existing_suppressed.get(r_type) or existing_suppressed.get(v_type):
-                v["suppressed"] = True
+            apply_violation_suppression(v, existing_suppressed)
 
         node.violations = node_viols
         violations.extend(node_viols)
@@ -189,12 +186,7 @@ def detect_quality_violations(
             for v in layer_viols:
                 nid = str(v.get("node_id") or "")
                 if nid and nid in suppressed_by_node:
-                    node_supp = suppressed_by_node[nid]
-                    v_id = str(v.get("violation_id") or "")
-                    r_type = str(v.get("rule_type") or "")
-                    v_type = str(v.get("type") or "")
-                    if node_supp.get(v_id) or node_supp.get(r_type) or node_supp.get(v_type):
-                        v["suppressed"] = True
+                    apply_violation_suppression(v, suppressed_by_node[nid])
                 if nid and nid in nodes_by_id:
                     nodes_by_id[nid].violations.append(v)
             violations.extend(layer_viols)

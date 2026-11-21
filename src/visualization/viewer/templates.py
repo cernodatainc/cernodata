@@ -12,6 +12,7 @@ import os
 from typing import Any, Dict, List, Optional, Union
 
 from src.dom import DocumentDOM
+from src.schemas.decision import DecisionTreeSchema
 from src.visualization.viewer.pdf_renderer import (
     get_pdf_page_dimensions,
     page_to_base64,
@@ -156,9 +157,10 @@ def build_viewer_html(
         else:
             page_dimensions = []
 
-    is_acc = decision.get("is_accepted", True)
-    primary_detected = decision.get("primary_detected_language", "en")
-    active_lang = decision.get("language", "pl")
+    dec = DecisionTreeSchema.model_validate(decision or {})
+    is_acc = dec.is_accepted
+    primary_detected = dec.primary_detected_language
+    active_lang = dec.language if "language" in dec.model_fields_set else "pl"
 
     plan_header_sub = ""
     if plan:
@@ -168,16 +170,11 @@ def build_viewer_html(
         ov_text = " [OVERRIDDEN]" if is_over else ""
         plan_header_sub = f" | Plan: {tax} ({hw}){ov_text}"
 
-    timeline_buttons = build_timeline_buttons(decision, plan)
-    per_page = (decision.get("per_page_confidence") or {}) if decision else {}
-    raw_overall = decision.get("overall_confidence") if decision else None
-    overall_val = float(raw_overall) if raw_overall is not None else 1.0
-    p1_val = per_page.get("1") if "1" in per_page else per_page.get(1)
-    if p1_val is None:
-        p1_val = overall_val
-    page1_conf = f"{float(p1_val):.4f}"
-    overall_conf = f"{overall_val:.4f}"
-    status_text = (decision.get("status") or "ACCEPT") if decision else "ACCEPT"
+    timeline_buttons = build_timeline_buttons(decision or {}, plan)
+    p1_val = dec.per_page_confidence.get("1", dec.overall_confidence)
+    page1_conf = f"{p1_val:.4f}"
+    overall_conf = f"{dec.overall_confidence:.4f}"
+    status_text = dec.status
 
     total_pages = dom.total_pages or len(page_images) or 1
     page_images_json = json.dumps(page_images)

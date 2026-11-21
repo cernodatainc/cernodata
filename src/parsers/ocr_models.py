@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import List, Optional, Sequence, Tuple, TypedDict, Union
 
+import numpy as np
+
 from src.dom.bounding_box import BoundingBox
 
 
@@ -113,8 +115,8 @@ def normalize_bbox_coords(
             float(bbox.get("y1", 0.0)),
         )
 
-    if hasattr(bbox, "tolist") and not isinstance(bbox, (str, bytes, bytearray, dict)):
-        bbox = bbox.tolist()  # type: ignore[union-attr]
+    if isinstance(bbox, np.ndarray):
+        bbox = bbox.tolist()
 
     if isinstance(bbox, Sequence) and not isinstance(bbox, (str, bytes, bytearray)) and len(bbox) >= 4:
         first = bbox[0]

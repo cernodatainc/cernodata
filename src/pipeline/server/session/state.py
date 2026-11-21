@@ -42,6 +42,7 @@ class BaseSessionState:
         self.current_result: Optional[Dict[str, Any]] = None
         self.preset_attempts: List[AttemptRecord] = []
         self.submitted_plan: Optional[DocumentPlan] = None
+        self._registered_documents: List[str] = []
 
         self._progress_tracker: ProgressTracker = ProgressTracker(lock=self._lock)
         self._preset_cache: PresetCache = PresetCache(lock=self._lock)

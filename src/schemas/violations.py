@@ -7,7 +7,7 @@ Pydantic contract schemas for quality violations (quality_violations.json).
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.schemas.dom import BoundingBoxSchema
 
@@ -19,25 +19,26 @@ class QualityViolationSchema(BaseModel):
 
     violation_id: str
     global_page_index: int = 1
-    node_id: Optional[str] = ""
+    node_id: str = ""
     type: str = "general"
     rule_type: str = ""
     severity: str = "MEDIUM"
-    detected_snippet: Optional[str] = ""
+    detected_snippet: str = ""
     suggestion: Optional[str] = None
     suggested_correction: Optional[str] = None
     suppressed: bool = False
-    is_fixed: Optional[bool] = False
-    accepted: Optional[bool] = False
+    is_fixed: bool = False
+    accepted: bool = False
     description: str = ""
     bounding_box: Optional[Union[BoundingBoxSchema, Dict[str, float], List[float]]] = None
 
-    @field_validator("node_id", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _coerce_node_id(cls, v: Any) -> str:
-        if v is None:
-            return ""
-        return str(v)
+    def _strip_none_defaults(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            nullable_keep = {"suggestion", "suggested_correction", "bounding_box"}
+            return {k: v for k, v in data.items() if v is not None or k in nullable_keep}
+        return data
 
     @field_validator("suppressed", mode="before")
     @classmethod
@@ -48,9 +49,7 @@ class QualityViolationSchema(BaseModel):
 
     def is_active(self) -> bool:
         """Determines if the violation is currently active (unsuppressed, unaccepted, unfixed)."""
-        if self.suppressed or bool(self.accepted) or bool(self.is_fixed):
-            return False
-        return True
+        return not (self.suppressed or self.accepted or self.is_fixed)
 
 
 class ViolationsReportSchema(BaseModel):

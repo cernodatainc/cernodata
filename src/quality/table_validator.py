@@ -8,6 +8,7 @@ cell strings whose first row is the header.
 from __future__ import annotations
 
 import re
+from typing import Sequence
 
 from src.schemas.test_suite import TableAssertion
 
@@ -17,20 +18,27 @@ _NUMBER_RE = re.compile(
 )
 
 
-def compute_grid_consistency(rows: list[list[str]]) -> float:
+def _normalize_rows(rows: Sequence[Sequence[object]]) -> list[list[str]]:
+    """Normalizes raw cell sequences once into stripped string rows."""
+    return [[str(cell if cell is not None else "").strip() for cell in row] for row in rows]
+
+
+def compute_grid_consistency(rows: Sequence[Sequence[object]]) -> float:
     """Returns the fraction of rows with the header's column count, scaled down by the share of empty header cells."""
-    if not rows or not rows[0]:
+    norm_rows = _normalize_rows(rows)
+    if not norm_rows or not norm_rows[0]:
         return 0.0
-    header = rows[0]
-    matching = sum(1 for row in rows if len(row) == len(header)) / len(rows)
-    empty_header_share = sum(1 for cell in header if not str(cell or "").strip()) / len(header)
+    header = norm_rows[0]
+    matching = sum(1 for row in norm_rows if len(row) == len(header)) / len(norm_rows)
+    empty_header_share = sum(1 for cell in header if not cell) / len(header)
     return matching * (1.0 - empty_header_share)
 
 
-def check_table_assertion(rows: list[list[str]], rule: TableAssertion) -> list[str]:
+def check_table_assertion(rows: Sequence[Sequence[object]], rule: TableAssertion) -> list[str]:
     """Returns one message per failed condition of rule; empty when the table satisfies it."""
-    header = rows[0] if rows else []
-    data_rows = rows[1:]
+    norm_rows = _normalize_rows(rows)
+    header = norm_rows[0] if norm_rows else []
+    data_rows = norm_rows[1:]
     failures: list[str] = []
 
     if len(header) < rule.min_columns:
@@ -38,16 +46,16 @@ def check_table_assertion(rows: list[list[str]], rule: TableAssertion) -> list[s
     if len(data_rows) < rule.min_rows:
         failures.append(f"{len(data_rows)} data row(s), expected at least {rule.min_rows}")
 
-    present = {str(cell or "").strip().lower() for cell in header}
+    present = {cell.lower() for cell in header}
     missing = [name for name in rule.expected_column_headers if name.strip().lower() not in present]
     if missing:
         failures.append(f"missing column header(s): {missing}")
 
     for index in rule.numeric_column_indices:
-        if rows and index >= len(header) and not any(index < len(row) for row in data_rows):
+        if norm_rows and index >= len(header) and not any(index < len(row) for row in data_rows):
             failures.append(f"column {index} out of range for table with {len(header)} column(s)")
             continue
-        cells = [str(row[index] or "").strip() for row in data_rows if index < len(row) and str(row[index] or "").strip()]
+        cells = [row[index] for row in data_rows if index < len(row) and row[index]]
         if any(not _NUMBER_RE.match(cell) for cell in cells):
             failures.append(f"column {index} has non-numeric value(s)")
 

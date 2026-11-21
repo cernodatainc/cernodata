@@ -7,9 +7,11 @@ Base mixin class and shared request utilities for server API route handlers.
 from __future__ import annotations
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
+from src.pipeline.planner import PresetPlanner
 from src.pipeline.server.http_utils import send_json_response
 from src.utils import resolve_pdf_path
 
@@ -33,6 +35,19 @@ class BaseApiRoutesMixin:
     def executor(self) -> ThreadPoolExecutor:
         """Worker thread pool executor provided by host request handler."""
         raise NotImplementedError
+
+    def _get_active_planner(self) -> PresetPlanner:
+        """Returns the server's active PresetPlanner with custom presets loaded if present."""
+        existing = getattr(self.server, "planner", None)
+        if existing is not None:
+            return existing
+        custom_path = getattr(self.server, "custom_presets_path", None)
+        if not custom_path:
+            out_dir = getattr(self.server, "output_dir", None) or "output"
+            custom_path = os.path.join(str(out_dir), "custom_presets.json")
+        if custom_path and os.path.isfile(str(custom_path)):
+            return PresetPlanner(custom_presets_path=str(custom_path))
+        return PresetPlanner()
 
     if TYPE_CHECKING:
         def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:

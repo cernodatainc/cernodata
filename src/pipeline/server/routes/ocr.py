@@ -7,6 +7,7 @@ Interactive section OCR parsing API route handlers for cernodata HTTP server.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.parsers.ocr_flags import parse_ocr_custom_flags, summarize_applied_flags
 from src.parsers.section_ocr import (
@@ -16,6 +17,45 @@ from src.parsers.section_ocr import (
 )
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
 from src.utils import resolve_pdf_path
+
+
+class SectionOcrRequest(BaseModel):
+    """Validated and normalized request payload for section OCR parsing."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    node_id: str = ""
+    image_base64: Optional[str] = None
+    bbox: Optional[Any] = None
+    page: int = 1
+    pdf_path: str = ""
+    language: str = ""
+    engines: List[str] = Field(default_factory=list)
+    custom_flags: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return {}
+        norm = dict(data)
+        raw_engines = norm.get("engines")
+        raw_engine = norm.get("engine")
+        if isinstance(raw_engines, (list, tuple)) and raw_engines:
+            norm["engines"] = [str(e).strip().lower() for e in raw_engines if str(e).strip()]
+        elif raw_engine and isinstance(raw_engine, str) and raw_engine.strip():
+            norm["engines"] = [raw_engine.strip().lower()]
+        else:
+            norm["engines"] = []
+        try:
+            norm["page"] = max(1, int(norm.get("page") or 1))
+        except (ValueError, TypeError):
+            norm["page"] = 1
+        norm["node_id"] = str(norm.get("node_id") or "")
+        norm["pdf_path"] = str(norm.get("pdf_path") or "")
+        norm["language"] = str(norm.get("language") or "")
+        norm["custom_flags"] = str(norm.get("custom_flags") or "").strip()
+        return norm
 
 
 class OcrRoutesMixin(BaseApiRoutesMixin):
@@ -33,24 +73,11 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: Dictionary with image_base64 or (pdf_path and bbox), node_id, page, language, engine/engines.
         """
-        node_id = str(payload.get("node_id") or "")
-        image_base64 = payload.get("image_base64")
-        bbox = payload.get("bbox")
-        try:
-            page = int(payload.get("page") or 1)
-        except (ValueError, TypeError):
-            page = 1
-        raw_pdf = payload.get("pdf_path") or self.session.pdf_path
-        pdf_path = resolve_pdf_path(str(raw_pdf)) if raw_pdf else ""
-        language = payload.get("language") or self.session.language or "en"
-
-        raw_engines = payload.get("engines")
-        raw_engine = payload.get("engine")
-        selected_engines: List[str] = []
-        if isinstance(raw_engines, (list, tuple)) and raw_engines:
-            selected_engines = [str(e).strip().lower() for e in raw_engines if str(e).strip()]
-        elif raw_engine and isinstance(raw_engine, str) and raw_engine.strip():
-            selected_engines = [raw_engine.strip().lower()]
+        req = SectionOcrRequest.model_validate(payload)
+        raw_pdf = req.pdf_path or self.session.pdf_path
+        pdf_path = resolve_pdf_path(raw_pdf) if raw_pdf else ""
+        language = req.language or self.session.language or "en"
+        selected_engines = req.engines
 
         if not selected_engines:
             self.send_bad_request(
@@ -66,24 +93,23 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             )
             return
 
-        custom_flags = str(payload.get("custom_flags") or "").strip()
-        parsed_flags = parse_ocr_custom_flags(custom_flags)
+        parsed_flags = parse_ocr_custom_flags(req.custom_flags)
         logger.info(
             "Parsing section '%s' using OCR engines: %s (Lang: %s%s)",
-            node_id,
+            req.node_id,
             ", ".join(selected_engines),
             language,
-            f", Flags: {custom_flags}" if custom_flags else "",
+            f", Flags: {req.custom_flags}" if req.custom_flags else "",
         )
 
         multi_results: Dict[str, Any]
-        if image_base64:
+        if req.image_base64:
             multi_results = parse_image_ocr_multi(
-                image_base64, engines=selected_engines, language=language, custom_flags=custom_flags
+                req.image_base64, engines=selected_engines, language=language, custom_flags=req.custom_flags
             )
-        elif pdf_path and bbox:
+        elif pdf_path and req.bbox:
             multi_results = parse_section_from_pdf_multi(
-                pdf_path, page, bbox, engines=selected_engines, language=language, custom_flags=custom_flags
+                pdf_path, req.page, req.bbox, engines=selected_engines, language=language, custom_flags=req.custom_flags
             )
         else:
             self.send_bad_request("Either image_base64 or (pdf_path and bbox) must be provided.")
@@ -111,13 +137,13 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
 
         response_data: Dict[str, Any] = {
             "success": has_any_success,
-            "node_id": node_id,
+            "node_id": req.node_id,
             "text": best_result.get("text", ""),
             "confidence": best_result.get("confidence", 0.0),
             "lines": best_result.get("lines", []),
             "engine": best_engine,
             "engines": selected_engines,
-            "custom_flags": custom_flags,
+            "custom_flags": req.custom_flags,
             "applied_flags": summarize_applied_flags(parsed_flags),
             "results": multi_results,
             "error": best_result.get("error"),

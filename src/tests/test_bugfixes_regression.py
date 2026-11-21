@@ -40,6 +40,7 @@ from src.quality.layers import normalize_layer_name
 from src.quality.materialization import MaterializedVerificationResult
 from src.quality.table_validator import check_table_assertion, compute_grid_consistency
 from src.quality.violations import detect_quality_violations
+from src.schemas.custom_preset import ParameterWiggleSpec
 from src.schemas.dom import BoundingBoxSchema, DocumentDOMSchema
 from src.schemas.test_suite import TableAssertion
 from src.schemas.violations import parse_violations_payload
@@ -218,7 +219,7 @@ class TestBugfixesRegression(unittest.TestCase):
 
         cli_fn = sec._create_cli_subprocess_engine(
             ["echo_tool", "{input_path}", "--psm", "{psm}"],
-            wiggle_parameters=[{"name": "psm", "default_value": "6"}],
+            wiggle_parameters=[ParameterWiggleSpec(name="psm", default_value="6")],
         )
         with patch("src.parsers.section_ocr.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")

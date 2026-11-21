@@ -157,8 +157,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         target_file = str(raw_path).strip()
         from src.pipeline.server.run_mappings import forget_document
         forget_document(target_file, repo_root=self.session.repo_root)
-        if hasattr(self.session, "forget_document"):
-            self.session.forget_document(target_file)
+        self.session.forget_document(target_file)
 
         self.send_ok({
             "forgotten_file": target_file,

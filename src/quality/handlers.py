@@ -15,7 +15,7 @@ from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_details, compute_garbage_ratio
 from src.quality.language import compute_language_score
 from src.quality.language_config import LanguageConfig, get_language_config
-from src.quality.layers import LAYER_METADATA, VerificationLayer
+from src.quality.layers import LAYER_METADATA, VerificationLayer, normalize_layer_name
 
 
 def make_node_violation(
@@ -59,28 +59,37 @@ def is_violation_suppressed(violation: Any) -> bool:
 def get_suppressed_violation_lookup(node: DOMNode) -> Dict[str, bool]:
     """Extracts a lookup mapping keyed by violation_id, rule_type, and type to suppression status."""
     lookup: Dict[str, bool] = {}
-    for ev in getattr(node, "violations", []):
+    for ev in node.violations:
         if isinstance(ev, dict):
             is_supp = is_violation_suppressed(ev)
-            if ev.get("violation_id"):
-                k_id = str(ev["violation_id"])
-                lookup[k_id] = lookup.get(k_id, False) or is_supp
-            if ev.get("rule_type"):
-                k_rule = str(ev["rule_type"])
-                lookup[k_rule] = lookup.get(k_rule, False) or is_supp
-            if ev.get("type"):
-                k_type = str(ev["type"])
-                lookup[k_type] = lookup.get(k_type, False) or is_supp
+            for field in ("violation_id", "rule_type", "type"):
+                if ev.get(field):
+                    key = str(ev[field])
+                    lookup[key] = lookup.get(key, False) or is_supp
     return lookup
 
 
+def apply_violation_suppression(violation: Dict[str, Any], lookup: Dict[str, bool]) -> None:
+    """Marks violation suppressed when any of its identifiers appears suppressed in lookup."""
+    if any(
+        lookup.get(str(violation.get(field) or ""))
+        for field in ("violation_id", "rule_type", "type")
+    ):
+        violation["suppressed"] = True
+
+
 def get_suppressed_violation_types(node: DOMNode) -> Dict[str, bool]:
-    """Extracts a mapping of violation types that have been marked as suppressed on a DOMNode."""
-    return {
-        str(v.get("type", "")): True
-        for v in getattr(node, "violations", [])
-        if isinstance(v, dict) and is_violation_suppressed(v)
-    }
+    """Extracts canonical violation layer keys marked as suppressed on a DOMNode."""
+    suppressed: Dict[str, bool] = {}
+    for v in node.violations:
+        if isinstance(v, dict) and is_violation_suppressed(v):
+            raw_type = str(v.get("type", ""))
+            norm_type = normalize_layer_name(raw_type) or raw_type
+            if norm_type:
+                suppressed[norm_type] = True
+            if raw_type:
+                suppressed[raw_type] = True
+    return suppressed
 
 
 class VerificationLayerHandler(ABC):
@@ -321,7 +330,7 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
         garbage_multiplier: float = 3.0,
     ) -> float:
         supp = suppressed_types or {}
-        if supp.get("diacritic") or supp.get("diacritics"):
+        if supp.get(self.layer_id) or supp.get("diacritic"):
             return 1.0
         raw_text = node.content.get("raw_text", "")
         if config is not None:
@@ -342,7 +351,7 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
         anomalies_count = 0
         for node in nodes:
             supp = get_suppressed_violation_types(node)
-            if not (supp.get("diacritic") or supp.get("diacritics")):
+            if not (supp.get(self.layer_id) or supp.get("diacritic")):
                 raw_text = node.content.get("raw_text", "")
                 anomalies_count += len(cfg.find_anomalous_substitutions(raw_text))
                 anomalies_count += len(cfg.find_diacritic_conflicts(raw_text))
@@ -362,6 +371,7 @@ __all__ = [
     "SymbolsLayerHandler",
     "TablesLayerHandler",
     "VerificationLayerHandler",
+    "apply_violation_suppression",
     "get_suppressed_violation_lookup",
     "get_suppressed_violation_types",
     "is_violation_suppressed",

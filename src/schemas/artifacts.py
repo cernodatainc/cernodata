@@ -220,13 +220,17 @@ def load_validated_run_artifacts(
     )
     exec_conf = (
         exec_result.overall_confidence
-        if exec_result and exec_result.overall_confidence is not None
-        else (exec_result.decision.overall_confidence if exec_result and exec_result.decision else None)
+        if exec_result and "overall_confidence" in exec_result.model_fields_set
+        else (
+            exec_result.decision.overall_confidence
+            if exec_result and exec_result.decision and "overall_confidence" in exec_result.decision.model_fields_set
+            else None
+        )
     )
     overall_conf = (
         dec_schema.overall_confidence
-        if dec_schema.overall_confidence is not None
-        else (exec_conf if exec_conf is not None else 1.0)
+        if "overall_confidence" in dec_schema.model_fields_set
+        else (exec_conf if exec_conf is not None else dec_schema.overall_confidence)
     )
 
     doc_path = ""

@@ -96,7 +96,7 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
 
         # Update interactive_viewer.html on disk if it exists in the output directory
         html_candidates = [os.path.join(output_dir, "interactive_viewer.html")]
-        if hasattr(self.session, "repo_root") and self.session.repo_root:
+        if self.session.repo_root:
             html_candidates.append(os.path.join(self.session.repo_root, output_dir, "interactive_viewer.html"))
         for h_path in html_candidates:
             if os.path.exists(h_path):
