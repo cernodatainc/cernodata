@@ -31,18 +31,23 @@ class ExtensibleOptionsMixin:
 
     options: Dict[str, Any]
 
+    @classmethod
+    def _declared_field_names(cls) -> Set[str]:
+        """Returns the set of declared dataclass field names for this model."""
+        return {f.name for f in fields(cast(Any, cls))}
+
     def get_option(self, key: str, default: Any = None) -> Any:
         """Retrieves a typed attribute or dynamic option value."""
-        if hasattr(self, key):
-            val = getattr(self, key)
+        if key in self._declared_field_names():
+            val = self.__dict__.get(key)
             if val is not None:
                 return val
         return self.options.get(key, default)
 
     def set_option(self, key: str, value: Any) -> None:
         """Sets a typed attribute or dynamic option value."""
-        if hasattr(self, key):
-            setattr(self, key, value)
+        if key in self._declared_field_names():
+            self.__dict__[key] = value
         else:
             self.options[key] = value
 
@@ -51,7 +56,7 @@ class ExtensibleOptionsMixin:
 
     def __getitem__(self, key: str) -> Any:
         val = self.get_option(key)
-        if val is None and key not in self.options and not hasattr(self, key):
+        if val is None and key not in self.options and key not in self._declared_field_names():
             raise KeyError(key)
         return val
 

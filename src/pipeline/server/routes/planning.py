@@ -12,6 +12,7 @@ from typing import Any, Dict
 
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.routes.base import BaseApiRoutesMixin
+from src.schemas.requests import SubmitPlanRequest
 from src.utils import mkdirs
 
 
@@ -63,47 +64,30 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
         if "primary_preset" in payload or ("target_threshold" in payload and "steps" in payload):
             plan = DocumentPlan.from_dict(payload)
         else:
-            default_doc = getattr(self.server, "default_doc", None) or self.session.pdf_path
-            raw_doc = payload.get("document_path")
-            document_path = raw_doc.strip() if isinstance(raw_doc, str) else ""
-            document_path = document_path or default_doc or ""
+            req = SubmitPlanRequest.model_validate(payload)
+            default_doc = self.server.default_doc or self.session.pdf_path or ""
+            document_path = req.document_path or default_doc
             criteria = PlannerCriteria.from_dict(payload)
-            raw_lang = payload.get("language")
-            language = (
-                raw_lang.strip()
-                if (isinstance(raw_lang, str) and raw_lang.strip() and raw_lang.strip().lower() != "none")
-                else None
+            target_threshold = (
+                req.target_threshold
+                if req.target_threshold is not None
+                else self.server.default_threshold
             )
-            try:
-                default_thresh = getattr(self.server, "default_threshold", 0.82)
-                target_threshold = float(payload.get("target_threshold", default_thresh))
-            except (ValueError, TypeError):
-                target_threshold = getattr(self.server, "default_threshold", 0.82)
-
-            override_primary = payload.get("override_primary")
-            raw_order = payload.get("override_order")
-            override_order = (
-                [str(p) for p in raw_order if p]
-                if isinstance(raw_order, (list, tuple)) and raw_order
-                else None
-            )
-            raw_layers = payload.get("verification_layers")
-            verification_layers = [str(x) for x in raw_layers] if isinstance(raw_layers, (list, tuple)) else None
 
             plan = planner.create_plan(
                 document_path=document_path,
                 criteria=criteria,
-                language=language,
+                language=req.language,
                 target_threshold=target_threshold,
-                override_primary=override_primary,
-                override_order=override_order,
-                verification_layers=verification_layers,
+                override_primary=req.override_primary,
+                override_order=req.override_order,
+                verification_layers=req.verification_layers,
             )
 
         self.session.submitted_plan = plan
-        setattr(self.server, "submitted_plan", plan)
+        self.server.submitted_plan = plan
 
-        out_dir = getattr(self.server, "output_dir", None) or "output"
+        out_dir = self.server.output_dir or "output"
         if out_dir:
             mkdirs(out_dir)
             plan_file = os.path.join(out_dir, "plan.json")
@@ -121,5 +105,5 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
             ),
         })
 
-        if getattr(self.server, "shutdown_on_submit", False):
+        if self.server.shutdown_on_submit:
             threading.Thread(target=self.server.shutdown, daemon=True).start()

@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 import os
 from typing import Any, Dict, Optional
+from pydantic import ValidationError
 
 from src.pipeline.server.http_utils import parse_run_dir_and_step
 from src.pipeline.server.router import api_router
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
+from src.schemas.requests import SaveDomRequest, VerifyLayersRequest
 from src.utils import mkdirs, safe_load_json, save_json
 
 
@@ -40,22 +42,24 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: Dictionary containing dom structure and target output_dir.
         """
-        dom_data = payload.get("dom")
-        raw_out = payload.get("output_dir") or self.session.output_dir or "output"
-        output_dir, _ = parse_run_dir_and_step(str(raw_out))
-        output_dir = output_dir or "output"
-
-        if not dom_data or not isinstance(dom_data, dict):
-            self.send_bad_request("Missing dom payload")
+        try:
+            req = SaveDomRequest.model_validate(payload)
+        except ValidationError as exc:
+            self.send_bad_request(str(exc))
             return
+
+        dom_data = req.dom
+        raw_out = req.output_dir or self.session.output_dir or "output"
+        output_dir, _ = parse_run_dir_and_step(raw_out)
+        output_dir = output_dir or "output"
 
         mkdirs(output_dir)
         dom_file = save_json(os.path.join(output_dir, "document_dom.json"), dom_data)
-        diff_data = payload.get("diff")
-        violations_data = payload.get("violations")
-        decision_data = payload.get("decision")
+        diff_data = req.diff
+        violations_data = req.violations
+        decision_data = req.decision
         for filename, item in (
-            ("raw_document_dom.json", payload.get("raw_dom")),
+            ("raw_document_dom.json", req.raw_dom),
             ("run_diff.json", diff_data),
             ("quality_violations.json", violations_data),
             ("decision_tree.json", decision_data),
@@ -67,32 +71,36 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
             self.session.viewer_data = None
             if self.session.current_result:
                 self.session.current_result["dom"] = dom_data
-                if payload.get("raw_dom") is not None:
-                    self.session.current_result["raw_dom"] = payload.get("raw_dom")
+                if req.raw_dom is not None:
+                    self.session.current_result["raw_dom"] = req.raw_dom
                 if diff_data is not None:
                     self.session.current_result["diff"] = diff_data
                 if violations_data is not None:
                     self.session.current_result["violations"] = violations_data
                 if decision_data:
                     self.session.current_result["decision"] = decision_data
-            if isinstance(decision_data, dict) and "attempts" in decision_data:
+            if decision_data is not None and "attempts" in decision_data:
                 self.session.preset_attempts = list(decision_data["attempts"])
 
             # Keep server-side preset cache synchronized with saved DOM
             if self.session.current_result:
-                pdf_path = self.session.pdf_path or dom_data.get("source_filename") or ""
+                pdf_path = self.session.pdf_path or str(dom_data.get("source_filename") or "")
                 curr_dec = self.session.current_result.get("decision")
-                chosen_preset = (
-                    (decision_data.get("chosen_preset") if isinstance(decision_data, dict) else None)
-                    or (curr_dec.get("chosen_preset") if isinstance(curr_dec, dict) else None)
-                    or "docling_fast"
+                chosen_preset = str(
+                    ((decision_data.get("chosen_preset") or decision_data.get("preset_id") or "") if decision_data else "")
+                    or (
+                        (curr_dec.get("chosen_preset") or curr_dec.get("preset_id") or "")
+                        if isinstance(curr_dec, dict)
+                        else ""
+                    )
                 )
-                self.session._preset_cache.put(
-                    pdf_path=pdf_path,
-                    preset=chosen_preset,
-                    result=self.session.current_result,
-                    language=self.session.language,
-                )
+                if chosen_preset:
+                    self.session._preset_cache.put(
+                        pdf_path=pdf_path,
+                        preset=chosen_preset,
+                        result=self.session.current_result,
+                        language=self.session.language,
+                    )
 
         # Update interactive_viewer.html on disk if it exists in the output directory
         html_candidates = [os.path.join(output_dir, "interactive_viewer.html")]
@@ -117,7 +125,7 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
                 except Exception as exc:
                     logger.warning("Could not update interactive_viewer.html at %s: %s", h_path, exc)
 
-        nodes_len = len(dom_data.get("nodes", [])) if isinstance(dom_data, dict) else 0
+        nodes_len = len(dom_data.get("nodes", []))
         logger.info("Saved updated DocumentDOM to '%s' (%d nodes).", dom_file, nodes_len)
         self.send_ok({"path": dom_file})
 
@@ -130,15 +138,16 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: Dictionary containing output_dir, verification_layers, language, and target_threshold.
         """
-        raw_out = payload.get("output_dir")
-        target_dir, _ = parse_run_dir_and_step(raw_out or self.session.output_dir or "output")
-        raw_layers = payload.get("verification_layers")
-        selected_layers = [str(x) for x in raw_layers] if isinstance(raw_layers, (list, tuple)) else None
-        language = payload.get("language") or self.session.language or "en"
         try:
-            target_threshold = float(payload.get("target_threshold", 0.82))
-        except (ValueError, TypeError):
-            target_threshold = 0.82
+            req = VerifyLayersRequest.model_validate(payload)
+        except ValidationError as exc:
+            self.send_bad_request(str(exc))
+            return
+
+        target_dir, _ = parse_run_dir_and_step(req.output_dir or self.session.output_dir or "output")
+        selected_layers = req.verification_layers
+        language = req.language or self.session.language or "en"
+        target_threshold = req.target_threshold
 
         from src.pipeline.orchestrator import PipelineOrchestrator
         try:
@@ -164,13 +173,14 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
                         dec["layer_scores"] = result.layer_scores
                         dec["status"] = result.status
                         dec["is_accepted"] = result.is_accepted
-                        chosen_p = str(dec.get("chosen_preset") or "docling_fast")
-                        self.session._preset_cache.put(
-                            pdf_path=self.session.pdf_path or result.source_filename,
-                            preset=chosen_p,
-                            result=self.session.current_result,
-                            language=language,
-                        )
+                        chosen_p = str(dec.get("chosen_preset") or dec.get("preset_id") or "")
+                        if chosen_p:
+                            self.session._preset_cache.put(
+                                pdf_path=self.session.pdf_path or result.source_filename,
+                                preset=chosen_p,
+                                result=self.session.current_result,
+                                language=language,
+                            )
 
             self.send_ok({"result": result.to_dict()})
         except Exception as e:

@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from src.dom.enums import ViolationSeverity
 from src.schemas.dom import BoundingBoxSchema
 
 
@@ -22,7 +23,7 @@ class QualityViolationSchema(BaseModel):
     node_id: str = ""
     type: str = "general"
     rule_type: str = ""
-    severity: str = "MEDIUM"
+    severity: ViolationSeverity = ViolationSeverity.MEDIUM
     detected_snippet: str = ""
     suggestion: Optional[str] = None
     suggested_correction: Optional[str] = None
@@ -39,6 +40,11 @@ class QualityViolationSchema(BaseModel):
             nullable_keep = {"suggestion", "suggested_correction", "bounding_box"}
             return {k: v for k, v in data.items() if v is not None or k in nullable_keep}
         return data
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _coerce_severity(cls, v: Any) -> ViolationSeverity:
+        return ViolationSeverity.coerce(v)
 
     @field_validator("suppressed", mode="before")
     @classmethod

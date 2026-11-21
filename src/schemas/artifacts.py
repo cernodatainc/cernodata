@@ -9,8 +9,9 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Dict, List, Optional, Type, TypeVar
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from src.dom.enums import DecisionStatus
 from src.parsers.pdf_utils import get_pdf_page_count
 from src.schemas.decision import DecisionTreeSchema
 from src.schemas.dom import DocumentDOMSchema
@@ -47,11 +48,16 @@ class ValidatedRunArtifacts(BaseModel):
     violations: List[QualityViolationSchema] = Field(default_factory=list)
     raw_dom: Optional[DocumentDOMSchema] = None
     diff: Dict[str, Any] = Field(default_factory=dict)
-    chosen_preset: str = "docling_fast"
-    status: str = "ACCEPT"
+    chosen_preset: str = ""
+    status: DecisionStatus = DecisionStatus.ACCEPT
     overall_confidence: float = 1.0
     document_path: str = ""
     document_name: str = "Unknown"
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, v: Any) -> DecisionStatus:
+        return DecisionStatus.coerce(v)
 
     @property
     def active_violations(self) -> List[QualityViolationSchema]:
@@ -211,12 +217,14 @@ def load_validated_run_artifacts(
 
     chosen_preset = (
         dec_schema.chosen_preset
+        or dec_schema.preset_id
         or (exec_result.chosen_preset if exec_result else None)
-        or (plan_schema.primary_preset if plan_schema else "docling_fast")
+        or (plan_schema.primary_preset if plan_schema else "")
+        or ""
     )
     status = (
         dec_schema.status
-        or (exec_result.status if exec_result else "ACCEPT")
+        or (exec_result.status if exec_result else DecisionStatus.ACCEPT)
     )
     exec_conf = (
         exec_result.overall_confidence

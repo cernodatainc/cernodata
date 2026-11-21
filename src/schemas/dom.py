@@ -7,7 +7,9 @@ Pydantic contract schemas for document DOM representations (document_dom.json).
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from src.dom.enums import DOMNodeOrigin, DOMNodeType
 
 
 class BoundingBoxSchema(BaseModel):
@@ -48,7 +50,7 @@ class DOMNodeSchema(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     node_id: str
-    type: str = "paragraph"
+    type: DOMNodeType = DOMNodeType.PARAGRAPH
     global_page_index: int = 1
     temp_slice_index: int = 1
     bounding_box: BoundingBoxSchema = Field(default_factory=BoundingBoxSchema)
@@ -62,7 +64,17 @@ class DOMNodeSchema(BaseModel):
     is_incorrect_text: Optional[bool] = None
     ocr_confidence: Optional[float] = None
     is_custom: Optional[bool] = None
-    origin: Optional[str] = None
+    origin: Optional[DOMNodeOrigin] = None
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def _coerce_type(cls, v: Any) -> DOMNodeType:
+        return DOMNodeType.coerce(v)
+
+    @field_validator("origin", mode="before")
+    @classmethod
+    def _coerce_origin(cls, v: Any) -> Optional[DOMNodeOrigin]:
+        return DOMNodeOrigin.coerce(v)
 
     @model_validator(mode="before")
     @classmethod

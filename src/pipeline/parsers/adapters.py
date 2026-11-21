@@ -14,15 +14,15 @@ from src.parsers import DoclingParser, PyPdfiumParser
 from src.pipeline.planner.models import IngestionConfig
 
 DEFAULT_PYPDFIUM_SCALE: float = 2.0
-DEFAULT_PARSER_PRESET: str = "docling_fast"
 DEFAULT_OCR_ENGINE: str = "auto"
 
 
 @dataclass(frozen=True)
 class ParserExecutionOptions:
     """Normalized options container for parser engine execution."""
+
+    preset: str
     language: Optional[str] = "en"
-    preset: str = DEFAULT_PARSER_PRESET
     ocr_engine: str = DEFAULT_OCR_ENGINE
     ocr_scale: Optional[float] = None
     force_full_page_ocr: bool = False
@@ -87,6 +87,11 @@ class ParserExecutionOptions:
 class ParserPresetAdapter(Protocol):
     """Protocol defining the interface for parser preset execution adapters."""
 
+    @property
+    def preset_id(self) -> Optional[str]:
+        """Static preset identifier when bound to a single custom preset."""
+        ...
+
     def can_handle(self, preset: str) -> bool:
         """Determines if this adapter supports the given preset identifier."""
         ...
@@ -99,6 +104,7 @@ class ParserPresetAdapter(Protocol):
 class PyPdfiumPresetAdapter:
     """Adapter executing the pypdfium_rapidocr standalone parser preset."""
 
+    preset_id: Optional[str] = "pypdfium_rapidocr"
     SUPPORTED_PRESETS = frozenset({"pypdfium_rapidocr"})
 
     def can_handle(self, preset: str) -> bool:
@@ -112,6 +118,7 @@ class PyPdfiumPresetAdapter:
 class DoclingPresetAdapter:
     """Adapter executing Docling layout and OCR parser presets."""
 
+    preset_id: Optional[str] = None
     SUPPORTED_PRESETS = frozenset({"docling_fast", "docling_deep"})
 
     def can_handle(self, preset: str) -> bool:

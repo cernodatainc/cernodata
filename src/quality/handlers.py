@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from src.dom import DOMNode, DocumentDOM
+from src.dom.enums import DOMNodeType, ViolationSeverity
 from src.quality.garbage import compute_garbage_details, compute_garbage_ratio
 from src.quality.language import compute_language_score
 from src.quality.language_config import LanguageConfig, get_language_config
@@ -24,7 +25,7 @@ def make_node_violation(
     v_type: str,
     rule_type: str,
     description: str,
-    severity: str = "WARNING",
+    severity: str = ViolationSeverity.WARNING.value,
     detected_snippet: str = "",
     suggestion: Optional[str] = None,
     suggested_correction: Optional[str] = None,
@@ -60,12 +61,11 @@ def get_suppressed_violation_lookup(node: DOMNode) -> Dict[str, bool]:
     """Extracts a lookup mapping keyed by violation_id, rule_type, and type to suppression status."""
     lookup: Dict[str, bool] = {}
     for ev in node.violations:
-        if isinstance(ev, dict):
-            is_supp = is_violation_suppressed(ev)
-            for field in ("violation_id", "rule_type", "type"):
-                if ev.get(field):
-                    key = str(ev[field])
-                    lookup[key] = lookup.get(key, False) or is_supp
+        is_supp = is_violation_suppressed(ev)
+        for field in ("violation_id", "rule_type", "type"):
+            if ev.get(field):
+                key = str(ev[field])
+                lookup[key] = lookup.get(key, False) or is_supp
     return lookup
 
 
@@ -82,7 +82,7 @@ def get_suppressed_violation_types(node: DOMNode) -> Dict[str, bool]:
     """Extracts canonical violation layer keys marked as suppressed on a DOMNode."""
     suppressed: Dict[str, bool] = {}
     for v in node.violations:
-        if isinstance(v, dict) and is_violation_suppressed(v):
+        if is_violation_suppressed(v):
             raw_type = str(v.get("type", ""))
             norm_type = normalize_layer_name(raw_type) or raw_type
             if norm_type:
@@ -160,10 +160,10 @@ class SymbolsLayerHandler(VerificationLayerHandler):
     @staticmethod
     def _extract_verifiable_text(node: DOMNode, raw_text: str) -> str:
         """Extracts cell text for table_grid nodes so markdown borders do not trigger noise checks."""
-        if node.type != "table_grid":
+        if node.type != DOMNodeType.TABLE_GRID:
             return raw_text
-        rows = node.content.get("rows")
-        if isinstance(rows, list) and rows:
+        rows = node.table_rows
+        if rows:
             cells = [str(c).strip() for r in rows if isinstance(r, list) for c in r if str(c).strip()]
             if cells:
                 return " ".join(cells)
@@ -202,9 +202,9 @@ class SymbolsLayerHandler(VerificationLayerHandler):
             make_node_violation(
                 node=node,
                 counter=counter,
-                v_type="symbols",
+                v_type=VerificationLayer.SYMBOLS.value,
                 rule_type="garbage_character_ratio",
-                severity="HIGH",
+                severity=ViolationSeverity.HIGH.value,
                 detected_snippet=raw_text[:60],
                 description=f"High ratio of OCR noise or corrupt characters ({round(gb_ratio, 3)}){desc_detail}",
             )
@@ -288,7 +288,7 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
                         counter=counter + len(violations),
                         v_type="diacritic",
                         rule_type=rule_type,
-                        severity="WARNING",
+                        severity=ViolationSeverity.WARNING.value,
                         detected_snippet=match_snippet,
                         suggestion=rewrite,
                         suggested_correction=suggested if has_replacement else "",

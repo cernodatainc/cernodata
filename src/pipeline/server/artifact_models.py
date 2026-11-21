@@ -29,17 +29,10 @@ class RunArtifacts:
     document_name: str = "Unknown"
 
     def __getitem__(self, key: str) -> Any:
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            if key in self.artifacts:
-                return self.artifacts[key]
-            raise KeyError(key) from None
+        return self.to_dict()[key]
 
     def get(self, key: str, default: Any = None) -> Any:
-        if hasattr(self, key):
-            return getattr(self, key)
-        return self.artifacts.get(key, default)
+        return self.to_dict().get(key, default)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes artifacts to dictionary mapping."""

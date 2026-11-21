@@ -89,7 +89,7 @@ class ParserPresetRegistry:
         self._adapters = [
             existing
             for existing in self._adapters
-            if getattr(existing, "preset_id", None) != config.preset_id
+            if existing.preset_id != config.preset_id
         ]
         if prepend:
             self._adapters.insert(0, adapter)

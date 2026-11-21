@@ -7,11 +7,20 @@ for targeted section Optical Character Recognition (OCR).
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple, TypedDict, Union
+from typing import Any, List, Optional, Protocol, Sequence, Tuple, TypedDict, Union, runtime_checkable
 
 import numpy as np
 
 from src.dom.bounding_box import BoundingBox
+
+
+@runtime_checkable
+class RapidOCROutput(Protocol):
+    """Protocol for structured RapidOCR output objects exposing txts, scores, and boxes."""
+
+    txts: Optional[Sequence[Any]]
+    scores: Optional[Sequence[Any]]
+    boxes: Optional[Any]
 
 
 class OCRLine(TypedDict, total=False):

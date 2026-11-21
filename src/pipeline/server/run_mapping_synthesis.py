@@ -99,7 +99,7 @@ def _build_discovered_run_entry(r: Dict[str, Any], run_id: str, output_dir: str)
     entry = make_run_record(
         run_id=run_id,
         output_dir=output_dir,
-        preset=r.get("chosen_preset") or "docling_fast",
+        preset=r.get("chosen_preset") or "",
         status=r.get("status") or "ACCEPT",
         confidence=float(r.get("overall_confidence", 1.0)),
         violations_count=int(r.get("violations_count", 0)),

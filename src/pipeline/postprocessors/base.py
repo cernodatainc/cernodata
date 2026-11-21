@@ -83,7 +83,7 @@ class PostprocessorChain:
                 if rec.action == "added_node":
                     added_node = current_dom.get_node_by_id(rec.node_id)
                     if added_node is not None:
-                        added_node.origin = DOMNodeOrigin.POSTPROCESSED.value
+                        added_node.origin = DOMNodeOrigin.POSTPROCESSED
                         if isinstance(added_node.content, dict):
                             added_node.content.setdefault("origin", DOMNodeOrigin.POSTPROCESSED.value)
                 chain_records.append(rec)

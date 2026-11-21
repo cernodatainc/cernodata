@@ -17,11 +17,21 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from src.dom import BoundingBox, DOMNode
+from pydantic import ValidationError
+
+from src.dom import (
+    BoundingBox,
+    DOMNode,
+    DOMNodeOrigin,
+    DOMNodeType,
+    DecisionStatus,
+    PipelineAction,
+    ViolationSeverity,
+)
 from src.parsers.docling_helpers import build_node_content, extract_page_no_and_bbox, fallback_top_left_bbox
 from src.parsers.ocr_flags import parse_ocr_custom_flags
 from src.parsers.ocr_imaging import normalize_to_pil
-from src.parsers.ocr_models import normalize_bbox_coords
+from src.parsers.ocr_models import RapidOCROutput, normalize_bbox_coords
 from src.parsers.pypdfium_parser import _convert_ocr_box_to_bbox
 from src.parsers.section_ocr import SectionOCRParser
 from src.parsers.table_parser import parse_docling_table, parse_markdown_table, parse_table_content
@@ -42,6 +52,16 @@ from src.quality.table_validator import check_table_assertion, compute_grid_cons
 from src.quality.violations import detect_quality_violations
 from src.schemas.custom_preset import ParameterWiggleSpec
 from src.schemas.dom import BoundingBoxSchema, DocumentDOMSchema
+from src.schemas.requests import (
+    AddDocumentsRequest,
+    DocumentTargetRequest,
+    RemoveRunRequest,
+    RerunPipelineRequest,
+    RunPipelineRequest,
+    SaveDomRequest,
+    SubmitPlanRequest,
+    VerifyLayersRequest,
+)
 from src.schemas.test_suite import TableAssertion
 from src.schemas.violations import parse_violations_payload
 from src.tests.conftest import make_test_dom, make_test_node
@@ -276,6 +296,89 @@ class TestBugfixesRegression(unittest.TestCase):
         )
         self.assertNotIn("</script><script>alert(1)</script>", html_out)
         self.assertIn("<\\/script><script>alert(1)<\\/script>", html_out)
+
+    def test_strong_typing_enums_request_schemas_cache_and_ocr_protocol(self) -> None:
+        node = DOMNode(
+            node_id="n_typed",
+            type="HEADING",
+            global_page_index=1,
+            temp_slice_index=1,
+            bounding_box=BoundingBox(0.0, 0.0, 50.0, 20.0),
+            origin="manual",
+        )
+        self.assertIs(node.type, DOMNodeType.HEADING)
+        self.assertIs(node.origin, DOMNodeOrigin.MANUAL)
+        self.assertIs(DecisionStatus.coerce("accept"), DecisionStatus.ACCEPT)
+        self.assertIs(ViolationSeverity.coerce("high"), ViolationSeverity.HIGH)
+        self.assertIs(PipelineAction.coerce("accept_output"), PipelineAction.ACCEPT_OUTPUT)
+
+        with self.assertRaises(ValidationError):
+            SaveDomRequest.model_validate({"dom": {}})
+        save_req = SaveDomRequest.model_validate({"dom": {"nodes": []}, "output_dir": None})
+        self.assertEqual(save_req.output_dir, "")
+
+        verify_req = VerifyLayersRequest.model_validate({"verification_layers": ("symbols",), "target_threshold": None})
+        self.assertEqual(verify_req.verification_layers, ["symbols"])
+        self.assertAlmostEqual(verify_req.target_threshold, 0.82)
+
+        run_req = RunPipelineRequest.model_validate({"force_rerun": True, "verification_layers": ["tables"]})
+        self.assertTrue(run_req.force)
+        self.assertEqual(run_req.verification_layers, ["tables"])
+
+        rerun_req = RerunPipelineRequest.model_validate({"preset": "  docling_deep  ", "force_rerun": True})
+        self.assertEqual(rerun_req.preset, "docling_deep")
+        self.assertTrue(rerun_req.force)
+
+        rm_req = RemoveRunRequest.model_validate({"run_id": " r1 ", "document_path": " doc.pdf "})
+        self.assertEqual(rm_req.run_id, "r1")
+        self.assertEqual(rm_req.document_path, "doc.pdf")
+
+        add_req = AddDocumentsRequest.model_validate({"paths": ["a.pdf"], "file_path": "b.pdf"})
+        self.assertEqual(add_req.paths, ["a.pdf", "b.pdf"])
+
+        tgt_req = DocumentTargetRequest.model_validate({"document_path": " folder/x.pdf "})
+        self.assertEqual(tgt_req.target_path, "folder/x.pdf")
+
+        plan_req = SubmitPlanRequest.model_validate({
+            "document_path": " doc.pdf ",
+            "language": "none",
+            "override_order": ("docling_deep", ""),
+            "verification_layers": ["geometry"],
+        })
+        self.assertEqual(plan_req.document_path, "doc.pdf")
+        self.assertIsNone(plan_req.language)
+        self.assertEqual(plan_req.override_order, ["docling_deep"])
+        self.assertEqual(plan_req.verification_layers, ["geometry"])
+
+        cache = PresetCache()
+        self.assertEqual(cache.make_cache_keys("doc.pdf", ""), [])
+        cache.put("doc.pdf", "", {"dom": {"total_pages": 1}, "decision": {}})
+        self.assertEqual(cache.preset_results, {})
+        self.assertIsNone(cache.get("doc.pdf", ""))
+        self.assertIsNone(cache.find_in_previous_runs("doc.pdf", "", [{"chosen_preset": ""}], self.temp_dir))
+
+        rapid_res = SimpleNamespace(txts=["Proto line"], scores=[0.91], boxes=[[[0, 0], [10, 0], [10, 10], [0, 10]]])
+        self.assertIsInstance(rapid_res, RapidOCROutput)
+        parser = SectionOCRParser(language="en")
+        txt, conf, lines = parser._parse_engine_result(rapid_res)
+        self.assertEqual(txt, "Proto line")
+        self.assertAlmostEqual(conf, 0.91, places=3)
+        self.assertEqual(len(lines), 1)
+
+        from PIL import Image
+        parser.register_engine("proto_eng", lambda arr: {"text": "Updated Text", "confidence": 0.98})
+        node.content["raw_text"] = "Old Text"
+        proc_res = parser.process_dom_node(
+            node,
+            image_input=Image.new("RGB", (32, 16), color="white"),
+            engines=["proto_eng"],
+            prompt_accept=lambda _e, _t, _c: True,
+        )
+        self.assertTrue(proc_res["accepted"])
+        self.assertEqual(node.content["raw_text"], "Updated Text")
+        self.assertEqual(node.user_correction_note, "Updated Text")
+        self.assertAlmostEqual(node.ocr_confidence or 0.0, 0.98)
+        self.assertFalse(node.is_incorrect_text)
 
 
 if __name__ == "__main__":

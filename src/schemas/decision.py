@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from src.dom.enums import DecisionStatus, PipelineAction
+
 
 def _strip_none_values(data: Any) -> Any:
     """Drops keys with None values so schema field defaults apply at validation boundaries."""
@@ -33,10 +35,10 @@ class AttemptRecordSchema(BaseModel):
     preset: str = ""
     overall_confidence: float = 1.0
     per_page_confidence: Dict[str, float] = Field(default_factory=dict)
-    status: str = "ACCEPT"
+    status: DecisionStatus = DecisionStatus.ACCEPT
     is_accepted: bool = True
     violations_count: int = 0
-    action: str = "ACCEPT_OUTPUT"
+    action: PipelineAction = PipelineAction.ACCEPT_OUTPUT
     reason: str = ""
     detail: str = ""
     parameters: Dict[str, Any] = Field(default_factory=dict)
@@ -45,6 +47,16 @@ class AttemptRecordSchema(BaseModel):
     @classmethod
     def _strip_none_defaults(cls, data: Any) -> Any:
         return _strip_none_values(data)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, v: Any) -> DecisionStatus:
+        return DecisionStatus.coerce(v)
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _coerce_action(cls, v: Any) -> PipelineAction:
+        return PipelineAction.coerce(v)
 
     @field_validator("per_page_confidence", mode="before")
     @classmethod
@@ -57,7 +69,7 @@ class DecisionTreeSchema(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    preset_id: str = "docling_fast"
+    preset_id: str = ""
     language: str = "en"
     detected_languages: Dict[str, Any] = Field(default_factory=dict)
     detected_language_confidences: Dict[str, Any] = Field(default_factory=dict)
@@ -71,7 +83,7 @@ class DecisionTreeSchema(BaseModel):
     is_accepted: bool = True
     pages_requiring_slicing: List[int] = Field(default_factory=list)
     decision_tree: Dict[str, Any] = Field(default_factory=dict)
-    status: str = "ACCEPT"
+    status: DecisionStatus = DecisionStatus.ACCEPT
     chosen_preset: str = ""
     attempts: List[AttemptRecordSchema] = Field(default_factory=list)
 
@@ -79,6 +91,11 @@ class DecisionTreeSchema(BaseModel):
     @classmethod
     def _strip_none_defaults(cls, data: Any) -> Any:
         return _strip_none_values(data)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, v: Any) -> DecisionStatus:
+        return DecisionStatus.coerce(v)
 
     @field_validator(
         "detected_languages",

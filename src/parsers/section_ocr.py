@@ -9,7 +9,6 @@ PDF crops, and extensible custom OCR engine backends.
 from __future__ import annotations
 
 import base64
-import inspect
 import io
 import json
 import logging
@@ -18,6 +17,7 @@ import subprocess
 import tempfile
 import urllib.error
 import urllib.request
+from types import FunctionType
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -26,9 +26,16 @@ from PIL import Image
 logger = logging.getLogger("cernodata.parsers.section_ocr")
 
 from src.dom.bounding_box import BoundingBox
+from src.dom.node import DOMNode
 from src.parsers.ocr_flags import OCRCustomFlags, parse_ocr_custom_flags, preprocess_ocr_image
 from src.parsers.ocr_imaging import crop_pdf_region, normalize_to_pil
-from src.parsers.ocr_models import OCRLine, OCRResult, create_ocr_result, normalize_bbox_coords
+from src.parsers.ocr_models import (
+    OCRLine,
+    OCRResult,
+    RapidOCROutput,
+    create_ocr_result,
+    normalize_bbox_coords,
+)
 from src.schemas.custom_preset import ParameterWiggleSpec
 
 HAS_RAPIDOCR = False
@@ -129,7 +136,7 @@ class SectionOCRParser:
         }
 
         def _cli_engine(image_input: Any) -> str:
-            pil_img = image_input if isinstance(image_input, Image.Image) else Image.fromarray(image_input)
+            pil_img = normalize_to_pil(image_input)
             with tempfile.TemporaryDirectory(prefix="cernodata_sec_cli_") as tmp_dir:
                 in_path = os.path.join(tmp_dir, "section.png")
                 out_path = os.path.join(tmp_dir, "section_out.txt")
@@ -192,7 +199,7 @@ class SectionOCRParser:
         target_lang = (language or self.language or "en").strip() or "en"
 
         def _http_engine(image_input: Any) -> Dict[str, Any]:
-            pil_img = image_input if isinstance(image_input, Image.Image) else Image.fromarray(image_input)
+            pil_img = normalize_to_pil(image_input)
             buf = io.BytesIO()
             pil_img.save(buf, format="PNG")
             img_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
@@ -237,18 +244,8 @@ class SectionOCRParser:
         return _http_engine
 
     def _resolve_engine_entry(self, entry: Any) -> Any:
-        if callable(entry):
-            try:
-                sig = inspect.signature(entry)
-                req = [
-                    p for p in sig.parameters.values()
-                    if p.default == inspect.Parameter.empty
-                    and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                ]
-                if len(req) == 0:
-                    return entry()
-            except (ValueError, TypeError) as ex:
-                logger.debug("Signature inspection skipped: %s", ex)
+        if isinstance(entry, FunctionType) and entry.__code__.co_argcount == 0:
+            return entry()
         return entry
 
     def _get_engine_by_name(
@@ -340,11 +337,12 @@ class SectionOCRParser:
             )
             return clean_dict_text, dict_conf, parsed_dict_lines
 
-        txts = getattr(result, "txts", None)
-        scores = getattr(result, "scores", None)
-        boxes = getattr(result, "boxes", None)
-
-        if txts is None and isinstance(result, dict):
+        txts: Optional[Sequence[Any]] = None
+        scores: Optional[Sequence[Any]] = None
+        boxes: Optional[Any] = None
+        if isinstance(result, RapidOCROutput):
+            txts, scores, boxes = result.txts, result.scores, result.boxes
+        elif isinstance(result, dict):
             txts, scores, boxes = result.get("txts"), result.get("scores"), result.get("boxes")
 
         if txts is None and isinstance(result, (list, tuple)) and len(result) > 0:
@@ -560,7 +558,7 @@ class SectionOCRParser:
 
     def process_dom_node(
         self,
-        node: Any,
+        node: DOMNode,
         pdf_path: Optional[str] = None,
         image_input: Optional[Any] = None,
         engines: Optional[Sequence[str]] = None,
@@ -579,8 +577,8 @@ class SectionOCRParser:
         elif pdf_path:
             results = self.parse_section_from_pdf_multi(
                 pdf_path,
-                getattr(node, "global_page_index", 1),
-                getattr(node, "bounding_box", (0.0, 0.0, 0.0, 0.0)),
+                node.global_page_index,
+                node.bounding_box,
                 engines=engines,
                 language=language,
                 custom_flags=custom_flags,
@@ -596,18 +594,14 @@ class SectionOCRParser:
             if prompt_accept is not None:
                 is_accepted = prompt_accept(eng_name, text, conf)
             elif interactive:
-                prompt_msg = f"Accept OCR output from '{eng_name}' for node '{getattr(node, 'node_id', '')}'? [y/N]: "
+                prompt_msg = f"Accept OCR output from '{eng_name}' for node '{node.node_id}'? [y/N]: "
                 is_accepted = input(prompt_msg).strip().lower() in ("y", "yes")
 
             if is_accepted:
-                if hasattr(node, "content") and isinstance(node.content, dict):
-                    node.content["raw_text"] = text
-                if hasattr(node, "user_correction_note"):
-                    node.user_correction_note = text
-                if hasattr(node, "ocr_confidence"):
-                    node.ocr_confidence = conf
-                if hasattr(node, "is_incorrect_text"):
-                    node.is_incorrect_text = False
+                node.content["raw_text"] = text
+                node.user_correction_note = text
+                node.ocr_confidence = conf
+                node.is_incorrect_text = False
                 return {
                     "results": results,
                     "accepted": True,

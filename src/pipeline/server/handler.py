@@ -11,8 +11,11 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from http.server import SimpleHTTPRequestHandler
-from typing import Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 from urllib.parse import parse_qs, urlparse
+
+if TYPE_CHECKING:
+    from src.pipeline.server.core import PipelineViewerServer
 
 from src.pipeline.server.http_utils import (
     SRC_DIR,
@@ -35,6 +38,8 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
     hydration API, and execution endpoints.
     """
 
+    server: PipelineViewerServer  # type: ignore[assignment]
+
     def log_message(self, format: str, *args: Any) -> None:
         """Suppresses standard HTTP access logs to keep terminal output clean."""
         logger.debug("%s - " + format, self.address_string(), *args)
@@ -47,23 +52,16 @@ class PipelineViewerHandler(StaticRoutesMixin, ApiRoutesMixin, SimpleHTTPRequest
             logger.debug("Client disconnected during connection handling: %s", e)
 
     _default_session: ServerSessionContext = ServerSessionContext()
-    _fallback_executor: Optional[ThreadPoolExecutor] = None
 
     @property
     def session(self) -> ServerSessionContext:
-        """Returns the thread-safe session context attached to the server or default fallback."""
-        if hasattr(self.server, "session_context") and self.server.session_context is not None:
-            return self.server.session_context
-        return self.__class__._default_session
+        """Returns the thread-safe session context attached to the server."""
+        return self.server.session_context
 
     @property
     def executor(self) -> ThreadPoolExecutor:
-        """Returns the thread pool executor attached to the server or creates a fallback."""
-        if hasattr(self.server, "executor") and self.server.executor is not None:
-            return self.server.executor
-        if self.__class__._fallback_executor is None:
-            self.__class__._fallback_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="fallback-worker")
-        return self.__class__._fallback_executor
+        """Returns the thread pool executor attached to the server."""
+        return self.server.executor
 
     # -------------------------------------------------------------------------
     # Route Dispatchers: do_GET and do_POST

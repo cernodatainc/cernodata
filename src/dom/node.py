@@ -9,13 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List, Union
 from src.dom.bounding_box import BoundingBox
-from src.dom.enums import DOMNodeType
+from src.dom.enums import DOMNodeOrigin, DOMNodeType
 
 
-@dataclass
+@dataclass(init=False)
 class DOMNode:
     node_id: str
-    type: Union[DOMNodeType, str]  # heading, paragraph, table_grid, figure, header_footer, multi_column_group
+    type: DOMNodeType  # heading, paragraph, table_grid, figure, header_footer, multi_column_group
     global_page_index: int
     temp_slice_index: int
     bounding_box: BoundingBox
@@ -31,36 +31,84 @@ class DOMNode:
     is_incorrect_text: Optional[bool] = None
     ocr_confidence: Optional[float] = None
     is_custom: Optional[bool] = None
-    origin: Optional[str] = None
+    origin: Optional[DOMNodeOrigin] = None
+
+    def __init__(
+        self,
+        node_id: str,
+        type: Union[DOMNodeType, str],
+        global_page_index: int,
+        temp_slice_index: int,
+        bounding_box: Union[BoundingBox, Dict[str, Any]],
+        content: Optional[Dict[str, Any]] = None,
+        template_hint_applied: Optional[str] = None,
+        violations: Optional[List[Dict[str, Any]]] = None,
+        is_merged: bool = False,
+        merged_from: Optional[List[Dict[str, Any]]] = None,
+        merged_at: Optional[str] = None,
+        user_correction_note: Optional[str] = None,
+        is_incorrect_text: Optional[bool] = None,
+        ocr_confidence: Optional[float] = None,
+        is_custom: Optional[bool] = None,
+        origin: Optional[Union[DOMNodeOrigin, str]] = None,
+    ) -> None:
+        self.node_id = node_id
+        self.type = DOMNodeType.coerce(type)
+        self.global_page_index = global_page_index
+        self.temp_slice_index = temp_slice_index
+        self.bounding_box = (
+            BoundingBox.from_dict(bounding_box)
+            if isinstance(bounding_box, dict)
+            else bounding_box
+        )
+        self.content = dict(content) if content is not None else {}
+        self.template_hint_applied = template_hint_applied
+        self.violations = [dict(v) for v in violations if isinstance(v, dict)] if violations is not None else []
+        self.is_merged = is_merged
+        self.merged_from = merged_from
+        self.merged_at = merged_at
+        self.user_correction_note = user_correction_note
+        self.is_incorrect_text = is_incorrect_text
+        self.ocr_confidence = ocr_confidence
+        self.is_custom = is_custom
+        self.origin = DOMNodeOrigin.coerce(origin)
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        self.type = DOMNodeType.coerce(self.type)
+        self.origin = DOMNodeOrigin.coerce(self.origin)
+        if isinstance(self.bounding_box, dict):
+            self.bounding_box = BoundingBox.from_dict(self.bounding_box)
+        self.violations = [dict(v) for v in self.violations if isinstance(v, dict)]
 
     def to_dict(self) -> Dict[str, Any]:
-        node_type = self.type.value if isinstance(self.type, DOMNodeType) else str(self.type)
         res: Dict[str, Any] = {
             "node_id": self.node_id,
-            "type": node_type,
+            "type": self.type.value,
             "global_page_index": self.global_page_index,
             "temp_slice_index": self.temp_slice_index,
             "bounding_box": self.bounding_box.to_dict(),
             "content": self.content,
             "violations": self.violations,
         }
-        for key in (
-            "template_hint_applied",
-            "is_merged",
-            "merged_from",
-            "merged_at",
-            "user_correction_note",
-            "is_custom",
-            "is_incorrect_text",
-            "ocr_confidence",
-            "origin",
-        ):
-            val = getattr(self, key)
-            if key in ("is_incorrect_text", "ocr_confidence"):
-                if val is not None:
-                    res[key] = val
-            elif val:
-                res[key] = val
+        if self.template_hint_applied:
+            res["template_hint_applied"] = self.template_hint_applied
+        if self.is_merged:
+            res["is_merged"] = self.is_merged
+        if self.merged_from:
+            res["merged_from"] = self.merged_from
+        if self.merged_at:
+            res["merged_at"] = self.merged_at
+        if self.user_correction_note:
+            res["user_correction_note"] = self.user_correction_note
+        if self.is_custom:
+            res["is_custom"] = self.is_custom
+        if self.is_incorrect_text is not None:
+            res["is_incorrect_text"] = self.is_incorrect_text
+        if self.ocr_confidence is not None:
+            res["ocr_confidence"] = self.ocr_confidence
+        if self.origin is not None:
+            res["origin"] = self.origin.value
         return res
 
     @classmethod
@@ -74,34 +122,23 @@ class DOMNode:
         else:
             bbox = BoundingBox(0.0, 0.0, 0.0, 0.0)
 
-        raw_type = data.get("type", "paragraph")
-        node_type = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
-
-        optional_fields = {
-            k: data[k]
-            for k in (
-                "template_hint_applied",
-                "merged_from",
-                "merged_at",
-                "user_correction_note",
-                "is_incorrect_text",
-                "ocr_confidence",
-                "is_custom",
-                "origin",
-            )
-            if k in data
-        }
-
         return cls(
             node_id=str(data.get("node_id", "")),
-            type=node_type,
+            type=DOMNodeType.coerce(data.get("type", DOMNodeType.PARAGRAPH)),
             global_page_index=int(data.get("global_page_index", 1)),
             temp_slice_index=int(data.get("temp_slice_index", 1)),
             bounding_box=bbox,
             content=dict(data.get("content", {})),
+            template_hint_applied=data.get("template_hint_applied"),
             violations=list(data.get("violations", [])),
             is_merged=bool(data.get("is_merged", False)),
-            **optional_fields,
+            merged_from=data.get("merged_from"),
+            merged_at=data.get("merged_at"),
+            user_correction_note=data.get("user_correction_note"),
+            is_incorrect_text=data.get("is_incorrect_text"),
+            ocr_confidence=data.get("ocr_confidence"),
+            is_custom=data.get("is_custom"),
+            origin=DOMNodeOrigin.coerce(data.get("origin")),
         )
 
     @property
@@ -118,8 +155,7 @@ class DOMNode:
     @property
     def table_rows(self) -> Optional[List[List[str]]]:
         """Returns row-oriented list of table cells if node is a table_grid."""
-        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
-        if type_val == "table_grid":
+        if self.type == DOMNodeType.TABLE_GRID:
             rows = self.content.get("rows")
             if isinstance(rows, list):
                 return rows
@@ -128,8 +164,7 @@ class DOMNode:
     @property
     def table_columns(self) -> Optional[List[List[str]]]:
         """Returns column-oriented list of table cells if node is a table_grid."""
-        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
-        if type_val == "table_grid":
+        if self.type == DOMNodeType.TABLE_GRID:
             cols = self.content.get("columns")
             if isinstance(cols, list):
                 return cols
@@ -138,8 +173,7 @@ class DOMNode:
     @property
     def table_headers(self) -> Optional[List[str]]:
         """Returns header labels if node is a table_grid."""
-        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
-        if type_val == "table_grid":
+        if self.type == DOMNodeType.TABLE_GRID:
             headers = self.content.get("headers")
             if isinstance(headers, list):
                 return headers
@@ -148,8 +182,7 @@ class DOMNode:
     @property
     def table_grid(self) -> Optional[List[List[Dict[str, Any]]]]:
         """Returns structured 2D cell grid if node is a table_grid."""
-        type_val = self.type.value if hasattr(self.type, "value") else str(self.type)
-        if type_val == "table_grid":
+        if self.type == DOMNodeType.TABLE_GRID:
             grid = self.content.get("grid")
             if isinstance(grid, list):
                 return grid

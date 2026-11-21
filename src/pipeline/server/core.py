@@ -10,10 +10,13 @@ import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Optional, Tuple, Type
 
 from src.pipeline.planner.models import DocumentPlan
 from src.pipeline.server.session import ServerSessionContext
+
+if TYPE_CHECKING:
+    from src.pipeline.planner.planner import PresetPlanner
 
 logger = logging.getLogger("cernodata.server.core")
 
@@ -29,7 +32,8 @@ class PipelineViewerServer(ThreadingHTTPServer):
     default_lang: Optional[str] = None
     default_threshold: float = 0.85
     output_dir: str = "output"
-    planner: Any = None
+    custom_presets_path: Optional[str] = None
+    planner: Optional[PresetPlanner] = None
 
     def __init__(
         self,
@@ -59,6 +63,5 @@ class PipelineViewerServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
     def server_close(self) -> None:
-        if hasattr(self, "executor"):
-            self.executor.shutdown(wait=False, cancel_futures=True)
+        self.executor.shutdown(wait=False, cancel_futures=True)
         super().server_close()

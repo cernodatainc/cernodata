@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from pydantic import ValidationError
 
 from src.dom import DocumentDOM
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
+from src.schemas.requests import RemoveRunRequest, RerunPipelineRequest, RunPipelineRequest
 
 if TYPE_CHECKING:
     from src.pipeline.execution_models import PipelineExecutionResult
@@ -172,19 +174,18 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         """
         timestamp = datetime.now().strftime("%H:%M:%S")
         try:
-            pdf_path, language = self._extract_document_and_language(payload)
-            raw_thresh = payload.get("target_threshold")
-            threshold = float(raw_thresh) if raw_thresh is not None else 0.85
-        except (ValueError, TypeError) as exc:
+            req = RunPipelineRequest.model_validate(payload)
+            pdf_path, language = self._resolve_document_and_language(req.pdf_path, req.language)
+        except (ValidationError, ValueError, TypeError) as exc:
             self.send_bad_request(str(exc))
             return
-        explicit_preset = payload.get("preset")
-        preset: Optional[str] = str(explicit_preset).strip() if explicit_preset else None
-        align_skew = bool(payload.get("align_skew", True))
-        visualize = bool(payload.get("visualize", True))
-        with_plan = bool(payload.get("with_plan", False))
-        plan_config = payload.get("plan_config")
-        force = bool(payload.get("force", payload.get("force_rerun", False)))
+        threshold = req.target_threshold
+        preset: Optional[str] = req.preset
+        align_skew = req.align_skew
+        visualize = req.visualize
+        with_plan = req.with_plan
+        plan_config = req.plan_config
+        force = req.force
 
         from src.pipeline.orchestrator import run_pipeline
         from src.utils import resolve_pdf_path
@@ -228,9 +229,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 rest = [p for p in all_known if p not in (primary_override, fallback_override)]
                 override_order = [str(primary_override), str(fallback_override)] + rest
 
-            raw_verif_layers = plan_config.get("verification_layers") or payload.get("verification_layers")
+            raw_verif_layers = plan_config.get("verification_layers")
             resolved_verif_layers = (
-                [str(x) for x in raw_verif_layers] if isinstance(raw_verif_layers, (list, tuple)) else None
+                [str(x) for x in raw_verif_layers]
+                if isinstance(raw_verif_layers, (list, tuple))
+                else req.verification_layers
             )
 
             plan_obj = planner.create_plan(
@@ -283,12 +286,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
 
         session = self.session
         on_progress = session.make_progress_callback()
-        direct_verif_layers = payload.get("verification_layers")
-        resolved_run_layers = (
-            [str(x) for x in direct_verif_layers]
-            if isinstance(direct_verif_layers, (list, tuple))
-            else None
-        )
+        resolved_run_layers = req.verification_layers
 
         def _lookup_cached_dom(target_preset: str) -> Optional[DocumentDOM]:
             cached = session.get_cached_preset_result(pdf_path, target_preset, language)
@@ -342,17 +340,17 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: JSON request body dictionary.
         """
-        raw_preset = payload.get("preset")
-        preset = str(raw_preset).strip() if raw_preset else ""
-        if not preset:
-            self.send_bad_request("Missing 'preset' in request payload.")
-            return
         try:
-            pdf_path, language = self._extract_document_and_language(payload)
-        except (ValueError, TypeError) as exc:
+            req = RerunPipelineRequest.model_validate(payload)
+            if not req.preset:
+                self.send_bad_request("Missing 'preset' in request payload.")
+                return
+            pdf_path, language = self._resolve_document_and_language(req.pdf_path, req.language)
+        except (ValidationError, ValueError, TypeError) as exc:
             self.send_bad_request(str(exc))
             return
-        force = bool(payload.get("force", payload.get("force_rerun", False)))
+        preset = req.preset
+        force = req.force
 
         if not force and self._try_serve_cached_preset(pdf_path, preset, language):
             return
@@ -395,9 +393,14 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         Args:
             payload: JSON request body containing run_id and optional output_dir / document_path.
         """
-        run_id = str(payload.get("run_id", "")).strip()
-        output_dir = payload.get("output_dir")
-        document_path = payload.get("document_path")
+        try:
+            req = RemoveRunRequest.model_validate(payload)
+        except ValidationError as exc:
+            self.send_bad_request(str(exc))
+            return
+        run_id = req.run_id
+        output_dir = req.output_dir
+        document_path = req.document_path
         if not run_id and not output_dir:
             self.send_bad_request("Missing run_id or output_dir")
             return
@@ -410,9 +413,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             repo_root=self.session.repo_root,
         )
         with self.session._lock:
-            self.session._preset_cache.invalidate_document(
-                str(document_path).strip() if document_path else None
-            )
+            self.session._preset_cache.invalidate_document(document_path)
             self.session.viewer_data = None
             if self.session.current_result:
                 self.session.current_result = None

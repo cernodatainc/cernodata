@@ -13,6 +13,7 @@ import threading
 from typing import Any, Dict, List, Optional
 
 from src.pipeline.server.artifacts import load_run_artifacts
+from src.schemas.decision import DecisionTreeSchema
 
 logger = logging.getLogger("cernodata.server.preset_cache")
 
@@ -43,7 +44,9 @@ class PresetCache:
             List of hierarchical lookup keys ordered from most to least specific.
         """
         doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
-        preset_clean = preset.strip().lower() if preset else "docling_fast"
+        preset_clean = preset.strip().lower() if preset else ""
+        if not preset_clean:
+            return []
         keys: List[str] = []
         if doc_base:
             keys.append(f"{doc_base}:{preset_clean}")
@@ -65,18 +68,21 @@ class PresetCache:
         Returns:
             Cached result dictionary or None.
         """
+        wanted = preset.strip().lower() if preset else ""
+        if not wanted:
+            return None
         with self._lock:
-            for k in self.make_cache_keys(pdf_path, preset, language):
+            for k in self.make_cache_keys(pdf_path, wanted, language):
                 if k in self.preset_results:
                     cached = self.preset_results[k]
                     decision = cached.get("decision")
-                    raw_chosen = (
-                        decision.get("chosen_preset")
-                        if isinstance(decision, dict)
-                        else getattr(decision, "chosen_preset", "")
-                    )
+                    if isinstance(decision, DecisionTreeSchema):
+                        raw_chosen = decision.chosen_preset
+                    elif isinstance(decision, dict):
+                        raw_chosen = decision.get("chosen_preset", "")
+                    else:
+                        raw_chosen = ""
                     chosen = str(raw_chosen or "").strip().lower()
-                    wanted = preset.strip().lower() if preset else "docling_fast"
                     if chosen and chosen != wanted:
                         continue
                     return dict(cached)
@@ -151,8 +157,10 @@ class PresetCache:
             Loaded result dictionary or None.
         """
         doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
-        preset_clean = preset.strip().lower() if preset else "docling_fast"
-        target_keys = self.make_cache_keys(pdf_path, preset, language)
+        preset_clean = preset.strip().lower() if preset else ""
+        if not preset_clean:
+            return None
+        target_keys = self.make_cache_keys(pdf_path, preset_clean, language)
 
         for r in previous_runs:
             r_doc = os.path.basename(r.get("document_path") or r.get("document_name") or "").strip().lower()

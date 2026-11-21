@@ -6,9 +6,10 @@ Pydantic contract schemas for pipeline execution results (plan_execution_result.
 
 from __future__ import annotations
 
-from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, List, Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.dom.enums import DecisionStatus
 from src.schemas.decision import DecisionTreeSchema
 from src.schemas.dom import DocumentDOMSchema
 from src.schemas.plan import DocumentPlanSchema
@@ -26,10 +27,15 @@ class PipelineExecutionResultSchema(BaseModel):
     violations: List[QualityViolationSchema] = Field(default_factory=list)
     total_violations: int = 0
     chosen_preset: Optional[str] = None
-    status: str = "ACCEPT"
+    status: DecisionStatus = DecisionStatus.ACCEPT
     overall_confidence: Optional[float] = None
     dom_json_path: Optional[str] = None
     violations_json_path: Optional[str] = None
     plan_result_path: Optional[str] = None
     html_viewer_path: Optional[str] = None
     rendered_images: List[str] = Field(default_factory=list)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, v: Any) -> DecisionStatus:
+        return DecisionStatus.coerce(v)

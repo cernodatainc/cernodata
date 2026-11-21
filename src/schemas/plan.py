@@ -34,7 +34,7 @@ class DocumentPlanSchema(BaseModel):
     hardware: Optional[str] = None
     language: Optional[str] = None
     target_threshold: float = 0.82
-    primary_preset: str = "docling_fast"
+    primary_preset: str = ""
     fallback_queue: List[Dict[str, Any]] = Field(default_factory=list)
     preset_order: List[str] = Field(default_factory=list)
     suggested_order: List[str] = Field(default_factory=list)

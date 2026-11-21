@@ -8,7 +8,7 @@ for the cernodata pipeline viewer HTTP handler.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 from src.pipeline.server.http_utils import (
     REPO_ROOT,
@@ -19,6 +19,7 @@ from src.pipeline.server.http_utils import (
 )
 
 if TYPE_CHECKING:
+    from src.pipeline.server.core import PipelineViewerServer
     from src.pipeline.server.session import ServerSessionContext
 
 
@@ -28,7 +29,7 @@ class StaticRoutesMixin:
     for HTTP server request handlers.
     """
 
-    server: Any
+    server: PipelineViewerServer
 
     @property
     def session(self) -> ServerSessionContext:
@@ -45,7 +46,7 @@ class StaticRoutesMixin:
         Serves the interactive landing page and pipeline execution dashboard.
         Uses in-memory override from server instance if present.
         """
-        html_override: str = getattr(self.server, "html_content", "")
+        html_override: str = self.server.html_content
         if html_override:
             send_html_response(self, html_override)  # type: ignore[arg-type]
             return
@@ -101,7 +102,7 @@ class StaticRoutesMixin:
         """
         Serves data shape questionnaire HTML configuration page.
         """
-        html_override: str = getattr(self.server, "html_content", "")
+        html_override: str = self.server.html_content
         if html_override:
             send_html_response(self, html_override)  # type: ignore[arg-type]
             return

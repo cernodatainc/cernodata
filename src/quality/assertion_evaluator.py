@@ -14,7 +14,7 @@ import re
 from typing import Any
 
 from src.dom import BoundingBox, DOMNode, DocumentDOM
-from src.dom.enums import DOMNodeType
+from src.dom.enums import DOMNodeType, ViolationSeverity
 from src.quality.handlers import make_node_violation
 from src.quality.layers import VerificationLayer
 from src.schemas.test_suite import DocumentAssertionSuite, HeaderAssertion
@@ -22,15 +22,17 @@ from src.schemas.test_suite import DocumentAssertionSuite, HeaderAssertion
 _LAYER = VerificationLayer.STRUCTURE.value
 
 
-def _type_value(node: DOMNode) -> str:
-    return node.type.value if isinstance(node.type, DOMNodeType) else str(node.type)
-
-
 def _text(node: DOMNode) -> str:
     return str(node.content.get("raw_text") or "").strip()
 
 
-def _document_violation(counter: int, page: int, rule_type: str, severity: str, description: str) -> dict[str, Any]:
+def _document_violation(
+    counter: int,
+    page: int,
+    rule_type: str,
+    severity: ViolationSeverity,
+    description: str,
+) -> dict[str, Any]:
     """Builds a violation record that is not tied to a single node."""
     return {
         "violation_id": f"viol_p{page}_v{counter}",
@@ -38,7 +40,7 @@ def _document_violation(counter: int, page: int, rule_type: str, severity: str, 
         "node_id": None,
         "type": _LAYER,
         "rule_type": rule_type,
-        "severity": severity,
+        "severity": severity.value,
         "suppressed": False,
         "description": description,
         "bounding_box": BoundingBox(0.0, 0.0, 0.0, 0.0).to_dict(),
@@ -66,10 +68,10 @@ def evaluate_assertions(
             if (header.min_page is None or n.global_page_index >= header.min_page)
             and (header.max_page is None or n.global_page_index <= header.max_page)
         ]
-        if any(_type_value(n) == "heading" and _header_matches(header, _text(n)) for n in in_range):
+        if any(n.type == DOMNodeType.HEADING and _header_matches(header, _text(n)) for n in in_range):
             continue
         paragraph = next(
-            (n for n in in_range if _type_value(n) == "paragraph" and _header_matches(header, _text(n))), None
+            (n for n in in_range if n.type == DOMNodeType.PARAGRAPH and _header_matches(header, _text(n))), None
         )
         if paragraph is not None:
             violations.append(make_node_violation(
@@ -81,18 +83,18 @@ def evaluate_assertions(
             ))
         else:
             violations.append(_document_violation(
-                next_id(), header.min_page or 1, "required_header_missing", "ERROR",
+                next_id(), header.min_page or 1, "required_header_missing", ViolationSeverity.ERROR,
                 f"Required header {header.text!r} not found",
             ))
 
     for rule in suite.regex_rules:
         pattern = re.compile(rule.pattern)
-        nodes = [n for n in dom.nodes if _type_value(n) == rule.node_type.value]
+        nodes = [n for n in dom.nodes if n.type == rule.node_type]
         if rule.must_match:
             total = sum(len(pattern.findall(_text(n))) for n in nodes)
             if total < rule.min_matches:
                 violations.append(_document_violation(
-                    next_id(), 1, "required_pattern_missing", "ERROR",
+                    next_id(), 1, "required_pattern_missing", ViolationSeverity.ERROR,
                     f"Pattern {rule.pattern!r} matched {total} time(s) in {rule.node_type.value} nodes; "
                     f"expected at least {rule.min_matches}",
                 ))
@@ -105,10 +107,10 @@ def evaluate_assertions(
                 ))
 
     for node_type, minimum in suite.min_node_counts.items():
-        actual = sum(1 for n in dom.nodes if _type_value(n) == node_type)
+        actual = sum(1 for n in dom.nodes if n.type.value == node_type)
         if actual < minimum:
             violations.append(_document_violation(
-                next_id(), 1, "min_node_count", "ERROR",
+                next_id(), 1, "min_node_count", ViolationSeverity.ERROR,
                 f"Found {actual} {node_type} node(s); expected at least {minimum}",
             ))
 

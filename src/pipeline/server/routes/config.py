@@ -31,6 +31,7 @@ from src.schemas.custom_preset import (
     load_custom_presets_file,
     save_custom_presets_file,
 )
+from src.schemas.requests import AddDocumentsRequest, DocumentTargetRequest
 
 
 def open_system_file_dialog(mock_paths: Optional[List[str]] = None) -> List[str]:
@@ -123,19 +124,12 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         Registers one or more document paths with the session and discovery mappings.
         No files are uploaded or copied; only their filesystem paths are made known to the backend.
         """
-        raw_paths: List[str] = []
-        if payload.get("paths") and isinstance(payload["paths"], list):
-            raw_paths.extend(str(p) for p in payload["paths"] if p)
-        for key in ("file_path", "path", "filename", "document_path"):
-            val = payload.get(key)
-            if val and str(val) not in raw_paths:
-                raw_paths.append(str(val))
-
-        if not raw_paths:
+        req = AddDocumentsRequest.model_validate(payload)
+        if not req.paths:
             self.send_bad_request("Missing 'file_path', 'path', or 'paths' in request payload.")
             return
 
-        registered = [r for r in (self.session.register_document(p) for p in raw_paths) if r]
+        registered = [r for r in (self.session.register_document(p) for p in req.paths) if r]
         self.send_ok({
             "paths": registered,
             "file_path": registered[0] if registered else "",
@@ -149,12 +143,12 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         Marks a document as forgotten, removing it from explorer listings
         without deleting historical execution runs or output artifacts.
         """
-        raw_path = payload.get("file_path") or payload.get("document_path") or payload.get("path")
-        if not raw_path:
+        req = DocumentTargetRequest.model_validate(payload)
+        if not req.target_path:
             self.send_bad_request("Missing 'file_path' or 'document_path' in request payload.")
             return
 
-        target_file = str(raw_path).strip()
+        target_file = req.target_path
         from src.pipeline.server.run_mappings import forget_document
         forget_document(target_file, repo_root=self.session.repo_root)
         self.session.forget_document(target_file)
@@ -170,12 +164,12 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         """
         Unforgets a document, restoring it to workspace explorer listings.
         """
-        raw_path = payload.get("file_path") or payload.get("document_path") or payload.get("path")
-        if not raw_path:
+        req = DocumentTargetRequest.model_validate(payload)
+        if not req.target_path:
             self.send_bad_request("Missing 'file_path' or 'document_path' in request payload.")
             return
 
-        target_file = str(raw_path).strip()
+        target_file = req.target_path
         from src.pipeline.server.run_mappings import unforget_document
         unforget_document(target_file, repo_root=self.session.repo_root)
 
@@ -188,12 +182,12 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
 
     def _resolve_custom_presets_path(self) -> str:
         """Resolves the JSON manifest path for persisting user-defined custom presets."""
-        configured = getattr(self.server, "custom_presets_path", None)
+        configured = self.server.custom_presets_path
         if configured:
-            return str(configured)
-        srv_out = getattr(self.server, "output_dir", None)
+            return configured
+        srv_out = self.server.output_dir
         if srv_out:
-            return os.path.join(str(srv_out), "custom_presets.json")
+            return os.path.join(srv_out, "custom_presets.json")
         return os.path.join("output", "custom_presets.json")
 
     def _get_custom_presets_catalog(self) -> List[Dict[str, Any]]:
@@ -244,9 +238,9 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
 
         get_default_parser_registry().register_custom_preset(config, prepend=True)
 
-        active_planner = getattr(self.server, "planner", None)
+        active_planner = self.server.planner
         if active_planner is None:
-            setattr(self.server, "planner", PresetPlanner(custom_presets=updated))
+            self.server.planner = PresetPlanner(custom_presets=updated)
         else:
             active_planner.register_custom_preset(config)
 
@@ -294,7 +288,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             try:
                 req = urllib.request.Request(url, method="GET")
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
-                    status_code = getattr(resp, "status", 200)
+                    status_code = resp.status
                 self.send_json(200, {
                     "success": True,
                     "reachable": True,
@@ -344,11 +338,11 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
         """
         Returns runtime server configuration and preset options.
         """
-        configured_doc = getattr(self.server, "default_doc", None)
+        configured_doc = self.server.default_doc
         session_doc = self.session.pdf_path
         default_doc = configured_doc or session_doc or ""
-        default_lang = getattr(self.server, "default_lang", None) or self.session.language or "en"
-        default_thresh = getattr(self.server, "default_threshold", 0.85)
+        default_lang = self.server.default_lang or self.session.language or "en"
+        default_thresh = self.server.default_threshold
 
         preset_weights: Dict[str, Dict[str, float]] = {
             k: dict(v) for k, v in DEFAULT_PRESET_WEIGHTS.items()

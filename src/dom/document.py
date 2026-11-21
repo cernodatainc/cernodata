@@ -92,11 +92,8 @@ class DocumentDOM:
 
     def get_nodes_by_type(self, node_type: Union[DOMNodeType, str]) -> List[DOMNode]:
         """Returns all DOM nodes matching the specified structural node type."""
-        target_val = node_type.value if hasattr(node_type, "value") else str(node_type)
-        return [
-            n for n in self.nodes
-            if (n.type.value if hasattr(n.type, "value") else str(n.type)) == target_val
-        ]
+        target = DOMNodeType.coerce(node_type)
+        return [n for n in self.nodes if n.type == target]
 
     def find_nodes_intersecting(
         self, bbox: BoundingBox, page_index: Optional[int] = None
@@ -163,12 +160,14 @@ class DocumentDOM:
         return node
 
     def update_node_type(
-        self, node_id: str, new_type: Union[DOMNodeType, str]
+        self,
+        node_id: str,
+        new_type: Union[DOMNodeType, str],
     ) -> Optional[DOMNode]:
         """Updates the structural type of a target node."""
         node = self.get_node_by_id(node_id)
         if node is not None:
-            node.type = new_type
+            node.type = DOMNodeType.coerce(new_type)
             node.is_custom = True
         return node
 
@@ -202,7 +201,7 @@ class DocumentDOM:
         self,
         node_id_1: str,
         node_id_2: str,
-        target_type: Optional[str] = None,
+        target_type: Optional[Union[DOMNodeType, str]] = None,
         merged_text: Optional[str] = None,
         text_separator: str = "\n",
     ) -> DOMNode:
@@ -228,7 +227,7 @@ class DocumentDOM:
             )
 
         upper, lower = (n1, n2) if (n1.bounding_box.y0 <= n2.bounding_box.y0) else (n2, n1)
-        res_type = target_type if target_type is not None else upper.type
+        res_type = DOMNodeType.coerce(target_type) if target_type is not None else upper.type
         merged_bbox = n1.bounding_box.union(n2.bounding_box)
 
         merged_content = dict(upper.content)

@@ -228,7 +228,7 @@ def create_preset_attempt_record(
     Returns:
         Structured attempt record dictionary.
     """
-    preset_name = decision_dict.get("chosen_preset") or "docling_fast"
+    preset_name = str(decision_dict.get("chosen_preset") or decision_dict.get("preset_id") or "")
     tree = decision_dict.get("decision_tree")
     action = tree.get("action", default_action) if isinstance(tree, dict) else default_action
     conf = decision_dict.get("overall_confidence")

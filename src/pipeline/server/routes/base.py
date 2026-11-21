@@ -16,6 +16,7 @@ from src.pipeline.server.http_utils import send_json_response
 from src.utils import resolve_pdf_path
 
 if TYPE_CHECKING:
+    from src.pipeline.server.core import PipelineViewerServer
     from src.pipeline.server.session import ServerSessionContext
 
 logger = logging.getLogger("cernodata.server.routes")
@@ -24,7 +25,7 @@ logger = logging.getLogger("cernodata.server.routes")
 class BaseApiRoutesMixin:
     """Base mixin defining host server contracts and shared route utilities."""
 
-    server: Any
+    server: PipelineViewerServer
 
     @property
     def session(self) -> ServerSessionContext:
@@ -38,15 +39,15 @@ class BaseApiRoutesMixin:
 
     def _get_active_planner(self) -> PresetPlanner:
         """Returns the server's active PresetPlanner with custom presets loaded if present."""
-        existing = getattr(self.server, "planner", None)
+        existing = self.server.planner
         if existing is not None:
             return existing
-        custom_path = getattr(self.server, "custom_presets_path", None)
+        custom_path = self.server.custom_presets_path
         if not custom_path:
-            out_dir = getattr(self.server, "output_dir", None) or "output"
-            custom_path = os.path.join(str(out_dir), "custom_presets.json")
-        if custom_path and os.path.isfile(str(custom_path)):
-            return PresetPlanner(custom_presets_path=str(custom_path))
+            out_dir = self.server.output_dir or "output"
+            custom_path = os.path.join(out_dir, "custom_presets.json")
+        if custom_path and os.path.isfile(custom_path):
+            return PresetPlanner(custom_presets_path=custom_path)
         return PresetPlanner()
 
     if TYPE_CHECKING:
@@ -81,6 +82,25 @@ class BaseApiRoutesMixin:
         """Sends a JSON response with the specified HTTP status code."""
         send_json_response(self, status_code, data)  # type: ignore[arg-type]
 
+    def _resolve_document_and_language(
+        self,
+        raw_pdf: Optional[str],
+        raw_lang: Optional[str],
+    ) -> Tuple[str, str]:
+        """Resolves document path and language code from validated inputs or active session state."""
+        target_pdf = raw_pdf or self.session.pdf_path or self.server.default_doc
+        if not target_pdf:
+            raise ValueError("No document path provided in request payload or active session.")
+
+        pdf_path = resolve_pdf_path(target_pdf)
+        cleaned_lang = raw_lang
+        if isinstance(cleaned_lang, str) and cleaned_lang.strip().lower() in ("auto", "none", ""):
+            cleaned_lang = None
+        language = cleaned_lang or self.session.language or "en"
+        if isinstance(language, str) and language.strip().lower() in ("auto", "none", ""):
+            language = "en"
+        return pdf_path, str(language)
+
     def _extract_document_and_language(self, payload: Dict[str, Any]) -> Tuple[str, str]:
         """
         Extracts and resolves document path and language from request payload or session state.
@@ -94,19 +114,7 @@ class BaseApiRoutesMixin:
         Raises:
             ValueError: If no document path is provided in payload or session.
         """
-        raw_pdf = payload.get("pdf_path") or self.session.pdf_path
-        if not raw_pdf:
-            default_doc = getattr(self.server, "default_doc", None)
-            if default_doc:
-                raw_pdf = default_doc
-            else:
-                raise ValueError("No document path provided in request payload or active session.")
-
-        pdf_path = resolve_pdf_path(raw_pdf)
-        raw_lang = payload.get("language")
-        if isinstance(raw_lang, str) and raw_lang.strip().lower() in ("auto", "none", ""):
-            raw_lang = None
-        language = raw_lang or self.session.language or "en"
-        if isinstance(language, str) and language.strip().lower() in ("auto", "none", ""):
-            language = "en"
-        return pdf_path, str(language)
+        return self._resolve_document_and_language(
+            raw_pdf=payload.get("pdf_path"),
+            raw_lang=payload.get("language"),
+        )

@@ -31,6 +31,16 @@ from src.schemas.plan import (
     DocumentPlanSchema,
     PlannerCriteriaSchema,
 )
+from src.schemas.requests import (
+    AddDocumentsRequest,
+    DocumentTargetRequest,
+    RemoveRunRequest,
+    RerunPipelineRequest,
+    RunPipelineRequest,
+    SaveDomRequest,
+    SubmitPlanRequest,
+    VerifyLayersRequest,
+)
 from src.schemas.violations import (
     QualityViolationSchema,
     ViolationsReportSchema,
@@ -38,6 +48,7 @@ from src.schemas.violations import (
 )
 
 __all__ = [
+    "AddDocumentsRequest",
     "AttemptRecordSchema",
     "BoundingBoxSchema",
     "CustomPresetConfig",
@@ -45,12 +56,19 @@ __all__ = [
     "DecisionTreeSchema",
     "DocumentDOMSchema",
     "DocumentPlanSchema",
+    "DocumentTargetRequest",
     "ParameterWiggleSpec",
     "PipelineExecutionResultSchema",
     "PlannerCriteriaSchema",
     "PresetBackendType",
     "QualityViolationSchema",
+    "RemoveRunRequest",
+    "RerunPipelineRequest",
+    "RunPipelineRequest",
+    "SaveDomRequest",
+    "SubmitPlanRequest",
     "ValidatedRunArtifacts",
+    "VerifyLayersRequest",
     "ViolationsReportSchema",
     "load_validated_run_artifacts",
     "parse_violations_payload",

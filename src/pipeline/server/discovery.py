@@ -14,6 +14,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from src.dom.enums import DecisionStatus
 from src.pipeline.server.http_utils import REPO_ROOT
 from src.schemas import ValidatedRunArtifacts, load_validated_run_artifacts
 
@@ -73,12 +74,13 @@ class RunMetadata:
             if diff_scoring.get("current_overall_confidence") is not None:
                 raw_conf = float(diff_scoring["current_overall_confidence"])
             if diff_scoring.get("status"):
-                status = str(diff_scoring["status"])
+                status = DecisionStatus.coerce(diff_scoring["status"])
 
         doc_name = artifacts.document_name or "Unknown"
-        chosen_preset = artifacts.chosen_preset or "docling_fast"
+        chosen_preset = artifacts.chosen_preset or ""
+        preset_label = chosen_preset or "unknown"
         violations_count = len(active_viols_pages)
-        label = f"{doc_name} [{chosen_preset} | {status} {raw_conf:.4f} | {violations_count} viols] ({norm_rel})"
+        label = f"{doc_name} [{preset_label} | {status.value} {raw_conf:.4f} | {violations_count} viols] ({norm_rel})"
 
         return cls(
             id=norm_rel,
@@ -292,7 +294,7 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
 
         run_id = str(r.get("id") or r.get("dir_path") or "output")
         dir_path = str(r.get("dir_path") or "output")
-        preset = str(r.get("chosen_preset") or "docling_fast")
+        preset = str(r.get("chosen_preset") or "")
         status_val = str(r.get("status") or "ACCEPT")
         raw_conf = r.get("overall_confidence")
         overall_conf = float(raw_conf) if raw_conf is not None else DEFAULT_OVERALL_CONFIDENCE

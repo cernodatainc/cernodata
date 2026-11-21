@@ -271,7 +271,11 @@ class ViewerHydrationMixin:
                 diff=diff,
             )
 
-            preset_name = decision_dict.get("chosen_preset") or "docling_fast"
+            preset_name = str(
+                decision_dict.get("chosen_preset")
+                or decision_dict.get("preset_id")
+                or ""
+            )
 
             # Sync preset attempts
             attempts = decision_dict.get("attempts", [])
@@ -294,9 +298,10 @@ class ViewerHydrationMixin:
                     self.preset_attempts.append(record)
 
             # Cache executed preset result for reuse
-            self._preset_cache.put(
-                pdf_path=resolved_path,
-                preset=preset_name,
-                result=self.current_result,
-                language=language,
-            )
+            if preset_name:
+                self._preset_cache.put(
+                    pdf_path=resolved_path,
+                    preset=preset_name,
+                    result=self.current_result,
+                    language=language,
+                )

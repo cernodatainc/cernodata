@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from src.dom import DOMNode, DocumentDOM
+from src.dom.enums import DOMNodeType, ViolationSeverity
 from src.quality.handlers import VerificationLayerHandler, make_node_violation
 from src.quality.language_config import LanguageConfig
 from src.quality.layers import VerificationLayer
@@ -38,25 +39,25 @@ class StructureLayerHandler(VerificationLayerHandler):
         for _page_idx, p_nodes in pages_nodes.items():
             for idx, node in enumerate(p_nodes):
                 raw_text = (node.content.get("raw_text") or "").strip()
-                if node.type in ("paragraph", "heading") and not raw_text:
+                if node.type in (DOMNodeType.PARAGRAPH, DOMNodeType.HEADING) and not raw_text:
                     violations.append(
                         make_node_violation(
                             node=node,
                             counter=counter + len(violations),
                             v_type=VerificationLayer.STRUCTURE.value,
                             rule_type="empty_structural_container",
-                            severity="WARNING",
-                            description=f"Empty structural {node.type} container without textual content",
+                            severity=ViolationSeverity.WARNING.value,
+                            description=f"Empty structural {node.type.value} container without textual content",
                         )
                     )
-                elif node.type == "heading" and idx == len(p_nodes) - 1 and len(p_nodes) > 1:
+                elif node.type == DOMNodeType.HEADING and idx == len(p_nodes) - 1 and len(p_nodes) > 1:
                     violations.append(
                         make_node_violation(
                             node=node,
                             counter=counter + len(violations),
                             v_type=VerificationLayer.STRUCTURE.value,
                             rule_type="orphan_heading",
-                            severity="INFO",
+                            severity=ViolationSeverity.INFO.value,
                             detected_snippet=raw_text[:60],
                             description="Orphan heading detected at page boundary with zero trailing content",
                         )
@@ -75,7 +76,7 @@ class StructureLayerHandler(VerificationLayerHandler):
         if (suppressed_types or {}).get(VerificationLayer.STRUCTURE.value):
             return 1.0
         raw_text = (node.content.get("raw_text") or "").strip()
-        if node.type in ("paragraph", "heading") and not raw_text:
+        if node.type in (DOMNodeType.PARAGRAPH, DOMNodeType.HEADING) and not raw_text:
             return 0.0
         return 1.0
 
@@ -97,20 +98,20 @@ class TablesLayerHandler(VerificationLayerHandler):
     ) -> List[Dict[str, Any]]:
         violations: List[Dict[str, Any]] = []
         for node in dom.nodes:
-            if node.type != "table_grid":
+            if node.type != DOMNodeType.TABLE_GRID:
                 continue
-            rows = node.content.get("rows")
+            rows = node.table_rows
             if rows is None and (node.content.get("markdown_table") or "|" in str(node.content.get("raw_text", ""))):
                 from src.parsers.table_parser import parse_table_content
                 parsed = parse_table_content(
                     node.content.get("markdown_table") or node.content.get("raw_text", "")
                 )
                 node.content.update(parsed)
-                rows = parsed.get("rows")
+                rows = node.table_rows
 
             if "cell_alignment_score" in node.content and node.content["cell_alignment_score"] is not None:
                 align_score = float(node.content["cell_alignment_score"])
-            elif isinstance(rows, list):
+            elif rows is not None:
                 from src.parsers.table_parser import compute_table_alignment_score
                 align_score = compute_table_alignment_score(rows)
             else:
@@ -122,12 +123,12 @@ class TablesLayerHandler(VerificationLayerHandler):
                         counter=counter + len(violations),
                         v_type=VerificationLayer.TABLES.value,
                         rule_type="low_cell_alignment",
-                        severity="WARNING",
+                        severity=ViolationSeverity.WARNING.value,
                         detected_snippet=str(node.content.get("raw_text", ""))[:60],
                         description=f"Table cell alignment score degraded ({round(align_score, 2)} < 0.60)",
                     )
                 )
-            if isinstance(rows, list) and len(rows) > 1:
+            if rows is not None and len(rows) > 1:
                 row_lens = [len(r) for r in rows if isinstance(r, list)]
                 if len(set(row_lens)) > 1:
                     violations.append(
@@ -136,7 +137,7 @@ class TablesLayerHandler(VerificationLayerHandler):
                             counter=counter + len(violations),
                             v_type=VerificationLayer.TABLES.value,
                             rule_type="table_column_count_mismatch",
-                            severity="WARNING",
+                            severity=ViolationSeverity.WARNING.value,
                             detected_snippet=f"Column counts: {row_lens[:4]}",
                             description="Inconsistent column counts across table rows",
                         )
@@ -154,12 +155,13 @@ class TablesLayerHandler(VerificationLayerHandler):
     ) -> float:
         if (suppressed_types or {}).get(VerificationLayer.TABLES.value):
             return 1.0
-        if node.type == "table_grid":
+        if node.type == DOMNodeType.TABLE_GRID:
             if "cell_alignment_score" in node.content:
                 return float(node.content["cell_alignment_score"])
-            if "rows" in node.content and isinstance(node.content["rows"], list):
+            rows = node.table_rows
+            if rows is not None:
                 from src.parsers.table_parser import compute_table_alignment_score
-                return compute_table_alignment_score(node.content["rows"])
+                return compute_table_alignment_score(rows)
             if "markdown_table" in node.content and isinstance(node.content["markdown_table"], str):
                 from src.parsers.table_parser import parse_markdown_table
                 return parse_markdown_table(node.content["markdown_table"]).cell_alignment_score
@@ -189,13 +191,25 @@ class GeometryLayerHandler(VerificationLayerHandler):
         violations: List[Dict[str, Any]] = []
         for node in dom.nodes:
             bbox = node.bounding_box
-            issue: Optional[ tuple[str, str, str] ] = None
+            issue: Optional[tuple[str, ViolationSeverity, str]] = None
             if bbox.x1 < bbox.x0 or bbox.y1 < bbox.y0:
-                issue = ("inverted_bounding_box", "HIGH", f"Inverted bounding box coordinates ({bbox.x0}, {bbox.y0}) -> ({bbox.x1}, {bbox.y1})")
+                issue = (
+                    "inverted_bounding_box",
+                    ViolationSeverity.HIGH,
+                    f"Inverted bounding box coordinates ({bbox.x0}, {bbox.y0}) -> ({bbox.x1}, {bbox.y1})",
+                )
             elif bbox.x0 < 0.0 or bbox.y0 < 0.0:
-                issue = ("out_of_bounds_bounding_box", "WARNING", f"Negative coordinate out-of-bounds bounding box ({bbox.x0}, {bbox.y0})")
+                issue = (
+                    "out_of_bounds_bounding_box",
+                    ViolationSeverity.WARNING,
+                    f"Negative coordinate out-of-bounds bounding box ({bbox.x0}, {bbox.y0})",
+                )
             elif bbox.width <= 0.0 or bbox.height <= 0.0:
-                issue = ("zero_area_bounding_box", "WARNING", f"Degenerate zero-area bounding box ({bbox.width}x{bbox.height})")
+                issue = (
+                    "zero_area_bounding_box",
+                    ViolationSeverity.WARNING,
+                    f"Degenerate zero-area bounding box ({bbox.width}x{bbox.height})",
+                )
             if issue is not None:
                 rule_type, severity, desc = issue
                 violations.append(
@@ -204,7 +218,7 @@ class GeometryLayerHandler(VerificationLayerHandler):
                         counter=counter + len(violations),
                         v_type=VerificationLayer.GEOMETRY.value,
                         rule_type=rule_type,
-                        severity=severity,
+                        severity=severity.value,
                         detected_snippet=str(node.content.get("raw_text", ""))[:60],
                         description=desc,
                     )

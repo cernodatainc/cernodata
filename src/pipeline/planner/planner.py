@@ -229,8 +229,7 @@ class PresetPlanner:
         """Interactive in-browser data shape configuration wizard delegating to server launcher."""
         import importlib
         server_launcher = importlib.import_module("src.pipeline.server.launcher")
-        runner = getattr(server_launcher, "serve_data_shape_wizard")
-        return runner(
+        return server_launcher.serve_data_shape_wizard(
             planner=self,
             default_doc=default_doc,
             default_lang=default_lang,
