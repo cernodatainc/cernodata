@@ -7,13 +7,14 @@ Provides base handler interface and text-level verification implementations (Sym
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from src.dom import DOMNode, DocumentDOM
 from src.quality.garbage import compute_garbage_details, compute_garbage_ratio
 from src.quality.language import compute_language_score
-from src.quality.language_config import LanguageConfig
+from src.quality.language_config import LanguageConfig, get_language_config
 from src.quality.layers import LAYER_METADATA, VerificationLayer
 
 
@@ -62,11 +63,14 @@ def get_suppressed_violation_lookup(node: DOMNode) -> Dict[str, bool]:
         if isinstance(ev, dict):
             is_supp = is_violation_suppressed(ev)
             if ev.get("violation_id"):
-                lookup[str(ev["violation_id"])] = is_supp
+                k_id = str(ev["violation_id"])
+                lookup[k_id] = lookup.get(k_id, False) or is_supp
             if ev.get("rule_type"):
-                lookup[str(ev["rule_type"])] = is_supp
+                k_rule = str(ev["rule_type"])
+                lookup[k_rule] = lookup.get(k_rule, False) or is_supp
             if ev.get("type"):
-                lookup[str(ev["type"])] = is_supp
+                k_type = str(ev["type"])
+                lookup[k_type] = lookup.get(k_type, False) or is_supp
     return lookup
 
 
@@ -145,11 +149,30 @@ class SymbolsLayerHandler(VerificationLayerHandler):
         return VerificationLayer.SYMBOLS.value
 
     @staticmethod
+    def _extract_verifiable_text(node: DOMNode, raw_text: str) -> str:
+        """Extracts cell text for table_grid nodes so markdown borders do not trigger noise checks."""
+        if node.type != "table_grid":
+            return raw_text
+        rows = node.content.get("rows")
+        if isinstance(rows, list) and rows:
+            cells = [str(c).strip() for r in rows if isinstance(r, list) for c in r if str(c).strip()]
+            if cells:
+                return " ".join(cells)
+        if "|" in raw_text:
+            stripped = re.sub(r"^\s*\|[\s:\-\|]+\|\s*$", " ", raw_text, flags=re.MULTILINE)
+            return re.sub(r"\s*\|\s*", " ", stripped).strip()
+        return raw_text
+
+    @staticmethod
     def check_node_violations(
-        node: DOMNode, raw_text: str, counter: int, threshold: float = 0.05
+        node: DOMNode,
+        raw_text: str,
+        counter: int,
+        threshold: float = 0.05,
     ) -> List[Dict[str, Any]]:
         """Checks node raw text for OCR damage, punctuation soup, or corrupt characters."""
-        details = compute_garbage_details(raw_text)
+        verif_text = SymbolsLayerHandler._extract_verifiable_text(node, raw_text)
+        details = compute_garbage_details(verif_text)
         gb_ratio = details["ratio"]
         if gb_ratio <= threshold:
             return []
@@ -205,8 +228,9 @@ class SymbolsLayerHandler(VerificationLayerHandler):
         if supp.get("symbols"):
             return 1.0
         raw_text = node.content.get("raw_text", "")
+        verif_text = self._extract_verifiable_text(node, raw_text)
         base_confidence = float(node.content.get("confidence", 1.0))
-        return max(0.0, base_confidence - (compute_garbage_ratio(raw_text) * garbage_multiplier))
+        return max(0.0, base_confidence - (compute_garbage_ratio(verif_text) * garbage_multiplier))
 
 
 class DiacriticsLayerHandler(VerificationLayerHandler):
@@ -245,7 +269,7 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
             for char_val, match_snippet, suggested in items:
                 has_replacement = bool(suggested and suggested != match_snippet)
                 rewrite = (
-                    raw_text.replace(match_snippet, suggested, 1)
+                    re.sub(rf"\b{re.escape(match_snippet)}\b", suggested, raw_text, count=1)
                     if (match_snippet and has_replacement)
                     else None
                 )
@@ -272,6 +296,14 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
         page_configs: Optional[Dict[int, Optional[LanguageConfig]]] = None,
         fixed_config: Optional[LanguageConfig] = None,
     ) -> List[Dict[str, Any]]:
+        if page_configs is None and fixed_config is None:
+            lang = (language or "en").lower().strip()
+            if lang == "auto":
+                from src.quality.language import detect_document_languages
+                page_langs = detect_document_languages(dom)
+                page_configs = {p: get_language_config(code) for p, code in page_langs.items()}
+            else:
+                fixed_config = get_language_config(lang)
         violations: List[Dict[str, Any]] = []
         for node in dom.nodes:
             raw_text = node.content.get("raw_text", "")
@@ -289,9 +321,12 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
         garbage_multiplier: float = 3.0,
     ) -> float:
         supp = suppressed_types or {}
-        effective_hit = 0.0 if supp.get("diacritic") else diacritic_hit
+        if supp.get("diacritic") or supp.get("diacritics"):
+            return 1.0
         raw_text = node.content.get("raw_text", "")
-        return compute_language_score(raw_text, language=language, diacritic_hit=effective_hit)
+        if config is not None:
+            return config.compute_score(raw_text, diacritic_hit=diacritic_hit)
+        return compute_language_score(raw_text, language=language, diacritic_hit=diacritic_hit)
 
     def compute_page_penalty(
         self,
@@ -301,14 +336,16 @@ class DiacriticsLayerHandler(VerificationLayerHandler):
         config: Optional[LanguageConfig] = None,
         max_penalty: float = 0.60,
     ) -> float:
-        if not config or diacritic_hit <= 0:
+        cfg = config or get_language_config((language or "en").lower().strip())
+        if not cfg or diacritic_hit <= 0:
             return 0.0
         anomalies_count = 0
         for node in nodes:
-            if not get_suppressed_violation_types(node).get("diacritic"):
+            supp = get_suppressed_violation_types(node)
+            if not (supp.get("diacritic") or supp.get("diacritics")):
                 raw_text = node.content.get("raw_text", "")
-                anomalies_count += len(config.find_anomalous_substitutions(raw_text))
-                anomalies_count += len(config.find_diacritic_conflicts(raw_text))
+                anomalies_count += len(cfg.find_anomalous_substitutions(raw_text))
+                anomalies_count += len(cfg.find_diacritic_conflicts(raw_text))
         return min(max_penalty, anomalies_count * diacritic_hit) if anomalies_count > 0 else 0.0
 
 

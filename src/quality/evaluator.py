@@ -87,6 +87,9 @@ def evaluate_page_confidence_details(
 
     active_layers = ActiveVerificationLayers.from_layers(layers)
 
+    if language and language.lower().strip() == "auto":
+        language, _, _ = detect_page_language(nodes)
+
     q_cfg = load_quality_config()
     config = get_language_config(language)
     hit = diacritic_hit if diacritic_hit is not None else q_cfg.get(
@@ -121,18 +124,18 @@ def evaluate_page_confidence_details(
 
         s_score = 1.0
         if active_layers.structure:
-            s_score = _STRUCTURE_HANDLER.evaluate_node(node)
+            s_score = _STRUCTURE_HANDLER.evaluate_node(node, suppressed_types=suppressed_types)
             struct_scores.append(s_score)
 
         g_score = 1.0
         if active_layers.geometry:
-            g_score = _GEOMETRY_HANDLER.evaluate_node(node)
+            g_score = _GEOMETRY_HANDLER.evaluate_node(node, suppressed_types=suppressed_types)
             geom_scores.append(g_score)
 
         combined_text_score = c_score * l_score * s_score * g_score
 
         if node.type == "table_grid" and active_layers.tables:
-            t_score = _TABLES_HANDLER.evaluate_node(node)
+            t_score = _TABLES_HANDLER.evaluate_node(node, suppressed_types=suppressed_types)
             table_scores.append(t_score)
             score = 0.5 * combined_text_score + 0.5 * t_score
         else:

@@ -156,11 +156,11 @@ def extract_table_headers_and_title(
     r0 = rows[0]
     r0_clean = [c.strip() for c in r0 if c.strip()]
     is_spanning = False
-    if r0_clean and len(set(r0_clean)) == 1 and (len(r0) == num_cols or len(r0_clean) == num_cols):
+    if num_cols > 1 and r0_clean and len(set(r0_clean)) == 1 and (len(r0) == num_cols or len(r0_clean) == num_cols):
         is_spanning = True
-    elif grid_cells and len(grid_cells) > 0 and len(grid_cells[0]) > 0:
+    elif num_cols > 1 and grid_cells and len(grid_cells) > 0 and len(grid_cells[0]) > 0:
         c0 = grid_cells[0][0]
-        if isinstance(c0, SpanningCell) and c0.col_span >= num_cols and r0_clean:
+        if isinstance(c0, SpanningCell) and int(c0.col_span or 1) >= num_cols and r0_clean:
             is_spanning = True
     if is_spanning and len(rows) > 1:
         title = r0_clean[0]
@@ -282,7 +282,7 @@ def parse_markdown_table(
         grid.append(grid_row)
 
     score = compute_table_alignment_score(raw_rows, expected_cols=max_cols, preset=preset)
-    data_sub = raw_rows[1:] if (headers and len(raw_rows) > 1) else raw_rows
+    data_sub = raw_rows[1:] if headers else raw_rows
     clean_md = generate_markdown_table(headers=headers, rows=data_sub, alignments=column_alignments)
 
     return ParsedTable(
@@ -352,15 +352,11 @@ def parse_docling_table(
                         logger.debug("Failed cell confidence extraction: %s", ex)
                 text_val = _extract_cell_text(cell_obj, doc)
                 is_hdr = bool(cell_obj.column_header) if isinstance(cell_obj, HeaderCell) else False
-                row_span = int(cell_obj.row_span) if isinstance(cell_obj, SpanningCell) else 1
-                col_span = int(cell_obj.col_span) if isinstance(cell_obj, SpanningCell) else 1
+                row_span = int(cell_obj.row_span or 1) if isinstance(cell_obj, SpanningCell) else 1
+                col_span = int(cell_obj.col_span or 1) if isinstance(cell_obj, SpanningCell) else 1
                 bbox_dict = (
-                    {
-                        "x0": float(cell_obj.bbox.l),
-                        "y0": float(cell_obj.bbox.t),
-                        "x1": float(cell_obj.bbox.r),
-                        "y1": float(cell_obj.bbox.b),
-                    }
+                    {"x0": float(cell_obj.bbox.l), "y0": float(cell_obj.bbox.t),
+                     "x1": float(cell_obj.bbox.r), "y1": float(cell_obj.bbox.b)}
                     if isinstance(cell_obj, BBoxBearing) and cell_obj.bbox is not None
                     else None
                 )
@@ -374,7 +370,15 @@ def parse_docling_table(
         rows.append(row_vals)
         grid.append(grid_row)
 
+    orig_rows_len = len(rows)
     headers, rows, table_title = extract_table_headers_and_title(rows, num_cols, grid_cells=grid_cells)
+    if table_title and len(rows) == orig_rows_len - 1:
+        grid = grid[1:] if len(grid) > 1 else []
+        cell_records = [cell_rec for cell_rec in cell_records if int(cell_rec.get("row_idx", 0)) >= 1]
+        for cell_rec in cell_records:
+            cell_rec["row_idx"] = int(cell_rec["row_idx"]) - 1
+            if headers and cell_rec["row_idx"] == 0:
+                cell_rec["is_header"] = True
     num_rows = len(rows)
     columns = build_column_oriented_view(rows, num_cols)
 
@@ -386,25 +390,15 @@ def parse_docling_table(
             logger.debug("Failed export_to_markdown: %s", ex)
             md_table = ""
     if not md_table:
-        md_table = generate_markdown_table(headers=headers, rows=rows[1:] if (headers and len(rows) > 1) else rows)
+        md_table = generate_markdown_table(headers=headers, rows=rows[1:] if headers else rows)
 
+    align_sc = compute_table_alignment_score(
+        rows, expected_cols=num_cols, cell_confidences=cell_confidences or None, preset=preset
+    )
     return ParsedTable(
-        headers=headers,
-        rows=rows,
-        columns=columns,
-        num_rows=num_rows,
-        num_cols=num_cols,
-        cells=cell_records,
-        grid=grid,
-        column_alignments=["default"] * num_cols,
-        markdown_table=md_table,
-        title=table_title,
-        cell_alignment_score=compute_table_alignment_score(
-            rows,
-            expected_cols=num_cols,
-            cell_confidences=cell_confidences if cell_confidences else None,
-            preset=preset,
-        ),
+        headers=headers, rows=rows, columns=columns, num_rows=num_rows, num_cols=num_cols,
+        cells=cell_records, grid=grid, column_alignments=["default"] * num_cols,
+        markdown_table=md_table, title=table_title, cell_alignment_score=align_sc,
         is_consistent=len(set(len(r) for r in rows)) <= 1,
     )
 
@@ -437,7 +431,8 @@ def parse_table_content(
             num_cols = max((len(r) for r in rows if isinstance(r, list)), default=0)
             headers = list(table_input.get("headers") or (rows[0] if rows else []))
             columns = table_input.get("columns") or build_column_oriented_view(rows, num_cols)
-            score = float(table_input.get("cell_alignment_score") or compute_table_alignment_score(rows, preset=preset))
+            raw_sc = table_input.get("cell_alignment_score")
+            score = float(raw_sc) if raw_sc is not None else compute_table_alignment_score(rows, preset=preset)
             return {
                 **table_input,
                 "rows": rows,

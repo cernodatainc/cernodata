@@ -56,15 +56,14 @@ class RunLoaderMixin:
         """
         with self._lock:
             norm_rel, step_idx = parse_run_dir_and_step(output_dir)
-            self.output_dir = norm_rel
-            self.active_step = step_idx
-            self.viewer_data = None
             full_dir = norm_rel if os.path.isabs(norm_rel) else os.path.join(self.repo_root, norm_rel)
             if not os.path.exists(full_dir):
                 logger.warning("Requested output directory does not exist: %s", full_dir)
-                self.current_result = None
-                self.preset_attempts = []
                 return {}
+
+            self.output_dir = norm_rel
+            self.active_step = step_idx
+            self.viewer_data = None
 
             artifacts = load_run_artifacts(full_dir)
             plan_dict = artifacts.plan
@@ -116,6 +115,8 @@ class RunLoaderMixin:
                         default_action="ACCEPT_OUTPUT",
                     )
                 ]
+            else:
+                self.preset_attempts = []
 
             raw_dom = artifacts.raw_dom or dom_dict
             diff = artifacts.diff or {}
@@ -138,6 +139,7 @@ class RunLoaderMixin:
 
             raw_chosen = decision_dict.get("chosen_preset")
             chosen_preset = str(raw_chosen) if raw_chosen is not None else "unknown"
+            artifact_chosen_preset = chosen_preset
 
             viol_count = len(viol_list)
 
@@ -150,13 +152,17 @@ class RunLoaderMixin:
                 if not target_att and 0 <= step_idx - 1 < len(self.preset_attempts):
                     target_att = self.preset_attempts[step_idx - 1]
             if target_att:
-                chosen_preset = str(target_att.get("preset", chosen_preset))
-                conf_val = float(target_att.get("overall_confidence", conf_val) or conf_val)
-                status_val = str(target_att.get("status", status_val))
-                viol_count = int(target_att.get("violations_count", viol_count))
+                chosen_preset = str(target_att.get("preset") or chosen_preset)
+                raw_att_conf = target_att.get("overall_confidence")
+                if raw_att_conf is not None:
+                    conf_val = float(raw_att_conf)
+                status_val = str(target_att.get("status") or status_val)
+                raw_att_viols = target_att.get("violations_count")
+                if raw_att_viols is not None:
+                    viol_count = int(raw_att_viols)
 
-            # Cache loaded preset result for instant reuse without redundant reruns
-            if dom_dict:
+            # Cache loaded preset result only when on-disk DOM matches the active preset
+            if dom_dict and chosen_preset == artifact_chosen_preset:
                 self._preset_cache.put(
                     pdf_path=self.pdf_path,
                     preset=chosen_preset,

@@ -16,7 +16,7 @@ ALLOWED_STANDALONE: Set[str] = {
     '...', '…'
 }
 
-# Common allowed 1-2 letter words across supported languages (PL, EN, DE)
+# Common allowed 1-2 letter words across supported languages (PL, EN, DE, FR, ES)
 VALID_SHORT_WORDS: Set[str] = {
     'iv', 'vi', 'ix', 'xi',
     # Polish
@@ -30,6 +30,11 @@ VALID_SHORT_WORDS: Set[str] = {
     'he', 'me', 'us', 'so', 'if', 'up', 'am', 'ok',
     # German (additional distinct)
     'er', 'es', 'um', 'zu', 'ab', 'ob', 'da', 'wo', 'du',
+    # French (additional distinct)
+    'le', 'la', 'de', 'un', 'et', 'au', 'ce', 'ou', 'où', 'ne', 'se', 'si',
+    'il', 'y', 'à', 'en', 'on', 'ça',
+    # Spanish (additional distinct)
+    'el', 'al', 'lo', 'ya', 'mi', 'te', 'ha', 'sí', 'ii',
 }
 
 MIN_ALNUM_RATIO: float = 0.40
@@ -56,8 +61,8 @@ def evaluate_unicode_anomalies(text: str) -> int:
 
 
 def evaluate_character_repetitions(text: str) -> int:
-    """Counts characters participating in runs of 4 or more identical consecutive characters."""
-    pattern = rf"(.)\1{{{REPEAT_CHAR_THRESHOLD - 1},}}"
+    """Counts non-whitespace characters participating in runs of 4 or more identical characters."""
+    pattern = rf"(\S)\1{{{REPEAT_CHAR_THRESHOLD - 1},}}"
     return sum(len(m.group(0)) for m in re.finditer(pattern, text))
 
 
@@ -115,9 +120,16 @@ def evaluate_punctuation_soup_and_noise(text: str, tokens: List[str]) -> Tuple[i
             soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT
             noise_tokens.append(stripped)
         elif len(stripped) <= 2 and any(unicodedata.category(c).startswith('P') for c in stripped) and not is_bullet_or_allowed:
-            # Short fragment containing punctuation like 'h)'
-            soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT
-            noise_tokens.append(stripped)
+            is_list_marker = bool(re.match(r"^\d[.:)]$", stripped))
+            is_valid_short_punct = (
+                len(stripped) == 2
+                and stripped[0].lower() in VALID_SHORT_WORDS
+                and stripped[1] in ",.;:!?"
+            )
+            if not is_list_marker and not is_valid_short_punct:
+                # Short fragment containing punctuation like 'h)'
+                soup_chars += len(stripped) * SOUP_PENALTY_WEIGHT
+                noise_tokens.append(stripped)
         elif len(stripped) <= 2 and stripped.isalnum() and not stripped.isdigit():
             # 1-2 char word not in valid list
             if stripped.lower() not in VALID_SHORT_WORDS:

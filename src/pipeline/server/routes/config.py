@@ -109,7 +109,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             })
             return
 
-        registered = [self.session.register_document(p) for p in paths]
+        registered = [r for r in (self.session.register_document(p) for p in paths) if r]
         self.send_ok({
             "cancelled": False,
             "paths": registered,
@@ -135,7 +135,7 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             self.send_bad_request("Missing 'file_path', 'path', or 'paths' in request payload.")
             return
 
-        registered = [self.session.register_document(p) for p in raw_paths]
+        registered = [r for r in (self.session.register_document(p) for p in raw_paths) if r]
         self.send_ok({
             "paths": registered,
             "file_path": registered[0] if registered else "",
@@ -291,9 +291,9 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
 
         if config.backend_type == PresetBackendType.HTTP_ENDPOINT:
             url = config.endpoint_url or ""
-            req = urllib.request.Request(url, method="GET")
             timeout = min(int(config.timeout_sec), 5)
             try:
+                req = urllib.request.Request(url, method="GET")
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     status_code = getattr(resp, "status", 200)
                 self.send_json(200, {

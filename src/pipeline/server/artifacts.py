@@ -97,8 +97,8 @@ def _resolve_decision(
     if html_decision and not saved_dec:
         plan_mtime = os.path.getmtime(plan_res_path) if os.path.exists(plan_res_path) else 0.0
         html_mtime = os.path.getmtime(html_path)
-        dec_page_count = len(decision_data.get("per_page_confidence", {})) if decision_data else 0
-        html_page_count = len(html_decision.get("per_page_confidence", {}))
+        dec_page_count = len(decision_data.get("per_page_confidence") or {}) if decision_data else 0
+        html_page_count = len(html_decision.get("per_page_confidence") or {})
 
         # Favor HTML decision if plan_execution_result was missing, HTML is newer, or HTML has more page scores
         if not decision_data or html_mtime > plan_mtime or html_page_count > dec_page_count:
@@ -113,7 +113,7 @@ def _backfill_page_confidence(
 ) -> None:
     """Computes confidence for pages missing from the decision, mutating decision_data in place."""
     total_pages = int(dom_data.get("total_pages", 1) or 1)
-    per_page_conf = dict(decision_data.get("per_page_confidence", {}))
+    per_page_conf = dict(decision_data.get("per_page_confidence") or {})
     missing_pages = [p for p in range(1, total_pages + 1) if str(p) not in per_page_conf and p not in per_page_conf]
 
     if not (missing_pages and dom_data.get("nodes")):

@@ -265,11 +265,11 @@ function escapeHtml(str) {
  * @returns {string} Text string with all suggested replacements applied.
  */
 function applyCorrectionsToNodeText(rawText) {
-    let text = rawText;
-    const viols = extractViolationsList(initialViolationsData);
+    let text = String(rawText || '');
+    const viols = (typeof getViolationsList === 'function') ? getViolationsList() : extractViolationsList(initialViolationsData);
     viols.forEach(v => {
         if (v.detected_snippet && v.suggested_correction) {
-            text = text.replace(new RegExp(v.detected_snippet, 'g'), v.suggested_correction);
+            text = text.split(v.detected_snippet).join(v.suggested_correction);
         }
     });
     return text;

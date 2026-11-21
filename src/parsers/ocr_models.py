@@ -113,7 +113,15 @@ def normalize_bbox_coords(
             float(bbox.get("y1", 0.0)),
         )
 
-    if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
-        return float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+    if hasattr(bbox, "tolist") and not isinstance(bbox, (str, bytes, bytearray, dict)):
+        bbox = bbox.tolist()  # type: ignore[union-attr]
+
+    if isinstance(bbox, Sequence) and not isinstance(bbox, (str, bytes, bytearray)) and len(bbox) >= 4:
+        first = bbox[0]
+        if isinstance(first, Sequence) and not isinstance(first, (str, bytes, bytearray)):
+            xs = [float(p[0]) for p in bbox]  # type: ignore[index]
+            ys = [float(p[1]) for p in bbox]  # type: ignore[index]
+            return min(xs), min(ys), max(xs), max(ys)
+        return float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])  # type: ignore[arg-type]
 
     raise TypeError(f"Unsupported bounding box coordinate specification: {type(bbox)}")

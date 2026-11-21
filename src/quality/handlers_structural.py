@@ -72,6 +72,8 @@ class StructureLayerHandler(VerificationLayerHandler):
         suppressed_types: Optional[Dict[str, bool]] = None,
         garbage_multiplier: float = 3.0,
     ) -> float:
+        if (suppressed_types or {}).get(VerificationLayer.STRUCTURE.value):
+            return 1.0
         raw_text = (node.content.get("raw_text") or "").strip()
         if node.type in ("paragraph", "heading") and not raw_text:
             return 0.0
@@ -106,7 +108,13 @@ class TablesLayerHandler(VerificationLayerHandler):
                 node.content.update(parsed)
                 rows = parsed.get("rows")
 
-            align_score = float(node.content.get("cell_alignment_score", 1.0))
+            if "cell_alignment_score" in node.content and node.content["cell_alignment_score"] is not None:
+                align_score = float(node.content["cell_alignment_score"])
+            elif isinstance(rows, list):
+                from src.parsers.table_parser import compute_table_alignment_score
+                align_score = compute_table_alignment_score(rows)
+            else:
+                align_score = 1.0
             if align_score < 0.60:
                 violations.append(
                     make_node_violation(
@@ -144,6 +152,8 @@ class TablesLayerHandler(VerificationLayerHandler):
         suppressed_types: Optional[Dict[str, bool]] = None,
         garbage_multiplier: float = 3.0,
     ) -> float:
+        if (suppressed_types or {}).get(VerificationLayer.TABLES.value):
+            return 1.0
         if node.type == "table_grid":
             if "cell_alignment_score" in node.content:
                 return float(node.content["cell_alignment_score"])
@@ -153,7 +163,7 @@ class TablesLayerHandler(VerificationLayerHandler):
             if "markdown_table" in node.content and isinstance(node.content["markdown_table"], str):
                 from src.parsers.table_parser import parse_markdown_table
                 return parse_markdown_table(node.content["markdown_table"]).cell_alignment_score
-            raw_text = str(node.content.get("text", "")).strip()
+            raw_text = str(node.content.get("raw_text") or node.content.get("text") or "").strip()
             if raw_text and "|" in raw_text:
                 from src.parsers.table_parser import parse_markdown_table
                 return parse_markdown_table(raw_text).cell_alignment_score
@@ -210,8 +220,17 @@ class GeometryLayerHandler(VerificationLayerHandler):
         suppressed_types: Optional[Dict[str, bool]] = None,
         garbage_multiplier: float = 3.0,
     ) -> float:
+        if (suppressed_types or {}).get(VerificationLayer.GEOMETRY.value):
+            return 1.0
         bbox = node.bounding_box
-        if bbox.width <= 0.0 or bbox.height <= 0.0 or bbox.x1 < bbox.x0 or bbox.y1 < bbox.y0:
+        if (
+            bbox.width <= 0.0
+            or bbox.height <= 0.0
+            or bbox.x1 < bbox.x0
+            or bbox.y1 < bbox.y0
+            or bbox.x0 < 0.0
+            or bbox.y0 < 0.0
+        ):
             return 0.0
         return 1.0
 

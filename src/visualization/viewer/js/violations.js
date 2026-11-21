@@ -132,7 +132,7 @@ function renderViolationsList() {
             hasFixable
         );
  
-        const itemsContainer = bundleEl.querySelector(`#bundle-items-${cat}`);
+        const itemsContainer = bundleEl.querySelector('.viol-bundle-items');
         catViols.forEach(v => {
             const card = document.createElement('div');
             const isFixed = !!v.is_fixed;
@@ -436,28 +436,25 @@ function applySingleFix(evt, idOrNodeId, snippet = null, fix = null) {
         }
     }
  
-    node.is_fixed = true;
- 
     if (targetViol) {
         targetViol.is_fixed = true;
     }
- 
     if (targetSnippet) {
-        const viols = getViolationsList();
-        viols.forEach(v => {
+        getViolationsList().forEach(v => {
             if (v.node_id === targetNodeId && v.detected_snippet === targetSnippet) {
                 v.is_fixed = true;
             }
         });
     }
- 
     if (node.violations) {
         node.violations.forEach(nv => {
-            if (nv.node_id === targetNodeId || (targetViol && nv.violation_id === targetViol.violation_id)) {
+            if ((targetViol && nv.violation_id === targetViol.violation_id) || (targetSnippet && nv.detected_snippet === targetSnippet)) {
                 nv.is_fixed = true;
             }
         });
     }
+    const remaining = getViolationsList().filter(v => v.node_id === targetNodeId);
+    node.is_fixed = remaining.length > 0 ? remaining.every(v => v.is_fixed || isSuppressed(v)) : true;
  
     if (typeof syncDomAndViolations === 'function') {
         syncDomAndViolations();

@@ -61,7 +61,11 @@ MAPPINGS_FILENAME = "run_mappings.json"
 _ROOT_OUTPUT_ARTIFACTS = (
     "plan_execution_result.json",
     "document_dom.json",
+    "raw_document_dom.json",
     "plan.json",
+    "decision_tree.json",
+    "run_diff.json",
+    "verification_result.json",
     "interactive_viewer.html",
     "quality_violations.json",
 )
@@ -194,6 +198,9 @@ def record_run_mapping(
         if is_excluded_path(norm_path, repo_root=repo_root):
             return
         doc_entry = mappings.setdefault(norm_path, _make_doc_entry(norm_path))
+        if "file_name" not in doc_entry or "file_path" not in doc_entry:
+            for k, v in _make_doc_entry(norm_path).items():
+                doc_entry.setdefault(k, v)
 
         run_record = _make_run_record(
             run_id, output_dir, preset, status, confidence, violations_count,
@@ -245,7 +252,7 @@ def register_document_path(document_path: str, repo_root: Optional[str] = None) 
         unforget_document(norm, repo_root=root)
         mappings = load_persistent_mappings(root)
         if norm not in mappings:
-            mappings[norm] = {"runs": []}
+            mappings[norm] = _make_doc_entry(norm)
         save_persistent_mappings(mappings, root)
 
 

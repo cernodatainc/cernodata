@@ -47,7 +47,16 @@ def normalize_to_pil(
         return image_input.convert("RGB")
 
     if isinstance(image_input, np.ndarray):
-        arr = image_input if image_input.ndim == 2 else image_input[:, :, :3]
+        if image_input.ndim not in (2, 3) or image_input.size == 0:
+            raise ValueError("Invalid numpy array shape for image conversion.")
+        if image_input.ndim == 3 and image_input.shape[2] == 1:
+            arr = image_input[:, :, 0]
+        elif image_input.ndim == 2:
+            arr = image_input
+        else:
+            arr = image_input[:, :, :3]
+        if arr.dtype != np.uint8:
+            arr = arr.astype(np.uint8)
         return Image.fromarray(arr).convert("RGB")
 
     if isinstance(image_input, (str, os.PathLike)):

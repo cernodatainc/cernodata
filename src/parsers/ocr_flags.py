@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 _TRUTHY_VALUES = {"1", "true", "yes", "on"}
 _KNOWN_BOOL_KEYS = {"binarize", "bw", "invert"}
-_KNOWN_VALUE_KEYS = {"psm", "oem", "threshold", "contrast", "scale", "whitelist"}
+_KNOWN_VALUE_KEYS = {"psm", "oem", "threshold", "contrast", "scale", "whitelist", "tessedit_char_whitelist"}
 _KNOWN_FLAG_KEYS = _KNOWN_BOOL_KEYS | _KNOWN_VALUE_KEYS
 _NUMBER_RE = re.compile(r"^-?\d+(?:\.\d+)?$")
 
@@ -172,7 +172,7 @@ def parse_ocr_custom_flags(custom_flags: Optional[str]) -> OCRCustomFlags:
             parsed_scale = _parse_float(val)
             if parsed_scale is not None:
                 result["scale"] = max(0.5, min(6.0, parsed_scale))
-        elif key == "whitelist" and val is not None:
+        elif key in ("whitelist", "tessedit_char_whitelist") and val is not None:
             result["whitelist"] = val
         elif tok.startswith("-") and key not in _KNOWN_FLAG_KEYS:
             extra_tess_tokens.append(tok)

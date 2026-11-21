@@ -98,6 +98,8 @@ def normalize_layer_name(name: str) -> Optional[str]:
     if not name:
         return None
     cleaned = name.strip().lower()
+    if not cleaned:
+        return None
     return LAYER_ALIASES.get(cleaned, cleaned)
 
 

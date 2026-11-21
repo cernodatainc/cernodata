@@ -169,13 +169,15 @@ def build_viewer_html(
         plan_header_sub = f" | Plan: {tax} ({hw}){ov_text}"
 
     timeline_buttons = build_timeline_buttons(decision, plan)
-    per_page = decision.get("per_page_confidence", {})
+    per_page = (decision.get("per_page_confidence") or {}) if decision else {}
+    raw_overall = decision.get("overall_confidence") if decision else None
+    overall_val = float(raw_overall) if raw_overall is not None else 1.0
     p1_val = per_page.get("1") if "1" in per_page else per_page.get(1)
     if p1_val is None:
-        p1_val = decision.get("overall_confidence", 1.0)
+        p1_val = overall_val
     page1_conf = f"{float(p1_val):.4f}"
-    overall_conf = f"{float(decision.get('overall_confidence', 1.0)):.4f}"
-    status_text = decision.get("status", "ACCEPT")
+    overall_conf = f"{overall_val:.4f}"
+    status_text = (decision.get("status") or "ACCEPT") if decision else "ACCEPT"
 
     total_pages = dom.total_pages or len(page_images) or 1
     page_images_json = json.dumps(page_images)
@@ -184,8 +186,12 @@ def build_viewer_html(
     output_dir_json = json.dumps(output_dir or "output")
     active_lang_json = json.dumps(active_lang)
 
+    def _safe_script_json(s: str) -> str:
+        return s.replace("</", "<\\/")
+
     replacements = {
         "<!-- __VIEWER_CSS__ -->": css_content,
+        "<!-- __VIEWER_JS__ -->": js_content,
         "<!-- __TIMELINE_BUTTONS__ -->": timeline_buttons,
         "{{ dom_source_filename }}": dom.source_filename,
         "{{ dom_document_id }}": dom.document_id,
@@ -201,17 +207,16 @@ def build_viewer_html(
         "{{ dom_node_count }}": str(len(dom.nodes)),
         "{{ primary_detected }}": primary_detected,
         **{f"{{{{ {lg}_selected }}}}": "selected" if active_lang == lg else "" for lg in ("pl", "en", "de", "fr", "es")},
-        "<!-- __DOM_JSON__ -->": dom_json,
-        "<!-- __VIOLATIONS_JSON__ -->": violations_json,
-        "<!-- __DECISION_JSON__ -->": decision_json,
-        "<!-- __DETECTED_LANGS_JSON__ -->": detected_langs_json,
-        "<!-- __PLAN_JSON__ -->": plan_json,
-        "<!-- __PDF_SOURCE_FILE__ -->": pdf_source_file,
-        "<!-- __ACTIVE_LANG__ -->": active_lang_json,
-        "<!-- __PAGE_IMAGES_JSON__ -->": page_images_json,
-        "<!-- __PAGE_DIMENSIONS_JSON__ -->": page_dimensions_json,
-        "<!-- __OUTPUT_DIR_JSON__ -->": output_dir_json,
-        "<!-- __VIEWER_JS__ -->": js_content,
+        "<!-- __DOM_JSON__ -->": _safe_script_json(dom_json),
+        "<!-- __VIOLATIONS_JSON__ -->": _safe_script_json(violations_json),
+        "<!-- __DECISION_JSON__ -->": _safe_script_json(decision_json),
+        "<!-- __DETECTED_LANGS_JSON__ -->": _safe_script_json(detected_langs_json),
+        "<!-- __PLAN_JSON__ -->": _safe_script_json(plan_json),
+        "<!-- __PDF_SOURCE_FILE__ -->": _safe_script_json(pdf_source_file),
+        "<!-- __ACTIVE_LANG__ -->": _safe_script_json(active_lang_json),
+        "<!-- __PAGE_IMAGES_JSON__ -->": _safe_script_json(page_images_json),
+        "<!-- __PAGE_DIMENSIONS_JSON__ -->": _safe_script_json(page_dimensions_json),
+        "<!-- __OUTPUT_DIR_JSON__ -->": _safe_script_json(output_dir_json),
     }
 
     result = template

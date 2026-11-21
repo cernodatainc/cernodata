@@ -57,6 +57,7 @@ def _draw_single_node_overlay(
     sy: float
 ) -> None:
     """Renders visual overlay bounding box polygon and violation callout badge for a single node."""
+    _ = draw_base
     bbox = node.bounding_box
     x0, y0 = bbox.x0 * sx, bbox.y0 * sy
     x1, y1 = bbox.x1 * sx, bbox.y1 * sy
@@ -89,11 +90,11 @@ def _draw_single_node_overlay(
     badge_x1 = badge_x0 + text_w + 8
     badge_y1 = badge_y0 + text_h + 4
 
-    draw_base.rectangle([badge_x0, badge_y0, badge_x1, badge_y1], fill=stroke_col)
-    draw_base.text((badge_x0 + 4, badge_y0 + 2), label_text, fill="white", font=font)
+    draw_overlay.rectangle([badge_x0, badge_y0, badge_x1, badge_y1], fill=stroke_col)
+    draw_overlay.text((badge_x0 + 4, badge_y0 + 2), label_text, fill="white", font=font)
 
     if has_violation:
-        draw_violation_callout(draw_base, x0, badge_y1, active_viols[0], font)
+        draw_violation_callout(draw_overlay, x0, badge_y1, active_viols[0], font)
 
 
 def _draw_top_banner_summary(

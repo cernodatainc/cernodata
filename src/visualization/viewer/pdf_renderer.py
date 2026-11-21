@@ -48,6 +48,7 @@ def get_pdf_page_dimensions(pdf_path: str) -> List[Dict[str, float]]:
                     dimensions.append({"width": round(float(w), 2), "height": round(float(h), 2)})
                 except Exception as e:
                     logger.warning("Could not retrieve PDF page dimensions: %s", e)
+                    dimensions.append({"width": 612.0, "height": 792.0})
     return dimensions
 
 
@@ -66,6 +67,7 @@ def render_all_pages_to_base64(
                     images.append(_render_pdf_page_uri(pdf[i], scale))
                 except Exception as e:
                     logger.warning("Base64 all pages render error on page %d: %s", i, e)
+                    images.append(page_to_base64("", page_index=0, scale=scale))
             if images:
                 return images
 

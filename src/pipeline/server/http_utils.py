@@ -222,12 +222,12 @@ def read_html_template(filename: str, fallback_title: str = "cernodata") -> str:
     return f"<html><body><h1>{fallback_title}</h1><p>Template missing.</p></body></html>"
 
 
-def parse_run_dir_and_step(output_dir: str) -> tuple[str, Optional[int]]:
+def parse_run_dir_and_step(output_dir: Optional[str]) -> tuple[str, Optional[int]]:
     """
     Separates base directory path and optional attempt step index from run identifier.
     Example: 'src/output:step_2' -> ('src/output', 2).
     """
-    raw = output_dir.replace("\\", "/").strip()
+    raw = str(output_dir or "").replace("\\", "/").strip()
     if ":step_" in raw:
         base, s_str = raw.split(":step_", 1)
         try:

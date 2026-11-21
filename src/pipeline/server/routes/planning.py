@@ -95,7 +95,12 @@ class PlanningRoutesMixin(BaseApiRoutesMixin):
                 target_threshold = getattr(self.server, "default_threshold", 0.82)
 
             override_primary = payload.get("override_primary")
-            override_order = payload.get("override_order")
+            raw_order = payload.get("override_order")
+            override_order = (
+                [str(p) for p in raw_order if p]
+                if isinstance(raw_order, (list, tuple)) and raw_order
+                else None
+            )
             raw_layers = payload.get("verification_layers")
             verification_layers = [str(x) for x in raw_layers] if isinstance(raw_layers, (list, tuple)) else None
 

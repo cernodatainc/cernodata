@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 from src.dom import BoundingBox, DOMNode, DocumentDOM
 from src.dom.enums import DOMNodeOrigin, DOMNodeType
+from src.parsers.pdf_utils import get_pdf_page_count
 from src.utils import generate_document_id
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$")
@@ -185,8 +186,12 @@ def convert_dom_dict_to_dom(
         normalized["document_id"] = generate_document_id(resolved_path)
     if not normalized.get("source_filename"):
         normalized["source_filename"] = os.path.basename(resolved_path)
+    raw_explicit = payload.get("total_pages")
+    explicit_pages = int(raw_explicit) if isinstance(raw_explicit, (int, float)) and int(raw_explicit) >= 1 else 1
     dom = DocumentDOM.from_dict(normalized)
     dom.recompute_total_pages()
+    actual_pages = get_pdf_page_count(resolved_path) if resolved_path and os.path.isfile(resolved_path) else None
+    dom.total_pages = max(dom.total_pages, explicit_pages, actual_pages or 1)
     dom.metadata.setdefault("preset", preset_id)
     return dom
 
@@ -214,7 +219,8 @@ def convert_raw_output_to_dom(
         text_content = _strip_hocr_markup(raw_output) if fmt == "hocr" else raw_output
         nodes = convert_plain_text_to_nodes(text_content, page_index=page_index, preset_id=preset_id)
 
-    total_pages = max((n.global_page_index for n in nodes), default=1)
+    actual_pages = get_pdf_page_count(resolved_path) if resolved_path and os.path.isfile(resolved_path) else None
+    total_pages = max(max((n.global_page_index for n in nodes), default=1), actual_pages or 1)
     return DocumentDOM(
         document_id=generate_document_id(resolved_path),
         source_filename=os.path.basename(resolved_path),

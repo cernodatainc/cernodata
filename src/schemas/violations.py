@@ -19,17 +19,25 @@ class QualityViolationSchema(BaseModel):
 
     violation_id: str
     global_page_index: int = 1
-    node_id: str = ""
+    node_id: Optional[str] = ""
     type: str = "general"
     rule_type: str = ""
     severity: str = "MEDIUM"
     detected_snippet: Optional[str] = ""
     suggestion: Optional[str] = None
+    suggested_correction: Optional[str] = None
     suppressed: bool = False
     is_fixed: Optional[bool] = False
     accepted: Optional[bool] = False
     description: str = ""
     bounding_box: Optional[Union[BoundingBoxSchema, Dict[str, float], List[float]]] = None
+
+    @field_validator("node_id", mode="before")
+    @classmethod
+    def _coerce_node_id(cls, v: Any) -> str:
+        if v is None:
+            return ""
+        return str(v)
 
     @field_validator("suppressed", mode="before")
     @classmethod

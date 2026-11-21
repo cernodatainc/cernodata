@@ -34,7 +34,7 @@ async function submitPlan() {
 
     if (!docPath) {
         showBanner("Please specify a document file path before proceeding.", "error");
-        document.getElementById("docPath").focus();
+        if (docPathEl) docPathEl.focus();
         return;
     }
 
@@ -56,8 +56,10 @@ async function submitPlan() {
     };
 
     const submitBtn = document.getElementById("submitBtn");
-    submitBtn.disabled = true;
-    submitBtn.textContent = "[SUBMITTING] Sending configuration...";
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "[SUBMITTING] Sending configuration...";
+    }
 
     try {
         const response = await fetch("/api/submit_plan", {
@@ -67,7 +69,7 @@ async function submitPlan() {
         });
 
         if (response.ok) {
-            submitBtn.textContent = "[COMPLETED] Plan Active";
+            if (submitBtn) submitBtn.textContent = "[COMPLETED] Plan Active";
             const chosenPreset = overridePrimary || (effectiveOrder && effectiveOrder.length > 0 ? effectiveOrder[0] : "docling_fast");
             const targetDocName = docPath.split(/[/\\]/).pop().toLowerCase();
             const forceRerunEl = document.getElementById("inpForceRerun");
@@ -134,14 +136,18 @@ async function submitPlan() {
         } else {
             const err = await response.json().catch(() => ({}));
             showBanner("[ERROR] " + (err.error || "Failed to submit plan to server."), "error");
-            submitBtn.disabled = false;
-            submitBtn.textContent = "[SUBMIT PLAN] Start Pipeline Execution";
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "[SUBMIT PLAN] Start Pipeline Execution";
+            }
         }
     } catch (e) {
         // Fallback for standalone/offline browser usage without local server process
         showBanner("[STANDALONE] Server connection offline. Generated plan JSON copied to console.", "success");
         console.log("DocumentPlan JSON:", JSON.stringify(payload, null, 2));
-        submitBtn.disabled = false;
-        submitBtn.textContent = "[SUBMIT PLAN] Start Pipeline Execution";
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "[SUBMIT PLAN] Start Pipeline Execution";
+        }
     }
 }

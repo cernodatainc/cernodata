@@ -186,10 +186,12 @@ function onManualCoordChange() {
     const y1 = parseFloat(document.getElementById('inpY1').value) || (y0 + 10);
     const inpAngle = document.getElementById('inpAngle');
 
-    node.bounding_box.x0 = roundCoord(Math.min(x0, x1 - 5));
-    node.bounding_box.y0 = roundCoord(Math.min(y0, y1 - 5));
-    node.bounding_box.x1 = roundCoord(Math.max(x1, x0 + 5));
-    node.bounding_box.y1 = roundCoord(Math.max(y1, y0 + 5));
+    const clampedX0 = roundCoord(Math.min(x0, x1));
+    const clampedY0 = roundCoord(Math.min(y0, y1));
+    node.bounding_box.x0 = clampedX0;
+    node.bounding_box.y0 = clampedY0;
+    node.bounding_box.x1 = roundCoord(Math.max(x1, clampedX0 + 5));
+    node.bounding_box.y1 = roundCoord(Math.max(y1, clampedY0 + 5));
     if (inpAngle) {
         node.bounding_box.angle = roundCoord(parseFloat(inpAngle.value) || 0);
     }
@@ -214,6 +216,7 @@ function toggleIncorrectText(nodeId) {
     renderSelectedEditor();
     renderDOMTree();
     renderSVGOverlays();
+    if (typeof renderViolationsList === 'function') renderViolationsList();
     if (typeof renderLiveOutput === 'function') renderLiveOutput();
 }
 

@@ -162,6 +162,14 @@ class PresetCache:
                 if dir_path:
                     full_dir = dir_path if os.path.isabs(dir_path) else os.path.join(repo_root, dir_path)
                     artifacts = load_run_artifacts(full_dir)
+                    art_preset = (artifacts.chosen_preset or "").strip().lower()
+                    dec_preset = (
+                        str(artifacts.decision.get("chosen_preset") or "").strip().lower()
+                        if isinstance(artifacts.decision, dict)
+                        else ""
+                    )
+                    if (art_preset and art_preset != preset_clean) or (dec_preset and dec_preset != preset_clean):
+                        continue
                     if artifacts.dom and artifacts.decision:
                         res: Dict[str, Any] = {
                             "dom": artifacts.dom,

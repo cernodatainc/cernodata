@@ -92,8 +92,10 @@ class LanguageConfig:
     max_anomalous_char_penalty: float = 0.50
 
     def __post_init__(self) -> None:
+        self.allowed_anomalous_tokens = {t.lower() for t in self.allowed_anomalous_tokens}
         if not self.conflicting_diacritics and self.code != "en":
-            self.conflicting_diacritics = set(ALL_KNOWN_DIACRITICS - self.valid_diacritics)
+            valid_both = {c.lower() for c in self.valid_diacritics} | {c.upper() for c in self.valid_diacritics}
+            self.conflicting_diacritics = set(ALL_KNOWN_DIACRITICS - valid_both)
 
     def find_diacritic_conflicts(self, text: str) -> List[Tuple[str, str, str]]:
         """
@@ -184,7 +186,7 @@ class LanguageConfig:
             score -= penalty
 
         if self.valid_diacritics:
-            has_diacritics = any(c in self.valid_diacritics for c in text)
+            has_diacritics = any(c in self.valid_diacritics or c.lower() in self.valid_diacritics for c in text)
             words = text.split()
             if len(words) > self.min_words_for_diacritic_check and not has_diacritics:
                 score -= self.no_diacritics_penalty

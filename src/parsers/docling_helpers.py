@@ -58,7 +58,7 @@ _EXACT_LABEL_TYPES: Dict[str, str] = {
 
 def fallback_top_left_bbox(bbox: DoclingBBox, page_height: float) -> Tuple[float, float, float, float]:
     """Calculates top-left origin coordinates from bottom-left origin fallback."""
-    if isinstance(bbox, DoclingBBoxWithOrigin) and bbox.coord_origin and "BOTTOMLEFT" in str(bbox.coord_origin):
+    if isinstance(bbox, DoclingBBoxWithOrigin) and bbox.coord_origin and "BOTTOMLEFT" in str(bbox.coord_origin).upper().replace("_", ""):
         return (
             bbox.l,
             page_height - bbox.t,
@@ -75,8 +75,9 @@ def extract_page_no_and_bbox(
 ) -> Tuple[int, float, float, float, float]:
     """Extracts page number and top-left origin normalized bounding box coordinates."""
     _ = item
-    page_no = prov_item.page_no if isinstance(prov_item, DoclingProvenance) else 1
-    bbox = prov_item.bbox if isinstance(prov_item, DoclingProvenance) else None
+    raw_page = getattr(prov_item, "page_no", None)
+    page_no = int(raw_page) if isinstance(raw_page, int) and raw_page >= 1 else 1
+    bbox = getattr(prov_item, "bbox", None)
     if bbox is None:
         return page_no, 0.0, 0.0, 0.0, 0.0
 
@@ -91,7 +92,12 @@ def extract_page_no_and_bbox(
             and 0 <= page_no - 1 < len(doc.pages)
         ):
             page_obj = doc.pages[page_no - 1]
-        if page_obj is not None and page_obj.size is not None:
+        if (
+            isinstance(page_obj, DoclingPage)
+            and page_obj.size is not None
+            and isinstance(page_obj.size.height, (int, float))
+            and page_obj.size.height > 0
+        ):
             page_height = page_obj.size.height
 
     if isinstance(bbox, DoclingBBoxConvertible):
@@ -171,16 +177,16 @@ def build_node_content(
     raw_text = resolve_raw_text(item, node_type, doc)
     if preset == "docling_deep":
         eff_lang = language
-        if eff_lang == "auto" and raw_text:
+        if (not eff_lang or eff_lang.lower().strip() in ("auto", "none")) and raw_text:
             from src.quality.language import detect_text_language
             eff_lang, _, _ = detect_text_language(raw_text)
         config = get_language_config(eff_lang)
         if config:
             if config.common_word_corrections:
                 for err, fix in config.common_word_corrections.items():
-                    raw_text = raw_text.replace(err, fix)
+                    raw_text = re.sub(rf"\b{re.escape(err)}\b", fix, raw_text)
             for _, word, suggested in config.find_anomalous_substitutions(raw_text):
-                raw_text = raw_text.replace(word, suggested)
+                raw_text = re.sub(rf"\b{re.escape(word)}\b", suggested, raw_text)
         # Deep OCR clean-up for trailing OCR noise/fragmented punctuation soup
         raw_text = _DEEP_OCR_TRAILING_NOISE_RE.sub("", raw_text).strip()
 

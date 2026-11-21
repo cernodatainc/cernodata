@@ -46,6 +46,8 @@ def compute_language_score(
     lang = language.lower().strip() if language else "en"
     if not text or lang == "en":
         return 1.0
+    if lang == "auto":
+        lang, _, _ = detect_text_language(text)
 
     config = get_language_config(lang)
     if config:

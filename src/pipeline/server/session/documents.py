@@ -7,6 +7,7 @@ Document discovery, runs table grid retrieval, and previous run search for serve
 from __future__ import annotations
 
 import glob
+import logging
 import os
 import threading
 from typing import Any, Dict, List, Optional
@@ -22,6 +23,8 @@ from src.pipeline.server.run_mappings import (
     register_document_path,
 )
 
+logger = logging.getLogger("cernodata.server.session.documents")
+
 
 class DocumentsMixin:
     """Mixin providing workspace document scanning, previous runs search, and runs grid."""
@@ -31,6 +34,19 @@ class DocumentsMixin:
     repo_root: str
     src_dir: str
     _registered_documents: List[str]
+
+    def _to_repo_relative(self, path_str: str) -> str:
+        """Converts path_str to a forward-slash path relative to repo_root when inside it."""
+        if not path_str:
+            return ""
+        abs_root = os.path.abspath(self.repo_root)
+        abs_target = os.path.abspath(path_str) if os.path.isabs(path_str) else os.path.abspath(os.path.join(abs_root, path_str))
+        try:
+            if os.path.commonpath([os.path.normcase(abs_root), os.path.normcase(abs_target)]) == os.path.normcase(abs_root):
+                return os.path.relpath(abs_target, abs_root).replace("\\", "/")
+        except ValueError as ex:
+            logger.debug("Skipping repo relativization for cross-drive path '%s': %s", path_str, ex)
+        return abs_target.replace("\\", "/") if os.path.isabs(path_str) else path_str.replace("\\", "/")
 
     def get_available_documents(self) -> List[str]:
         """Finds candidate PDF documents in repository workspace."""
@@ -63,10 +79,11 @@ class DocumentsMixin:
                     docs.append(reg)
             if self.pdf_path and _is_forgotten(self.pdf_path):
                 self.pdf_path = docs[0] if docs else ""
-            elif not docs and self.pdf_path and not _is_forgotten(self.pdf_path) and not is_excluded_path(self.pdf_path, repo_root=self.repo_root):
-                docs.append(self.pdf_path)
-            elif self.pdf_path and self.pdf_path not in docs and not _is_forgotten(self.pdf_path) and not is_excluded_path(self.pdf_path, repo_root=self.repo_root):
-                docs.append(self.pdf_path)
+            elif self.pdf_path:
+                norm_active = self._to_repo_relative(self.pdf_path)
+                if not _is_forgotten(norm_active) and not is_excluded_path(norm_active, repo_root=self.repo_root):
+                    if not docs or (norm_active not in docs and not any(os.path.basename(d).lower() == os.path.basename(norm_active).lower() for d in docs)):
+                        docs.append(norm_active)
         return docs
 
     def forget_document(self, path: str) -> bool:
@@ -100,22 +117,10 @@ class DocumentsMixin:
             return ""
 
         if os.path.exists(resolved):
-            try:
-                if os.path.commonpath([self.repo_root, resolved]) == self.repo_root:
-                    rel = os.path.relpath(resolved, self.repo_root).replace("\\", "/")
-                else:
-                    rel = resolved.replace("\\", "/")
-            except ValueError:
-                rel = resolved.replace("\\", "/")
+            rel = self._to_repo_relative(resolved)
         else:
             norm = path.strip().replace("\\", "/")
-            try:
-                if os.path.isabs(norm) and os.path.commonpath([self.repo_root, norm]) == self.repo_root:
-                    rel = os.path.relpath(norm, self.repo_root).replace("\\", "/")
-                else:
-                    rel = norm
-            except ValueError:
-                rel = norm
+            rel = self._to_repo_relative(norm) if os.path.isabs(norm) else norm
 
         if is_excluded_path(rel, repo_root=self.repo_root):
             return ""

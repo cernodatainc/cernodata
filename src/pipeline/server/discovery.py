@@ -245,7 +245,11 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
     max_pages = 1
     for r in file_runs:
         max_pages = max(max_pages, int(r.get("total_pages", 1) or 1))
-        for key_map in (r.get("per_page_confidence", {}), r.get("per_page_violations", {})):
+        for key_map in (
+            r.get("per_page_confidence") or {},
+            r.get("per_page_violations") or {},
+            r.get("per_page_nodes") or {},
+        ):
             max_pages = _max_int_key(key_map.keys(), max_pages)
 
     pages = list(range(1, max_pages + 1))
@@ -255,13 +259,20 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
         pages_data: Dict[str, Dict[str, Any]] = {}
         for p in pages:
             p_str = str(p)
-            page_conf = r.get("per_page_confidence", {})
+            page_conf = r.get("per_page_confidence") or {}
             conf = page_conf.get(p_str)
             if conf is None:
                 conf = page_conf.get(p)
 
-            viols = r.get("per_page_violations", {}).get(p_str, 0)
-            nodes = r.get("per_page_nodes", {}).get(p_str, 0)
+            page_viols = r.get("per_page_violations") or {}
+            viols = page_viols.get(p_str)
+            if viols is None:
+                viols = page_viols.get(p, 0)
+
+            page_nodes = r.get("per_page_nodes") or {}
+            nodes = page_nodes.get(p_str)
+            if nodes is None:
+                nodes = page_nodes.get(p, 0)
 
             if conf is not None:
                 is_passed = conf >= PAGE_PASS_CONFIDENCE

@@ -43,6 +43,8 @@ async function loadFileRunMappings() {
         }
         if (data.all_mappings) {
             data.all_mappings = data.all_mappings.filter(m => m.file_set !== 'test_output' && m.file_name !== 'test_output' && !m.file_path.includes('test_output'));
+            data.total_documents = data.all_mappings.length;
+            data.total_runs = data.all_mappings.reduce((sum, m) => sum + ((m.runs && m.runs.length) || 0), 0);
         }
         window.explorerData = data;
         const allMappings = data.all_mappings || [];

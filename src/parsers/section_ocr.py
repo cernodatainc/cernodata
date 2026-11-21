@@ -78,7 +78,18 @@ class SectionOCRParser:
         """Creates Tesseract OCR engine wrapper if pytesseract is installed."""
         try:
             import pytesseract
-            lang_code = language or self.language or "eng"
+            lang_map = {
+                "en": "eng",
+                "pl": "pol",
+                "de": "deu",
+                "fr": "fra",
+                "es": "spa",
+                "auto": "eng",
+                "none": "eng",
+                "": "eng",
+            }
+            raw_lang = (language or self.language or "eng").strip().lower()
+            lang_code = lang_map.get(raw_lang, raw_lang)
             tess_config = custom_flags["tesseract_config"] if custom_flags else ""
             if tess_config:
                 return lambda arr: pytesseract.image_to_string(arr, lang=lang_code, config=tess_config)
@@ -91,9 +102,9 @@ class SectionOCRParser:
         """Creates EasyOCR engine wrapper if easyocr is installed."""
         try:
             import easyocr
-            target_lang = (language or self.language or "en").strip().lower()
-            langs = [target_lang] if target_lang else ["en"]
-            reader = easyocr.Reader(langs)
+            raw_lang = (language or self.language or "en").strip().lower()
+            target_lang = "en" if raw_lang in ("auto", "none", "") else raw_lang
+            reader = easyocr.Reader([target_lang])
             return lambda arr: reader.readtext(arr)
         except Exception as ex:
             logger.debug("EasyOCR engine initialization unavailable: %s", ex)
@@ -105,10 +116,18 @@ class SectionOCRParser:
         timeout_sec: int = 120,
         output_format: str = "text",
         language: Optional[str] = None,
+        wiggle_parameters: Optional[Sequence[Any]] = None,
     ) -> Callable[[Any], str]:
         """Creates a section OCR engine callable backed by an external CLI subprocess."""
         cmd_tpl = [str(tok) for tok in command_template]
         target_lang = (language or self.language or "en").strip() or "en"
+        wiggle_defaults: Dict[str, str] = {}
+        if wiggle_parameters:
+            for wp in wiggle_parameters:
+                w_name = wp.get("name") if isinstance(wp, dict) else getattr(wp, "name", None)
+                w_val = wp.get("default_value") if isinstance(wp, dict) else getattr(wp, "default_value", None)
+                if w_name and w_val is not None:
+                    wiggle_defaults[f"{{{str(w_name).strip()}}}"] = str(w_val)
 
         def _cli_engine(image_input: Any) -> str:
             pil_img = image_input if isinstance(image_input, Image.Image) else Image.fromarray(image_input)
@@ -117,6 +136,7 @@ class SectionOCRParser:
                 out_path = os.path.join(tmp_dir, "section_out.txt")
                 pil_img.save(in_path, format="PNG")
                 replacements = {
+                    **wiggle_defaults,
                     "{input_path}": in_path,
                     "{output_path}": out_path,
                     "{page_index}": "1",
@@ -309,8 +329,10 @@ class SectionOCRParser:
             return clean, 1.0, str_lines
 
         if isinstance(result, dict) and "text" in result and "txts" not in result:
-            clean_dict_text = str(result.get("text", "")).strip()
-            dict_conf = float(result.get("confidence", 1.0))
+            raw_dict_txt = result.get("text")
+            clean_dict_text = str(raw_dict_txt if raw_dict_txt is not None else "").strip()
+            raw_dict_conf = result.get("confidence")
+            dict_conf = float(raw_dict_conf) if raw_dict_conf is not None else 1.0
             raw_dict_lines = result.get("lines")
             parsed_dict_lines: List[OCRLine] = (
                 list(raw_dict_lines)
@@ -330,9 +352,13 @@ class SectionOCRParser:
             first = result[0]
             if isinstance(first, (list, tuple)):
                 is_flat_tuple_list = (
-                    len(first) >= 3
-                    and isinstance(first[1], str)
-                    and isinstance(first[2], (int, float))
+                    (len(first) >= 3 and isinstance(first[1], str))
+                    or (
+                        len(first) == 2
+                        and isinstance(first[1], (list, tuple))
+                        and len(first[1]) >= 1
+                        and isinstance(first[1][0], str)
+                    )
                 )
                 entries = result if is_flat_tuple_list else first
                 parsed_txts, parsed_scores, parsed_boxes = [], [], []
@@ -520,12 +546,11 @@ class SectionOCRParser:
         try:
             cropped_img = self.crop_section_image(pdf_path, page_number, bbox, scale=effective_scale)
         except (FileNotFoundError, ValueError, IndexError, RuntimeError) as ex:
-            err_res = create_ocr_result(success=False, error=str(ex))
-            return {eng: err_res for eng in engine_list}
+            return {eng: create_ocr_result(success=False, error=str(ex)) for eng in engine_list}
         except Exception as ex:
             logger.warning("Failed to crop PDF section: %s", ex, exc_info=True)
-            err_res = create_ocr_result(success=False, error=f"Failed to crop PDF section: {str(ex)}")
-            return {eng: err_res for eng in engine_list}
+            msg = f"Failed to crop PDF section: {str(ex)}"
+            return {eng: create_ocr_result(success=False, error=msg) for eng in engine_list}
 
         return {
             eng: self._parse_image_with_options(

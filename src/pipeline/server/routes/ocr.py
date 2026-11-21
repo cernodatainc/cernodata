@@ -15,6 +15,7 @@ from src.parsers.section_ocr import (
     parse_section_from_pdf_multi,
 )
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
+from src.utils import resolve_pdf_path
 
 
 class OcrRoutesMixin(BaseApiRoutesMixin):
@@ -39,7 +40,8 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
             page = int(payload.get("page") or 1)
         except (ValueError, TypeError):
             page = 1
-        pdf_path = payload.get("pdf_path") or self.session.pdf_path
+        raw_pdf = payload.get("pdf_path") or self.session.pdf_path
+        pdf_path = resolve_pdf_path(str(raw_pdf)) if raw_pdf else ""
         language = payload.get("language") or self.session.language or "en"
 
         raw_engines = payload.get("engines")
@@ -93,7 +95,7 @@ class OcrRoutesMixin(BaseApiRoutesMixin):
         for eng in selected_engines:
             r = multi_results.get(eng)
             if isinstance(r, dict) and r.get("success"):
-                if not best_result or float(r.get("confidence", 0.0)) > float(best_result.get("confidence", 0.0)):
+                if not best_result or float(r.get("confidence") or 0.0) > float(best_result.get("confidence") or 0.0):
                     best_engine = eng
                     best_result = dict(r)
 

@@ -33,8 +33,13 @@ function saveCurrentPresetToClientCache() {
  * Handles language selection dropdown change event and updates active language.
  */
 function onLanguageChanged() {
-    const sel = document.getElementById('selectLanguage').value;
-    activeLanguage = (sel === 'auto') ? (primaryDetectedLanguage || 'en') : sel;
+    const selEl = document.getElementById('selectLanguage');
+    const sel = selEl ? selEl.value : 'en';
+    const fallbackLang = (typeof decisionData !== 'undefined' && decisionData && decisionData.primary_detected_language)
+        ? decisionData.primary_detected_language
+        : 'en';
+    activeLanguage = (sel === 'auto') ? fallbackLang : sel;
+    if (typeof updatePageScoreBadge === 'function') updatePageScoreBadge();
     const banner = document.getElementById('statusBanner');
     if (banner) {
         banner.style.display = 'block';
@@ -276,7 +281,9 @@ function updatePresetUIState() {
 
     const subEl = document.getElementById('scoreSub');
     if (subEl) {
-        const violCount = getViolationsList().length;
+        const violCount = getViolationsList().filter(
+            v => (typeof isViolationInactive === 'function') ? !isViolationInactive(v) : (!v.is_fixed && !isSuppressed(v))
+        ).length;
         subEl.textContent = `Status: ${displayedStatus} | Overall Confidence: ${Number(overallScore).toFixed(4)} | Violations Flagged: ${violCount}`;
         subEl.style.color = isAccepted ? '#2E6E52' : '#B42318';
     }

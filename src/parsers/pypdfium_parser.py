@@ -44,19 +44,29 @@ def _convert_ocr_box_to_bbox(
     scale_x: float,
     scale_y: float,
     page_w: float,
-    page_h: float
+    page_h: float,
 ) -> BoundingBox:
     """Normalizes OCR polygon or bounding box coordinates to page-relative BoundingBox points."""
+    sx = scale_x if scale_x > 0 else 1.0
+    sy = scale_y if scale_y > 0 else 1.0
     if box_coords and len(box_coords) >= 4:
-        bx0 = min(pt[0] for pt in box_coords) / scale_x
-        by0 = min(pt[1] for pt in box_coords) / scale_y
-        bx1 = max(pt[0] for pt in box_coords) / scale_x
-        by1 = max(pt[1] for pt in box_coords) / scale_y
+        if all(isinstance(v, (int, float)) for v in box_coords[:4]):
+            bx0 = float(box_coords[0]) / sx
+            by0 = float(box_coords[1]) / sy
+            bx1 = float(box_coords[2]) / sx
+            by1 = float(box_coords[3]) / sy
+        else:
+            bx0 = min(float(pt[0]) for pt in box_coords) / sx
+            by0 = min(float(pt[1]) for pt in box_coords) / sy
+            bx1 = max(float(pt[0]) for pt in box_coords) / sx
+            by1 = max(float(pt[1]) for pt in box_coords) / sy
     else:
-        bx0 = DEFAULT_PAGE_MARGIN_PT
-        by0 = DEFAULT_PAGE_MARGIN_PT
-        bx1 = page_w - DEFAULT_PAGE_MARGIN_PT
-        by1 = page_h - DEFAULT_PAGE_MARGIN_PT
+        mx = min(DEFAULT_PAGE_MARGIN_PT, max(0.0, page_w * 0.1))
+        my = min(DEFAULT_PAGE_MARGIN_PT, max(0.0, page_h * 0.1))
+        bx0 = mx
+        by0 = my
+        bx1 = max(mx + 1.0, page_w - mx)
+        by1 = max(my + 1.0, page_h - my)
     return BoundingBox(x0=bx0, y0=by0, x1=bx1, y1=by1, angle=0.0)
 
 
@@ -232,18 +242,20 @@ class PyPdfiumParser:
         page_no: int,
         page_w: float,
         page_h: float,
-        node_counter: int
+        node_counter: int,
     ) -> Optional[DOMNode]:
         """Creates a fallback DOM node containing full page text if rects yielded nothing."""
         full_text = textpage.get_text_range().strip()
         if not full_text:
             return None
 
+        mx = min(DEFAULT_PAGE_MARGIN_PT, max(0.0, page_w * 0.1))
+        my = min(DEFAULT_PAGE_MARGIN_PT, max(0.0, page_h * 0.1))
         return _make_page_node(
             page_no,
             node_counter,
             "paragraph",
-            BoundingBox(x0=36.0, y0=36.0, x1=page_w - 36.0, y1=page_h - 36.0, angle=0.0),
+            BoundingBox(x0=mx, y0=my, x1=max(mx + 1.0, page_w - mx), y1=max(my + 1.0, page_h - my), angle=0.0),
             {"raw_text": full_text, "source": "native_digital"},
         )
 
@@ -287,7 +299,7 @@ class PyPdfiumParser:
                 page_w=page_w,
                 page_h=page_h
             )
-            node_type = _classify_ocr_node_type(line_text, is_first_line=(line_idx == 0))
+            node_type = _classify_ocr_node_type(line_text, is_first_line=(len(nodes) == 0))
             nodes.append(
                 _make_page_node(
                     page_no,

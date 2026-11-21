@@ -96,6 +96,9 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         from src.pipeline.server.run_mappings import record_run_mapping
 
         session = self.session
+        with session._lock:
+            session.output_dir = RUN_OUTPUT_DIR
+            session.active_step = None
         session.update_result_state(res, pdf_path=pdf_path, language=language)
         dec = res.get("decision", {})
         chosen_preset = str(dec.get("chosen_preset") or default_preset)
@@ -168,8 +171,13 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             payload: JSON request body dictionary.
         """
         timestamp = datetime.now().strftime("%H:%M:%S")
-        pdf_path, language = self._extract_document_and_language(payload)
-        threshold = float(payload.get("target_threshold", 0.85))
+        try:
+            pdf_path, language = self._extract_document_and_language(payload)
+            raw_thresh = payload.get("target_threshold")
+            threshold = float(raw_thresh) if raw_thresh is not None else 0.85
+        except (ValueError, TypeError) as exc:
+            self.send_bad_request(str(exc))
+            return
         explicit_preset = payload.get("preset")
         preset: Optional[str] = str(explicit_preset).strip() if explicit_preset else None
         align_skew = bool(payload.get("align_skew", True))
@@ -184,7 +192,8 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
 
         plan_obj: Optional[DocumentPlan] = None
         if with_plan and plan_config:
-            planner = PresetPlanner()
+            get_planner = getattr(self, "_get_active_planner", None)
+            planner = get_planner() if callable(get_planner) else PresetPlanner()
             raw_tax = str(plan_config.get("taxonomy", "standard"))
             tax_map = {
                 "standard": "general_text",
@@ -217,11 +226,9 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             if isinstance(raw_override_order, list) and raw_override_order:
                 override_order = [str(p) for p in raw_override_order]
             elif primary_override and fallback_override:
-                all_known = ["docling_fast", "docling_deep", "pypdfium_rapidocr", "vision_llm_direct"]
+                all_known = list(planner.weights.keys())
                 rest = [p for p in all_known if p not in (primary_override, fallback_override)]
                 override_order = [str(primary_override), str(fallback_override)] + rest
-            elif primary_override:
-                override_order = [str(primary_override)]
 
             raw_verif_layers = plan_config.get("verification_layers") or payload.get("verification_layers")
             resolved_verif_layers = (
@@ -342,7 +349,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         if not preset:
             self.send_bad_request("Missing 'preset' in request payload.")
             return
-        pdf_path, language = self._extract_document_and_language(payload)
+        try:
+            pdf_path, language = self._extract_document_and_language(payload)
+        except (ValueError, TypeError) as exc:
+            self.send_bad_request(str(exc))
+            return
         force = bool(payload.get("force", payload.get("force_rerun", False)))
 
         if not force and self._try_serve_cached_preset(pdf_path, preset, language):
@@ -400,10 +411,11 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             document_path=document_path,
             repo_root=self.session.repo_root,
         )
-        self.session._preset_cache.invalidate_document(
-            str(document_path).strip() if document_path else None
-        )
-        self.session.viewer_data = None
-        if self.session.current_result:
-            self.session.current_result = None
+        with self.session._lock:
+            self.session._preset_cache.invalidate_document(
+                str(document_path).strip() if document_path else None
+            )
+            self.session.viewer_data = None
+            if self.session.current_result:
+                self.session.current_result = None
         self.send_ok({"run_id": run_id, "success": success})

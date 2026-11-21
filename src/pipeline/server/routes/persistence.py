@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 from src.pipeline.server.http_utils import parse_run_dir_and_step
 from src.pipeline.server.router import api_router
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
-from src.utils import mkdirs, save_json
+from src.utils import mkdirs, safe_load_json, save_json
 
 
 class PersistenceRoutesMixin(BaseApiRoutesMixin):
@@ -41,9 +41,11 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
             payload: Dictionary containing dom structure and target output_dir.
         """
         dom_data = payload.get("dom")
-        output_dir, _ = parse_run_dir_and_step(payload.get("output_dir", "output"))
+        raw_out = payload.get("output_dir") or self.session.output_dir or "output"
+        output_dir, _ = parse_run_dir_and_step(str(raw_out))
+        output_dir = output_dir or "output"
 
-        if not dom_data:
+        if not dom_data or not isinstance(dom_data, dict):
             self.send_bad_request("Missing dom payload")
             return
 
@@ -61,34 +63,36 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
             if item is not None:
                 save_json(os.path.join(output_dir, filename), item)
 
-        self.session.viewer_data = None
-        if self.session.current_result:
-            result_diff = diff_data or {}
-            result_violations = violations_data or []
-            self.session.current_result.update({
-                "dom": dom_data,
-                "diff": result_diff,
-                "violations": result_violations,
-            })
-            if decision_data:
-                self.session.current_result["decision"] = decision_data
-        if isinstance(decision_data, dict) and "attempts" in decision_data:
-            self.session.preset_attempts = list(decision_data["attempts"])
+        with self.session._lock:
+            self.session.viewer_data = None
+            if self.session.current_result:
+                self.session.current_result["dom"] = dom_data
+                if payload.get("raw_dom") is not None:
+                    self.session.current_result["raw_dom"] = payload.get("raw_dom")
+                if diff_data is not None:
+                    self.session.current_result["diff"] = diff_data
+                if violations_data is not None:
+                    self.session.current_result["violations"] = violations_data
+                if decision_data:
+                    self.session.current_result["decision"] = decision_data
+            if isinstance(decision_data, dict) and "attempts" in decision_data:
+                self.session.preset_attempts = list(decision_data["attempts"])
 
-        # Keep server-side preset cache synchronized with saved DOM
-        if self.session.current_result:
-            pdf_path = self.session.pdf_path or dom_data.get("source_filename") or ""
-            chosen_preset = (
-                (decision_data.get("chosen_preset") if isinstance(decision_data, dict) else None)
-                or (self.session.current_result.get("decision", {}).get("chosen_preset") if isinstance(self.session.current_result.get("decision"), dict) else None)
-                or "docling_fast"
-            )
-            self.session._preset_cache.put(
-                pdf_path=pdf_path,
-                preset=chosen_preset,
-                result=self.session.current_result,
-                language=self.session.language,
-            )
+            # Keep server-side preset cache synchronized with saved DOM
+            if self.session.current_result:
+                pdf_path = self.session.pdf_path or dom_data.get("source_filename") or ""
+                curr_dec = self.session.current_result.get("decision")
+                chosen_preset = (
+                    (decision_data.get("chosen_preset") if isinstance(decision_data, dict) else None)
+                    or (curr_dec.get("chosen_preset") if isinstance(curr_dec, dict) else None)
+                    or "docling_fast"
+                )
+                self.session._preset_cache.put(
+                    pdf_path=pdf_path,
+                    preset=chosen_preset,
+                    result=self.session.current_result,
+                    language=self.session.language,
+                )
 
         # Update interactive_viewer.html on disk if it exists in the output directory
         html_candidates = [os.path.join(output_dir, "interactive_viewer.html")]
@@ -145,16 +149,28 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
                 language=language,
                 target_threshold=target_threshold,
             )
-            self.session.viewer_data = None
-            if self.session.current_result:
-                self.session.current_result["violations"] = result.violations
-                if "decision" in self.session.current_result:
-                    dec = self.session.current_result["decision"]
-                    dec["overall_confidence"] = result.overall_confidence
-                    dec["per_page_confidence"] = result.per_page_confidence
-                    dec["selected_layers"] = result.selected_layers
-                    dec["layer_scores"] = result.layer_scores
-                    dec["status"] = result.status
+            with self.session._lock:
+                self.session.viewer_data = None
+                if self.session.current_result:
+                    self.session.current_result["violations"] = result.violations
+                    updated_dom = safe_load_json(os.path.join(target_dir, "document_dom.json"))
+                    if isinstance(updated_dom, dict) and updated_dom:
+                        self.session.current_result["dom"] = updated_dom
+                    dec = self.session.current_result.get("decision")
+                    if isinstance(dec, dict):
+                        dec["overall_confidence"] = result.overall_confidence
+                        dec["per_page_confidence"] = result.per_page_confidence
+                        dec["selected_layers"] = result.selected_layers
+                        dec["layer_scores"] = result.layer_scores
+                        dec["status"] = result.status
+                        dec["is_accepted"] = result.is_accepted
+                        chosen_p = str(dec.get("chosen_preset") or "docling_fast")
+                        self.session._preset_cache.put(
+                            pdf_path=self.session.pdf_path or result.source_filename,
+                            preset=chosen_p,
+                            result=self.session.current_result,
+                            language=language,
+                        )
 
             self.send_ok({"result": result.to_dict()})
         except Exception as e:

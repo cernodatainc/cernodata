@@ -61,13 +61,19 @@ class ParserPresetRegistry:
         if config.backend_type == PresetBackendType.CLI_SUBPROCESS:
             adapter = SubprocessCliPresetAdapter(config)
             if config.command_template:
-                cli_engine = section_parser._create_cli_subprocess_engine(config.command_template)
+                cli_engine = section_parser._create_cli_subprocess_engine(
+                    config.command_template,
+                    timeout_sec=config.timeout_sec,
+                    output_format=config.output_format,
+                    wiggle_parameters=config.wiggle_parameters,
+                )
                 section_parser.register_engine(config.preset_id, cli_engine)
         elif config.backend_type == PresetBackendType.HTTP_ENDPOINT:
             adapter = HttpPresetAdapter(config)
             if config.endpoint_url:
                 http_engine = section_parser._create_http_endpoint_engine(
                     config.endpoint_url,
+                    timeout_sec=config.timeout_sec,
                     preset_id=config.preset_id,
                 )
                 section_parser.register_engine(config.preset_id, http_engine)

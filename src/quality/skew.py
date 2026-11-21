@@ -36,6 +36,8 @@ _PDF_POINTS_PER_INCH = 72.0
 
 def _extract_contour_angles(crop_np: np.ndarray) -> List[float]:
     """Extracts text line contour minimum area rectangle angles from image crop."""
+    if crop_np.dtype != np.uint8:
+        crop_np = crop_np.astype(np.uint8)
     if crop_np.ndim == 2:
         gray = crop_np
     elif crop_np.ndim == 3 and crop_np.shape[2] == 1:
@@ -46,9 +48,6 @@ def _extract_contour_angles(crop_np: np.ndarray) -> List[float]:
         gray = cv2.cvtColor(crop_np, cv2.COLOR_RGBA2GRAY)
     else:
         return []
-
-    if gray.dtype != np.uint8:
-        gray = gray.astype(np.uint8)
 
     _, thresh = cv2.threshold(gray, _BINARIZE_THRESHOLD, 255, cv2.THRESH_BINARY_INV)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

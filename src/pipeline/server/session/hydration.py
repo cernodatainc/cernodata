@@ -65,8 +65,10 @@ class ViewerHydrationMixin:
     def get_results(self, output_dir: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe retrieval of preset comparison results."""
         with self._lock:
-            if output_dir and output_dir != self.output_dir:
-                self.load_previous_run(output_dir)
+            if output_dir:
+                norm_rel, step_idx = parse_run_dir_and_step(output_dir)
+                if norm_rel != self.output_dir or step_idx != self.active_step:
+                    self.load_previous_run(output_dir)
             elif not self.preset_attempts and not self.current_result:
                 target_to_load = self.output_dir or "output"
                 target_full = target_to_load if os.path.isabs(target_to_load) else os.path.join(self.repo_root, target_to_load)
@@ -91,6 +93,11 @@ class ViewerHydrationMixin:
         with self._lock:
             if output_dir:
                 norm_rel, step_idx = parse_run_dir_and_step(output_dir)
+                cand_full = norm_rel if os.path.isabs(norm_rel) else os.path.join(self.repo_root, norm_rel)
+                if not os.path.exists(cand_full):
+                    raise FileNotFoundError(
+                        f"Requested output directory does not exist: '{cand_full}'"
+                    )
                 if norm_rel != self.output_dir or step_idx != self.active_step:
                     self.load_previous_run(output_dir)
 
@@ -220,51 +227,49 @@ class ViewerHydrationMixin:
             violations_list = normalize_violations(result.get("violations", []))
             total_pages = self._validate_total_pages(dom_dict, "in execution result")
 
+            self.active_step = None
             target_output_dir = self.output_dir or "output"
-            page_images, page_dimensions = load_or_render_page_images(
-                pdf_path=resolved_path,
-                target_dir=target_output_dir,
-                total_pages=total_pages,
+            target_full = (
+                target_output_dir
+                if os.path.isabs(target_output_dir)
+                else os.path.join(self.repo_root, target_output_dir)
             )
-
             plan = result.get("plan")
             raw_dom = result.get("raw_dom") or dom_dict
             diff = result.get("diff") or {}
 
-            # If existing viewer_data has the same document and pages, update only changed fields
             existing = self.viewer_data
             if (
                 existing is not None
                 and existing.get("pdfSourceFile") == resolved_path
                 and existing.get("totalPages") == total_pages
                 and existing.get("outputDir") == target_output_dir
+                and existing.get("pageImages")
+                and existing.get("pageDimensions") is not None
             ):
-                updated_dataset: ViewerDataset = dict(existing)  # type: ignore[assignment]
-                updated_dataset.update({
-                    "dom": dom_dict,
-                    "violations": violations_list,
-                    "decision": decision_dict,
-                    "plan": plan,
-                    "activeLanguage": language,
-                    "raw_dom": raw_dom,
-                    "diff": diff,
-                })
-                self.viewer_data = updated_dataset
+                page_images = list(existing["pageImages"])
+                page_dimensions = list(existing["pageDimensions"])
             else:
-                self.viewer_data = build_viewer_dataset(
-                    dom=dom_dict,
-                    violations=violations_list,
-                    decision=decision_dict,
-                    plan=plan,
+                page_images, page_dimensions = load_or_render_page_images(
                     pdf_path=resolved_path,
-                    language=language,
-                    page_images=page_images,
-                    page_dimensions=page_dimensions,
+                    target_dir=target_full,
                     total_pages=total_pages,
-                    output_dir=target_output_dir,
-                    raw_dom=raw_dom,
-                    diff=diff,
                 )
+
+            self.viewer_data = build_viewer_dataset(
+                dom=dom_dict,
+                violations=violations_list,
+                decision=decision_dict,
+                plan=plan,
+                pdf_path=resolved_path,
+                language=language,
+                page_images=page_images,
+                page_dimensions=page_dimensions,
+                total_pages=total_pages,
+                output_dir=target_output_dir,
+                raw_dom=raw_dom,
+                diff=diff,
+            )
 
             preset_name = decision_dict.get("chosen_preset") or "docling_fast"
 

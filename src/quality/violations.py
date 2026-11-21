@@ -136,9 +136,12 @@ def detect_quality_violations(
 
     garbage_threshold = float(load_quality_config().get("garbage_threshold", 0.05))
     counter = 1
+    nodes_by_id: Dict[str, DOMNode] = {node.node_id: node for node in dom.nodes if node.node_id}
+    suppressed_by_node: Dict[str, Dict[str, bool]] = {}
 
     for node in dom.nodes:
         existing_suppressed = get_suppressed_violation_lookup(node)
+        suppressed_by_node[node.node_id] = existing_suppressed
         preserved_viols = [
             dict(v)
             for v in node.violations
@@ -159,12 +162,11 @@ def detect_quality_violations(
             node_viols.extend(lang_viols)
 
         for v in node_viols:
-            v_id = v.get("violation_id", "")
-            r_type = v.get("rule_type", "")
-            if v_id in existing_suppressed:
-                v["suppressed"] = existing_suppressed[v_id]
-            elif r_type in existing_suppressed:
-                v["suppressed"] = existing_suppressed[r_type]
+            v_id = str(v.get("violation_id") or "")
+            r_type = str(v.get("rule_type") or "")
+            v_type = str(v.get("type") or "")
+            if existing_suppressed.get(v_id) or existing_suppressed.get(r_type) or existing_suppressed.get(v_type):
+                v["suppressed"] = True
 
         node.violations = node_viols
         violations.extend(node_viols)
@@ -184,6 +186,17 @@ def detect_quality_violations(
         if is_active:
             layer_viols = check_fn(dom, counter=counter)
             counter += len(layer_viols)
+            for v in layer_viols:
+                nid = str(v.get("node_id") or "")
+                if nid and nid in suppressed_by_node:
+                    node_supp = suppressed_by_node[nid]
+                    v_id = str(v.get("violation_id") or "")
+                    r_type = str(v.get("rule_type") or "")
+                    v_type = str(v.get("type") or "")
+                    if node_supp.get(v_id) or node_supp.get(r_type) or node_supp.get(v_type):
+                        v["suppressed"] = True
+                if nid and nid in nodes_by_id:
+                    nodes_by_id[nid].violations.append(v)
             violations.extend(layer_viols)
 
     violations.extend(_check_template_misapplication_violations(dom))

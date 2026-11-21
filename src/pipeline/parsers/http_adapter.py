@@ -15,6 +15,7 @@ import urllib.request
 from typing import Any, Dict, List, Mapping, Optional, Union
 
 from src.dom import DOMNode, DocumentDOM
+from src.parsers.pdf_utils import get_pdf_page_count
 from src.pipeline.parsers.adapters import ParserExecutionOptions
 from src.pipeline.parsers.custom_output import (
     convert_dom_dict_to_dom,
@@ -129,7 +130,8 @@ class HttpPresetAdapter:
                 f"{list(response_data.keys())}"
             )
 
-        total_pages = max((n.global_page_index for n in nodes), default=1)
+        actual_pages = get_pdf_page_count(resolved_path) if resolved_path and os.path.isfile(resolved_path) else None
+        total_pages = max(max((n.global_page_index for n in nodes), default=1), actual_pages or 1)
         return DocumentDOM(
             document_id=generate_document_id(resolved_path),
             source_filename=os.path.basename(resolved_path),

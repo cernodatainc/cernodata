@@ -19,6 +19,8 @@ class BoundingBoxSchema(BaseModel):
     y0: float = 0.0
     x1: float = 0.0
     y1: float = 0.0
+    angle: float = 0.0
+    quad: Optional[List[List[float]]] = None
 
     @classmethod
     def from_raw(cls, raw: Any) -> BoundingBoxSchema:
@@ -28,11 +30,14 @@ class BoundingBoxSchema(BaseModel):
         if isinstance(raw, (list, tuple)) and len(raw) >= 4:
             return cls(x0=float(raw[0]), y0=float(raw[1]), x1=float(raw[2]), y1=float(raw[3]))
         if isinstance(raw, dict):
+            raw_quad = raw.get("quad")
             return cls(
                 x0=float(raw.get("x0", 0.0)),
                 y0=float(raw.get("y0", 0.0)),
                 x1=float(raw.get("x1", 0.0)),
                 y1=float(raw.get("y1", 0.0)),
+                angle=float(raw.get("angle", 0.0) or 0.0),
+                quad=raw_quad if isinstance(raw_quad, list) else None,
             )
         return cls()
 
@@ -76,3 +81,4 @@ class DocumentDOMSchema(BaseModel):
     source_filename: str
     total_pages: int
     nodes: List[DOMNodeSchema] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)

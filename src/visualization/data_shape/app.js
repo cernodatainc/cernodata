@@ -17,11 +17,19 @@ window.addEventListener("DOMContentLoaded", async () => {
                 if (inpPdf && !inpPdf.value) inpPdf.value = cfg.default_doc;
             }
             if (cfg.default_lang) {
-                document.getElementById("enableLangHint").checked = true;
+                const enableHintEl = document.getElementById("enableLangHint");
+                if (enableHintEl) enableHintEl.checked = true;
                 const langSelect = document.getElementById("langCode");
-                langSelect.value = cfg.default_lang;
-                langSelect.disabled = false;
-                langSelect.style.opacity = "1";
+                if (langSelect) {
+                    langSelect.value = cfg.default_lang;
+                    langSelect.disabled = false;
+                    langSelect.style.opacity = "1";
+                }
+                const inpLangEl = document.getElementById("inpLanguage");
+                if (inpLangEl) inpLangEl.value = cfg.default_lang;
+            }
+            if (cfg.default_threshold !== undefined && cfg.default_threshold !== null) {
+                if (typeof updateThreshold === "function") updateThreshold(cfg.default_threshold);
             }
             if (cfg.previous_runs && cfg.previous_runs.length > 0) {
                 populatePreviousRunsDropdown(cfg.previous_runs);

@@ -23,7 +23,7 @@ def compute_grid_consistency(rows: list[list[str]]) -> float:
         return 0.0
     header = rows[0]
     matching = sum(1 for row in rows if len(row) == len(header)) / len(rows)
-    empty_header_share = sum(1 for cell in header if not cell.strip()) / len(header)
+    empty_header_share = sum(1 for cell in header if not str(cell or "").strip()) / len(header)
     return matching * (1.0 - empty_header_share)
 
 
@@ -38,13 +38,16 @@ def check_table_assertion(rows: list[list[str]], rule: TableAssertion) -> list[s
     if len(data_rows) < rule.min_rows:
         failures.append(f"{len(data_rows)} data row(s), expected at least {rule.min_rows}")
 
-    present = {cell.strip().lower() for cell in header}
+    present = {str(cell or "").strip().lower() for cell in header}
     missing = [name for name in rule.expected_column_headers if name.strip().lower() not in present]
     if missing:
         failures.append(f"missing column header(s): {missing}")
 
     for index in rule.numeric_column_indices:
-        cells = [row[index].strip() for row in data_rows if index < len(row) and row[index].strip()]
+        if rows and index >= len(header) and not any(index < len(row) for row in data_rows):
+            failures.append(f"column {index} out of range for table with {len(header)} column(s)")
+            continue
+        cells = [str(row[index] or "").strip() for row in data_rows if index < len(row) and str(row[index] or "").strip()]
         if any(not _NUMBER_RE.match(cell) for cell in cells):
             failures.append(f"column {index} has non-numeric value(s)")
 

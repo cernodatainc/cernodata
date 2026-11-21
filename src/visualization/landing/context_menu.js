@@ -119,11 +119,11 @@ async function onContextAction(action) {
         selectDocAndOpenPlanning(target.docPath);
     } else if (action === 'forget' && target.docPath) {
         await forgetExplorerFile(target.docPath);
-    } else if (action === 'inspect_run' && target.runId) {
-        selectExplorerRun(target.runId, target.outputDir, target.docPath);
-    } else if (action === 'remove_run' && target.runId) {
+    } else if (action === 'inspect_run' && (target.runId || target.outputDir)) {
+        selectExplorerRun(target.runId || target.outputDir, target.outputDir || target.runId, target.docPath);
+    } else if (action === 'remove_run' && (target.runId || target.outputDir)) {
         if (typeof removeExplorerRun === 'function') {
-            await removeExplorerRun(target.runId, target.outputDir, target.docPath);
+            await removeExplorerRun(target.runId || target.outputDir, target.outputDir || target.runId, target.docPath);
         }
     } else if (action === 'copy_run_id' && (target.runId || target.outputDir)) {
         if (navigator.clipboard) {
@@ -198,11 +198,12 @@ document.addEventListener('contextmenu', function(e) {
     const runRow = e.target.closest('[data-run-id], .run-row');
     if (runRow) {
         const runId = runRow.getAttribute('data-run-id');
+        const outputDir = runRow.getAttribute('data-output-dir') || runId;
         const docPath = runRow.getAttribute('data-doc-path');
-        if (runId) {
+        if (runId || outputDir) {
             e.preventDefault();
             e.stopPropagation();
-            showExplorerRunContextMenu(e.clientX, e.clientY, runId, runId, docPath);
+            showExplorerRunContextMenu(e.clientX, e.clientY, runId || outputDir, outputDir, docPath);
             return;
         }
     }

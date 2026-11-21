@@ -122,9 +122,9 @@ def _match_doc_key(doc_mappings: Dict[str, Dict[str, Any]], target: str) -> Opti
     norm_t = normalize_path(target)
     if norm_t in doc_mappings:
         return norm_t
-    base_t = os.path.basename(norm_t)
+    base_t = os.path.basename(norm_t).lower()
     for k, v in doc_mappings.items():
-        if v["file_name"] == base_t:
+        if str(v.get("file_name", "")).lower() == base_t:
             return k
     return None
 
@@ -218,9 +218,10 @@ def merge_persistent_runs(
         if p_path.startswith("_") or not isinstance(p_val, dict):
             continue
         norm_p = normalize_path(p_path)
-        if norm_p not in doc_mappings:
+        matched_key = _match_doc_key(doc_mappings, norm_p)
+        if not matched_key:
             continue
-        target_runs = doc_mappings[norm_p]["runs"]
+        target_runs = doc_mappings[matched_key]["runs"]
         base_p = os.path.basename(norm_p)
         for p_run in p_val.get("runs", []):
             r_id = normalize_path(str(p_run.get("run_id") or ""))
