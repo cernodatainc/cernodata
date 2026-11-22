@@ -102,15 +102,13 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             session.output_dir = RUN_OUTPUT_DIR
             session.active_step = None
         session.update_result_state(res, pdf_path=pdf_path, language=language)
-        dec = res.get("decision", {})
+        dec = res["decision"]
         chosen_preset = str(dec.get("chosen_preset") or default_preset)
-        raw_score = dec.get("overall_confidence")
-        score = float(raw_score) if raw_score is not None else 0.0
-        raw_status = dec.get("status")
-        status = str(raw_status) if raw_status is not None else "UNKNOWN"
-        viols_count = len(res.get("violations", []))
+        score = float(dec["overall_confidence"])
+        status = str(dec["status"])
+        viols_count = len(res["violations"])
         t_end = datetime.now().strftime("%H:%M:%S")
-        out_dir = session.output_dir or "output"
+        out_dir = RUN_OUTPUT_DIR
 
         record_run_mapping(
             document_path=pdf_path,
@@ -120,7 +118,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             status=status,
             confidence=score,
             violations_count=viols_count,
-            total_pages=res.get("dom", {}).get("total_pages", 1) or 1,
+            total_pages=int(res["dom"]["total_pages"]),
             per_page_confidence=dec.get("per_page_confidence", {}),
             timestamp=t_end,
             repo_root=session.repo_root,
@@ -144,7 +142,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         """Submits an execution callable to the thread pool and sends the formatted HTTP response."""
         try:
             result = self.executor.submit(task_fn).result()
-            dec = result.get("decision") or {}
+            dec = result["decision"]
             executed_preset = str(dec.get("chosen_preset") or preset)
             response_body: Dict[str, Any] = {
                 "preset": executed_preset,

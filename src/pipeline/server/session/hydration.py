@@ -187,8 +187,8 @@ class ViewerHydrationMixin:
                 decision_data["attempts"] = list(self.preset_attempts)
 
             viewer_language = self.language or decision_data.get("language", "en")
-            raw_dom = artifacts.raw_dom or dom_data
-            diff = artifacts.diff or {}
+            raw_dom = artifacts.raw_dom
+            diff = artifacts.diff
 
             self.viewer_data = build_viewer_dataset(
                 dom=dom_data,

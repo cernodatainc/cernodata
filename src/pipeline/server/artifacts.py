@@ -17,6 +17,7 @@ import re
 from typing import Any, Dict, List, Optional
 from pydantic import ValidationError
 
+from src.dom.enums import DecisionStatus
 from src.pipeline.artifact_registry import default_artifact_registry
 from src.pipeline.execution_models import AttemptRecord
 from src.pipeline.server.artifact_models import RunArtifacts, ViewerDataset
@@ -130,12 +131,12 @@ def _backfill_page_confidence(
         from src.quality import evaluate_document_confidence
         temp_dom = DocumentDOM.from_dict(dom_data)
         metrics = evaluate_document_confidence(temp_dom, language=decision_data.get("language") or "en")
-        for p, sc in metrics.get("per_page_confidence", {}).items():
+        for p, sc in metrics["per_page_confidence"].items():
             if str(p) not in per_page_conf and p not in per_page_conf:
                 per_page_conf[str(p)] = sc
         decision_data["per_page_confidence"] = per_page_conf
         if (decision_data.get("overall_confidence") == 1.0 or not decision_data.get("overall_confidence")) and violations:
-            decision_data["overall_confidence"] = metrics.get("overall_confidence", 1.0)
+            decision_data["overall_confidence"] = metrics["overall_confidence"]
     except Exception as e:
         logger.debug("Could not compute fallback per-page confidence: %s", e)
 
@@ -188,7 +189,7 @@ def load_run_artifacts(run_dir: str) -> RunArtifacts:
     _backfill_page_confidence(decision_data, dom_data, violations)
 
     chosen_preset = decision_data.get("chosen_preset") or plan_res_data.get("chosen_preset", "N/A")
-    status = decision_data.get("status") or plan_res_data.get("status", "ACCEPT")
+    status = decision_data.get("status") or plan_res_data.get("status") or DecisionStatus.UNKNOWN.value
     overall_confidence = decision_data.get("overall_confidence")
     doc_path, doc_name, chosen_preset = _resolve_document_identity(plan_data, dom_data, chosen_preset)
 
@@ -231,9 +232,13 @@ def create_preset_attempt_record(
     preset_name = str(decision_dict.get("chosen_preset") or decision_dict.get("preset_id") or "")
     tree = decision_dict.get("decision_tree")
     action = tree.get("action", default_action) if isinstance(tree, dict) else default_action
-    conf = decision_dict.get("overall_confidence")
-    overall_confidence = float(conf) if conf is not None else 1.0
-    status = decision_dict.get("status") or "ACCEPT"
+    overall_confidence = float(decision_dict["overall_confidence"])
+    status = str(decision_dict["status"])
+    is_accepted = (
+        bool(decision_dict["is_accepted"])
+        if "is_accepted" in decision_dict
+        else (status == DecisionStatus.ACCEPT.value)
+    )
     per_page_conf = decision_dict.get("per_page_confidence")
     return {
         "step": step,
@@ -242,7 +247,7 @@ def create_preset_attempt_record(
         "per_page_confidence": per_page_conf if isinstance(per_page_conf, dict) else {},
         "violations_count": violations_count,
         "status": status,
-        "is_accepted": decision_dict.get("is_accepted", True),
+        "is_accepted": is_accepted,
         "action": action,
     }
 
@@ -257,22 +262,21 @@ def build_viewer_dataset(
     page_images: List[str],
     page_dimensions: List[Dict[str, float]],
     total_pages: int,
-    output_dir: Optional[str] = None,
-    raw_dom: Optional[Dict[str, Any]] = None,
-    diff: Optional[Dict[str, Any]] = None,
+    output_dir: str,
+    raw_dom: Dict[str, Any],
+    diff: Dict[str, Any],
 ) -> ViewerDataset:
     """
     Constructs canonical dataset required to hydrate interactive visual viewer.
     Stores raw result and diff to eliminate expensive redundant preset reruns.
     """
-    resolved_raw_dom = raw_dom if raw_dom is not None else dom
-    resolved_diff = diff if diff is not None else {}
-    resolved_output_dir = output_dir if output_dir else "output"
+    if not output_dir:
+        raise ValueError("output_dir must be a non-empty path.")
 
-    det_langs = decision.get("detected_languages") if isinstance(decision, dict) else None
+    det_langs = decision.get("detected_languages")
     detected_languages = det_langs if isinstance(det_langs, dict) else {}
 
-    verif_res = safe_load_json(os.path.join(resolved_output_dir, "verification_result.json"), {})
+    verif_res = safe_load_json(os.path.join(output_dir, "verification_result.json"), {})
     verif_layers = (
         decision.get("selected_layers")
         or verif_res.get("selected_layers")
@@ -283,8 +287,8 @@ def build_viewer_dataset(
 
     dataset: ViewerDataset = {
         "dom": dom,
-        "raw_dom": resolved_raw_dom,
-        "diff": resolved_diff,
+        "raw_dom": raw_dom,
+        "diff": diff,
         "violations": violations,
         "decision": decision,
         "detectedLanguages": detected_languages,
@@ -294,7 +298,7 @@ def build_viewer_dataset(
         "pageImages": page_images,
         "pageDimensions": page_dimensions,
         "totalPages": total_pages,
-        "outputDir": resolved_output_dir,
+        "outputDir": output_dir,
         "verificationResult": verif_res,
         "verificationLayers": list(verif_layers),
         "layerScores": dict(layer_scores),

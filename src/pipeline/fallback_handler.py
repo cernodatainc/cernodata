@@ -394,7 +394,7 @@ class FallbackLoopHandler:
         """Path A: switches through remaining candidate presets until one is accepted."""
         thresh_val = float(config.target_threshold)
         curr_preset = config.preset
-        plan_names = {str(_normalize_fallback_name(item)) for item in (plan.fallback_queue or [])} if plan else set()
+        plan_names = {str(_normalize_fallback_name(item)) for item in plan.fallback_queue} if plan else set()
 
         best_dom, best_decision, best_violations = dom, decision, violations
         best_conf = _confidence_or_zero(decision)

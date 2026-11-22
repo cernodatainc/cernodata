@@ -224,7 +224,8 @@ def load_validated_run_artifacts(
     )
     status = (
         dec_schema.status
-        or (exec_result.status if exec_result else DecisionStatus.ACCEPT)
+        if "status" in dec_schema.model_fields_set
+        else (exec_result.status if exec_result else dec_schema.status)
     )
     exec_conf = (
         exec_result.overall_confidence

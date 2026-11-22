@@ -204,7 +204,7 @@ def convert_raw_output_to_dom(
     page_index: int = 1,
 ) -> DocumentDOM:
     """Converts raw text, markdown, hocr, or cernodata_dom_json output into a DocumentDOM."""
-    fmt = (output_format or "text").strip().lower()
+    fmt = output_format.strip().lower()
     if fmt == "cernodata_dom_json":
         parsed = json.loads(raw_output)
         if isinstance(parsed, list):
@@ -215,9 +215,12 @@ def convert_raw_output_to_dom(
 
     if fmt == "markdown":
         nodes = convert_markdown_to_nodes(raw_output, page_index=page_index, preset_id=preset_id)
+    elif fmt == "hocr":
+        nodes = convert_plain_text_to_nodes(_strip_hocr_markup(raw_output), page_index=page_index, preset_id=preset_id)
+    elif fmt == "text":
+        nodes = convert_plain_text_to_nodes(raw_output, page_index=page_index, preset_id=preset_id)
     else:
-        text_content = _strip_hocr_markup(raw_output) if fmt == "hocr" else raw_output
-        nodes = convert_plain_text_to_nodes(text_content, page_index=page_index, preset_id=preset_id)
+        raise ValueError(f"Unsupported output_format: {output_format!r}")
 
     actual_pages = get_pdf_page_count(resolved_path) if resolved_path and os.path.isfile(resolved_path) else None
     total_pages = max(max((n.global_page_index for n in nodes), default=1), actual_pages or 1)

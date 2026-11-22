@@ -60,16 +60,18 @@ class PresetPlanner:
         for hint in hints:
             weights.setdefault(hint, 0.88)
 
-        hw = (config.hardware_weight or "light_cpu").strip().lower()
+        hw = config.hardware_weight
         if hw == "heavy_cpu":
             weights["rapid_approximate"] = 0.5
             weights["high_precision_structure"] = 0.82
         elif hw == "gpu_vram":
             weights["rapid_approximate"] = 0.45
             weights["high_precision_structure"] = 0.9
-        else:
+        elif hw == "light_cpu":
             weights["rapid_approximate"] = 0.85
             weights["high_precision_structure"] = 0.6
+        else:
+            raise ValueError(f"Unsupported hardware_weight: {hw!r}")
 
         if config.backend_type == PresetBackendType.HTTP_ENDPOINT:
             weights["air_gapped_local"] = 0.25

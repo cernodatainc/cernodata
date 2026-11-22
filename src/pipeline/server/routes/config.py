@@ -262,8 +262,10 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             return
 
         if config.backend_type == PresetBackendType.CLI_SUBPROCESS:
-            exe = config.command_template[0] if config.command_template else ""
-            resolved = shutil.which(exe) or (exe if exe and os.path.isfile(exe) else None)
+            if not config.command_template:
+                raise ValueError("CLI_SUBPROCESS preset requires a non-empty command_template.")
+            exe = config.command_template[0]
+            resolved = shutil.which(exe) or (exe if os.path.isfile(exe) else None)
             if resolved:
                 self.send_json(200, {
                     "success": True,
@@ -283,7 +285,9 @@ class ConfigRoutesMixin(BaseApiRoutesMixin):
             return
 
         if config.backend_type == PresetBackendType.HTTP_ENDPOINT:
-            url = config.endpoint_url or ""
+            if not config.endpoint_url:
+                raise ValueError("HTTP_ENDPOINT preset requires a non-empty endpoint_url.")
+            url = config.endpoint_url
             timeout = min(int(config.timeout_sec), 5)
             try:
                 req = urllib.request.Request(url, method="GET")

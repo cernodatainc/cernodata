@@ -99,19 +99,19 @@ def _build_discovered_run_entry(r: Dict[str, Any], run_id: str, output_dir: str)
     entry = make_run_record(
         run_id=run_id,
         output_dir=output_dir,
-        preset=r.get("chosen_preset") or "",
-        status=r.get("status") or "ACCEPT",
-        confidence=float(r.get("overall_confidence", 1.0)),
-        violations_count=int(r.get("violations_count", 0)),
-        total_pages=int(r.get("total_pages", 1)),
-        per_page_confidence=r.get("per_page_confidence", {}),
-        per_page_violations=r.get("per_page_violations", {}),
-        timestamp=r.get("timestamp") or "",
+        preset=str(r["chosen_preset"]),
+        status=str(r["status"]),
+        confidence=float(r["overall_confidence"]),
+        violations_count=int(r["violations_count"]),
+        total_pages=int(r["total_pages"]),
+        per_page_confidence=r["per_page_confidence"],
+        per_page_violations=r["per_page_violations"],
+        timestamp=str(r["timestamp"]),
     )
-    entry["has_viewer"] = r.get("has_viewer", False)
-    entry["has_dom"] = r.get("has_dom", False)
-    entry["has_plan"] = r.get("has_plan", False)
-    entry["label"] = r.get("label", "")
+    entry["has_viewer"] = bool(r["has_viewer"])
+    entry["has_dom"] = bool(r["has_dom"])
+    entry["has_plan"] = bool(r["has_plan"])
+    entry["label"] = str(r["label"])
     return entry
 
 
@@ -152,8 +152,8 @@ def associate_discovered_runs(
         if is_test_or_cache_dir(r_doc_path) or is_test_or_cache_dir(r_doc_name):
             continue
 
-        run_id = r.get("id") or r.get("dir_path") or "output"
-        output_dir = r.get("dir_path") or "output"
+        run_id = str(r["id"])
+        output_dir = str(r["dir_path"])
         if is_test_or_cache_dir(run_id) or is_test_or_cache_dir(output_dir):
             continue
         run_entry = _build_discovered_run_entry(r, run_id, output_dir)

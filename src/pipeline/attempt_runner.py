@@ -79,16 +79,18 @@ class AttemptRunner:
         parameters: Optional[Dict[str, Any]] = None,
     ) -> AttemptRecord:
         """Builds a structured attempt record for tracking iteration history."""
+        resolved_action = action if action is not None else decision["decision_tree"]["action"]
+        resolved_reason = reason if reason is not None else decision["decision_tree"].get("reason")
         record: AttemptRecord = {
             "step": step,
             "preset": preset,
-            "overall_confidence": decision.get("overall_confidence"),
+            "overall_confidence": float(decision["overall_confidence"]),
             "per_page_confidence": decision.get("per_page_confidence"),
             "status": decision.get("status"),
-            "is_accepted": decision.get("is_accepted", False),
+            "is_accepted": bool(decision["is_accepted"]),
             "violations_count": len(violations),
-            "action": action or decision.get("decision_tree", {}).get("action"),
-            "reason": reason or decision.get("decision_tree", {}).get("reason"),
+            "action": resolved_action,
+            "reason": resolved_reason,
         }
         if detail is not None:
             record["detail"] = detail

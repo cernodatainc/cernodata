@@ -118,8 +118,8 @@ class RunLoaderMixin:
             else:
                 self.preset_attempts = []
 
-            raw_dom = artifacts.raw_dom or dom_dict
-            diff = artifacts.diff or {}
+            raw_dom = artifacts.raw_dom
+            diff = artifacts.diff
             self.current_result = {
                 "decision": decision_dict,
                 "violations": viol_list,

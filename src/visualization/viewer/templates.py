@@ -157,7 +157,7 @@ def build_viewer_html(
         else:
             page_dimensions = []
 
-    dec = DecisionTreeSchema.model_validate(decision or {})
+    dec = DecisionTreeSchema.model_validate(decision)
     is_acc = dec.is_accepted
     primary_detected = dec.primary_detected_language
     active_lang = dec.language if "language" in dec.model_fields_set else "pl"
@@ -170,7 +170,7 @@ def build_viewer_html(
         ov_text = " [OVERRIDDEN]" if is_over else ""
         plan_header_sub = f" | Plan: {tax} ({hw}){ov_text}"
 
-    timeline_buttons = build_timeline_buttons(decision or {}, plan)
+    timeline_buttons = build_timeline_buttons(decision, plan)
     p1_val = dec.per_page_confidence.get("1", dec.overall_confidence)
     page1_conf = f"{p1_val:.4f}"
     overall_conf = f"{dec.overall_confidence:.4f}"
@@ -178,7 +178,7 @@ def build_viewer_html(
 
     total_pages = dom.total_pages or len(page_images) or 1
     page_images_json = json.dumps(page_images)
-    page_dimensions_json = json.dumps(page_dimensions or [])
+    page_dimensions_json = json.dumps(page_dimensions)
     pdf_source_file = json.dumps(dom.source_filename)
     output_dir_json = json.dumps(output_dir or "output")
     active_lang_json = json.dumps(active_lang)

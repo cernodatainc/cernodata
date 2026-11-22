@@ -99,9 +99,8 @@ class PipelineOrchestrator:
             plan=plan,
         )
 
-        status_str = str(decision.get("status", "ACCEPT"))
-        raw_confidence = decision.get("overall_confidence")
-        score_val = 1.0 if raw_confidence is None else float(raw_confidence)
+        status_str = str(decision["status"])
+        score_val = float(decision["overall_confidence"])
         notifier.notify_complete(status_str, score_val, len(violations))
 
         return result

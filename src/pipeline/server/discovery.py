@@ -76,8 +76,8 @@ class RunMetadata:
             if diff_scoring.get("status"):
                 status = DecisionStatus.coerce(diff_scoring["status"])
 
-        doc_name = artifacts.document_name or "Unknown"
-        chosen_preset = artifacts.chosen_preset or ""
+        doc_name = artifacts.document_name
+        chosen_preset = artifacts.chosen_preset
         preset_label = chosen_preset or "unknown"
         violations_count = len(active_viols_pages)
         label = f"{doc_name} [{preset_label} | {status.value} {raw_conf:.4f} | {violations_count} viols] ({norm_rel})"
@@ -249,11 +249,11 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
     # Determine maximum page count across all runs for this file
     max_pages = 1
     for r in file_runs:
-        max_pages = max(max_pages, int(r.get("total_pages", 1) or 1))
+        max_pages = max(max_pages, int(r["total_pages"]))
         for key_map in (
-            r.get("per_page_confidence") or {},
-            r.get("per_page_violations") or {},
-            r.get("per_page_nodes") or {},
+            r["per_page_confidence"],
+            r["per_page_violations"],
+            r["per_page_nodes"],
         ):
             max_pages = _max_int_key(key_map.keys(), max_pages)
 
@@ -261,28 +261,22 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
 
     matrix_rows: List[Dict[str, Any]] = []
     for r in file_runs:
+        page_conf = r["per_page_confidence"]
+        page_viols = r["per_page_violations"]
+        page_nodes = r["per_page_nodes"]
+        status_val = str(r["status"])
+
         pages_data: Dict[str, Dict[str, Any]] = {}
         for p in pages:
             p_str = str(p)
-            page_conf = r.get("per_page_confidence") or {}
             conf = page_conf.get(p_str)
-            if conf is None:
-                conf = page_conf.get(p)
-
-            page_viols = r.get("per_page_violations") or {}
-            viols = page_viols.get(p_str)
-            if viols is None:
-                viols = page_viols.get(p, 0)
-
-            page_nodes = r.get("per_page_nodes") or {}
-            nodes = page_nodes.get(p_str)
-            if nodes is None:
-                nodes = page_nodes.get(p, 0)
+            viols = page_viols.get(p_str, 0)
+            nodes = page_nodes.get(p_str, 0)
 
             if conf is not None:
                 is_passed = conf >= PAGE_PASS_CONFIDENCE
             else:
-                is_passed = (r.get("status") == "ACCEPT")
+                is_passed = (status_val == DecisionStatus.ACCEPT.value)
 
             pages_data[p_str] = {
                 "page": p,
@@ -292,23 +286,14 @@ def build_runs_grid(runs: List[Dict[str, Any]], target_file: Optional[str] = Non
                 "is_passed": is_passed,
             }
 
-        run_id = str(r.get("id") or r.get("dir_path") or "output")
-        dir_path = str(r.get("dir_path") or "output")
-        preset = str(r.get("chosen_preset") or "")
-        status_val = str(r.get("status") or "ACCEPT")
-        raw_conf = r.get("overall_confidence")
-        overall_conf = float(raw_conf) if raw_conf is not None else DEFAULT_OVERALL_CONFIDENCE
-        violations_cnt = int(r.get("violations_count") or 0)
-        timestamp_val = str(r.get("timestamp") or "")
-
         matrix_rows.append({
-            "run_id": run_id,
-            "dir_path": dir_path,
-            "preset": preset,
+            "run_id": str(r["id"]),
+            "dir_path": str(r["dir_path"]),
+            "preset": str(r["chosen_preset"]),
             "status": status_val,
-            "overall_confidence": overall_conf,
-            "violations_count": violations_cnt,
-            "timestamp": timestamp_val,
+            "overall_confidence": float(r["overall_confidence"]),
+            "violations_count": int(r["violations_count"]),
+            "timestamp": str(r["timestamp"]),
             "pages_data": pages_data,
         })
 

@@ -21,14 +21,16 @@ logger = logging.getLogger("cernodata.pipeline.parsers.cli_adapter")
 
 
 def _output_filename_for_format(output_format: str) -> str:
-    fmt = (output_format or "text").strip().lower()
+    fmt = output_format.strip().lower()
     if fmt == "cernodata_dom_json":
         return "output.json"
     if fmt == "markdown":
         return "output.md"
     if fmt == "hocr":
         return "output.hocr"
-    return "output.txt"
+    if fmt == "text":
+        return "output.txt"
+    raise ValueError(f"Unsupported output_format: {output_format!r}")
 
 
 def _read_cli_output(output_path: str, stdout: str) -> str:
@@ -47,7 +49,7 @@ def _read_cli_output(output_path: str, stdout: str) -> str:
                 if content.strip():
                     return content
 
-    return stdout or ""
+    return stdout
 
 
 def build_cli_command(

@@ -167,7 +167,7 @@ def materialize_document_verification(
     metrics = evaluate_document_confidence(dom, language=language, layers=active_layers)
     overall_conf = metrics["overall_confidence"]
     per_page_conf = metrics["per_page_confidence"]
-    layer_scores = metrics.get("layer_scores", {})
+    layer_scores = metrics["layer_scores"]
 
     is_accepted = overall_conf >= target_threshold
     status = "ACCEPT" if is_accepted else "TRIGGER_FALLBACK"
@@ -179,7 +179,7 @@ def materialize_document_verification(
         "target_confidence_threshold": target_threshold,
         "overall_confidence": overall_conf,
         "per_page_confidence": per_page_conf,
-        "per_page_layer_scores": metrics.get("per_page_layer_scores", {}),
+        "per_page_layer_scores": metrics["per_page_layer_scores"],
         "is_accepted": is_accepted,
         "status": status,
         "selected_layers": active_layers,
@@ -203,8 +203,8 @@ def materialize_document_verification(
         output_dir=output_dir,
         materialized_at=materialized_time,
         metadata={
-            "detected_languages": metrics.get("detected_languages", {}),
-            "primary_detected_language": metrics.get("primary_detected_language", "en"),
+            "detected_languages": metrics["detected_languages"],
+            "primary_detected_language": metrics["primary_detected_language"],
             "language": language,
         },
     )
@@ -219,8 +219,8 @@ def materialize_document_verification(
                 "document_id": dom.document_id,
                 "source_filename": dom.source_filename,
                 "language": language or "en",
-                "detected_languages": metrics.get("detected_languages", {}),
-                "primary_detected_language": metrics.get("primary_detected_language", "en"),
+                "detected_languages": metrics["detected_languages"],
+                "primary_detected_language": metrics["primary_detected_language"],
                 "selected_layers": active_layers,
                 "layer_scores": layer_scores,
                 "total_violations": len(violations),

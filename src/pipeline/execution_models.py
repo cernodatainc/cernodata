@@ -24,7 +24,7 @@ class AttemptRecord(TypedDict, total=False):
     """Structured record tracking iteration history in pipeline fallback execution."""
     step: int
     preset: str
-    overall_confidence: Optional[float]
+    overall_confidence: float
     per_page_confidence: Optional[Dict[int, float]]
     status: Optional[str]
     is_accepted: bool
