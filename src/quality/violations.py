@@ -22,8 +22,9 @@ from src.quality.handlers import (
 )
 from src.quality.language_config import LanguageConfig, get_language_config
 from src.quality.layers import ActiveVerificationLayers, VerificationLayer
+from src.quality.retrieval_evaluator import evaluate_retrieval_suite
 from src.quality.table_validator import check_table_assertion
-from src.schemas.test_suite import DocumentAssertionSuite
+from src.schemas.test_suite import DocumentAssertionSuite, RetrievalTestSuite
 
 
 def _check_garbage_violations(
@@ -98,11 +99,15 @@ def _check_template_misapplication_violations(dom: DocumentDOM) -> List[Dict[str
     return []
 
 
-def _check_dataset_retrieval_violations(dom: DocumentDOM) -> List[Dict[str, Any]]:
-    """No-op hook for Level 5 downstream RAG retrieval recall evaluation."""
-    # TODO(TASK-106): Hook Level 5 downstream retrieval evaluation (`evaluate_retrieval_suite`) for batch runs.
-    _ = dom
-    return []
+def _check_dataset_retrieval_violations(
+    dom: DocumentDOM,
+    counter: int = 1,
+    suite: Optional[RetrievalTestSuite] = None,
+) -> List[Dict[str, Any]]:
+    """Evaluates Level 5 RAG retrieval recall of the document against user-supplied test questions."""
+    if suite is None:
+        return []
+    return evaluate_retrieval_suite([dom], suite, counter=counter)
 
 
 def detect_quality_violations(
@@ -111,10 +116,12 @@ def detect_quality_violations(
     page_languages: Optional[Dict[int, str]] = None,
     layers: Optional[Sequence[str]] = None,
     assertion_suite: Optional[DocumentAssertionSuite] = None,
+    retrieval_suite: Optional[RetrievalTestSuite] = None,
 ) -> List[Dict[str, Any]]:
     """
     Scans DocumentDOM nodes for specific quality violations across selected verification layers.
     When `assertion_suite` is given, the structure layer also evaluates its rules.
+    When `retrieval_suite` is given, its questions are checked against the document's retrieved chunks.
     Composes single-rule check functions with language configuration and layer filters.
     Populates violations directly on each DOMNode.
     """
@@ -187,5 +194,5 @@ def detect_quality_violations(
             violations.extend(layer_viols)
 
     violations.extend(_check_template_misapplication_violations(dom))
-    violations.extend(_check_dataset_retrieval_violations(dom))
+    violations.extend(_check_dataset_retrieval_violations(dom, counter=counter, suite=retrieval_suite))
     return violations
