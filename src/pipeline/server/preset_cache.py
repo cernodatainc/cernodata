@@ -40,18 +40,12 @@ class PresetCache:
             language: Optional language hint code.
 
         Returns:
-            List of hierarchical lookup keys ordered from most to least specific.
+            Single-element key list. A result cached under one language is never served for another.
         """
         doc_base = os.path.basename(pdf_path).strip().lower() if pdf_path else ""
         preset_clean = preset.strip().lower() if preset else "docling_fast"
-        keys: List[str] = []
-        if doc_base:
-            keys.append(f"{doc_base}:{preset_clean}")
-            if language:
-                keys.insert(0, f"{doc_base}:{preset_clean}:{language.strip().lower()}")
-        else:
-            keys.append(preset_clean)
-        return keys
+        key = f"{doc_base}:{preset_clean}" if doc_base else preset_clean
+        return [f"{key}:{language.strip().lower()}"] if language else [key]
 
     def get(self, pdf_path: str, preset: str, language: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
@@ -162,6 +156,9 @@ class PresetCache:
                 if dir_path:
                     full_dir = dir_path if os.path.isabs(dir_path) else os.path.join(repo_root, dir_path)
                     artifacts = load_run_artifacts(full_dir)
+                    run_language = str((artifacts.decision or {}).get("language") or "").strip().lower()
+                    if language and run_language and run_language != language.strip().lower():
+                        continue
                     if artifacts.dom and artifacts.decision:
                         res: Dict[str, Any] = {
                             "dom": artifacts.dom,
