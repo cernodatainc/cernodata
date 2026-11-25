@@ -344,6 +344,7 @@ class TestPlanner(unittest.TestCase):
         self.assertIsNone(cache.get("src/e2e/Document 8.pdf", "docling_fast", "pl"))
         self.assertIsNone(cache.get("src/e2e/Dokument 5.pdf", "docling_deep", "pl"))
         self.assertIsNotNone(cache.get("src/e2e/Dokument 5.pdf", "docling_fast", "pl"))
+        self.assertIsNone(cache.get("src/e2e/Dokument 5.pdf", "docling_fast", "en"))
 
         mock_dom = make_test_dom(
             "Sprawozdanie finansowe za rok obrotowy 2024.",

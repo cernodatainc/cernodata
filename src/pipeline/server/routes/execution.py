@@ -7,6 +7,7 @@ Pipeline execution and rerun API route handlers for cernodata HTTP server.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.dom import DocumentDOM
@@ -18,6 +19,11 @@ if TYPE_CHECKING:
     from src.pipeline.execution_models import PipelineExecutionResult
 
 RUN_OUTPUT_DIR = "output"
+
+
+def document_run_dir(pdf_path: str) -> str:
+    """Per-document run directory, so runs of different documents never overwrite each other."""
+    return f"{RUN_OUTPUT_DIR}/{Path(pdf_path).stem}"
 
 
 class ExecutionRoutesMixin(BaseApiRoutesMixin):
@@ -60,6 +66,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
             )
             return False
         logger.info("Reusing existing result for preset '%s' (PDF: %s, Lang: %s)", preset, pdf_path, language)
+        self.session.output_dir = document_run_dir(pdf_path)
         self.session.update_result_state(cached, pdf_path=pdf_path, language=language)
         raw_status = dec.get("status")
         status = str(raw_status) if raw_status is not None else "UNKNOWN"
@@ -96,6 +103,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         from src.pipeline.server.run_mappings import record_run_mapping
 
         session = self.session
+        session.output_dir = document_run_dir(pdf_path)
         session.update_result_state(res, pdf_path=pdf_path, language=language)
         dec = res.get("decision", {})
         chosen_preset = str(dec.get("chosen_preset") or default_preset)
@@ -105,7 +113,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
         status = str(raw_status) if raw_status is not None else "UNKNOWN"
         viols_count = len(res.get("violations", []))
         t_end = datetime.now().strftime("%H:%M:%S")
-        out_dir = session.output_dir or "output"
+        out_dir = session.output_dir
 
         record_run_mapping(
             document_path=pdf_path,
@@ -314,7 +322,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 preset=preset,
                 align_skew=align_skew,
                 visualize=visualize,
-                output_dir=RUN_OUTPUT_DIR,
+                output_dir=document_run_dir(pdf_path),
                 plan=plan_obj,
                 verification_layers=resolved_run_layers,
                 progress_callback=on_progress,
@@ -366,7 +374,7 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
                 preset=preset,
                 align_skew=True,
                 visualize=True,
-                output_dir=RUN_OUTPUT_DIR,
+                output_dir=document_run_dir(pdf_path),
                 progress_callback=on_progress,
             )
             return self._finalize_pipeline_run(res, pdf_path, language, preset, "Rerun")
