@@ -121,12 +121,81 @@ function renderDownstreamRecommendationAndConnectorCard(data) {
 }
 
 /**
- * No-op UI hook for rendering visual Pass/Fail badges from the Output Test Case & Q&A Sandbox UI.
+ * Fills the output expectations template dropdown from GET /api/test_templates.
+ */
+async function loadTestTemplates() {
+    const select = document.getElementById('tsTemplate');
+    if (!select) return;
+    try {
+        const resp = await fetch('/api/test_templates');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        (data.templates || []).forEach(name => select.add(new Option(name.replace(/_/g, ' '), name)));
+    } catch (e) {
+        console.log('[INFO] Failed to load test templates:', e);
+    }
+}
+
+/**
+ * Reads the output expectations card into a POST /api/test_suite_check payload.
  *
- * @param {Object} data - Results payload returned by /api/results.
+ * @returns {Object} Payload with template, required_headers, min_table_columns, and questions.
+ */
+function readOutputTestSuiteForm() {
+    const value = id => (document.getElementById(id) || {}).value || '';
+    const questions = value('tsQuestions').split('\n')
+        .map(line => line.split('=>'))
+        .filter(parts => parts.length > 1 && parts[0].trim() && parts.slice(1).join('=>').trim())
+        .map(parts => ({ question: parts[0].trim(), expected_answer: parts.slice(1).join('=>').trim() }));
+    return {
+        template: value('tsTemplate') || null,
+        required_headers: value('tsHeaders').split(',').map(h => h.trim()).filter(Boolean),
+        min_table_columns: parseInt(value('tsMinColumns'), 10) || null,
+        questions: questions
+    };
+}
+
+/**
+ * Checks the last parsed document against the output expectations card.
+ *
+ * @param {boolean} onlyIfDefined - Skip silently when the card is empty (used after pipeline runs).
+ */
+async function runOutputTestSuiteCheck(onlyIfDefined) {
+    const payload = readOutputTestSuiteForm();
+    const isEmpty = !payload.template && !payload.required_headers.length
+        && !payload.min_table_columns && !payload.questions.length;
+    if (isEmpty && onlyIfDefined) return;
+    try {
+        const resp = await fetch('/api/test_suite_check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        renderOutputTestSuiteResultsCard(resp.ok ? data : { error: data.error || resp.statusText });
+    } catch (e) {
+        renderOutputTestSuiteResultsCard({ error: e.message });
+    }
+}
+
+/**
+ * Renders Pass/Fail badges for output expectations and test questions.
+ *
+ * @param {Object} data - Payload from /api/test_suite_check; other payloads without results are ignored.
  */
 function renderOutputTestSuiteResultsCard(data) {
-    // TODO(TASK-107): Render visual Pass/Fail badges for user-defined expected section headers,
-    // table structure rules, and plain-English retrieval Q&A checks configured in the Web Hub.
-    void data;
+    const box = document.getElementById('testSuiteResults');
+    if (!box || !data || !(data.results || data.error)) return;
+    if (data.error) {
+        box.innerHTML = `<div class="test-suite-detail">${escapeHtml(data.error)}</div>`;
+        return;
+    }
+    const passed = data.results.filter(r => r.passed).length;
+    const rows = data.results.map(r => `<div class="test-suite-result">`
+        + `<span class="badge ${r.passed ? 'badge-success' : 'badge-error'}">${r.passed ? 'PASS' : 'FAIL'}</span> `
+        + `${escapeHtml(r.label)}`
+        + (r.detail ? `<div class="test-suite-detail">${escapeHtml(r.detail)}</div>` : '')
+        + `</div>`).join('');
+    box.innerHTML = `<div class="test-suite-summary">${passed}/${data.results.length} passed on `
+        + `${escapeHtml(data.document || 'last run')}</div>${rows}`;
 }

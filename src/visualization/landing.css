@@ -2292,3 +2292,27 @@ body.viewer-open-fullscreen {
 }
 
 
+
+/* Output expectations & test questions (TASK-107) */
+.test-suite-questions {
+    height: auto;
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+}
+
+.test-suite-results {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.test-suite-summary {
+    font-weight: 600;
+}
+
+.test-suite-detail {
+    margin-left: 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+}

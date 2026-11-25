@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from src.dom import DocumentDOM
 from src.pipeline.decision_tree import DEFAULT_TARGET_CONFIDENCE_THRESHOLD
 from src.pipeline.planner.models import DocumentPlan, PlannerCriteria
+from src.pipeline.server.router import api_router
 from src.pipeline.server.routes.base import BaseApiRoutesMixin, logger
+from src.quality.test_suite_check import list_templates, run_test_suite_check
 
 if TYPE_CHECKING:
     from src.pipeline.execution_models import PipelineExecutionResult
@@ -30,11 +32,27 @@ class ExecutionRoutesMixin(BaseApiRoutesMixin):
     """Mixin handling live document pipeline execution and rerun endpoints."""
 
     def _run_visual_test_suite_check(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """No-op hook for evaluating expectations and Q&A questions configured in the Web Hub UI."""
-        # TODO(TASK-107): Evaluate expected section headers, table checks, and plain-English retrieval
-        # questions submitted from the Web Hub 'Define Output Expectations & Test Questions' UI card.
-        _ = payload
-        return []
+        """Evaluates Web Hub output expectations and test questions against the session's parsed document."""
+        raw_dom = (self.session.current_result or {}).get("dom")
+        if not raw_dom:
+            raise ValueError("No parsed document in session; run the pipeline first.")
+        dom = raw_dom if isinstance(raw_dom, DocumentDOM) else DocumentDOM.from_dict(raw_dom)
+        return run_test_suite_check(dom, payload)
+
+    @api_router.get("/api/test_templates")
+    def _handle_get_test_templates(self, query_params: Dict[str, List[str]]) -> None:
+        """Lists the domain assertion templates (TASK-108) for the Web Hub dropdown."""
+        self.send_ok({"templates": list_templates()})
+
+    @api_router.post("/api/test_suite_check")
+    def _handle_post_test_suite_check(self, payload: Dict[str, Any]) -> None:
+        """Returns pass/fail for every output expectation and test question in payload."""
+        try:
+            results = self._run_visual_test_suite_check(payload)
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_bad_request(str(e))
+            return
+        self.send_ok({"document": Path(self.session.pdf_path or "").name, "results": results})
 
     def _run_fast_layout_preview(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """No-op hook for instant bounding-box layout preview in the Web Hub and Viewer UI."""

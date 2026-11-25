@@ -178,6 +178,36 @@
                     </div>
                 </div>
 
+                <div class="form-section test-suite-card">
+                    <div class="section-header">
+                        <div class="section-title">Output expectations &amp; test questions</div>
+                    </div>
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="input-label" for="tsTemplate">Domain template</label>
+                            <select class="form-select override-select" id="tsTemplate">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="input-label" for="tsHeaders">Required headers (comma-separated)</label>
+                            <input type="text" class="input-text" id="tsHeaders" placeholder="e.g. Overview, Volume Discounts">
+                        </div>
+                        <div class="form-group">
+                            <label class="input-label" for="tsMinColumns">Min table columns</label>
+                            <input type="number" class="input-text" id="tsMinColumns" min="0" placeholder="e.g. 3">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label" for="tsQuestions">Test questions, one per line: question =&gt; expected answer</label>
+                        <textarea class="input-text test-suite-questions" id="tsQuestions" rows="4"
+                            placeholder="What is the EU price for the Team tier effective Q3? => 11.90"></textarea>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="runOutputTestSuiteCheck(false)">Check last
+                        run</button>
+                    <div class="test-suite-results" id="testSuiteResults"></div>
+                </div>
+
                 <div class="card-footer">
                     <span class="badge badge-idle" id="inputStatusBadge">Ready</span>
                     <div class="card-footer-actions">
