@@ -1,0 +1,230 @@
+{
+    "suite_name": "retrieval_benchmark",
+    "chunk_size_chars": 1000,
+    "chunk_overlap_chars": 150,
+    "min_pass_rate": 1.0,
+    "questions": [
+        {
+            "question_id": "q01",
+            "question": "What is the monthly list price per TB for the Business tier in the United Kingdom?",
+            "expected_answer_substrings": [
+                "15.10"
+            ],
+            "expected_source_docs": [
+                "doc_pricing_matrix.md"
+            ],
+            "distractor_substrings": [
+                "17.45",
+                "19.80"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "column_shift_in_table"
+        },
+        {
+            "question_id": "q02",
+            "question": "How much does Archive storage cost per TB per month in Asia-Pacific?",
+            "expected_answer_substrings": [
+                "2.44"
+            ],
+            "expected_source_docs": [
+                "doc_pricing_matrix.md"
+            ],
+            "distractor_substrings": [
+                "26.25"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "row_merge_in_table"
+        },
+        {
+            "question_id": "q03",
+            "question": "What is the EU price for the Team tier effective Q3?",
+            "expected_answer_substrings": [
+                "11.90"
+            ],
+            "expected_source_docs": [
+                "doc_pricing_matrix.md"
+            ],
+            "distractor_substrings": [
+                "12.50"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "lost_footnote"
+        },
+        {
+            "question_id": "q04",
+            "question": "What is the minimum commitment period for Archive tier storage?",
+            "expected_answer_substrings": [
+                "9 months"
+            ],
+            "expected_source_docs": [
+                "doc_pricing_matrix.md"
+            ],
+            "distractor_substrings": [
+                "36 months"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "footnote_merged_into_body"
+        },
+        {
+            "question_id": "q05",
+            "question": "What is the 15-minute STEL for n-butyl acetate?",
+            "expected_answer_substrings": [
+                "145 ppm"
+            ],
+            "expected_source_docs": [
+                "doc_safety_protocol.md"
+            ],
+            "distractor_substrings": [
+                "260 ppm",
+                "330 ppm"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "row_merge_in_table"
+        },
+        {
+            "question_id": "q06",
+            "question": "What is the maximum allowed meter reading for the drum bonding check?",
+            "expected_answer_substrings": [
+                "10 ohms"
+            ],
+            "expected_source_docs": [
+                "doc_safety_protocol.md"
+            ],
+            "distractor_substrings": [
+                "25 ohms"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "detached_section_header"
+        },
+        {
+            "question_id": "q07",
+            "question": "How long must staff wait before re-entering the Mixing Hall after a ventilation alarm?",
+            "expected_answer_substrings": [
+                "47 minutes"
+            ],
+            "expected_source_docs": [
+                "doc_safety_protocol.md"
+            ],
+            "distractor_substrings": [
+                "31 minutes"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "detached_section_header"
+        },
+        {
+            "question_id": "q08",
+            "question": "What is the maximum pump flow rate when transferring methyl ethyl ketone?",
+            "expected_answer_substrings": [
+                "19 liters per minute"
+            ],
+            "expected_source_docs": [
+                "doc_safety_protocol.md"
+            ],
+            "distractor_substrings": [
+                "38 liters per minute"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "lost_callout"
+        },
+        {
+            "question_id": "q09",
+            "question": "What was Brightwater's operating income in FY2024?",
+            "expected_answer_substrings": [
+                "20,475"
+            ],
+            "expected_source_docs": [
+                "doc_annual_summary.md"
+            ],
+            "distractor_substrings": [
+                "18,670",
+                "25,445"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "column_shift_in_table"
+        },
+        {
+            "question_id": "q10",
+            "question": "What is Brightwater's restated revenue for FY2024?",
+            "expected_answer_substrings": [
+                "198,140"
+            ],
+            "expected_source_docs": [
+                "doc_annual_summary.md"
+            ],
+            "distractor_substrings": [
+                "201,355"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "lost_footnote"
+        },
+        {
+            "question_id": "q11",
+            "question": "What return on capital employed has the board targeted for FY2026?",
+            "expected_answer_substrings": [
+                "11.3 percent"
+            ],
+            "expected_source_docs": [
+                "doc_annual_summary.md"
+            ],
+            "distractor_substrings": [
+                "8.7 percent"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "footnote_merged_into_body"
+        },
+        {
+            "question_id": "q12",
+            "question": "How many individual people did Brightwater employ at the end of FY2025, not counting on an FTE basis?",
+            "expected_answer_substrings": [
+                "1,412"
+            ],
+            "expected_source_docs": [
+                "doc_annual_summary.md"
+            ],
+            "distractor_substrings": [
+                "1,268"
+            ],
+            "top_k": 3,
+            "failure_mode_tested": "lost_callout"
+        },
+        {
+            "question_id": "q13",
+            "question": "What is the name of the storage product covered by the Halvorsen price list?",
+            "expected_answer_substrings": [
+                "Stratus Object Storage"
+            ],
+            "expected_source_docs": [
+                "doc_pricing_matrix.md"
+            ],
+            "distractor_substrings": [],
+            "top_k": 3,
+            "failure_mode_tested": "control"
+        },
+        {
+            "question_id": "q14",
+            "question": "What is the document number of the Kestrel Ridge solvent transfer protocol?",
+            "expected_answer_substrings": [
+                "SP-118"
+            ],
+            "expected_source_docs": [
+                "doc_safety_protocol.md"
+            ],
+            "distractor_substrings": [],
+            "top_k": 3,
+            "failure_mode_tested": "control"
+        },
+        {
+            "question_id": "q15",
+            "question": "In which city is Brightwater Marine Logistics headquartered?",
+            "expected_answer_substrings": [
+                "Tauranga"
+            ],
+            "expected_source_docs": [
+                "doc_annual_summary.md"
+            ],
+            "distractor_substrings": [],
+            "top_k": 3,
+            "failure_mode_tested": "control"
+        }
+    ]
+}

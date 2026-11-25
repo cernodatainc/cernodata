@@ -254,6 +254,7 @@ async function onPipelineCompleted(result) {
     if (pctText) pctText.textContent = '100%';
     const stepText = document.getElementById('progressCurrentStepText');
     if (stepText) stepText.textContent = 'Ingestion and verification finished.';
+    if (typeof runOutputTestSuiteCheck === 'function') runOutputTestSuiteCheck(true);
     const statusBadge = document.getElementById('progressStatusBadge');
     if (statusBadge) {
         statusBadge.textContent = 'COMPLETED';

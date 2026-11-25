@@ -11,6 +11,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof loadPreviousRunsList === 'function') loadPreviousRunsList();
     if (typeof loadFileRunMappings === 'function') loadFileRunMappings();
     if (typeof refreshResultsData === 'function') refreshResultsData();
+    if (typeof loadTestTemplates === 'function') loadTestTemplates();
     if (typeof loadRunsGrid === 'function') loadRunsGrid();
     if (typeof updateNextStepHints === 'function') updateNextStepHints();
     if (typeof initCustomPresetBuilderModal === 'function') initCustomPresetBuilderModal();

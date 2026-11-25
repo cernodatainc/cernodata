@@ -1,0 +1,42 @@
+{
+  "description": "Research paper or thesis chapter: standard IMRaD sections and numbered figure/table captions.",
+  "required_headers": [
+    {
+      "text": "Abstract",
+      "description": "Summary section near the start of the paper."
+    },
+    {
+      "text": "Introduction",
+      "description": "Opening section stating the problem and contribution."
+    },
+    {
+      "text": "\\b(?:Methods|Methodology|Materials and Methods)\\b",
+      "is_regex": true,
+      "description": "Methods section under any of its common names."
+    },
+    {
+      "text": "\\b(?:References|Bibliography)\\b",
+      "is_regex": true,
+      "description": "Reference list at the end of the paper."
+    }
+  ],
+  "regex_rules": [
+    {
+      "pattern": "(?i)^(figure|fig\\.|table)\\s*\\d+",
+      "node_type": "paragraph",
+      "min_matches": 1,
+      "description": "At least one numbered caption such as 'Figure 1' or 'Table 2', at the start of a paragraph (Docling emits captions as paragraph nodes)."
+    },
+    {
+      "pattern": "\\[\\d+(?:[,\\u2013-]\\s*\\d+)*\\]|\\([A-Z][A-Za-z-]+(?: et al\\.)?,? \\d{4}\\)",
+      "node_type": "paragraph",
+      "min_matches": 3,
+      "description": "In-text citations in numeric '[3]' or author-year '(Smith et al., 2021)' style."
+    }
+  ],
+  "table_rules": [],
+  "min_node_counts": {
+    "heading": 5,
+    "paragraph": 10
+  }
+}

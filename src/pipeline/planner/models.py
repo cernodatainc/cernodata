@@ -129,8 +129,8 @@ class IngestionConfig(ExtensibleOptionsMixin):
     verification_layers: Optional[List[str]] = None
     custom_presets_path: Optional[str] = None
     options: Dict[str, Any] = field(default_factory=dict)
-    # TODO(stride): Extend `IngestionConfig` with optional paths/flags for `test_suite_path` (TASK-107),
-    # `postprocess_steps` (TASK-506), and `template_hint_path` (TASK-903).
+    # TODO(stride): Extend `IngestionConfig` with optional paths/flags for
+    # `postprocess_steps` (TASK-506) and `template_hint_path` (TASK-903).
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> IngestionConfig:

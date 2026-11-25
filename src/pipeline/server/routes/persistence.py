@@ -77,7 +77,8 @@ class PersistenceRoutesMixin(BaseApiRoutesMixin):
 
         # Keep server-side preset cache synchronized with saved DOM
         if self.session.current_result:
-            pdf_path = self.session.pdf_path or dom_data.get("source_filename") or ""
+            # Key by the saved DOM's own document so a stale viewer cannot overwrite another document's cache
+            pdf_path = dom_data.get("source_filename") or self.session.pdf_path or ""
             chosen_preset = (
                 (decision_data.get("chosen_preset") if isinstance(decision_data, dict) else None)
                 or (self.session.current_result.get("decision", {}).get("chosen_preset") if isinstance(self.session.current_result.get("decision"), dict) else None)

@@ -1,0 +1,39 @@
+{
+  "description": "Commercial agreement or contract: definitions, governing law, numbered clauses, and signature blocks.",
+  "required_headers": [
+    {
+      "text": "\\b(?:Definitions|Interpretation)\\b",
+      "is_regex": true,
+      "description": "Section defining the capitalised terms used in the agreement."
+    },
+    {
+      "text": "\\b(?:Governing Law|Applicable Law|Jurisdiction)\\b",
+      "is_regex": true,
+      "description": "Clause naming the law and courts that govern the agreement."
+    }
+  ],
+  "regex_rules": [
+    {
+      "pattern": "^\\s*(?:\\d+\\.){1,3}\\d*\\s+\\S",
+      "node_type": "paragraph",
+      "min_matches": 5,
+      "description": "Numbered clauses such as '4.2 The Supplier shall...' kept at the start of their paragraph."
+    },
+    {
+      "pattern": "(?i)\\b(signature|signed by|for and on behalf of|authori[sz]ed signatory)\\b",
+      "node_type": "paragraph",
+      "min_matches": 2,
+      "description": "Signature blocks for at least two parties."
+    },
+    {
+      "pattern": "(?i)\\b(date|dated)\\s*:?\\s*(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}|_{3,})",
+      "node_type": "paragraph",
+      "min_matches": 1,
+      "description": "A dated or blank date line next to the signatures."
+    }
+  ],
+  "table_rules": [],
+  "min_node_counts": {
+    "heading": 3
+  }
+}
