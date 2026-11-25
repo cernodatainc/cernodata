@@ -1,0 +1,65 @@
+name: Feature proposal
+description: Suggest a new feature or improvement for Cernodata. Maintainers will decide whether it fits the project before any work starts.
+title: "[Feature]: "
+labels: ["feature"]
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve Cernodata!
+
+        **How this works**
+        - A proposal is a question: *"Do you want this in the project?"* It is not a request to merge ready-made code.
+        - Every new proposal goes to **Triage** first. The maintainers may ask follow-up questions here, so please keep an eye on this issue.
+        - **Please don't start coding or open a pull request until the proposal is accepted and assigned to you.**
+        - If the proposal is accepted, it moves to the Backlog. Larger features may be split into smaller sub-issues first.
+        - If it doesn't fit the direction of the project, we will close it as *not planned* and explain why.
+        - Please keep all questions and discussion in this issue, not in private messages, so the full context stays in the repository.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you start
+      options:
+        - label: I have searched the existing issues and this feature has not been proposed yet.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem would this feature solve? Who would benefit from it and in what situation?
+      placeholder: I often need to ..., but currently I have to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you would like to happen. Focus on the behavior, not on the code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other solutions or workarounds you have thought about, and why they are not enough.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Examples, mockups, links or anything else that helps explain the proposal. You can drag and drop files here.
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Would you like to implement this feature yourself?
+      description: |
+        If the proposal is accepted, a maintainer will assign it to you. Then fork the repository and open a draft pull request with `Closes #<issue number>` in the description. Please wait for the assignment before you start.
+        Limits: new contributors can have **1** assigned task at a time, and **2** after their first merged PR. If no PR is opened within **14 days** of the assignment, the issue goes back to the Backlog.
+      options:
+        - label: I want to implement this feature myself.
