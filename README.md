@@ -99,3 +99,6 @@ Verify code hygiene, static typing, and test suites:
 ```bash
 python src/meta_checks/check_all.py
 ```
+## Contributing
+
+Contributions are welcome! Whether you want to fix a bug, propose a feature or pick up an open task, please read our [Contributing guide](CONTRIBUTING.md) first. It explains how to get started and what we expect from pull requests.
