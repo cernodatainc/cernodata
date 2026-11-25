@@ -1,0 +1,34 @@
+{
+  "description": "Component or product datasheet: specification tables with parameters, values, and physical units.",
+  "required_headers": [
+    {
+      "text": "\\b(?:Specifications?|Electrical Characteristics|Technical Data|Ratings)\\b",
+      "is_regex": true,
+      "description": "Section introducing the parameter tables."
+    }
+  ],
+  "regex_rules": [
+    {
+      "pattern": "\\d(?:[\\d.,]*\\d)?\\s?(?:[mk\\u00b5u]?(?:V|A|W|Hz|\\u03a9|F)|mm|cm|kg|g|\\u00b0C|%|dB)(?![A-Za-z])",
+      "node_type": "table_grid",
+      "min_matches": 5,
+      "description": "Values with units such as '3.3 V', '25 mA', '-40 °C' inside tables."
+    },
+    {
+      "pattern": "(?i)\\b(min|typ|max|nominal)\\b",
+      "node_type": "table_grid",
+      "min_matches": 1,
+      "description": "Min/typ/max style columns of a parameter table."
+    }
+  ],
+  "table_rules": [
+    {
+      "min_columns": 2,
+      "min_rows": 2,
+      "description": "Every table has a parameter column and at least one value column, with two or more data rows."
+    }
+  ],
+  "min_node_counts": {
+    "table_grid": 1
+  }
+}

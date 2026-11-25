@@ -1,0 +1,34 @@
+{
+  "description": "Invoice, balance sheet, or short financial statement: document header, currency amounts, and an amounts table.",
+  "required_headers": [
+    {
+      "text": "\\b(?:Invoice|Balance Sheet|Statement of Financial Position|Income Statement|Profit and Loss)\\b",
+      "is_regex": true,
+      "description": "Document title identifying the kind of financial record."
+    }
+  ],
+  "regex_rules": [
+    {
+      "pattern": "(?i)(?:[$\\u20ac\\u00a3]\\s?\\d[\\d,.\\s]*\\d|\\d[\\d,.\\s]*\\d\\s?(?:USD|EUR|GBP|PLN|z\\u0142))",
+      "node_type": "paragraph",
+      "min_matches": 1,
+      "description": "At least one currency amount in body text, e.g. '$1,450.00' or '1 450,00 PLN'."
+    },
+    {
+      "pattern": "(?i)\\b(total|amount due|balance due|net amount)\\b",
+      "node_type": "paragraph",
+      "min_matches": 1,
+      "description": "A total or amount-due line outside the table."
+    }
+  ],
+  "table_rules": [
+    {
+      "min_columns": 2,
+      "min_rows": 1,
+      "description": "Every table has a label column and at least one value column, with at least one data row."
+    }
+  ],
+  "min_node_counts": {
+    "table_grid": 1
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "description": "Regulatory filing or government form: form identifier, statutory references, and disclosure sections.",
+  "required_headers": [
+    {
+      "text": "\\b(?:Disclosures?|Risk Factors|Statement of Compliance|Declaration)\\b",
+      "is_regex": true,
+      "description": "At least one disclosure or declaration section."
+    }
+  ],
+  "regex_rules": [
+    {
+      "pattern": "(?i)\\bform\\s+[A-Z0-9][A-Z0-9-]*\\b",
+      "node_type": "paragraph",
+      "min_matches": 1,
+      "description": "A form identifier such as 'Form 10-K' or 'Form W-9'."
+    },
+    {
+      "pattern": "(?i)(\\u00a7\\s?\\d+|\\b(section|article|regulation|directive)\\s+\\d+[\\w.()/-]*|\\b\\d+\\s+U\\.S\\.C\\.)",
+      "node_type": "paragraph",
+      "min_matches": 2,
+      "description": "Statutory references such as '§ 13(a)', 'Article 6(1)', or '15 U.S.C. 78m'."
+    }
+  ],
+  "table_rules": [],
+  "min_node_counts": {
+    "heading": 2
+  }
+}
