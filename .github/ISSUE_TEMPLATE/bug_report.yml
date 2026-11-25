@@ -1,0 +1,93 @@
+name: Bug report
+description: Report a problem in Cernodata. A maintainer will review it before any work starts.
+title: "[Bug]: "
+labels: ["bug"]
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+        **How this works**
+        - A maintainer will check whether it is a real bug or intended behavior.
+        - **Please don't start working on a fix or open a pull request until a maintainer has confirmed the bug and assigned it to you.** This way nobody spends time on a PR we can't merge, and two people don't fix the same thing.
+        - Please keep all questions and discussion in this issue, not in private messages, so the full context stays in the repository.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you start
+      options:
+        - label: I have searched the existing issues and this bug has not been reported yet.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+      placeholder: When I run ..., the program ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps we need to follow to see the bug. A minimal example is the most helpful.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and error messages
+      description: Paste any relevant output or stack trace. It will be formatted as code automatically, so there is no need for backticks.
+      render: shell
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your operating system and any relevant runtime or dependency versions.
+      placeholder: |
+        - OS: e.g. Ubuntu 24.04
+        - Runtime version: e.g. Python 3.12
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, sample files or anything else that helps explain the problem. You can drag and drop files here.
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Would you like to fix this bug yourself?
+      description: |
+        If a maintainer confirms the bug, they will assign it to you and you can start working on it. Please wait for the assignment before opening a PR.
+        Limits: new contributors can have **1** assigned task at a time, and **2** after their first merged PR. If no PR is opened within **14 days** of the assignment, the issue goes back to the Backlog.
+      options:
+        - label: I want to fix this bug myself.
+        
